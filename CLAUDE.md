@@ -72,7 +72,8 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless
 
 - Work milestone by milestone from `docs/PLAN.md`; tick items off there.
 - For non-trivial features, plan first (plan mode), then implement, then run the tests, then the `cpp-reviewer` agent.
-- Agents in `.claude/agents/`: `songbook-latex` (LaTeX/song format, builds, linters), `chords-converter` (the Rust CLI), `cpp-reviewer` (read-only review of C++ changes).
+- Agents in `.claude/agents/`: `songbook-latex` (LaTeX/song format, builds, linters), `chords-converter` (the Rust CLI), `cpp-reviewer` (read-only review of C++ changes), `cpp-implementer` (Sonnet, writes code from a precise spec).
+- Division of labour (an experiment, started at milestone 2): the main session designs APIs and does cross-cutting work; well-specified implementation goes to `cpp-implementer`; `cpp-reviewer` (Opus) reviews. Compare cost and quality per milestone and adjust.
 - Skills: `/preview-song <path>`, `/import-song <url>`, `/new-feature <description>`.
 
 ## Open decisions
