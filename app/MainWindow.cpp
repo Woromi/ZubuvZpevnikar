@@ -1,5 +1,6 @@
 #include "MainWindow.hpp"
 
+#include "ImportDialog.hpp"
 #include "PreviewPane.hpp"
 #include "PreviewRunner.hpp"
 #include "SongEditor.hpp"
@@ -14,6 +15,7 @@
 #include <QComboBox>
 #include <QDir>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QHeaderView>
 #include <QKeySequence>
 #include <QLabel>
@@ -22,6 +24,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
 #include <QStandardPaths>
@@ -36,12 +39,14 @@
 #include <zub/core/preview.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/song.hpp>
+#include <zub/core/songimport.hpp>
 #include <zub/core/textfile.hpp>
 
 namespace {
 
 const auto songbookPathKey = QStringLiteral("songbook/path");
 const auto previewClassKey = QStringLiteral("preview/class");
+const auto converterKey = QStringLiteral("converter/path");
 const auto geometryKey = QStringLiteral("window/geometry");
 const auto splitterKey = QStringLiteral("window/splitter");
 
@@ -95,6 +100,10 @@ void MainWindow::createMenus() {
 
     QAction* closeSong = file->addAction(tr("&Close Song"));
     closeSong->setShortcut(QKeySequence::Close);
+
+    QAction* import = file->addAction(tr("&Import Song…"));
+    import->setShortcut(QKeySequence(QStringLiteral("Ctrl+I")));
+    connect(import, &QAction::triggered, this, &MainWindow::importSong);
     connect(closeSong, &QAction::triggered, this, [this] {
         if (tabs_->currentIndex() >= 0)
             closeTab(tabs_->currentIndex());
@@ -304,13 +313,10 @@ void MainWindow::openSong(const QModelIndex& proxyIndex) {
     if (!song)
         return;
 
-    for (int i = 0; i < tabs_->count(); ++i) {
-        auto* editor = qobject_cast<SongEditor*>(tabs_->widget(i));
-        if (editor && editor->path() == song->path) {
-            tabs_->setCurrentIndex(i);
-            editor->textEdit()->setFocus();
-            return;
-        }
+    if (SongEditor* open = findEditor(song->path)) {
+        tabs_->setCurrentWidget(open);
+        open->textEdit()->setFocus();
+        return;
     }
 
     auto* editor = new SongEditor(song->path, *repository_, tabs_);
@@ -319,10 +325,24 @@ void MainWindow::openSong(const QModelIndex& proxyIndex) {
         QMessageBox::warning(this, tr("Cannot open song"), loaded.error());
         return;
     }
+    addEditorTab(editor, toQString(zub::latex::toDisplayText(song->meta.title)),
+                 toQString(song->inputName));
+}
+
+SongEditor* MainWindow::findEditor(const std::filesystem::path& path) const {
+    for (int i = 0; i < tabs_->count(); ++i) {
+        auto* editor = qobject_cast<SongEditor*>(tabs_->widget(i));
+        if (editor && editor->path() == path)
+            return editor;
+    }
+    return nullptr;
+}
+
+void MainWindow::addEditorTab(SongEditor* editor, const QString& title, const QString& toolTip) {
     // The tab label is the editor's window title plus a "*" while modified.
-    editor->setWindowTitle(toQString(zub::latex::toDisplayText(song->meta.title)));
+    editor->setWindowTitle(title);
     const int index = tabs_->addTab(editor, QString{});
-    tabs_->setTabToolTip(index, toQString(song->inputName));
+    tabs_->setTabToolTip(index, toolTip);
     updateTabTitle(editor);
     tabs_->setCurrentIndex(index);
     editor->textEdit()->setFocus();
@@ -389,7 +409,8 @@ bool MainWindow::closeTab(int index) {
         return false;
     // No more reload dialogs from a tab that is gone but not yet deleted.
     editor->stopWatching();
-    tabs_->removeTab(tabs_->indexOf(editor)); // the index may have moved during the dialog
+    approvedConstructs_.erase(editor->path()); // approvals last as long as the tab
+    tabs_->removeTab(tabs_->indexOf(editor));  // the index may have moved during the dialog
     editor->deleteLater();
     return true;
 }
@@ -439,7 +460,12 @@ void MainWindow::refreshSongMetadata(SongEditor* editor, const std::string& cont
     }
     editor->setWindowTitle(toQString(zub::latex::toDisplayText(meta->title)));
     updateTabTitle(editor);
-    model_->updateSong(editor->path(), std::move(*meta));
+    tabs_->setTabToolTip(tabs_->indexOf(editor), toQString(inputNameOf(editor)));
+    if (!model_->updateSong(editor->path(), *meta)) {
+        // A new song's first save: it joins the table now.
+        model_->addSong({editor->path(), inputNameOf(editor), std::move(*meta)});
+        updateLanguageFilter();
+    }
 }
 
 void MainWindow::createPreview() {
@@ -541,4 +567,107 @@ void MainWindow::requestPreview(bool userAsked) {
 void MainWindow::requestPreviewIfCurrent(SongEditor* editor) {
     if (editor == currentEditor())
         requestPreview();
+}
+
+std::filesystem::path MainWindow::findConverter() const {
+    const auto usable = [](const QString& path) {
+        const QFileInfo info(path);
+        // Absolute only: PATH may contain "." or empty entries.
+        return !path.isEmpty() && info.isAbsolute() && info.isFile() && info.isExecutable();
+    };
+    QStringList candidates{
+        QSettings{}.value(converterKey).toString(),
+        QStandardPaths::findExecutable(QStringLiteral("chords_converter")),
+        // cargo install puts it here, which is not always on PATH for GUI apps
+        QDir::home().filePath(QStringLiteral(".cargo/bin/chords_converter")),
+    };
+    if (!songbookRoot_.empty()) {
+        // The sibling checkout next to the songbook: ../chords_converter
+        candidates << toQString(songbookRoot_.parent_path() / "chords_converter" / "target" /
+                                "release" / "chords_converter");
+    }
+    for (const QString& candidate : candidates) {
+        if (usable(candidate))
+            return toPath(candidate);
+    }
+    return {};
+}
+
+void MainWindow::importSong() {
+    if (songbookRoot_.empty()) {
+        QMessageBox::information(this, tr("Import Song"), tr("Open a songbook folder first."));
+        return;
+    }
+    ImportDialog dialog(findConverter(), this);
+    const int result = dialog.exec();
+    // Remember only a converter the user picked: a remembered automatic find would shadow a
+    // newer build found later.
+    if (dialog.converterChosen())
+        QSettings{}.setValue(converterKey, toQString(dialog.converter()));
+    if (result != QDialog::Accepted)
+        return;
+    const zub::songimport::Imported& imported = dialog.imported();
+
+    const auto dest = zub::songimport::destination(songbookRoot_, imported.inputName);
+    std::filesystem::path target = dest.path;
+    if (const auto existing = zub::songimport::existingSong(songbookRoot_, imported.inputName)) {
+        QMessageBox box(QMessageBox::Question, tr("Song already exists"),
+                        tr("The songbook already has %1.")
+                            .arg(toQString(existing->lexically_relative(songbookRoot_))),
+                        QMessageBox::Cancel, this);
+        box.setInformativeText(tr("Open the existing song, or open the import in its place "
+                                  "(nothing is overwritten until you save, and saving asks)?"));
+        QPushButton* openExisting = box.addButton(tr("Open Existing"), QMessageBox::AcceptRole);
+        QPushButton* importAnyway =
+            box.addButton(tr("Import Anyway"), QMessageBox::DestructiveRole);
+        box.setDefaultButton(openExisting);
+        box.exec();
+        if (box.clickedButton() == openExisting) {
+            if (SongEditor* open = findEditor(*existing)) {
+                tabs_->setCurrentWidget(open);
+            } else {
+                auto* editor = new SongEditor(*existing, *repository_, tabs_);
+                if (auto loaded = editor->load(); !loaded) {
+                    delete editor;
+                    QMessageBox::warning(this, tr("Cannot open song"), loaded.error());
+                    return;
+                }
+                // A song whose header does not parse still opens, titled by its file name.
+                const auto meta = zub::parseSong(editor->content());
+                addEditorTab(editor,
+                             meta ? toQString(zub::latex::toDisplayText(meta->title))
+                                  : toQString(existing->stem()),
+                             toQString(existing->lexically_relative(songbookRoot_)));
+            }
+            return;
+        }
+        if (box.clickedButton() != importAnyway)
+            return;
+        target = *existing;
+    }
+    if (SongEditor* open = findEditor(target)) {
+        tabs_->setCurrentWidget(open);
+        QMessageBox::information(this, tr("Import Song"),
+                                 tr("This song is already open. Close it first to import it "
+                                    "again."));
+        return;
+    }
+
+    // Downloaded content is untrusted: it must not inherit "build anyway" approvals given
+    // earlier in the session to whatever was at this path.
+    approvedConstructs_.erase(target);
+    auto* editor = new SongEditor(target, *repository_, tabs_);
+    editor->openNew(imported.content);
+    const auto meta = zub::parseSong(imported.content);
+    const QString title =
+        meta ? toQString(zub::latex::toDisplayText(meta->title)) : toQString(target.stem());
+    addEditorTab(editor, title, toQString(dest.inputName) + tr(" (imported, not saved)"));
+    QStringList notes;
+    for (const std::string& warning : imported.warnings)
+        notes << toQString(warning);
+    statusBar()->showMessage(
+        notes.isEmpty()
+            ? tr("Imported %1. Check it, then save with Ctrl+S.").arg(toQString(imported.inputName))
+            : notes.join(QStringLiteral(" ")),
+        10000);
 }

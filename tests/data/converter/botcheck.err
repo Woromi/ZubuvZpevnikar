@@ -1,0 +1,11 @@
+Could not fetch http://127.0.0.1:8765/akordy.kytary.cz/x — the site answered with a bot check rather than the song.
+It is solved by running the challenge's JavaScript, which this tool does not do, so there are two ways round it:
+
+1. Open the page in a browser, save it (Ctrl-S), and pass the saved file instead:
+       chords_converter page.html latex
+
+2. Lend this tool the clearance your browser already holds. In the browser, on that site: DevTools → Application (Storage) → Cookies, and copy the `cf_clearance` value; the user agent has to be the same browser's, which `navigator.userAgent` in the console prints:
+       export CHORDS_COOKIE='cf_clearance=<value>'
+       export CHORDS_USER_AGENT='<what navigator.userAgent printed>'
+
+The cookie is tied to that browser and address and lasts a while, not forever — when it lapses, copy it again or fall back on 1.

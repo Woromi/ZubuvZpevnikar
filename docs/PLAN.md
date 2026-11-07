@@ -39,10 +39,11 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 
 ## 4. Import from a URL
 
-- [ ] Decide how to call the converter (see Open decisions in CLAUDE.md). Start with the subprocess.
-- [ ] core: run `chords_converter <url> latex`, locate the output, report bot-check errors clearly.
-- [ ] app: "Import from URL" dialog → opens the result in the editor as a new, unsaved song with a proposed path.
-- [ ] Warn if the song already exists.
+- [x] The converter runs as a subprocess (`chords_converter <source> latex`) in a fresh temp dir; no changes to that repo needed.
+- [x] core (`zub::songimport`): prepare the run, interpret exit code/stdout/stderr (bot check, unsupported site, network, HTTP, invalid input; exit 0 without a written file is a failure), read the output, find the destination and an existing song (case-insensitive). Tests on real captured converter outputs.
+- [x] app: File → Import Song… (Ctrl+I): URL or saved page, cancel, optional cookie/user agent for bot checks; the result opens as a new unsaved tab at `songs/chords/<Artist>/<Title>.tex`; the first save creates the folder and adds it to the table.
+- [x] Existing song: Open Existing or Import Anyway (saving then asks before overwriting).
+- [ ] Rebuild the converter from the app, or warn when its binary is older than its sources.
 
 ## 5. Songbook assembler
 

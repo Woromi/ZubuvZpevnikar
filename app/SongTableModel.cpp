@@ -44,6 +44,13 @@ void SongTableModel::setSongs(std::vector<zub::SongEntry> songs) {
     endResetModel();
 }
 
+void SongTableModel::addSong(zub::SongEntry song) {
+    const int row = static_cast<int>(rows_.size());
+    beginInsertRows({}, row, row);
+    rows_.push_back(makeRow(std::move(song)));
+    endInsertRows();
+}
+
 bool SongTableModel::updateSong(const std::filesystem::path& path, zub::SongMetadata meta) {
     const auto it = std::ranges::find(rows_, path, [](const Row& row) { return row.entry.path; });
     if (it == rows_.end())

@@ -4,6 +4,8 @@ qt_standard_project_setup(REQUIRES 6.5)
 
 qt_add_executable(zubuvzpevnik-ui
     main.cpp
+    ImportDialog.hpp
+    ImportDialog.cpp
     MainWindow.hpp
     MainWindow.cpp
     PreviewPane.hpp

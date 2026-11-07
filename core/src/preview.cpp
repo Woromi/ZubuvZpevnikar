@@ -4,6 +4,7 @@
 #include <cctype>
 #include <charconv>
 #include <system_error>
+#include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
 
 namespace fs = std::filesystem;
@@ -22,33 +23,6 @@ constexpr char kSep = ':';
 std::string utf8(const fs::path& p) {
     const auto u8 = p.generic_u8string();
     return {u8.begin(), u8.end()};
-}
-
-std::optional<std::string> validateInputName(const std::string& name) {
-    const char* const bad = "invalid input name: ";
-    if (name.empty())
-        return std::string(bad) + "empty";
-    if (name.front() == '/')
-        return std::string(bad) + "must be relative";
-    for (const char c : name) {
-        const auto u = static_cast<unsigned char>(c);
-        if (u < 0x20 || u == 0x7F ||
-            std::string_view("\\{}%#$&~^:\"*?<>|").find(c) != std::string_view::npos)
-            return std::string(bad) + "contains a character that is not allowed";
-    }
-    std::size_t start = 0;
-    while (true) {
-        const auto end = name.find('/', start);
-        const auto part = name.substr(start, end == std::string::npos ? end : end - start);
-        if (part.empty() || part == "." || part == "..")
-            return std::string(bad) + "empty, '.' or '..' path component";
-        if (end == std::string::npos)
-            break;
-        start = end + 1;
-    }
-    if (!fs::path(name).is_relative())
-        return std::string(bad) + "must be relative";
-    return std::nullopt;
 }
 
 std::optional<std::string> validateClass(const std::string& cls) {
@@ -205,8 +179,8 @@ bool refersTo(const fs::path& reported, const fs::path& songCopy) {
 } // namespace
 
 std::expected<Command, std::string> prepare(const Request& request) {
-    if (auto err = validateInputName(request.inputName))
-        return std::unexpected(*err);
+    if (const auto reason = invalidInputName(request.inputName))
+        return std::unexpected("invalid input name: " + *reason);
     if (auto err = validateClass(request.documentClass))
         return std::unexpected(*err);
 

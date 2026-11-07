@@ -24,7 +24,7 @@ Key facts from them:
 - Builds need `lualatex -shell-escape` (lyluatex runs `lilypond`), with `TEXINPUTS` pointing at `zubuvzpevnik/`, `songs/chords/`, the repo root and the project dir. See `projects/velkyzpevnik/build.sh`.
 - Song header parsing in `core/` (`zub::parseSong`, `zub::latex::*`) is a port of `scripts/songfile.py`. Keep them in agreement; if one changes, check the other.
 - Linters: `scripts/checksongs.py`, `scripts/checkkeys.py`, `scripts/checkpaper.py` (read-only, except `checkpaper.py --write`).
-- `chords_converter` is binary-only (no `lib.rs`). `cargo run -- <url|file|-> latex` writes `out/latex/<Artist>/<Title>.tex` relative to the **current directory** (with `--manifest-path` from here, that means this repo's ignored `out/`).
+- `chords_converter` is binary-only (no `lib.rs`); the app runs it as a subprocess (`ImportDialog`, `zub::songimport`). It writes `out/latex/<Artist>/<Title>.tex` relative to the **current directory**, prints `Saving output to: <path>`, and exits 0 even when writing failed; captured real outputs are in `tests/data/converter/`. The app finds it via the remembered path, PATH, `~/.cargo/bin`, then `../chords_converter/target/release/` — rebuild it there (`cargo build --release`) after converter changes.
 
 ## Architecture (hard rule)
 
@@ -65,7 +65,7 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless
 
 - **Sibling repos are not ours to restructure.** ZubuvZpevnik has CI and GitHub releases. Never commit, push, or change their layout, scripts or class files without asking. Editing song `.tex` files and project `\input` lists is the app's job and is fine when the task is about that.
 - **Previews never write into `../ZubuvZpevnik/build/`.** Build previews in a temp dir (the app's cache dir, or `tmp/` here). Reuse `build/tmp-ly` only by symlink/read.
-- Don't write in `../chords_converter/` (e.g. adding a `lib.rs`) without asking. See Open decisions.
+- Don't write in `../chords_converter/` (e.g. adding a `lib.rs`) without asking.
 - Song files are Czech-heavy UTF-8. Keep encodings and line endings intact; don't reformat songs.
 - Preview builds run in `QStandardPaths::CacheLocation/preview` (kept between builds for LilyPond's `tmp-ly` cache), from the editor's text via a song copy in `override/` that shadows the real file on TEXINPUTS. Errors come from `lualatex -file-line-error`; real logs for tests are in `tests/data/logs/`.
 - **Songs are code.** Previews run `lualatex -shell-escape`, so `\directlua` etc. in a song would run with the user's rights. `zub::safety::unknownConstructs` checks songs against an allowlist of the commands real songs use (`knownSongCommands`); songs with anything else are never built automatically and only after confirmation. When the song format gains a command, add it to the allowlist (the `[integration]` test fails otherwise). Never weaken this check to make a test pass.
@@ -83,4 +83,4 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless
 
 ## Open decisions
 
-- **How the app calls the converter:** run the CLI as a subprocess (no change to that repo, current plan) vs adding a `lib.rs` + C ABI and linking it (faster, needs changes there). Ask before choosing the second.
+None right now. Record new ones here (what, the options, who decides).

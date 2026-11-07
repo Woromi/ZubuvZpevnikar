@@ -3,6 +3,7 @@
 #include "zub/core/latex.hpp"
 
 #include <cstddef>
+#include <filesystem>
 
 namespace zub {
 
@@ -133,6 +134,32 @@ std::expected<SongMetadata, std::string> parseSong(std::string_view content) {
         meta.keys = parseOptions(tex.substr(optionsOpen + 1, *optionsClose - optionsOpen - 1));
     }
     return meta;
+}
+
+std::optional<std::string> invalidInputName(std::string_view name) {
+    if (name.empty())
+        return "empty";
+    if (name.front() == '/')
+        return "must be relative";
+    for (const char c : name) {
+        const auto u = static_cast<unsigned char>(c);
+        if (u < 0x20 || u == 0x7F ||
+            std::string_view("\\{}%#$&~^:\"*?<>|").find(c) != std::string_view::npos)
+            return "contains a character that is not allowed";
+    }
+    std::size_t start = 0;
+    while (true) {
+        const auto end = name.find('/', start);
+        const auto part = name.substr(start, end == std::string_view::npos ? end : end - start);
+        if (part.empty() || part == "." || part == "..")
+            return "empty, '.' or '..' path component";
+        if (end == std::string_view::npos)
+            break;
+        start = end + 1;
+    }
+    if (!std::filesystem::path(std::u8string(name.begin(), name.end())).is_relative())
+        return "must be relative";
+    return std::nullopt;
 }
 
 } // namespace zub

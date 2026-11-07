@@ -30,6 +30,11 @@ public:
     // stays empty and the message is returned.
     std::expected<void, QString> load();
 
+    // For a song that is not on disk yet (an import): shows `content` as unsaved. The file and
+    // its folder are created by the first save(); if the path exists by then, save() asks
+    // before overwriting it. Nothing is watched until then.
+    void openNew(const std::string& content);
+
     enum class SaveResult { Saved, Cancelled };
 
     // Writes the editor content to the file (zub::writeTextFileAtomic) and clears the
@@ -78,4 +83,5 @@ private:
     bool missing_ = false; // the file vanished from disk
     bool modifiedBeforeMissing_ = false;
     bool stopped_ = false;
+    bool isNew_ = false; // opened with openNew() and not saved yet
 };

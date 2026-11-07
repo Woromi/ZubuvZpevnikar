@@ -2,6 +2,7 @@
 
 #include <expected>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -24,5 +25,9 @@ std::expected<SongMetadata, std::string> parseSong(std::string_view content);
 // Parses the body of a [key={value}, ...] option list. Brace-aware, so values may contain
 // commas, brackets and macros. The last value wins on duplicate keys.
 std::map<std::string, std::string, std::less<>> parseOptions(std::string_view options);
+
+// Why `inputName` ("Artist/Title", relative, '/'-separated, no .tex) cannot name a song the
+// songbook can \input; nullopt if it is fine.
+std::optional<std::string> invalidInputName(std::string_view inputName);
 
 } // namespace zub

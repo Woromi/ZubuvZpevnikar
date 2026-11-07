@@ -85,3 +85,16 @@ TEST_CASE("parseOptions edge cases", "[song]") {
         CHECK(keys.at("by") == "X");
     }
 }
+
+TEST_CASE("invalidInputName", "[song]") {
+    CHECK_FALSE(zub::invalidInputName("Abba/OurLastSummer"));
+    CHECK_FALSE(zub::invalidInputName("Song"));
+    CHECK(zub::invalidInputName("") == "empty");
+    CHECK(zub::invalidInputName("/abs/x") == "must be relative");
+    CHECK(zub::invalidInputName("A/b%c"));
+    CHECK(zub::invalidInputName("A\\B"));
+    CHECK(zub::invalidInputName("A/../B") == "empty, '.' or '..' path component");
+    CHECK(zub::invalidInputName("A//B"));
+    CHECK(zub::invalidInputName("A/"));
+    CHECK(zub::invalidInputName("A/B\n"));
+}

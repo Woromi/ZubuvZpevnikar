@@ -26,6 +26,8 @@ public:
     // Replaces the metadata of the song stored at `path` (e.g. after it was edited).
     // Returns false if no song in the model has that path.
     bool updateSong(const std::filesystem::path& path, zub::SongMetadata meta);
+    // Adds a song (e.g. a newly imported one after its first save).
+    void addSong(zub::SongEntry song);
 
     int rowCount(const QModelIndex& parent = {}) const override;
     int columnCount(const QModelIndex& parent = {}) const override;

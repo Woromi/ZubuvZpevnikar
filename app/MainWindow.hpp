@@ -56,6 +56,10 @@ private:
 
     // Editor tabs
     void openSong(const QModelIndex& proxyIndex);
+    SongEditor* findEditor(const std::filesystem::path& path) const;
+    void addEditorTab(SongEditor* editor, const QString& title, const QString& toolTip);
+    void importSong();
+    std::filesystem::path findConverter() const;
     SongEditor* currentEditor() const;
     void saveCurrent();
     bool closeTab(int index);              // false if the user cancelled

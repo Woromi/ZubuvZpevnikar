@@ -6,6 +6,7 @@ add_library(zub_core STATIC
     src/library.cpp
     src/preview.cpp
     src/safety.cpp
+    src/songimport.cpp
     src/song.cpp
     src/textfile.cpp
     src/version.cpp

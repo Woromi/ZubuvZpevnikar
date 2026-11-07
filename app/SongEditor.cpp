@@ -82,6 +82,13 @@ std::expected<void, QString> SongEditor::load() {
     return {};
 }
 
+void SongEditor::openNew(const std::string& content) {
+    setContent(content); // also refuses content that would not round-trip
+    diskContent_.clear();
+    isNew_ = true;
+    edit_->document()->setModified(true);
+}
+
 std::expected<SongEditor::SaveResult, QString> SongEditor::save() {
     if (lossy_) {
         return std::unexpected(
@@ -89,11 +96,18 @@ std::expected<SongEditor::SaveResult, QString> SongEditor::save() {
                 .arg(toQString(path_.filename()), lossyReason_));
     }
 
-    if (auto onDisk = zub::readTextFile(path_); onDisk && *onDisk != diskContent_) {
-        QMessageBox box(QMessageBox::Warning, tr("Song changed on disk"),
-                        tr("%1 was changed outside the app since you opened it.")
-                            .arg(toQString(path_.filename())),
-                        {}, this);
+    std::error_code existsError;
+    const auto onDisk = zub::readTextFile(path_);
+    // A new song asks whenever something is at its path, even an empty or unreadable file.
+    const bool conflict = isNew_ ? std::filesystem::exists(path_, existsError) || bool(existsError)
+                                 : onDisk && *onDisk != diskContent_;
+    if (conflict) {
+        const QString name = toQString(path_.filename());
+        QMessageBox box(
+            QMessageBox::Warning, isNew_ ? tr("Song already exists") : tr("Song changed on disk"),
+            isNew_ ? tr("%1 already exists.").arg(name)
+                   : tr("%1 was changed outside the app since you opened it.").arg(name),
+            {}, this);
         box.setInformativeText(tr("Overwrite it with your version?"));
         QPushButton* overwrite = box.addButton(tr("Overwrite"), QMessageBox::DestructiveRole);
         QPushButton* cancel = box.addButton(tr("Cancel"), QMessageBox::RejectRole);
@@ -106,12 +120,21 @@ std::expected<SongEditor::SaveResult, QString> SongEditor::save() {
         }
     }
 
+    if (isNew_) {
+        // A new artist gets its folder with the first song.
+        std::error_code ec;
+        std::filesystem::create_directories(path_.parent_path(), ec);
+        if (ec)
+            return std::unexpected(toQString(path_.parent_path()) + QStringLiteral(": ") +
+                                   QString::fromStdString(ec.message()));
+    }
     const std::string bytes = currentContent();
     auto written = zub::writeTextFileAtomic(path_, bytes);
     if (!written) {
         return std::unexpected(toQString(written.error()));
     }
     diskContent_ = bytes;
+    isNew_ = false;
     if (missing_) {
         missing_ = false;
         updateBanner();
