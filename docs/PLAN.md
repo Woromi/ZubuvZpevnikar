@@ -22,9 +22,10 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 
 ## 2. Editor
 
-- [ ] app: open a song in an editor tab (QPlainTextEdit + KSyntaxHighlighting LaTeX definition).
-- [ ] app: save, dirty-state marker, "reload from disk" when the file changes outside the app.
-- [ ] (later) highlighting of chords `\[...]`, and song-part commands.
+- [x] app: open a song in an editor tab (double-click / Enter in the table): QPlainTextEdit + KSyntaxHighlighting LaTeX definition, theme from the palette.
+- [x] Save (Ctrl+S, atomic via `zub::writeTextFileAtomic`, byte-exact: nbsp, tabs, CRLF, missing final newline), `*` dirty marker, Save/Discard/Cancel on closing a tab, the window, or switching songbook; the table row refreshes after saving.
+- [x] Reload when the file changes outside the app (silently if unmodified, asks if modified).
+- [x] Custom syntax definition for songs (`app/syntax/zubuvzpevnik-song.xml`, bundled as a Qt resource): whole chords `\[…]` and `^`, song parts, bar lines/repeats, header keys and values, comments. The stock LaTeX one read `\[D]` as display math.
 
 ## 3. Live preview
 

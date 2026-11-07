@@ -5,6 +5,7 @@ add_library(zub_core STATIC
     src/latex.cpp
     src/library.cpp
     src/song.cpp
+    src/textfile.cpp
     src/version.cpp
 )
 add_library(Zub::core ALIAS zub_core)

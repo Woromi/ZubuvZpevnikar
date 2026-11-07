@@ -66,6 +66,8 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless
 - **Previews never write into `../ZubuvZpevnik/build/`.** Build previews in a temp dir (the app's cache dir, or `tmp/` here). Reuse `build/tmp-ly` only by symlink/read.
 - Don't write in `../chords_converter/` (e.g. adding a `lib.rs`) without asking. See Open decisions.
 - Song files are Czech-heavy UTF-8. Keep encodings and line endings intact; don't reformat songs.
+- Song highlighting is `app/syntax/zubuvzpevnik-song.xml` (KSyntaxHighlighting XML, loaded from the Qt resource path `:/org.kde.syntax-highlighting/syntax-addons`). When the song format gains commands, update it.
+- Saving a song must be byte-exact for the parts not edited. `SongEditor` opens any file that would not round-trip (BOM, invalid UTF-8, mixed line endings, U+2028) read-only; keep that guarantee when touching the editor.
 - No commits unless asked. Small, focused commits when asked.
 
 ## Workflow

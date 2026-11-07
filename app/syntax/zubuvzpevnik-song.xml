@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE language>
+<!--
+  Syntax highlighting for ZubuvZpevnik song files (the `songs` LaTeX package plus the
+  zubuvzpevnik extensions). Bundled into the app as a Qt resource; looked up by name.
+  Stock LaTeX highlighting does not fit: it reads the chord \[G] as display math.
+-->
+<language name="ZubuvZpevnik Song" section="Markup" version="1" kateversion="5.0"
+          extensions="" author="ZubuvZpevnikUi" license="GPL-2.0">
+  <highlighting>
+    <contexts>
+      <context name="Normal" attribute="Normal Text" lineEndContext="#stay">
+        <!-- \[G], \[F#m/C], \[B&], \[] (chord placeholder), \[\nochord] -->
+        <RegExpr attribute="Chord" String="\\\[[^\]]*\]"/>
+        <!-- ^ replays the next memorized chord -->
+        <DetectChar attribute="Chord" char="^"/>
+        <!-- \beginsong{Title}[key={value}, ...] -->
+        <RegExpr attribute="Song Part" String="\\beginsong\b" context="SongTitle"/>
+        <!-- song parts: \beginverse, \endchorus, \beginverse*, \beginverseA, \begininstrumental, ... -->
+        <RegExpr attribute="Song Part" String="\\(begin|end)[a-zA-Z]+\*?"/>
+        <!-- bar lines and repeats in instrumentals -->
+        <DetectChar attribute="Bar" char="|"/>
+        <RegExpr attribute="Bar" String="\\(lrep|rrep|rep|mbar)\b"/>
+        <!-- any other macro, then escaped characters like \& \% \  -->
+        <RegExpr attribute="Command" String="\\[a-zA-Z@]+\*?"/>
+        <RegExpr attribute="Special Character" String="\\."/>
+        <AnyChar attribute="Brace" String="{}"/>
+        <DetectChar attribute="Comment" char="%" context="Comment"/>
+      </context>
+
+      <!-- After \beginsong: the {title}, then optionally [options]. -->
+      <context name="SongTitle" attribute="Normal Text" lineEndContext="#stay"
+               fallthroughContext="#pop">
+        <DetectSpaces/>
+        <DetectChar attribute="Brace" char="{" context="TitleText"/>
+        <DetectChar attribute="Brace" char="[" context="#pop!SongOptions"/>
+        <DetectChar attribute="Comment" char="%" context="Comment"/>
+      </context>
+      <context name="TitleText" attribute="Title" lineEndContext="#stay">
+        <RegExpr attribute="Title" String="\\[a-zA-Z]+|\\."/>
+        <DetectChar attribute="Title" char="{" context="TitleText"/>
+        <DetectChar attribute="Brace" char="}" context="#pop"/>
+      </context>
+
+      <!-- key={value}, ... up to the closing ] (a ] inside a {value} does not end it) -->
+      <context name="SongOptions" attribute="Normal Text" lineEndContext="#stay">
+        <DetectChar attribute="Comment" char="%" context="Comment"/>
+        <RegExpr attribute="Metadata Key" String="[A-Za-z0-9]+(?=\s*=)"/>
+        <DetectChar attribute="Brace" char="{" context="Value"/>
+        <DetectChar attribute="Brace" char="]" context="#pop"/>
+      </context>
+      <context name="Value" attribute="Metadata Value" lineEndContext="#stay">
+        <RegExpr attribute="Metadata Value" String="\\[a-zA-Z]+|\\."/>
+        <DetectChar attribute="Metadata Value" char="{" context="Value"/>
+        <DetectChar attribute="Brace" char="}" context="#pop"/>
+      </context>
+
+      <context name="Comment" attribute="Comment" lineEndContext="#pop"/>
+    </contexts>
+
+    <itemDatas>
+      <itemData name="Normal Text" defStyleNum="dsNormal"/>
+      <!-- dsImport is a distinct orange in the stock light and dark themes -->
+      <itemData name="Chord" defStyleNum="dsImport" bold="1"/>
+      <itemData name="Song Part" defStyleNum="dsKeyword"/>
+      <itemData name="Bar" defStyleNum="dsOperator"/>
+      <itemData name="Command" defStyleNum="dsFunction"/>
+      <itemData name="Special Character" defStyleNum="dsSpecialChar"/>
+      <itemData name="Brace" defStyleNum="dsNormal"/>
+      <itemData name="Title" defStyleNum="dsString" bold="1"/>
+      <itemData name="Metadata Key" defStyleNum="dsAttribute"/>
+      <itemData name="Metadata Value" defStyleNum="dsString"/>
+      <itemData name="Comment" defStyleNum="dsComment"/>
+    </itemDatas>
+  </highlighting>
+  <general>
+    <comments>
+      <comment name="singleLine" start="%"/>
+    </comments>
+  </general>
+</language>

@@ -1,12 +1,9 @@
 #include "zub/core/library.hpp"
 
 #include "zub/core/latex.hpp"
+#include "zub/core/textfile.hpp"
 
 #include <algorithm>
-#include <fstream>
-#include <iterator>
-#include <optional>
-#include <sstream>
 #include <system_error>
 
 namespace fs = std::filesystem;
@@ -16,17 +13,6 @@ namespace zub {
 namespace {
 
 constexpr auto songsSubdir = "songs/chords";
-
-std::optional<std::string> readFile(const fs::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in)
-        return std::nullopt;
-    std::ostringstream buffer;
-    buffer << in.rdbuf();
-    if (in.bad())
-        return std::nullopt;
-    return std::move(buffer).str();
-}
 
 std::size_t countOccurrences(std::string_view text, std::string_view needle) {
     std::size_t count = 0;
@@ -100,7 +86,7 @@ std::expected<Library, std::string> scanLibrary(const fs::path& root) {
             continue;
         }
         for (const auto& file : *files) {
-            const auto content = readFile(file);
+            const auto content = readTextFile(file);
             if (!content) {
                 library.issues.push_back({file, "cannot read the file"});
                 continue;

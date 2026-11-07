@@ -2,6 +2,7 @@
 
 #include "convert.hpp"
 
+#include <algorithm>
 #include <zub/core/latex.hpp>
 
 SongTableModel::SongTableModel(QObject* parent) : QAbstractTableModel(parent) {}
@@ -21,23 +22,38 @@ QString SongTableModel::foldForSearch(const QString& text) {
     return folded.toCaseFolded();
 }
 
+SongTableModel::Row SongTableModel::makeRow(zub::SongEntry entry) {
+    Row row;
+    row.title = toQString(zub::latex::toDisplayText(entry.meta.title));
+    row.artist = toQString(zub::latex::toDisplayText(entry.meta.value("by")));
+    row.language = toQString(entry.meta.value("lang"));
+    row.key = toQString(zub::latex::toDisplayText(entry.meta.value("key")));
+    row.searchText = foldForSearch(
+        QStringList{row.title, row.artist, row.language, row.key}.join(QLatin1Char('\n')));
+    row.toolTip = toQString(entry.inputName) + QLatin1Char('\n') + toQString(entry.path);
+    row.entry = std::move(entry);
+    return row;
+}
+
 void SongTableModel::setSongs(std::vector<zub::SongEntry> songs) {
     beginResetModel();
     rows_.clear();
     rows_.reserve(songs.size());
-    for (auto& entry : songs) {
-        Row row;
-        row.title = toQString(zub::latex::toDisplayText(entry.meta.title));
-        row.artist = toQString(zub::latex::toDisplayText(entry.meta.value("by")));
-        row.language = toQString(entry.meta.value("lang"));
-        row.key = toQString(zub::latex::toDisplayText(entry.meta.value("key")));
-        row.searchText = foldForSearch(
-            QStringList{row.title, row.artist, row.language, row.key}.join(QLatin1Char('\n')));
-        row.toolTip = toQString(entry.inputName) + QLatin1Char('\n') + toQString(entry.path);
-        row.entry = std::move(entry);
-        rows_.push_back(std::move(row));
-    }
+    for (auto& entry : songs)
+        rows_.push_back(makeRow(std::move(entry)));
     endResetModel();
+}
+
+bool SongTableModel::updateSong(const std::filesystem::path& path, zub::SongMetadata meta) {
+    const auto it = std::ranges::find(rows_, path, [](const Row& row) { return row.entry.path; });
+    if (it == rows_.end())
+        return false;
+    zub::SongEntry entry = std::move(it->entry);
+    entry.meta = std::move(meta);
+    *it = makeRow(std::move(entry));
+    const int row = static_cast<int>(it - rows_.begin());
+    emit dataChanged(index(row, 0), index(row, ColumnCount - 1));
+    return true;
 }
 
 const zub::SongEntry* SongTableModel::song(int row) const {

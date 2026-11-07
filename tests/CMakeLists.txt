@@ -5,6 +5,7 @@ add_executable(zub_core_tests
     test_latex.cpp
     test_library.cpp
     test_song.cpp
+    test_textfile.cpp
     test_version.cpp
 )
 target_link_libraries(zub_core_tests PRIVATE Zub::core zub_warnings Catch2::Catch2WithMain)

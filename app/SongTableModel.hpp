@@ -2,6 +2,7 @@
 
 #include <QAbstractTableModel>
 #include <QString>
+#include <filesystem>
 #include <vector>
 #include <zub/core/library.hpp>
 
@@ -22,6 +23,9 @@ public:
 
     void setSongs(std::vector<zub::SongEntry> songs);
     const zub::SongEntry* song(int row) const;
+    // Replaces the metadata of the song stored at `path` (e.g. after it was edited).
+    // Returns false if no song in the model has that path.
+    bool updateSong(const std::filesystem::path& path, zub::SongMetadata meta);
 
     int rowCount(const QModelIndex& parent = {}) const override;
     int columnCount(const QModelIndex& parent = {}) const override;
@@ -38,5 +42,6 @@ private:
         zub::SongEntry entry;
         QString title, artist, language, key, searchText, toolTip;
     };
+    static Row makeRow(zub::SongEntry entry);
     std::vector<Row> rows_;
 };
