@@ -1,0 +1,20 @@
+# Build output (CMake presets put everything under build/)
+build/
+out/
+cmake-build-*/
+compile_commands.json
+.cache/
+
+# Preview / scratch output from the app
+tmp/
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.user
+*.swp
+
+# Claude Code: personal, not shared
+.claude/settings.local.json
+CLAUDE.local.md
