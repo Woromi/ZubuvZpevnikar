@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
+#include <zub/core/safety.hpp>
+#include <zub/core/textfile.hpp>
 
 namespace fs = std::filesystem;
 
@@ -91,6 +93,13 @@ TEST_CASE("scanLibrary reads the real songbook without issues", "[.integration]"
         INFO(song.inputName);
         CHECK_FALSE(song.meta.title.empty());
         CHECK_FALSE(song.meta.value("by").empty());
+        const auto content = zub::readTextFile(song.path);
+        REQUIRE(content);
+        const auto unknown = zub::safety::unknownConstructs(*content);
+        INFO(song.path.string());
+        for (const auto& construct : unknown)
+            UNSCOPED_INFO(construct);
+        CHECK(unknown.empty());
         for (const auto& raw : {song.meta.title, song.meta.value("by"), song.meta.value("key")}) {
             const auto shown = zub::latex::toDisplayText(raw);
             INFO(raw << " -> " << shown);

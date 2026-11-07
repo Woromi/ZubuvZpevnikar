@@ -31,7 +31,8 @@ Key facts from them:
 ```
 core/    std-only C++23 library. NO Qt includes, NO Qt types. Links nothing from Qt.
          Song model, song .tex parser/writer, songbook project parser/writer,
-         process running (lualatex, pdftoppm, chords_converter), paths/config.
+         preparing external builds (zub::preview: files + command line) and reading their logs.
+         core never starts processes: std C++ cannot run them asynchronously or cancel them.
 app/     Qt 6 Widgets UI. Thin: owns windows, editor, PDF view, models for views.
          Converts std::string <-> QString / std::filesystem::path <-> QString only here.
 tests/   Catch2 v3 unit tests for core/ (no Qt needed to build or run them).
@@ -40,7 +41,7 @@ tests/   Catch2 v3 unit tests for core/ (no Qt needed to build or run them).
 - If something in `core/` seems to need Qt, stop and ask instead of adding the dependency.
 - Prefer `std::filesystem`, `std::string_view`, `std::expected`/`std::optional`, ranges. No raw `new`/`delete` in `core/`.
 - In `app/`, normal Qt idioms are fine: parent ownership, signals/slots. Keep logic out of widgets.
-- Long-running work (lualatex, converter) must not block the UI thread.
+- Long-running work (lualatex, converter) must not block the UI thread. app/ runs it with QProcess (see `PreviewRunner`: newest request wins, the old process is killed).
 
 ## Build & test
 
@@ -66,6 +67,8 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless
 - **Previews never write into `../ZubuvZpevnik/build/`.** Build previews in a temp dir (the app's cache dir, or `tmp/` here). Reuse `build/tmp-ly` only by symlink/read.
 - Don't write in `../chords_converter/` (e.g. adding a `lib.rs`) without asking. See Open decisions.
 - Song files are Czech-heavy UTF-8. Keep encodings and line endings intact; don't reformat songs.
+- Preview builds run in `QStandardPaths::CacheLocation/preview` (kept between builds for LilyPond's `tmp-ly` cache), from the editor's text via a song copy in `override/` that shadows the real file on TEXINPUTS. Errors come from `lualatex -file-line-error`; real logs for tests are in `tests/data/logs/`.
+- **Songs are code.** Previews run `lualatex -shell-escape`, so `\directlua` etc. in a song would run with the user's rights. `zub::safety::unknownConstructs` checks songs against an allowlist of the commands real songs use (`knownSongCommands`); songs with anything else are never built automatically and only after confirmation. When the song format gains a command, add it to the allowlist (the `[integration]` test fails otherwise). Never weaken this check to make a test pass.
 - Song highlighting is `app/syntax/zubuvzpevnik-song.xml` (KSyntaxHighlighting XML, loaded from the Qt resource path `:/org.kde.syntax-highlighting/syntax-addons`). When the song format gains commands, update it.
 - Saving a song must be byte-exact for the parts not edited. `SongEditor` opens any file that would not round-trip (BOM, invalid UTF-8, mixed line endings, U+2028) read-only; keep that guarantee when touching the editor.
 - No commits unless asked. Small, focused commits when asked.
@@ -81,5 +84,3 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless
 ## Open decisions
 
 - **How the app calls the converter:** run the CLI as a subprocess (no change to that repo, current plan) vs adding a `lib.rs` + C ABI and linking it (faster, needs changes there). Ask before choosing the second.
-- **Preview rendering:** QtPdf (`QPdfView`) vs `pdftoppm` → images. QtPdf is preferred if the package is available.
-- **Single-song preview:** a wrapper `.tex` with the right class and one `\input`. Which class/options to use per songbook is not yet decided.

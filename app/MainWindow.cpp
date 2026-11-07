@@ -1,5 +1,7 @@
 #include "MainWindow.hpp"
 
+#include "PreviewPane.hpp"
+#include "PreviewRunner.hpp"
 #include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongTableModel.hpp"
@@ -16,11 +18,13 @@
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLockFile>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QSettings>
 #include <QSplitter>
+#include <QStandardPaths>
 #include <QStatusBar>
 #include <QTabWidget>
 #include <QTableView>
@@ -29,12 +33,17 @@
 #include <system_error>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
+#include <zub/core/preview.hpp>
+#include <zub/core/safety.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
 
 namespace {
 
 const auto songbookPathKey = QStringLiteral("songbook/path");
+const auto previewClassKey = QStringLiteral("preview/class");
+const auto geometryKey = QStringLiteral("window/geometry");
+const auto splitterKey = QStringLiteral("window/splitter");
 
 } // namespace
 
@@ -53,11 +62,18 @@ MainWindow::MainWindow(QWidget* parent)
     issuesLabel_ = new QLabel(this);
     statusBar()->addPermanentWidget(issuesLabel_);
     updateStatus();
+
+    // Window size and pane widths as the user left them.
+    const QSettings settings;
+    restoreGeometry(settings.value(geometryKey).toByteArray());
+    splitter_->restoreState(settings.value(splitterKey).toByteArray());
 }
 
 MainWindow::~MainWindow() {
     // Members are destroyed before QWidget deletes the children, so without this the editors
-    // (and their highlighters) would outlive repository_.
+    // (and their highlighters) would outlive repository_. Disconnect first: removing the tabs
+    // emits currentChanged, which must not reach a half-destroyed window.
+    disconnect(tabs_, nullptr, this, nullptr);
     delete tabs_;
 }
 
@@ -137,13 +153,18 @@ void MainWindow::createCentralWidget() {
     tabs_->setDocumentMode(true);
     connect(tabs_, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
 
-    auto* splitter = new QSplitter(Qt::Horizontal, this);
+    createPreview();
+
+    auto* splitter = splitter_ = new QSplitter(Qt::Horizontal, this);
     splitter->addWidget(table_);
     splitter->addWidget(tabs_);
-    splitter->setStretchFactor(0, 1);
-    splitter->setStretchFactor(1, 2);
+    splitter->addWidget(preview_);
+    // Growing the window shares the extra width by these factors, so they match the sizes.
+    splitter->setStretchFactor(0, 3);
+    splitter->setStretchFactor(1, 4);
+    splitter->setStretchFactor(2, 4);
     // Stretch factors alone lose to the table's wide size hint: set the first split explicitly.
-    splitter->setSizes({1, 2});
+    splitter->setSizes({3, 4, 4});
     table_->horizontalHeader()->setMinimumSectionSize(60);
     setCentralWidget(splitter);
 
@@ -225,6 +246,10 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
 
     model_->setSongs(std::move(library->songs));
     updateLanguageFilter();
+    preview_->setDocumentClasses(
+        zub::preview::documentClasses(root),
+        // The main songbook's class unless another was chosen.
+        QSettings{}.value(previewClassKey, QStringLiteral("velkyzpevnik")).toString());
     updateStatus();
     setWindowTitle(QApplication::applicationDisplayName() + QStringLiteral(" — ") +
                    toQString(root));
@@ -304,14 +329,17 @@ void MainWindow::openSong(const QModelIndex& proxyIndex) {
 
     connect(editor, &SongEditor::modificationChanged, this,
             [this, editor] { updateTabTitle(editor); });
-    connect(editor, &SongEditor::saved, this,
-            [this, editor](const std::string& content) { refreshSongMetadata(editor, content); });
+    connect(editor, &SongEditor::saved, this, [this, editor](const std::string& content) {
+        refreshSongMetadata(editor, content);
+        requestPreviewIfCurrent(editor);
+    });
     connect(editor, &SongEditor::reloadedFromDisk, this, [this, editor] {
         statusBar()->showMessage(
             tr("%1 changed on disk and was reloaded.").arg(toQString(editor->path().filename())),
             5000);
         if (auto content = zub::readTextFile(editor->path()))
             refreshSongMetadata(editor, *content);
+        requestPreviewIfCurrent(editor);
     });
 }
 
@@ -367,14 +395,20 @@ bool MainWindow::closeTab(int index) {
 }
 
 bool MainWindow::closeAllTabs() {
-    while (tabs_->count() > 0) {
-        if (!closeTab(tabs_->count() - 1))
-            return false;
+    {
+        // Each closed tab would otherwise start (and kill) a build of the next one.
+        const QSignalBlocker blocker(tabs_);
+        while (tabs_->count() > 0) {
+            if (!closeTab(tabs_->count() - 1))
+                break;
+        }
     }
-    return true;
+    requestPreview();
+    return tabs_->count() == 0;
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
+    const QSignalBlocker blocker(tabs_); // confirmClose() switches tabs: no builds for those
     for (int i = 0; i < tabs_->count(); ++i) {
         auto* editor = qobject_cast<SongEditor*>(tabs_->widget(i));
         if (editor && !confirmClose(editor)) {
@@ -382,6 +416,9 @@ void MainWindow::closeEvent(QCloseEvent* event) {
             return;
         }
     }
+    QSettings settings;
+    settings.setValue(geometryKey, saveGeometry());
+    settings.setValue(splitterKey, splitter_->saveState());
     event->accept();
 }
 
@@ -403,4 +440,105 @@ void MainWindow::refreshSongMetadata(SongEditor* editor, const std::string& cont
     editor->setWindowTitle(toQString(zub::latex::toDisplayText(meta->title)));
     updateTabTitle(editor);
     model_->updateSong(editor->path(), std::move(*meta));
+}
+
+void MainWindow::createPreview() {
+    preview_ = new PreviewPane(this);
+    previewRunner_ = new PreviewRunner(this);
+
+    connect(previewRunner_, &PreviewRunner::started, preview_, &PreviewPane::showBuilding);
+    connect(previewRunner_, &PreviewRunner::finished, preview_, &PreviewPane::showResult);
+    connect(preview_, &PreviewPane::rebuildRequested, this, [this] { requestPreview(true); });
+    connect(preview_, &PreviewPane::documentClassChanged, this, [this](const QString& name) {
+        QSettings{}.setValue(previewClassKey, name);
+        requestPreview();
+    });
+    connect(preview_, &PreviewPane::errorActivated, this,
+            [this](const QString& inputName, int line) {
+                // Only if the error belongs to the song that is open now.
+                SongEditor* editor = currentEditor();
+                if (editor && toQString(inputNameOf(editor)) == inputName)
+                    editor->goToLine(line);
+            });
+    // Also fires when the first tab is added and when the last one is closed.
+    connect(tabs_, &QTabWidget::currentChanged, this, [this] { requestPreview(); });
+
+    // One work dir per running instance: two instances building in the same dir would
+    // overwrite each other's files. The first instance gets the shared dir (and keeps
+    // LilyPond's cache between sessions); others get their own.
+    QString cache = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    if (cache.isEmpty())
+        cache = QDir(QDir::tempPath()).filePath(QApplication::applicationName());
+    QDir().mkpath(cache);
+    previewLock_ =
+        std::make_unique<QLockFile>(QDir(cache).filePath(QStringLiteral("preview.lock")));
+    previewLock_->setStaleLockTime(0);
+    const QString dirName = previewLock_->tryLock(0)
+                                ? QStringLiteral("preview")
+                                : QStringLiteral("preview-%1").arg(QApplication::applicationPid());
+    previewWorkDir_ = toPath(QDir(cache).absoluteFilePath(dirName));
+}
+
+std::string MainWindow::inputNameOf(const SongEditor* editor) const {
+    // songs/chords/Artist/Title.tex -> "Artist/Title"
+    const auto relative =
+        editor->path().lexically_relative(songbookRoot_ / "songs" / "chords").replace_extension();
+    const auto u8 = relative.generic_u8string();
+    return {u8.begin(), u8.end()};
+}
+
+void MainWindow::requestPreview(bool userAsked) {
+    SongEditor* editor = currentEditor();
+    if (!editor || songbookRoot_.empty()) {
+        previewRunner_->cancel(); // a build for a closed song must not fill the pane
+        preview_->clear();
+        return;
+    }
+
+    std::string content = editor->content();
+    // Songs build with -shell-escape, so a song is code. Unknown commands (e.g. from an
+    // imported song) are never built automatically, and only after confirmation on Rebuild.
+    std::set<std::string>& approved = approvedConstructs_[editor->path()];
+    QStringList unapproved;
+    for (const std::string& construct : zub::safety::unknownConstructs(content)) {
+        if (!approved.contains(construct))
+            unapproved << toQString(construct);
+    }
+    if (!unapproved.isEmpty()) {
+        const QString list = unapproved.join(QStringLiteral(", "));
+        const bool build =
+            userAsked &&
+            QMessageBox::warning(
+                this, tr("Build this song?"),
+                tr("This song uses commands that songs normally don't: %1").arg(list),
+                QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) == QMessageBox::Yes;
+        if (!build) {
+            previewRunner_->cancel();
+            preview_->clear(); // the PDF shown may be another song's
+            PreviewResult blocked;
+            blocked.inputName = inputNameOf(editor);
+            blocked.message =
+                tr("Not built automatically: the song uses %1, which songs normally don't. "
+                   "Building runs it with full access to your files. Check the song, then "
+                   "press Rebuild to build it anyway.")
+                    .arg(list);
+            preview_->showResult(blocked);
+            return;
+        }
+        for (const QString& construct : unapproved)
+            approved.insert(toStdString(construct));
+    }
+
+    zub::preview::Request request;
+    request.songbookRoot = songbookRoot_;
+    request.workDir = previewWorkDir_;
+    request.inputName = inputNameOf(editor);
+    request.songContent = std::move(content);
+    request.documentClass = toStdString(preview_->documentClass());
+    previewRunner_->request(std::move(request));
+}
+
+void MainWindow::requestPreviewIfCurrent(SongEditor* editor) {
+    if (editor == currentEditor())
+        requestPreview();
 }

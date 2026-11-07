@@ -3,15 +3,21 @@
 #include <QMainWindow>
 #include <QString>
 #include <filesystem>
+#include <map>
 #include <memory>
+#include <set>
 #include <string>
 
 class QComboBox;
 class QLabel;
+class QLockFile;
 class QLineEdit;
 class QModelIndex;
+class QSplitter;
 class QTabWidget;
 class QTableView;
+class PreviewPane;
+class PreviewRunner;
 class SongEditor;
 class SongFilterProxy;
 class SongTableModel;
@@ -58,12 +64,27 @@ private:
     void updateTabTitle(SongEditor* editor);
     void refreshSongMetadata(SongEditor* editor, const std::string& content);
 
+    // Preview
+    void createPreview();
+    // Builds the current editor's text; clears the pane without one. A song with commands
+    // outside the song format is built only when `userAsked` (Rebuild) and confirmed.
+    void requestPreview(bool userAsked = false);
+    void requestPreviewIfCurrent(SongEditor* editor);
+    std::string inputNameOf(const SongEditor* editor) const; // "Artist/Title"
+
     SongTableModel* model_ = nullptr;
     SongFilterProxy* proxy_ = nullptr;
     QTableView* table_ = nullptr;
     QTabWidget* tabs_ = nullptr;
+    QSplitter* splitter_ = nullptr;
     // Syntax definitions and themes, shared by all editors (must outlive them).
     std::unique_ptr<KSyntaxHighlighting::Repository> repository_;
+    PreviewPane* preview_ = nullptr;
+    PreviewRunner* previewRunner_ = nullptr;
+    std::filesystem::path previewWorkDir_;
+    std::unique_ptr<QLockFile> previewLock_; // the work dir is this instance's while held
+    // Per song, the unknown commands the user agreed to build anyway (this session only).
+    std::map<std::filesystem::path, std::set<std::string>> approvedConstructs_;
     QLineEdit* search_ = nullptr;
     QComboBox* language_ = nullptr;
     QLabel* countLabel_ = nullptr;

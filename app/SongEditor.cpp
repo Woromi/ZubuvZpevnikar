@@ -16,6 +16,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QScrollBar>
+#include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTimer>
@@ -334,4 +335,14 @@ void SongEditor::onFileChanged() {
     if (!again || *again != diskContent_) {
         QTimer::singleShot(0, this, [this] { onFileChanged(); });
     }
+}
+
+void SongEditor::goToLine(int line) {
+    // A block is one line of the file (no wrapping), so block number = line - 1.
+    const QTextBlock block = edit_->document()->findBlockByNumber(std::max(0, line - 1));
+    if (!block.isValid())
+        return;
+    edit_->setTextCursor(QTextCursor(block));
+    edit_->centerCursor();
+    edit_->setFocus();
 }

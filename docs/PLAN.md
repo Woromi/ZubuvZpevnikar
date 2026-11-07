@@ -29,10 +29,13 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 
 ## 3. Live preview
 
-- [ ] core: single-song preview build: wrapper `.tex` in a temp dir, `lualatex` with the right TEXINPUTS, captured log, extraction of the first error. Never writes into ZubuvZpevnik/build/.
-- [ ] core: run builds asynchronously; cancel the previous one when a new one starts.
-- [ ] app: PDF preview pane (QPdfView), rebuilt on save (later: debounced while typing).
-- [ ] app: show build errors and jump to the song line.
+- [x] core: single-song preview build (`zub::preview::prepare`): wrapper `.tex` + a copy of the editor text in the app cache dir, `lualatex -file-line-error` with TEXINPUTS; `firstError` reads the log. Never writes into ZubuvZpevnik/build/.
+- [x] app: builds run asynchronously with QProcess (`PreviewRunner`); a new build kills the running one.
+- [x] app: PDF preview pane (QPdfView) with a class chooser; rebuilt on open, tab switch, save, reload, class change, Rebuild/Ctrl+R. A failed build keeps the last good PDF.
+- [x] app: build errors listed under the PDF; double-click jumps to the song line. Full log via "Log".
+- [x] Safety: songs using commands outside the allowlist are not built automatically (Rebuild asks first). Preview builds are cancelled with their tab; LilyPond children are killed with lualatex; each app instance has its own work dir.
+- [x] chords_converter: chord names keep only chord characters, comment text stays on one line (`src/printers/latex.rs`, approved by the user). The change is left uncommitted in that repo, to be finished there in its own session.
+- [ ] Rebuild while typing (debounced) — easy now, since the preview already builds the editor text.
 
 ## 4. Import from a URL
 

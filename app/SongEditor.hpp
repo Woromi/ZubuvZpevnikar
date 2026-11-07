@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <expected>
 #include <filesystem>
+#include <string>
 
 class QFileSystemWatcher;
 class QLabel;
@@ -42,6 +43,10 @@ public:
 
     const std::filesystem::path& path() const { return path_; }
     bool isModified() const;
+    // The editor text as it would be saved (UTF-8).
+    std::string content() const { return currentContent(); }
+    // Moves the cursor to the start of the 1-based `line`, centres it and focuses the editor.
+    void goToLine(int line);
     QPlainTextEdit* textEdit() const { return edit_; }
 
 signals:

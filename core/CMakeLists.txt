@@ -4,6 +4,8 @@ configure_file(src/build_info.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/generated/build
 add_library(zub_core STATIC
     src/latex.cpp
     src/library.cpp
+    src/preview.cpp
+    src/safety.cpp
     src/song.cpp
     src/textfile.cpp
     src/version.cpp

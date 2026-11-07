@@ -8,3 +8,4 @@
 - `Broken/` holds files the scanner must report as issues.
 - `Synthetic/` holds valid hand-written songs for edge cases (e.g. a commented-out second header).
 - `.ly` and `.log` files must be ignored by the scanner.
+- `zubuvzpevnik/*.cls` are empty placeholders: only their names matter (document class discovery).
