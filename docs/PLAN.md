@@ -5,13 +5,13 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 
 ## 0. Prerequisites & skeleton
 
-- [ ] Install the dev packages (exact names may differ on TUXEDO OS / Ubuntu 24.04; check with `apt search`):
-      `sudo apt install qt6-base-dev qt6-pdf-dev libkf6syntaxhighlighting-dev ninja-build clangd clang-tidy catch2`
-- [ ] CMake skeleton: top-level `CMakeLists.txt`, `CMakePresets.json` (debug/release, Ninja, `CMAKE_EXPORT_COMPILE_COMMANDS`), C++20, warnings on.
-- [ ] `core/` static library, std-only, which must not link Qt. One trivial function plus a test.
-- [ ] `tests/` with Catch2 (or GoogleTest) registered in CTest.
-- [ ] `app/` Qt Widgets executable that links `core`, showing an empty main window.
-- [ ] Update the "Build & test" section of CLAUDE.md with the real commands.
+- [x] Install the dev packages (verified available 2026-11-07: Qt 6.10.2 and KF6 6.24 from the TUXEDO repo, Catch2 3.4):
+      `sudo apt install qt6-base-dev qt6-pdf-dev libkf6syntaxhighlighting-dev catch2 ninja-build clangd clang-tidy`
+- [x] CMake skeleton: top-level `CMakeLists.txt`, `CMakePresets.json` (debug/release, Ninja, `CMAKE_EXPORT_COMPILE_COMMANDS`), C++23 (for `std::expected`), warnings on.
+- [x] `core/` static library, std-only, which must not link Qt. One trivial function plus a test.
+- [x] `tests/` with Catch2 v3 (`Catch2::Catch2WithMain`, `catch_discover_tests`) registered in CTest.
+- [x] `app/` Qt Widgets executable that links `core`, showing an empty main window.
+- [x] Update the "Build & test" section of CLAUDE.md with the real commands.
 
 ## 1. Open the songbook and browse songs
 

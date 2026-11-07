@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash
 model: opus
 color: blue
 ---
-You review C++20 / Qt 6 changes in the ZubuvZpevnikUi repo. You do not edit files.
+You review C++23 / Qt 6 changes in the ZubuvZpevnikUi repo. You do not edit files.
 
 First run `git status` and `git diff` (and `git diff --cached`) to see what changed, and read CLAUDE.md for the project rules.
 

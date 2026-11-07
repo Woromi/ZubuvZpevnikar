@@ -12,7 +12,7 @@ The app does not reimplement the songbook or the converter. It drives two siblin
 
 | Repo | Path | What it is | Docs |
 |---|---|---|---|
-| this one | `.` | C++20 / Qt 6 desktop app | `docs/PLAN.md` |
+| this one | `.` | C++23 / Qt 6 desktop app | `docs/PLAN.md` |
 | ZubuvZpevnik | `../ZubuvZpevnik` | LaTeX package, classes, ~200 songs, songbook projects, build + lint scripts | `README.md`, `zubuvzpevnik/README.md` (song format), `docs/building.md`, `docs/tools.md` |
 | chords_converter | `../chords_converter` | Rust CLI: URL / saved HTML / text → LaTeX song | `README.md` |
 
@@ -28,12 +28,12 @@ Key facts from them:
 ## Architecture (hard rule)
 
 ```
-core/    std-only C++20 library. NO Qt includes, NO Qt types. Links nothing from Qt.
+core/    std-only C++23 library. NO Qt includes, NO Qt types. Links nothing from Qt.
          Song model, song .tex parser/writer, songbook project parser/writer,
          process running (lualatex, pdftoppm, chords_converter), paths/config.
 app/     Qt 6 Widgets UI. Thin: owns windows, editor, PDF view, models for views.
          Converts std::string <-> QString / std::filesystem::path <-> QString only here.
-tests/   Unit tests for core/ (no Qt needed to build or run them).
+tests/   Catch2 v3 unit tests for core/ (no Qt needed to build or run them).
 ```
 
 - If something in `core/` seems to need Qt, stop and ask instead of adding the dependency.
@@ -43,18 +43,19 @@ tests/   Unit tests for core/ (no Qt needed to build or run them).
 
 ## Build & test
 
-The skeleton doesn't exist yet (milestone 0 in `docs/PLAN.md`). Target commands:
-
 ```bash
 cmake --preset debug                 # configure (Ninja, build/debug, compile_commands.json)
 cmake --build --preset debug         # build
-ctest --preset debug                 # run core unit tests
+ctest --preset debug                 # run core unit tests (Catch2)
 build/debug/app/zubuvzpevnik-ui      # run the app
+QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless smoke test (exit 124 = ran fine)
 ```
 
-Update this section when the real commands exist.
-
-Formatting is `.clang-format` (a hook runs clang-format on edited C++ files).
+- `-DZUB_BUILD_APP=OFF` builds only core + tests (no Qt needed).
+- Layout: public core headers in `core/include/zub/core/` (`#include <zub/core/...>`), namespace `zub`. App classes in `app/`, one class per `.hpp/.cpp` pair.
+- New tests: add the `.cpp` to `tests/CMakeLists.txt`. Catch2 discovers the test cases.
+- Warnings: every target links `zub_warnings` (`-Wall -Wextra -Wpedantic -Wshadow -Wconversion ...`). Keep the build warning-free.
+- Formatting is `.clang-format` (a hook runs clang-format on C++ files Claude edits). clangd reads `build/debug/compile_commands.json` via `.clangd`.
 
 ## Guardrails
 
@@ -76,4 +77,3 @@ Formatting is `.clang-format` (a hook runs clang-format on edited C++ files).
 - **How the app calls the converter:** run the CLI as a subprocess (no change to that repo, current plan) vs adding a `lib.rs` + C ABI and linking it (faster, needs changes there). Ask before choosing the second.
 - **Preview rendering:** QtPdf (`QPdfView`) vs `pdftoppm` → images. QtPdf is preferred if the package is available.
 - **Single-song preview:** a wrapper `.tex` with the right class and one `\input`. Which class/options to use per songbook is not yet decided.
-- **Test framework:** Catch2 or GoogleTest (whichever the distro packages better).
