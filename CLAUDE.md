@@ -22,6 +22,7 @@ Key facts from them:
 - A song is `songs/chords/<Artist>/<Title>.tex` (`\beginsong{Title}[by=..., key=...]` … `\endsong`).
 - A songbook is `projects/<name>/<name>.tex`: a `\documentclass` from `zubuvzpevnik/` plus an alphabetical list of `\input{Artist/Title}`.
 - Builds need `lualatex -shell-escape` (lyluatex runs `lilypond`), with `TEXINPUTS` pointing at `zubuvzpevnik/`, `songs/chords/`, the repo root and the project dir. See `projects/velkyzpevnik/build.sh`.
+- Song header parsing in `core/` (`zub::parseSong`, `zub::latex::*`) is a port of `scripts/songfile.py`. Keep them in agreement; if one changes, check the other.
 - Linters: `scripts/checksongs.py`, `scripts/checkkeys.py`, `scripts/checkpaper.py` (read-only, except `checkpaper.py --write`).
 - `chords_converter` is binary-only (no `lib.rs`). `cargo run -- <url|file|-> latex` writes `out/latex/<Artist>/<Title>.tex` relative to the **current directory** (with `--manifest-path` from here, that means this repo's ignored `out/`).
 
@@ -54,6 +55,8 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless
 - `-DZUB_BUILD_APP=OFF` builds only core + tests (no Qt needed).
 - Layout: public core headers in `core/include/zub/core/` (`#include <zub/core/...>`), namespace `zub`. App classes in `app/`, one class per `.hpp/.cpp` pair.
 - New tests: add the `.cpp` to `tests/CMakeLists.txt`. Catch2 discovers the test cases.
+- Test data: `tests/data/songbook/` is a miniature ZubuvZpevnik checkout (copies of real tricky songs + `Broken/`). Tests get its path from `ZUB_TEST_DATA_DIR`; never read the real sibling repo from normal tests.
+- `build/debug/tests/zub_core_tests "[integration]"` runs the hidden tests against the real `../ZubuvZpevnik` (e.g. every song parses). Run it after changing parsers.
 - Warnings: every target links `zub_warnings` (`-Wall -Wextra -Wpedantic -Wshadow -Wconversion ...`). Keep the build warning-free.
 - Formatting is `.clang-format` (a hook runs clang-format on C++ files Claude edits). clangd reads `build/debug/compile_commands.json` via `.clangd`.
 

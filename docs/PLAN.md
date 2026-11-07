@@ -15,10 +15,10 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 
 ## 1. Open the songbook and browse songs
 
-- [ ] core: config with the path to the ZubuvZpevnik repo (default `../ZubuvZpevnik`, overridable, persisted).
-- [ ] core: scan `songs/chords/` → list of songs (artist, title, path).
-- [ ] core: parse song metadata from `\beginsong{Title}[by=…, key=…, lang=…]` (tests with real songs as fixtures).
-- [ ] app: main window with a filterable song list (artist / title / language).
+- [x] Songbook location: `--songbook <dir>`, else remembered in QSettings (app layer, not core), else the sibling `../ZubuvZpevnik`, else a folder dialog. File → Open Songbook Folder… / Reload.
+- [x] core: scan `songs/chords/` → list of songs (artist, title, path), with per-file issues instead of failing.
+- [x] core: parse song metadata from `\beginsong{Title}[by=…, key=…, lang=…]` (port of `scripts/songfile.py`; tests with real songs as fixtures in `tests/data/songbook`).
+- [x] app: main window with a sortable song table, search (case- and accent-insensitive) and a language filter.
 
 ## 2. Editor
 

@@ -2,6 +2,9 @@
 configure_file(src/build_info.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/generated/build_info.hpp @ONLY)
 
 add_library(zub_core STATIC
+    src/latex.cpp
+    src/library.cpp
+    src/song.cpp
     src/version.cpp
 )
 add_library(Zub::core ALIAS zub_core)

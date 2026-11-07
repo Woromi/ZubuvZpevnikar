@@ -5,5 +5,10 @@ qt_add_executable(zubuvzpevnik-ui
     main.cpp
     MainWindow.hpp
     MainWindow.cpp
+    SongFilterProxy.hpp
+    SongFilterProxy.cpp
+    SongTableModel.hpp
+    SongTableModel.cpp
+    convert.hpp
 )
 target_link_libraries(zubuvzpevnik-ui PRIVATE Zub::core zub_warnings Qt6::Widgets)
