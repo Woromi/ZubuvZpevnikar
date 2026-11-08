@@ -71,6 +71,26 @@ bool SongTableModel::updateSong(const std::filesystem::path& path, zub::SongMeta
     return true;
 }
 
+void SongTableModel::setScanResult(const std::filesystem::path& path, const QString& summary,
+                                   const QString& details) {
+    const int row = rowOf(path);
+    if (row < 0)
+        return;
+    Row& r = rows_[static_cast<std::size_t>(row)];
+    r.changes = summary;
+    r.changesToolTip = summary.isEmpty() ? QString() : details;
+    emit dataChanged(index(row, Changes), index(row, Changes));
+}
+
+void SongTableModel::clearScanResults() {
+    for (Row& row : rows_) {
+        row.changes.clear();
+        row.changesToolTip.clear();
+    }
+    if (!rows_.empty())
+        emit dataChanged(index(0, Changes), index(rowCount() - 1, Changes));
+}
+
 int SongTableModel::rowOf(const std::filesystem::path& path) const {
     const auto it = std::ranges::find(rows_, path, [](const Row& row) { return row.entry.path; });
     return it == rows_.end() ? -1 : static_cast<int>(it - rows_.begin());
@@ -108,15 +128,21 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
             return row.key;
         case Todo:
             return row.todo;
+        case Changes:
+            return row.changes;
         default:
             return {};
         }
     case Qt::ToolTipRole:
         if (index.column() == Todo && !row.todoToolTip.isEmpty())
             return row.todoToolTip;
+        if (index.column() == Changes && !row.changesToolTip.isEmpty())
+            return row.changesToolTip;
         return row.toolTip;
     case HasTodoRole:
         return !row.entry.todos.empty();
+    case HasChangesRole:
+        return !row.changes.isEmpty();
     case LanguageRole:
         return row.language;
     case SearchTextRole:
@@ -142,6 +168,8 @@ QVariant SongTableModel::headerData(int section, Qt::Orientation orientation, in
         return tr("Key");
     case Todo:
         return tr("TODO");
+    case Changes:
+        return tr("Possible changes");
     default:
         return {};
     }

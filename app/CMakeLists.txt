@@ -18,6 +18,7 @@ qt_add_executable(zubuvzpevnik-ui
     ConverterVersion.cpp
     ShrinkDialog.hpp
     ShrinkDialog.cpp
+    SongbookScan.cpp
     DiffView.hpp
     DiffView.cpp
     SongEditor.hpp

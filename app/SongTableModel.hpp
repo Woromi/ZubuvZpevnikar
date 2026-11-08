@@ -12,12 +12,13 @@ class SongTableModel : public QAbstractTableModel {
     Q_OBJECT
 
 public:
-    enum Column { Title, Artist, Language, Key, Todo, ColumnCount };
+    enum Column { Title, Artist, Language, Key, Todo, Changes, ColumnCount };
     enum Role {
         LanguageRole = Qt::UserRole, // raw lang value, e.g. "czech"
         SearchTextRole,              // all columns, case- and accent-folded, for filtering
         InputNameRole,               // "Artist/Title"
         HasTodoRole,                 // bool: the song has TODO comments
+        HasChangesRole,              // bool: a songbook scan found possible changes
     };
 
     explicit SongTableModel(QObject* parent = nullptr);
@@ -30,6 +31,11 @@ public:
                     std::vector<std::string> todos);
     // Row of the song stored at `path`, -1 if absent.
     int rowOf(const std::filesystem::path& path) const;
+    // What a songbook scan found in the song at `path` (this session only): a short summary for
+    // the Changes column and the details for its tooltip. Empty `summary` clears it.
+    void setScanResult(const std::filesystem::path& path, const QString& summary,
+                       const QString& details);
+    void clearScanResults();
     // Adds a song (e.g. a newly imported one after its first save).
     void addSong(zub::SongEntry song);
 
@@ -47,6 +53,7 @@ private:
     struct Row {
         zub::SongEntry entry;
         QString title, artist, language, key, todo, todoToolTip, searchText, toolTip;
+        QString changes, changesToolTip; // from a songbook scan
     };
     static Row makeRow(zub::SongEntry entry);
     std::vector<Row> rows_;

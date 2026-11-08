@@ -31,6 +31,7 @@ class DiffView;
 class PreviewPane;
 class PreviewRunner;
 class SongEditor;
+class SongbookScan;
 class SongFilterProxy;
 class SongTableModel;
 class ConverterRunner;
@@ -83,6 +84,9 @@ private:
     void createSongToolBar();
     void updateSongActions();
     void updateMarkChecked(); // enabled while the editor text has the "not checked yet" line
+    // Songs → Scan Songbook…: runs tidy/check/shrink on many songs and marks the ones with
+    // possible changes in the list (this session only); changes nothing.
+    void scanSongbook();
     // Tidy (chords_converter tidy on the open song, one undo step) and the Changes view
     void startTidy(const QString& note = {});
     void onConverterFinished(const std::expected<ConverterOutput, QString>& output);
@@ -147,6 +151,10 @@ private:
     QAction* makeSmallerAction_ = nullptr;
     QAction* checkAction_ = nullptr;
     QAction* markCheckedAction_ = nullptr; // removes the import's "not checked yet" TODO line
+    SongbookScan* scan_ = nullptr;         // while a songbook scan runs
+    int scanFound_ = 0;                    // songs it marked so far
+    QCheckBox* changesOnly_ = nullptr;       // "Only songs with possible changes"
+    QAction* changesOnlyAction_ = nullptr;   // its place in the filter bar (hidden until a scan)
     QAction* joinLinesAction_ = nullptr;
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any

@@ -14,6 +14,7 @@ public:
     void setSearchText(const QString& text);
     void setLanguage(const QString& language); // empty = all languages
     void setTodoOnly(bool todoOnly);           // only songs with TODO comments
+    void setChangesOnly(bool changesOnly);     // only songs a scan found changes in
 
 protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override;
@@ -22,4 +23,5 @@ private:
     QStringList searchWords_; // folded; every word must match
     QString language_;
     bool todoOnly_ = false;
+    bool changesOnly_ = false;
 };

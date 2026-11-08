@@ -248,14 +248,14 @@ TEST_CASE("apply interprets real runs", "[songsuggest]") {
 TEST_CASE("version output is parsed", "[converter]") {
     const auto version = cv::parseVersion(slurp(converterData / "version.out"));
     REQUIRE(version);
-    CHECK(*version == cv::Version{0, 7, 0});
-    CHECK(cv::toString(*version) == "0.7.0");
+    CHECK(*version == cv::Version{0, 8, 0});
+    CHECK(cv::toString(*version) == "0.8.0");
     CHECK(*version >= cv::kRequired);
 
     CHECK(cv::parseVersion("chords_converter 0.10.3\r\nmore")->minor == 10);
     CHECK(cv::parseVersion("chords_converter 1.0.0-beta")->major == 1);
-    CHECK(*cv::parseVersion("chords_converter 0.6.0") < cv::kRequired);
-    CHECK(*cv::parseVersion("chords_converter 0.7.1") > cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.7.0") < cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.8.1") > cv::kRequired);
 }
 
 TEST_CASE("unparseable version output gives nothing", "[converter]") {

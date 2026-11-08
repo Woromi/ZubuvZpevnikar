@@ -7,6 +7,7 @@
 #include "PreviewPane.hpp"
 #include "PreviewRunner.hpp"
 #include "ShrinkDialog.hpp"
+#include "SongbookScan.hpp"
 #include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongTableModel.hpp"
@@ -17,6 +18,8 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QCheckBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QComboBox>
 #include <QDir>
 #include <QFileDialog>
@@ -31,7 +34,9 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QProgressDialog>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QSettings>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -137,6 +142,10 @@ void MainWindow::createMenus() {
 
     file->addSeparator();
     QAction* quit = file->addAction(tr("&Quit"));
+    QMenu* songs = menuBar()->addMenu(tr("&Songs"));
+    QAction* scan = songs->addAction(tr("&Scan Songbook…"));
+    scan->setToolTip(tr("Find the songs Tidy, Check Song or Make Smaller would change"));
+    connect(scan, &QAction::triggered, this, &MainWindow::scanSongbook);
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
 
@@ -184,6 +193,12 @@ void MainWindow::createCentralWidget() {
     connect(todoOnly, &QCheckBox::toggled, proxy_, &SongFilterProxy::setTodoOnly);
     filters->addWidget(todoOnly);
 
+    // Shown after a songbook scan (Songs → Scan Songbook…).
+    changesOnly_ = new QCheckBox(tr("Only songs with possible changes"), filters);
+    changesOnly_->setToolTip(tr("Songs the last Scan Songbook found changes in (this session)"));
+    connect(changesOnly_, &QCheckBox::toggled, proxy_, &SongFilterProxy::setChangesOnly);
+    changesOnlyAction_ = filters->addWidget(changesOnly_);
+    changesOnlyAction_->setVisible(false);
 
     table_ = new QTableView(listPage_);
     table_->setModel(proxy_);
@@ -196,6 +211,9 @@ void MainWindow::createCentralWidget() {
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Title, QHeaderView::Stretch);
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Artist, QHeaderView::Stretch);
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Todo, QHeaderView::Stretch);
+    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Changes,
+                                                     QHeaderView::Stretch);
+    table_->setColumnHidden(SongTableModel::Changes, true); // until a songbook scan
     connect(table_, &QAbstractItemView::activated, this, &MainWindow::openSong);
 
     listLayout->addWidget(filters);
@@ -1344,4 +1362,154 @@ void MainWindow::importSong() {
     // converter's warnings.
     if (tidy)
         startTidy(message);
+}
+
+void MainWindow::scanSongbook() {
+    if (scan_ || songbookRoot_.empty())
+        return;
+    const QString name = tr("Scan Songbook");
+    const std::filesystem::path converter = findConverter();
+    if (converter.empty()) {
+        QMessageBox::warning(this, name, tr("The scan needs chords_converter, which was not found."));
+        return;
+    }
+    if (!converterUsable(converter, name))
+        return;
+    const auto paper = zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
+    const QString paperName = !paper ? tr("its paper")
+                              : *paper == zub::songsuggest::Paper::A5 ? QStringLiteral("A5")
+                                                                       : QStringLiteral("A4");
+
+    // The settings: what to look for, and in which songs.
+    QDialog dialog(this);
+    dialog.setWindowTitle(name);
+    auto* layout = new QVBoxLayout(&dialog);
+    layout->addWidget(new QLabel(
+        tr("Look for songs where a song action would change something. Nothing is changed: the "
+           "songs are marked in the list (this session only), and you decide song by song."),
+        &dialog));
+    auto* tidy = new QCheckBox(tr("Tidy: a chorus typed again, chords inside a syllable, spaces"),
+                               &dialog);
+    auto* check = new QCheckBox(
+        tr("Check Song: typos, apostrophes typed two ways, a chorus typed as a verse"), &dialog);
+    auto* shrink = new QCheckBox(
+        tr("Make Smaller: songs that don't fit %1 (the preview's paper). Typesets every song: "
+           "about 2 seconds each, some 8 minutes for the whole songbook.")
+            .arg(paperName),
+        &dialog);
+    QSettings settings;
+    tidy->setChecked(settings.value(QStringLiteral("scan/tidy"), true).toBool());
+    check->setChecked(settings.value(QStringLiteral("scan/check"), true).toBool());
+    shrink->setChecked(settings.value(QStringLiteral("scan/shrink"), false).toBool());
+    for (QCheckBox* box : {tidy, check, shrink})
+        layout->addWidget(box);
+    const int shown = proxy_->rowCount();
+    const int all = model_->rowCount();
+    auto* allSongs = new QRadioButton(tr("All %n song(s)", nullptr, all), &dialog);
+    auto* shownSongs =
+        new QRadioButton(tr("The %n song(s) shown in the list", nullptr, shown), &dialog);
+    allSongs->setChecked(true);
+    shownSongs->setEnabled(shown != all);
+    layout->addWidget(allSongs);
+    layout->addWidget(shownSongs);
+    layout->addWidget(new QLabel(tr("Unsaved edits are not scanned: the scan reads the files."),
+                                 &dialog));
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, &dialog);
+    QPushButton* start = buttons->addButton(tr("Scan"), QDialogButtonBox::AcceptRole);
+    start->setDefault(true);
+    const auto updateStart = [=] {
+        start->setEnabled(tidy->isChecked() || check->isChecked() || shrink->isChecked());
+    };
+    for (QCheckBox* box : {tidy, check, shrink})
+        connect(box, &QCheckBox::toggled, &dialog, updateStart);
+    updateStart();
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    settings.setValue(QStringLiteral("scan/tidy"), tidy->isChecked());
+    settings.setValue(QStringLiteral("scan/check"), check->isChecked());
+    settings.setValue(QStringLiteral("scan/shrink"), shrink->isChecked());
+
+    std::vector<SongbookScan::Song> songs;
+    if (shownSongs->isChecked()) {
+        for (int row = 0; row < proxy_->rowCount(); ++row) {
+            if (const auto* song = model_->song(proxy_->mapToSource(proxy_->index(row, 0)).row()))
+                songs.push_back({song->path, song->inputName});
+        }
+    } else {
+        for (int row = 0; row < model_->rowCount(); ++row) {
+            if (const auto* song = model_->song(row))
+                songs.push_back({song->path, song->inputName});
+        }
+    }
+    ScanOptions options;
+    options.tidy = tidy->isChecked();
+    options.check = check->isChecked();
+    options.shrink = shrink->isChecked();
+    options.paper = paper;
+    options.converter = converter;
+    options.songbookRoot = songbookRoot_;
+
+    model_->clearScanResults();
+    scanFound_ = 0;
+    scan_ = new SongbookScan(options, std::move(songs), this);
+    auto* progress = new QProgressDialog(tr("Scanning…"), tr("Cancel"), 0, scan_->stepCount(), this);
+    progress->setWindowTitle(name);
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    progress->setMinimumWidth(480);
+    connect(progress, &QProgressDialog::canceled, scan_, &SongbookScan::cancel);
+    connect(scan_, &SongbookScan::progress, progress,
+            [progress](int done, int, const QString& what) {
+                progress->setValue(done);
+                progress->setLabelText(what);
+            });
+    connect(scan_, &SongbookScan::songScanned, this,
+            [this](const QString& path, const ScanFinding& finding) {
+                QStringList summary;
+                QStringList details;
+                const auto section = [&details](const QString& title, const QStringList& lines) {
+                    if (lines.isEmpty())
+                        return;
+                    details << title;
+                    for (const QString& line : lines)
+                        details << QStringLiteral("  • ") + line;
+                };
+                if (!finding.tidy.isEmpty())
+                    summary << tr("Tidy %1").arg(finding.tidy.size());
+                if (!finding.check.isEmpty())
+                    summary << tr("Check %1").arg(finding.check.size());
+                if (!finding.shrink.isEmpty())
+                    summary << (finding.pages.isEmpty() ? tr("Too big")
+                                                        : tr("Too big (%1)").arg(finding.pages));
+                if (!finding.errors.isEmpty())
+                    summary << tr("Errors %1").arg(finding.errors.size());
+                section(tr("Tidy:"), finding.tidy);
+                section(tr("Check Song:"), finding.check);
+                section(finding.pages.isEmpty() ? tr("Make Smaller:")
+                                                : tr("Make Smaller (%1):").arg(finding.pages),
+                        finding.shrink);
+                section(tr("Problems:"), finding.errors);
+                model_->setScanResult(toPath(path), summary.join(QStringLiteral(" · ")),
+                                      details.join(QLatin1Char('\n')));
+                ++scanFound_;
+            });
+    connect(scan_, &SongbookScan::finished, this, [this, progress](bool cancelled) {
+        progress->reset();
+        progress->deleteLater();
+        scan_->deleteLater();
+        scan_ = nullptr;
+        table_->setColumnHidden(SongTableModel::Changes, false);
+        changesOnlyAction_->setVisible(true);
+        changesOnly_->setChecked(true);
+        statusBar()->showMessage(
+            (cancelled ? tr("Scan cancelled. ") : QString()) +
+                tr("%n song(s) with possible changes: open one and use Tidy, Check Song or Make "
+                   "Smaller to decide.",
+                   nullptr, scanFound_),
+            15000);
+    });
+    scan_->start();
 }
