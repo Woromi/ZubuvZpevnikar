@@ -106,7 +106,21 @@ converter::Command joinCommand(const std::filesystem::path& converter,
 
 converter::Command applyCommand(const std::filesystem::path& converter,
                                 const std::filesystem::path& songFile, std::string_view id) {
-    return {utf8(converter), {"apply", utf8(songFile), "--id", std::string(id), "-o", "-"}};
+    const std::string one(id);
+    return applyCommand(converter, songFile, std::span(&one, 1));
+}
+
+converter::Command applyCommand(const std::filesystem::path& converter,
+                                const std::filesystem::path& songFile,
+                                std::span<const std::string> ids) {
+    converter::Command command{utf8(converter), {"apply", utf8(songFile)}};
+    for (const auto& id : ids) {
+        command.arguments.push_back("--id");
+        command.arguments.push_back(id);
+    }
+    command.arguments.push_back("-o");
+    command.arguments.push_back("-");
+    return command;
 }
 
 std::expected<Suggestions, std::string> interpretSuggest(int exitCode, std::string_view stdOut,

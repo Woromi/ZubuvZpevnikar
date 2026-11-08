@@ -4,6 +4,7 @@
 #include <expected>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -84,6 +85,12 @@ converter::Command joinCommand(const std::filesystem::path& converter,
 // {"apply", file, "--id", id, "-o", "-"}
 converter::Command applyCommand(const std::filesystem::path& converter,
                                 const std::filesystem::path& songFile, std::string_view id);
+// Several proposals together: {"apply", file, "--id", a, "--id", b, ..., "-o", "-"}. The
+// converter refuses ones that change the same text or together would leave a part without a
+// chorded neighbour (exit 1 and a message).
+converter::Command applyCommand(const std::filesystem::path& converter,
+                                const std::filesystem::path& songFile,
+                                std::span<const std::string> ids);
 
 // Exit code 0 and stdout = the JSON (of suggest or join). Non-zero exit, malformed JSON or a missing field gives an
 // error message (stderr trimmed, or a description). stderr is ignored on success.

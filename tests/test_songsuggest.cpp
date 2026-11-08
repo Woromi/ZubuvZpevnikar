@@ -41,6 +41,9 @@ TEST_CASE("suggest and apply build the command lines", "[songsuggest]") {
     const auto a4 = ss::suggestCommand("/opt/cc", "S.tex", ss::Paper::A4, false, "/sb");
     CHECK(a4.arguments[2] == "--fit");
     CHECK(a4.arguments[3] == "a4");
+    const std::vector<std::string> ids{"a@1", "b@2"};
+    CHECK(ss::applyCommand("/opt/cc", "/tmp/x/S.tex", ids).arguments ==
+          std::vector<std::string>{"apply", "/tmp/x/S.tex", "--id", "a@1", "--id", "b@2", "-o", "-"});
     const auto apply = ss::applyCommand("/opt/cc", "/tmp/x/S.tex", "chordsoff@81");
     CHECK(apply.arguments == std::vector<std::string>{"apply", "/tmp/x/S.tex", "--id",
                                                       "chordsoff@81", "-o", "-"});

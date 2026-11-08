@@ -1088,7 +1088,7 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
     QString heading;
     switch (action) {
     case SongAction::Shrink:
-        heading = tr("Pick one change, most readable first (score 0–100: how readable the song "
+        heading = tr("Pick a change, most readable first (score 0–100: how readable the song "
                      "stays):");
         break;
     case SongAction::Restructure:
@@ -1114,14 +1114,23 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
         statusBar()->showMessage(tr("%1 discarded: the song changed.").arg(name), 8000);
         return;
     }
-    const auto& proposal = dialog.selected();
+    const auto chosen = dialog.selected();
+    if (chosen.empty())
+        return;
+    std::vector<std::string> ids;
+    for (const auto& proposal : chosen)
+        ids.push_back(proposal.id);
+    const QString description =
+        chosen.size() == 1
+            ? toQString(chosen.front().description)
+            : tr("%n changes", nullptr, static_cast<int>(chosen.size()));
     runEditor_ = editor.data();
     runInput_ = input;
     songAction_ = action;
-    startApply(proposal.id, toQString(proposal.description));
+    startApply(std::move(ids), description);
 }
 
-void MainWindow::startApply(const std::string& id, const QString& description) {
+void MainWindow::startApply(std::vector<std::string> ids, const QString& description) {
     const std::filesystem::path converter = findConverter();
     if (converter.empty() || !runEditor_) {
         runEditor_.clear();
@@ -1132,8 +1141,8 @@ void MainWindow::startApply(const std::string& id, const QString& description) {
     applyDescription_ = description;
     statusBar()->showMessage(tr("Applying…"));
     if (!converterRunner_->start(
-            [converter, id](const std::filesystem::path& file) {
-                return zub::songsuggest::applyCommand(converter, file, id);
+            [converter, ids = std::move(ids)](const std::filesystem::path& file) {
+                return zub::songsuggest::applyCommand(converter, file, ids);
             },
             runInput_, toQString(runEditor_->path().stem())))
         return;
@@ -1173,8 +1182,8 @@ void MainWindow::onApplyFinished(const std::expected<ConverterOutput, QString>& 
         const QPointer<SongEditor> restructured = editor; // the song may close meanwhile
         const auto answer = QMessageBox::question(
             this, tr("Restructure"),
-            tr("The part is a chorus now. Run Tidy, so that copies of the chorus become "
-               "\\insertchorus? (One more undo step.)"),
+            tr("Done. Run Tidy now, so that copies of a chorus become \\insertchorus? (One more "
+               "undo step.)"),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
         if (answer == QMessageBox::Yes && restructured && restructured == editor_)
             startTidy();

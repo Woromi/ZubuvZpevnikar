@@ -91,7 +91,7 @@ private:
     void startProposals(SongAction action);
     QString actionName(SongAction action) const;
     void onSuggestFinished(const std::expected<ConverterOutput, QString>& output);
-    void startApply(const std::string& id, const QString& description);
+    void startApply(std::vector<std::string> ids, const QString& description);
     void onApplyFinished(const std::expected<ConverterOutput, QString>& output);
     // Takes over the state of the run that just finished; the editor it belongs to, or nullptr
     // (after a status message) when the song changed meanwhile. `input` gets the bytes sent.

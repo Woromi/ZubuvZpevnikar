@@ -2,6 +2,8 @@
 
 #include "convert.hpp"
 
+#include <QItemSelectionModel>
+#include <QAbstractItemView>
 #include <QDialogButtonBox>
 #include <algorithm>
 #include <QLabel>
@@ -68,11 +70,7 @@ QString ShrinkDialog::summary(const zub::songsuggest::Suggestions& suggestions) 
 ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
                            const std::string& songText, const QString& title,
                            const QString& heading, QWidget* parent)
-    : QDialog(parent), suggestions_(suggestions) {
-    for (const auto& proposal : suggestions_.proposals) {
-        auto preview = zub::songoutline::preview(songText, proposal.edits, proposal.sources);
-        previews_.push_back(preview ? std::optional(std::move(*preview)) : std::nullopt);
-    }
+    : QDialog(parent), suggestions_(suggestions), songText_(songText) {
     setWindowTitle(title);
     resize(1180, 600);
     setSizeGripEnabled(true);
@@ -84,7 +82,9 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
         label->setWordWrap(true);
         layout->addWidget(label);
     }
-    auto* headingLabel = new QLabel(heading, this);
+    auto* headingLabel =
+        new QLabel(heading + QStringLiteral(" ") + tr("(Ctrl+click or Shift+click picks several.)"),
+                   this);
     headingLabel->setWordWrap(true);
     layout->addWidget(headingLabel);
 
@@ -103,6 +103,7 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
             item->setToolTip(tr("Line %1").arg(proposal.line));
     }
     list_->setWordWrap(true);
+    list_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     outline_ = new QTextBrowser(this);
     outline_->setOpenLinks(false);
     auto* splitter = new QSplitter(Qt::Horizontal, this);
@@ -114,8 +115,8 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     layout->addWidget(splitter, 1);
 
     auto* buttons = new QDialogButtonBox(this);
-    QPushButton* apply = buttons->addButton(tr("Apply"), QDialogButtonBox::AcceptRole);
-    apply->setDefault(true);
+    apply_ = buttons->addButton(tr("Apply"), QDialogButtonBox::AcceptRole);
+    apply_->setDefault(true);
     buttons->addButton(QDialogButtonBox::Cancel);
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -123,10 +124,9 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     connect(list_, &QListWidget::itemDoubleClicked, this, &QDialog::accept);
     if (list_->count() > 0)
         list_->setCurrentRow(0); // nobody listens yet: the caller shows the first line itself
-    showOutline(list_->currentRow());
-    connect(list_, &QListWidget::currentRowChanged, this, [this, apply](int row) {
-        apply->setEnabled(row >= 0);
-        showOutline(row);
+    showOutline();
+    connect(list_, &QListWidget::itemSelectionChanged, this, [this] { showOutline(); });
+    connect(list_, &QListWidget::currentRowChanged, this, [this](int row) {
         if (row >= 0) {
             const int line = suggestions_.proposals.at(static_cast<std::size_t>(row)).line;
             if (line > 0)
@@ -135,9 +135,19 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     });
 }
 
-const zub::songsuggest::Proposal& ShrinkDialog::selected() const {
-    const int row = list_->currentRow();
-    return suggestions_.proposals.at(static_cast<std::size_t>(row < 0 ? 0 : row));
+std::vector<int> ShrinkDialog::selectedRows() const {
+    std::vector<int> rows;
+    for (const QModelIndex& index : list_->selectionModel()->selectedRows())
+        rows.push_back(index.row());
+    std::ranges::sort(rows);
+    return rows;
+}
+
+std::vector<zub::songsuggest::Proposal> ShrinkDialog::selected() const {
+    std::vector<zub::songsuggest::Proposal> proposals;
+    for (const int row : selectedRows())
+        proposals.push_back(suggestions_.proposals.at(static_cast<std::size_t>(row)));
+    return proposals;
 }
 
 namespace {
@@ -154,18 +164,32 @@ QString span(const QString& text, const QString& style) {
 
 } // namespace
 
-void ShrinkDialog::showOutline(int row) {
+void ShrinkDialog::showOutline() {
     using zub::songoutline::Chords;
     using zub::songoutline::Repeat;
-    if (row < 0 || static_cast<std::size_t>(row) >= previews_.size()) {
-        outline_->clear();
+    const auto chosen = selected();
+    apply_->setText(chosen.size() > 1 ? tr("Apply %n Changes", nullptr, static_cast<int>(chosen.size()))
+                                      : tr("Apply"));
+    apply_->setEnabled(false);
+    if (chosen.empty()) {
+        outline_->setPlainText(tr("Pick a change to see the song with it."));
         return;
     }
-    const auto& preview = previews_[static_cast<std::size_t>(row)];
+    std::vector<zub::songsuggest::Edit> edits;
+    std::vector<zub::songsuggest::Source> sources;
+    for (const auto& proposal : chosen) {
+        edits.insert(edits.end(), proposal.edits.begin(), proposal.edits.end());
+        sources.insert(sources.end(), proposal.sources.begin(), proposal.sources.end());
+    }
+    const auto preview = zub::songoutline::preview(songText_, edits, sources);
     if (!preview) {
-        outline_->setPlainText(tr("The proposal does not fit the song text."));
+        outline_->setPlainText(chosen.size() > 1
+                                   ? tr("These changes touch the same text: pick them one at a "
+                                        "time, or leave one out.")
+                                   : tr("The proposal does not fit the song text."));
         return;
     }
+    apply_->setEnabled(true);
     const QPalette& pal = palette();
     const QString sourceTint =
         mix(pal.color(QPalette::Link), pal.color(QPalette::Base), 0.12).name();
