@@ -12,15 +12,15 @@ class QListWidget;
 class QPushButton;
 class QTextBrowser;
 
-// Make Smaller, Restructure and Join Lines: shows what chords_converter suggest/join found (the measured pages and the
-// proposals, rated, most readable first) and lets the user pick one or several to apply, or
-// none. Next to
-// the list, the song's parts as an outline with the parts the selected proposal changes marked.
+// Make Smaller, Join Lines and Check Song: shows what chords_converter shrink/join/check found
+// (the measured pages and the proposals) and lets the user pick one or several to apply, or none.
+// Next to the list, a sketch of the song with the selected proposals made, the parts they change
+// marked.
 class ShrinkDialog : public QDialog {
     Q_OBJECT
 
 public:
-    // `songText` is the text suggest ran on (the proposals' edits point into it). `title` and
+    // `songText` is the text the proposals were listed for (the proposals' edits point into it). `title` and
     // `heading` name the action (Make Smaller, Restructure, Join Lines).
     ShrinkDialog(const zub::songsuggest::Suggestions& suggestions, const std::string& songText,
                  const QString& title, const QString& heading, QWidget* parent = nullptr);

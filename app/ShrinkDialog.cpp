@@ -92,8 +92,11 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     for (std::size_t i = 0; i < suggestions_.proposals.size(); ++i) {
         const auto& proposal = suggestions_.proposals[i];
         // "57 fair: the pre-chorus repeats ... — saves 1 line (small paper only)"
-        QString text = tr("%1 %2: ").arg(proposal.score).arg(toQString(proposal.grade)) +
-                       toQString(proposal.description);
+        // A correction (check) has no score: only shrink's proposals are rated.
+        QString text = proposal.grade == "correction"
+                           ? QString()
+                           : tr("%1 %2: ").arg(proposal.score).arg(toQString(proposal.grade));
+        text += toQString(proposal.description);
         if (proposal.gainLines > 0) // a restructuring saves nothing by itself
             text += QStringLiteral(" — ") + tr("saves %n line(s)", nullptr, proposal.gainLines);
         if (proposal.stage == 2)
@@ -173,6 +176,17 @@ void ShrinkDialog::showOutline() {
     apply_->setEnabled(false);
     if (chosen.empty()) {
         outline_->setPlainText(tr("Pick a change to see the song with it."));
+        return;
+    }
+    // A typo with a chord inside the word comes without edits: nothing to apply.
+    const auto byHand = std::ranges::count_if(
+        chosen, [](const auto& proposal) { return proposal.edits.empty(); });
+    if (byHand > 0) {
+        outline_->setPlainText(
+            chosen.size() == 1
+                ? tr("Fix this one by hand at line %1 (the editor shows it).")
+                      .arg(chosen.front().line)
+                : tr("One of the picked items is to fix by hand: leave it out to apply the rest."));
         return;
     }
     std::vector<zub::songsuggest::Edit> edits;

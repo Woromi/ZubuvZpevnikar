@@ -23,7 +23,7 @@ struct ConverterOutput {
     bool operator==(const ConverterOutput&) const = default; // Qt's metatype of std::expected needs it
 };
 
-// Runs a chords_converter command (tidy, suggest, apply) on a song text with QProcess, one run at
+// Runs a chords_converter command (tidy, shrink, join, check, apply) on a song text with QProcess, one run at
 // a time, without blocking the UI. The text goes through a temporary file, so the song on disk is
 // never touched.
 class ConverterRunner : public QObject {

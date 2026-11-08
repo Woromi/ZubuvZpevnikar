@@ -25,13 +25,13 @@ std::string_view trim(std::string_view text) {
 std::string failure(const char* what, int exitCode, std::string_view stdErr) {
     const auto message = trim(stdErr);
     if (message.empty())
-        return std::string("chords_converter ") + what + " exited with code " +
-               std::to_string(exitCode);
+        return std::string("chords_converter ") + (*what ? std::string(what) + " " : "") +
+               "exited with code " + std::to_string(exitCode);
     return std::string(message);
 }
 
 std::unexpected<std::string> badOutput(const std::string& what) {
-    return std::unexpected("Unexpected output of chords_converter suggest: " + what);
+    return std::unexpected("Unexpected output of chords_converter: " + what);
 }
 
 // A required integer member.
@@ -81,10 +81,10 @@ std::optional<Measured> readMeasured(const json::Value& object) {
 
 } // namespace
 
-converter::Command suggestCommand(const std::filesystem::path& converter,
+converter::Command shrinkCommand(const std::filesystem::path& converter,
                                   const std::filesystem::path& songFile, std::optional<Paper> fit,
                                   bool measure, const std::filesystem::path& songbookRoot) {
-    converter::Command command{utf8(converter), {"suggest", utf8(songFile)}};
+    converter::Command command{utf8(converter), {"shrink", utf8(songFile)}};
     if (fit) {
         command.arguments.push_back("--fit");
         command.arguments.push_back(*fit == Paper::A4 ? "a4" : "a5");
@@ -95,6 +95,11 @@ converter::Command suggestCommand(const std::filesystem::path& converter,
     command.arguments.push_back(utf8(songbookRoot));
     command.arguments.push_back("--json");
     return command;
+}
+
+converter::Command checkCommand(const std::filesystem::path& converter,
+                                const std::filesystem::path& songFile) {
+    return {utf8(converter), {"check", utf8(songFile), "--json"}};
 }
 
 converter::Command joinCommand(const std::filesystem::path& converter,
@@ -123,10 +128,10 @@ converter::Command applyCommand(const std::filesystem::path& converter,
     return command;
 }
 
-std::expected<Suggestions, std::string> interpretSuggest(int exitCode, std::string_view stdOut,
+std::expected<Suggestions, std::string> interpretProposals(int exitCode, std::string_view stdOut,
                                                          std::string_view stdErr) {
     if (exitCode != 0)
-        return std::unexpected(failure("suggest", exitCode, stdErr));
+        return std::unexpected(failure("", exitCode, stdErr));
     const auto parsed = json::parse(stdOut);
     if (!parsed)
         return badOutput(parsed.error());

@@ -30,15 +30,15 @@ int exitCode(const char* name) {
 
 } // namespace
 
-TEST_CASE("suggest and apply build the command lines", "[songsuggest]") {
-    const auto full = ss::suggestCommand("/opt/cc", "/tmp/x/S.tex", ss::Paper::A5, true, "/sb");
+TEST_CASE("shrink, check and apply build the command lines", "[songsuggest]") {
+    const auto full = ss::shrinkCommand("/opt/cc", "/tmp/x/S.tex", ss::Paper::A5, true, "/sb");
     CHECK(full.program == "/opt/cc");
-    CHECK(full.arguments == std::vector<std::string>{"suggest", "/tmp/x/S.tex", "--fit", "a5",
+    CHECK(full.arguments == std::vector<std::string>{"shrink", "/tmp/x/S.tex", "--fit", "a5",
                                                      "--measure", "--songbook", "/sb", "--json"});
-    const auto plain = ss::suggestCommand("/opt/cc", "/tmp/x/S.tex", std::nullopt, false, "/sb");
+    const auto plain = ss::shrinkCommand("/opt/cc", "/tmp/x/S.tex", std::nullopt, false, "/sb");
     CHECK(plain.arguments ==
-          std::vector<std::string>{"suggest", "/tmp/x/S.tex", "--songbook", "/sb", "--json"});
-    const auto a4 = ss::suggestCommand("/opt/cc", "S.tex", ss::Paper::A4, false, "/sb");
+          std::vector<std::string>{"shrink", "/tmp/x/S.tex", "--songbook", "/sb", "--json"});
+    const auto a4 = ss::shrinkCommand("/opt/cc", "S.tex", ss::Paper::A4, false, "/sb");
     CHECK(a4.arguments[2] == "--fit");
     CHECK(a4.arguments[3] == "a4");
     const std::vector<std::string> ids{"a@1", "b@2"};
@@ -49,9 +49,9 @@ TEST_CASE("suggest and apply build the command lines", "[songsuggest]") {
                                                       "chordsoff@81", "-o", "-"});
 }
 
-TEST_CASE("suggest interprets a real run with both papers measured", "[songsuggest]") {
-    const auto result = ss::interpretSuggest(exitCode("suggest"), slurp(converterData / "suggest.json"),
-                                             slurp(converterData / "suggest.err"));
+TEST_CASE("shrink interprets a real run with both papers measured", "[songsuggest]") {
+    const auto result = ss::interpretProposals(exitCode("shrink"), slurp(converterData / "shrink.json"),
+                                             slurp(converterData / "shrink.err"));
     REQUIRE(result);
     CHECK(result->fits == false);
     CHECK(result->note == "It fits A4: the changes for small paper only.");
@@ -85,14 +85,14 @@ TEST_CASE("suggest interprets a real run with both papers measured", "[songsugge
     CHECK(result->proposals[1].sources.empty());
 }
 
-TEST_CASE("suggest interprets a run where only A4 was measured", "[songsuggest]") {
-    const auto result = ss::interpretSuggest(exitCode("suggest-a4only"),
-                                             slurp(converterData / "suggest-a4only.json"), "");
+TEST_CASE("shrink interprets a run where only A4 was measured", "[songsuggest]") {
+    const auto result = ss::interpretProposals(exitCode("shrink-a4only"),
+                                             slurp(converterData / "shrink-a4only.json"), "");
     REQUIRE(result);
     CHECK(result->fits == false);
     REQUIRE(result->a4);
     CHECK(result->a4->pages == 2);
-    CHECK_FALSE(result->a5); // not measured while A4 does not fit (it was in 0.4.0)
+    CHECK_FALSE(result->a5); // not measured while A4 does not fit
     REQUIRE(result->proposals.size() == 1);
     CHECK(result->proposals[0].id == "chordsoff@81");
     CHECK(result->proposals[0].stage == 1);
@@ -100,34 +100,47 @@ TEST_CASE("suggest interprets a run where only A4 was measured", "[songsuggest]"
     CHECK(result->proposals[0].sources == std::vector<ss::Source>{{76, 2816, 3047}});
 }
 
-TEST_CASE("suggest offers restructuring apart, without measuring", "[songsuggest]") {
-    const auto result = ss::interpretSuggest(exitCode("restructure"),
-                                             slurp(converterData / "restructure.json"), "");
+TEST_CASE("check lists corrections in song order", "[songsuggest]") {
+    CHECK(ss::checkCommand("/opt/cc", "/tmp/x/S.tex").arguments ==
+          std::vector<std::string>{"check", "/tmp/x/S.tex", "--json"});
+    const auto result =
+        ss::interpretProposals(exitCode("check"), slurp(converterData / "check.json"), "");
     REQUIRE(result);
     CHECK_FALSE(result->a4);
     CHECK_FALSE(result->a5);
     REQUIRE(result->proposals.size() == 4);
-    const auto& restructure = result->proposals[0];
-    CHECK(restructure.id == "restructure@18");
+    std::vector<std::string> ids;
+    for (const auto& proposal : result->proposals) {
+        ids.push_back(proposal.id);
+        CHECK(proposal.score == 0);
+        CHECK(proposal.grade == "correction");
+    }
+    CHECK(ids == std::vector<std::string>{"typo@14", "apostrophes@15", "restructure@18", "typo@29"});
+    CHECK(result->proposals[0].category == "typo");
+    CHECK(result->proposals[0].edits.size() == 1);
+    const auto& restructure = result->proposals[2];
     CHECK(restructure.category == "restructure");
     CHECK(restructure.gainLines == 0);
-    CHECK(restructure.sources == std::vector<ss::Source>{{8, 145, 242}});
-    for (std::size_t i = 1; i < result->proposals.size(); ++i)
-        CHECK(result->proposals[i].category == "fit");
+    CHECK(restructure.sources == std::vector<ss::Source>{{8, 155, 258}});
+    // a typo with a chord inside the word: to fix by hand, nothing to apply
+    CHECK(result->proposals[3].edits.empty());
+    CHECK(result->proposals[3].description.ends_with("so fix it by hand"));
 
-    const auto applied = ss::interpretApply(exitCode("restructure-apply"),
-                                            slurp(converterData / "restructure-apply.out"),
-                                            slurp(converterData / "restructure-apply.err"));
+    const auto applied = ss::interpretApply(exitCode("check-apply"),
+                                            slurp(converterData / "check-apply.out"),
+                                            slurp(converterData / "check-apply.err"));
     REQUIRE(applied);
     CHECK(applied->find("\\beginverse*") == std::string::npos);
+    CHECK(applied->find("Ill be") == std::string::npos);
+    CHECK(applied->find("\xE2\x80\x99") == std::string::npos); // no ’ left
 }
 
-TEST_CASE("join lists joined lines in suggest's shape", "[songsuggest]") {
+TEST_CASE("join lists joined lines in shrink's shape", "[songsuggest]") {
     const auto command = ss::joinCommand("/opt/cc", "/tmp/x/S.tex", "/sb");
     CHECK(command.arguments ==
           std::vector<std::string>{"join", "/tmp/x/S.tex", "--songbook", "/sb", "--json"});
     const auto result =
-        ss::interpretSuggest(exitCode("join"), slurp(converterData / "join.json"), "");
+        ss::interpretProposals(exitCode("join"), slurp(converterData / "join.json"), "");
     REQUIRE(result);
     REQUIRE(result->a4);
     REQUIRE(result->a5);
@@ -140,7 +153,7 @@ TEST_CASE("join lists joined lines in suggest's shape", "[songsuggest]") {
 }
 
 TEST_CASE("suggest copes with null fits, null wrap lines and nothing measured", "[songsuggest]") {
-    const auto result = ss::interpretSuggest(
+    const auto result = ss::interpretProposals(
         0,
         R"({"file":"x.tex","fit":null,"fits":null,"note":"","proposals":[],
             "measured":{"a5":{"fits":false,"pages":3,
@@ -156,14 +169,14 @@ TEST_CASE("suggest copes with null fits, null wrap lines and nothing measured", 
     CHECK(result->a5->wrapLines == std::vector<int>{9});
     CHECK(result->proposals.empty());
 
-    const auto bare = ss::interpretSuggest(0, R"({"proposals":[]})", "");
+    const auto bare = ss::interpretProposals(0, R"({"proposals":[]})", "");
     REQUIRE(bare);
     CHECK_FALSE(bare->fits);
     CHECK(bare->note.empty());
 }
 
 TEST_CASE("suggest decodes escapes in descriptions", "[songsuggest]") {
-    const auto result = ss::interpretSuggest(
+    const auto result = ss::interpretProposals(
         0,
         R"({"proposals":[{"id":"a@1","kind":"k","stage":1,"line":1,"gain_lines":2,
             "score":80,"grade":"good","description":"quote \" backslash \\ caron \u010d"}]})",
@@ -174,37 +187,37 @@ TEST_CASE("suggest decodes escapes in descriptions", "[songsuggest]") {
 
 TEST_CASE("suggest reports failures", "[songsuggest]") {
     SECTION("non-zero exit uses stderr") {
-        const auto result = ss::interpretSuggest(1, "", "  Failed to read file\n");
+        const auto result = ss::interpretProposals(1, "", "  Failed to read file\n");
         REQUIRE_FALSE(result);
         CHECK(result.error() == "Failed to read file");
     }
     SECTION("non-zero exit without a message") {
-        const auto result = ss::interpretSuggest(2, "", "");
+        const auto result = ss::interpretProposals(2, "", "");
         REQUIRE_FALSE(result);
-        CHECK(result.error() == "chords_converter suggest exited with code 2");
+        CHECK(result.error() == "chords_converter exited with code 2");
     }
     SECTION("truncated json") {
-        const std::string json = slurp(converterData / "suggest.json");
-        CHECK_FALSE(ss::interpretSuggest(0, json.substr(0, json.size() / 2), ""));
-        CHECK_FALSE(ss::interpretSuggest(0, "", ""));
+        const std::string json = slurp(converterData / "shrink.json");
+        CHECK_FALSE(ss::interpretProposals(0, json.substr(0, json.size() / 2), ""));
+        CHECK_FALSE(ss::interpretProposals(0, "", ""));
     }
     SECTION("trailing garbage") {
-        CHECK_FALSE(ss::interpretSuggest(0, slurp(converterData / "suggest.json") + "x", ""));
+        CHECK_FALSE(ss::interpretProposals(0, slurp(converterData / "shrink.json") + "x", ""));
     }
     SECTION("wrong shape") {
-        CHECK_FALSE(ss::interpretSuggest(0, "[]", ""));
-        CHECK_FALSE(ss::interpretSuggest(0, "{}", ""));
-        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":{}})", ""));
-        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[{"id":"a"}]})", ""));
-        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,
+        CHECK_FALSE(ss::interpretProposals(0, "[]", ""));
+        CHECK_FALSE(ss::interpretProposals(0, "{}", ""));
+        CHECK_FALSE(ss::interpretProposals(0, R"({"proposals":{}})", ""));
+        CHECK_FALSE(ss::interpretProposals(0, R"({"proposals":[{"id":"a"}]})", ""));
+        CHECK_FALSE(ss::interpretProposals(0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,
             "score":1,"grade":"g","description":"d","edits":[{"start":5,"end":4,"replacement":""}]}]})", ""));
-        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,
+        CHECK_FALSE(ss::interpretProposals(0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,
             "score":1,"grade":"g","description":"d","sources":[{"line":1,"start":2}]}]})", ""));
         // a 0.2.0 proposal: no score and grade
-        CHECK_FALSE(ss::interpretSuggest(
+        CHECK_FALSE(ss::interpretProposals(
             0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,"description":"d"}]})", ""));
-        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[],"fits":"yes"})", ""));
-        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[],"measured":{"a4":{"pages":1}}})", ""));
+        CHECK_FALSE(ss::interpretProposals(0, R"({"proposals":[],"fits":"yes"})", ""));
+        CHECK_FALSE(ss::interpretProposals(0, R"({"proposals":[],"measured":{"a4":{"pages":1}}})", ""));
     }
 }
 
@@ -235,14 +248,14 @@ TEST_CASE("apply interprets real runs", "[songsuggest]") {
 TEST_CASE("version output is parsed", "[converter]") {
     const auto version = cv::parseVersion(slurp(converterData / "version.out"));
     REQUIRE(version);
-    CHECK(*version == cv::Version{0, 5, 0});
-    CHECK(cv::toString(*version) == "0.5.0");
+    CHECK(*version == cv::Version{0, 7, 0});
+    CHECK(cv::toString(*version) == "0.7.0");
     CHECK(*version >= cv::kRequired);
 
     CHECK(cv::parseVersion("chords_converter 0.10.3\r\nmore")->minor == 10);
     CHECK(cv::parseVersion("chords_converter 1.0.0-beta")->major == 1);
-    CHECK(*cv::parseVersion("chords_converter 0.4.0") < cv::kRequired);
-    CHECK(*cv::parseVersion("chords_converter 0.5.1") > cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.6.0") < cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.7.1") > cv::kRequired);
 }
 
 TEST_CASE("unparseable version output gives nothing", "[converter]") {

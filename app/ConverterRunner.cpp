@@ -13,10 +13,10 @@
 #endif
 
 namespace {
-// Measuring (suggest --measure) builds the song with lualatex: slow on a cold cache.
+// Measuring (shrink --measure, join) builds the song with lualatex: slow on a cold cache.
 constexpr int watchdogSeconds = 60;
 
-// Stops the converter and what it started (a measuring suggest runs python3 checkpaper.py,
+// Stops the converter and what it started (a measuring shrink or join runs python3 checkpaper.py,
 // lualatex and lilypond). On Unix the converter leads its own process group (see start()):
 // SIGTERM to the group, a short grace period, then SIGKILL. Waits for the converter to exit.
 void killTree(QProcess* process) {

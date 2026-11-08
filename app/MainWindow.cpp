@@ -40,9 +40,11 @@
 #include <QToolBar>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <algorithm>
 #include <functional>
 #include <set>
 #include <system_error>
+#include <utility>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/linediff.hpp>
@@ -173,6 +175,8 @@ void MainWindow::createCentralWidget() {
     connect(language_, &QComboBox::currentIndexChanged, this,
             [this] { proxy_->setLanguage(language_->currentData().toString()); });
     filters->addWidget(language_);
+
+
 
     table_ = new QTableView(listPage_);
     table_->setModel(proxy_);
@@ -590,13 +594,14 @@ void MainWindow::createSongToolBar() {
             [this] { startProposals(SongAction::Join); });
     songToolBar_->addAction(joinLinesAction_);
 
-    restructureAction_ = new QAction(QIcon::fromTheme(QStringLiteral("view-list-tree")),
-                                     tr("Restructure"), this);
-    restructureAction_->setToolTip(
-        tr("Find parts typed as a verse that have the chorus's words, and make one a chorus"));
-    connect(restructureAction_, &QAction::triggered, this,
-            [this] { startProposals(SongAction::Restructure); });
-    songToolBar_->addAction(restructureAction_);
+    checkAction_ = new QAction(QIcon::fromTheme(QStringLiteral("tools-check-spelling")),
+                               tr("Check Song"), this);
+    checkAction_->setToolTip(
+        tr("Look for mistakes: typos where a line's copies differ, apostrophes typed two ways, "
+           "a chorus typed as a verse"));
+    connect(checkAction_, &QAction::triggered, this, [this] { startProposals(SongAction::Check); });
+    songToolBar_->addAction(checkAction_);
+
 
     changesAction_ =
         new QAction(QIcon::fromTheme(QStringLiteral("document-compare")), tr("Changes"), this);
@@ -626,7 +631,7 @@ void MainWindow::updateSongActions() {
     if (!open) {
         for (QAction* action :
              {undoAction_, redoAction_, cutAction_, copyAction_, pasteAction_, tidyAction_,
-              makeSmallerAction_, joinLinesAction_, restructureAction_})
+              makeSmallerAction_, joinLinesAction_, checkAction_})
             action->setEnabled(false);
         return;
     }
@@ -643,8 +648,9 @@ void MainWindow::updateSongActions() {
     const bool converterFree =
         !readOnly && !converterRunner_->isRunning() && !findConverter().empty();
     tidyAction_->setEnabled(converterFree);
-    for (QAction* action : {makeSmallerAction_, joinLinesAction_, restructureAction_})
+    for (QAction* action : {makeSmallerAction_, joinLinesAction_})
         action->setEnabled(converterFree && !songbookRoot_.empty());
+    checkAction_->setEnabled(converterFree); // check needs no songbook
 }
 
 void MainWindow::startTidy(const QString& note) {
@@ -959,8 +965,8 @@ QString MainWindow::actionName(SongAction action) const {
     switch (action) {
     case SongAction::Shrink:
         return tr("Make Smaller");
-    case SongAction::Restructure:
-        return tr("Restructure");
+    case SongAction::Check:
+        return tr("Check Song");
     case SongAction::Join:
         return tr("Join Lines");
     }
@@ -997,17 +1003,17 @@ void MainWindow::startProposals(SongAction action) {
         const auto paper =
             zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
         command = [converter, paper, measure, root](const std::filesystem::path& file) {
-            return zub::songsuggest::suggestCommand(converter, file, paper, measure, root);
+            return zub::songsuggest::shrinkCommand(converter, file, paper, measure, root);
         };
         status = tr("Looking for ways to make the song smaller…");
         break;
     }
-    case SongAction::Restructure:
-        // Restructuring needs no measuring: nothing is built.
-        command = [converter, root](const std::filesystem::path& file) {
-            return zub::songsuggest::suggestCommand(converter, file, std::nullopt, false, root);
+    case SongAction::Check:
+        // check builds nothing: no approval needed
+        command = [converter](const std::filesystem::path& file) {
+            return zub::songsuggest::checkCommand(converter, file);
         };
-        status = tr("Looking for parts to restructure…");
+        status = tr("Checking the song…");
         break;
     case SongAction::Join:
         // join always typesets the song: without the approval it can't run.
@@ -1042,7 +1048,7 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
     }
     std::expected<zub::songsuggest::Suggestions, QString> result = std::unexpected(output.error_or({}));
     if (output) {
-        auto interpreted = zub::songsuggest::interpretSuggest(output->exitCode, output->out, output->err);
+        auto interpreted = zub::songsuggest::interpretProposals(output->exitCode, output->out, output->err);
         if (interpreted)
             result = std::move(*interpreted);
         else
@@ -1054,11 +1060,7 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
         QMessageBox::warning(this, tr("%1 failed").arg(name), result.error());
         return;
     }
-    zub::songsuggest::Suggestions& suggestions = *result;
-    // Each button shows its own kind: restructuring is listed apart from fitting the page.
-    const std::string wanted = action == SongAction::Restructure ? "restructure" : "fit";
-    std::erase_if(suggestions.proposals,
-                  [&wanted](const auto& proposal) { return proposal.category != wanted; });
+    const zub::songsuggest::Suggestions& suggestions = *result;
     if (suggestions.proposals.empty()) {
         const QString summary = ShrinkDialog::summary(suggestions);
         QString text;
@@ -1071,16 +1073,15 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
                        QStringLiteral(" ") + text;
             }
             break;
-        case SongAction::Restructure:
-            text = tr("Nothing to restructure: no part outside a chorus has the words of a "
-                      "chorus.");
+        case SongAction::Check:
+            text = tr("No mistakes found.");
             break;
         case SongAction::Join:
             text = tr("No lines can be joined: every part of a kind needs an even number of "
                       "lines, and the joined lines must still fit the column on A4 and A5.");
             break;
         }
-        if (!summary.isEmpty() && action != SongAction::Restructure)
+        if (!summary.isEmpty() && action != SongAction::Check)
             text += QStringLiteral("\n\n") + summary;
         QMessageBox::information(this, name, text);
         return;
@@ -1091,10 +1092,10 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
         heading = tr("Pick a change, most readable first (score 0–100: how readable the song "
                      "stays):");
         break;
-    case SongAction::Restructure:
-        heading = tr("These parts have the words of a chorus. Only you can tell whether one is the "
-                     "chorus sung again (the melody may differ). Pick one to make it a chorus, "
-                     "chords kept; Tidy can then shorten the copies:");
+    case SongAction::Check:
+        heading = tr("Possible mistakes, in song order. A part with a chorus's words: only you can "
+                     "tell whether it is the chorus sung again (the melody may differ); made a "
+                     "chorus, Tidy runs after it to shorten the copies.");
         break;
     case SongAction::Join:
         heading = tr("Pick the parts whose lines to join in pairs (checked: the joined lines fit "
@@ -1127,6 +1128,8 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
     runEditor_ = editor.data();
     runInput_ = input;
     songAction_ = action;
+    applyRestructures_ = std::ranges::any_of(
+        chosen, [](const auto& proposal) { return proposal.category == "restructure"; });
     startApply(std::move(ids), description);
 }
 
@@ -1154,6 +1157,7 @@ void MainWindow::onApplyFinished(const std::expected<ConverterOutput, QString>& 
     const QString description = std::move(applyDescription_);
     applyDescription_.clear();
     const SongAction action = songAction_;
+    const bool restructured = std::exchange(applyRestructures_, false);
     SongEditor* editor = takeRun(input, actionName(action));
     if (!editor) {
         updateSongActions();
@@ -1177,17 +1181,10 @@ void MainWindow::onApplyFinished(const std::expected<ConverterOutput, QString>& 
     statusBar()->showMessage(tr("Applied: %1").arg(description), 10000);
     updateSongActions();
     requestPreview();
-    // The saving comes after a restructuring: tidy makes the chorus's copies \insertchorus.
-    if (action == SongAction::Restructure) {
-        const QPointer<SongEditor> restructured = editor; // the song may close meanwhile
-        const auto answer = QMessageBox::question(
-            this, tr("Restructure"),
-            tr("Done. Run Tidy now, so that copies of a chorus become \\insertchorus? (One more "
-               "undo step.)"),
-            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
-        if (answer == QMessageBox::Yes && restructured && restructured == editor_)
-            startTidy();
-    }
+    // The saving comes after a restructuring: tidy makes the chorus's copies \insertchorus
+    // (its own undo step).
+    if (restructured && editor == editor_)
+        startTidy(tr(" (after making a part a chorus)"));
 }
 
 namespace {

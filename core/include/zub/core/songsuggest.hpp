@@ -10,12 +10,14 @@
 #include <vector>
 #include <zub/core/converter.hpp>
 
-// "Make Smaller" with the chords_converter CLI: "suggest SONG.tex --fit a5 --measure --songbook
-// ROOT --json" lists changes that make the song print smaller (rated by readability, best
-// first), "apply SONG.tex --id ID -o -" prints the song with one of them made. core prepares the
-// commands and interprets the results; the app runs the processes.
+// Song actions with the chords_converter CLI, each listing proposals in one JSON shape:
+// "shrink SONG.tex --fit a5 --measure --songbook ROOT --json" (Make Smaller: changes that make
+// the song print smaller, rated by readability, best first), "join" (Join Lines) and "check"
+// (Check Song: corrections, in song order). "apply SONG.tex --id ID ... -o -" prints the song with
+// the chosen ones made. core prepares the commands and interprets the results; the app runs the
+// processes.
 //
-// A proposal id such as "chordsoff@81" is valid only for the text suggest was run on; apply
+// A proposal id such as "chordsoff@81" is valid only for the text it was listed for; apply
 // refuses a stale id with exit code 1. --measure builds the song with lualatex -shell-escape
 // (the songbook's scripts/checkpaper.py), so callers apply the same safety rule as for a preview.
 namespace zub::songsuggest {
@@ -51,14 +53,17 @@ struct Source {
 struct Proposal {
     std::string id;
     std::string kind;
-    std::string category = "fit"; // "fit", or "restructure": changes what a part is (0.5.0)
+    // "fit" (shrink, join), "restructure" (changes what a part is) or "typo" (check)
+    std::string category = "fit";
     std::string description;
     int stage = 0; // 2: for small paper only
     int line = 0;  // in the text suggest ran on
     int gainLines = 0;
     int score = 0;     // 0-100: how readable the song stays (higher is better)
     std::string grade; // "good", "fair", "poor" or "last resort"; shown as is
-    std::vector<Edit> edits; // what apply would change; for showing it (apply makes the change)
+    // what apply would change; for showing it (apply makes the change). Empty for a correction
+    // to make by hand (a typo with a chord inside the word): nothing to apply.
+    std::vector<Edit> edits;
     std::vector<Source> sources;
     bool operator==(const Proposal&) const = default;
 };
@@ -72,11 +77,15 @@ struct Suggestions {
     bool operator==(const Suggestions&) const = default;
 };
 
-// {"suggest", file, ["--fit", "a4"|"a5"], ["--measure"], "--songbook", root, "--json"}
-converter::Command suggestCommand(const std::filesystem::path& converter,
+// {"shrink", file, ["--fit", "a4"|"a5"], ["--measure"], "--songbook", root, "--json"}
+converter::Command shrinkCommand(const std::filesystem::path& converter,
                                   const std::filesystem::path& songFile,
                                   std::optional<Paper> fit, bool measure,
                                   const std::filesystem::path& songbookRoot);
+// {"check", file, "--json"}: corrections (restructuring, typos), whether the song fits or not
+// (0.6.0). Builds nothing.
+converter::Command checkCommand(const std::filesystem::path& converter,
+                                const std::filesystem::path& songFile);
 // {"join", file, "--songbook", root, "--json"}: joining lines in pairs (0.5.0). Always builds the
 // song on A4 and A5 (seconds), so it needs the preview's safety approval; its output is suggest's.
 converter::Command joinCommand(const std::filesystem::path& converter,
@@ -92,9 +101,9 @@ converter::Command applyCommand(const std::filesystem::path& converter,
                                 const std::filesystem::path& songFile,
                                 std::span<const std::string> ids);
 
-// Exit code 0 and stdout = the JSON (of suggest or join). Non-zero exit, malformed JSON or a missing field gives an
+// Exit code 0 and stdout = the JSON (of shrink, join or check). Non-zero exit, malformed JSON or a missing field gives an
 // error message (stderr trimmed, or a description). stderr is ignored on success.
-std::expected<Suggestions, std::string> interpretSuggest(int exitCode, std::string_view stdOut,
+std::expected<Suggestions, std::string> interpretProposals(int exitCode, std::string_view stdOut,
                                                          std::string_view stdErr);
 // Exit code 0: stdout is the changed song. Otherwise the error message as above.
 std::expected<std::string, std::string> interpretApply(int exitCode, std::string_view stdOut,
