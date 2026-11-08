@@ -250,7 +250,15 @@ Outline outline(std::string_view songText) {
                     }
                 }
             }
-            const PartChords chords = chordsIn(song.substr(after, endAt - after), songChords);
+            const std::string_view body = song.substr(after, endAt - after);
+            for (std::size_t from = 0; from < body.size();) {
+                const auto newline = std::min(body.find('\n', from), body.size());
+                if (body.substr(from, newline - from).find_first_not_of(" \t\r") !=
+                    std::string_view::npos)
+                    ++part.lines;
+                from = newline + 1;
+            }
+            const PartChords chords = chordsIn(body, songChords);
             part.chords = chords.chords;
             part.chordsOffPartWay = chords.offPartWay;
             if (kind == "chorus") {
@@ -370,10 +378,12 @@ std::expected<Preview, std::string> preview(std::string_view before,
             result.songChanged = true;
     }
     // A setting between parts changes the parts after it too.
+    result.linesBefore.assign(parts.size(), -1);
     if (old.parts.size() == parts.size()) {
         for (std::size_t i = 0; i < parts.size(); ++i) {
             if (!sameLook(old.parts[i], parts[i]))
                 result.changed[i] = true;
+            result.linesBefore[i] = old.parts[i].lines;
         }
     }
     result.smallerChanged = old.smallerOnSmallPage != result.after.smallerOnSmallPage;

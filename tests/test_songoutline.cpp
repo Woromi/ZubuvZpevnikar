@@ -65,6 +65,8 @@ TEST_CASE("outline names and numbers the parts", "[songoutline]") {
           "Chorus 3 reminder off|Chorus 4 full off|Instrumental 1|");
     REQUIRE(outline.parts.size() == 9);
     CHECK(outline.parts[0].line == 2);
+    CHECK(outline.parts[0].lines == 1);
+    CHECK(outline.parts[3].lines == 0); // a repeat
     CHECK(outline.parts[3].line == 11);
     CHECK(song.substr(outline.parts[0].begin, outline.parts[0].end - outline.parts[0].begin) ==
           "\\beginverse\n\\[C]la\n\\endverse");
@@ -181,6 +183,8 @@ TEST_CASE("preview: a deletion right before a part, joined lines, bad edits", "[
     const auto joined = so::preview(song, std::vector<E>{{newline, newline + 1, " "}});
     REQUIRE(joined);
     CHECK(joined->changed == std::vector<bool>{true, false});
+    CHECK(joined->linesBefore == std::vector<int>{2, 1});
+    CHECK(joined->after.parts[0].lines == 1);
     CHECK(joined->after.parts[1].line == 8);
     CHECK_FALSE(joined->songChanged);
 

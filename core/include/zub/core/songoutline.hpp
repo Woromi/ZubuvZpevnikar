@@ -36,6 +36,7 @@ struct Part {
     bool chordsOffPartWay = false; // a \chordsoff(onsmallpage) after its first line: some lines
                                    // without chords
     Repeat repeat = Repeat::None;
+    int lines = 0; // source lines with text in a written-out part (0 for a repeat)
     int line = 0;          // where it starts (1-based)
     std::size_t begin = 0; // byte span in the text, \begin<kind> to after \end<kind>
     std::size_t end = 0;
@@ -65,6 +66,9 @@ struct Preview {
     std::vector<bool> changed;   // per part of `after`: an edit touches it, or it looks different
     bool songChanged = false;    // an edit outside the parts, or smallerChanged
     bool smallerChanged = false; // \smalleronsmallpage added or removed
+    // per part of `after`: its `lines` before the change; -1 when the parts can't be matched
+    // (the change added or removed parts)
+    std::vector<int> linesBefore;
 };
 
 // What a proposal does, for showing: the outline after its edits, with the touched parts.

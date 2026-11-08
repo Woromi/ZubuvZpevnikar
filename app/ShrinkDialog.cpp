@@ -51,18 +51,6 @@ QString partState(const zub::songoutline::Part& part) {
     return state.join(QStringLiteral(", "));
 }
 
-// The names of the parts a proposal changes, "Verse 3", or "whole song".
-QString changedParts(const zub::songoutline::Preview& preview) {
-    QStringList names;
-    if (preview.songChanged)
-        names << ShrinkDialog::tr("Whole song");
-    for (std::size_t i = 0; i < preview.after.parts.size(); ++i) {
-        if (preview.changed[i])
-            names << toQString(preview.after.parts[i].name);
-    }
-    return names.join(QStringLiteral(", "));
-}
-
 } // namespace
 
 QString ShrinkDialog::summary(const zub::songsuggest::Suggestions& suggestions) {
@@ -101,14 +89,8 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     list_ = new QListWidget(this);
     for (std::size_t i = 0; i < suggestions_.proposals.size(); ++i) {
         const auto& proposal = suggestions_.proposals[i];
-        // "57 fair: Verse 3: the verse repeats ... — saves 1 line (small paper only)"
-        QString where;
-        if (previews_[i])
-            where = changedParts(*previews_[i]);
-        if (!where.isEmpty())
-            where += QStringLiteral(": ");
         // "57 fair: the pre-chorus repeats ... — saves 1 line (small paper only)"
-        QString text = tr("%1 %2: ").arg(proposal.score).arg(toQString(proposal.grade)) + where +
+        QString text = tr("%1 %2: ").arg(proposal.score).arg(toQString(proposal.grade)) +
                        toQString(proposal.description) + QStringLiteral(" — ") +
                        tr("saves %n line(s)", nullptr, proposal.gainLines);
         if (proposal.stage == 2)
@@ -190,7 +172,15 @@ void ShrinkDialog::showOutline(int row) {
     }
     for (std::size_t i = 0; i < preview->after.parts.size(); ++i) {
         const auto& part = preview->after.parts[i];
-        row_(toQString(part.name), partState(part), part.line, preview->changed[i]);
+        QString state = partState(part);
+        const int linesBefore = preview->linesBefore.at(i);
+        if (preview->changed[i] && part.repeat == zub::songoutline::Repeat::None &&
+            linesBefore > 0 && linesBefore != part.lines) {
+            // "12 → 6 lines" (joined lines)
+            const QString count = tr("%1 → %2 lines").arg(linesBefore).arg(part.lines);
+            state = state.isEmpty() ? count : state + QStringLiteral(", ") + count;
+        }
+        row_(toQString(part.name), state, part.line, preview->changed[i]);
     }
     html += QStringLiteral("</table>");
     outline_->setHtml(html);
