@@ -25,7 +25,10 @@ class ImportDialog : public QDialog {
 
 public:
     // `converter` may be empty or wrong; the user can choose the program in the dialog.
-    explicit ImportDialog(std::filesystem::path converter, QWidget* parent = nullptr);
+    // `builtIn` is the converter built with the app (empty if there is none); "Use Built-in"
+    // switches back to it from a chosen one.
+    ImportDialog(std::filesystem::path converter, std::filesystem::path builtIn,
+                 QWidget* parent = nullptr);
     ~ImportDialog() override; // kills a running conversion
 
     // Valid after the dialog was accepted.
@@ -34,6 +37,8 @@ public:
     const std::filesystem::path& converter() const { return converter_; }
     // The user picked the converter with "Choose…" (only then is it worth remembering).
     bool converterChosen() const { return converterChosen_; }
+    // The user went back to the built-in converter (forget the chosen one).
+    bool converterReset() const { return converterReset_; }
 
 protected:
     void reject() override; // Cancel/Esc: stops a running conversion first
@@ -50,12 +55,14 @@ private:
     bool converterExists() const;
 
     std::filesystem::path converter_;
+    std::filesystem::path builtIn_;
     std::optional<zub::songimport::Imported> imported_;
 
     QLineEdit* source_ = nullptr;
     QPushButton* browse_ = nullptr;
     QLabel* converterLabel_ = nullptr;
     QPushButton* chooseConverter_ = nullptr;
+    QPushButton* useBuiltIn_ = nullptr; // shown while another converter is in use
     QGroupBox* botCheck_ = nullptr; // checkable; holds the cookie and user-agent fields
     QLineEdit* cookie_ = nullptr;
     QLineEdit* userAgent_ = nullptr;
@@ -69,6 +76,7 @@ private:
     std::unique_ptr<QTemporaryDir> workDir_; // one per run
     bool timedOut_ = false;
     bool converterChosen_ = false;
+    bool converterReset_ = false;
     bool cancelled_ = false;
     bool running_ = false;
     QByteArray out_;

@@ -1,0 +1,3 @@
+[submodule "external/chords_converter"]
+	path = external/chords_converter
+	url = https://github.com/Woromi/chords_converter.git

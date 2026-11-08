@@ -209,22 +209,12 @@ void MainWindow::openInitialSongbook(const QString& commandLinePath) {
         return;
     }
 
-    QStringList candidates;
+    // Only the remembered folder: no guesses. If it is missing (e.g. an unplugged disk), say
+    // so; it stays remembered unless the user picks another one.
     const QString remembered = QSettings{}.value(songbookPathKey).toString();
-    if (!remembered.isEmpty())
-        candidates << remembered;
-    // Development defaults: the sibling checkout next to this repo.
-    candidates << QDir::current().filePath(QStringLiteral("../ZubuvZpevnik"))
-               << QDir(QApplication::applicationDirPath())
-                      .filePath(QStringLiteral("../../../../ZubuvZpevnik"));
-
-    // Silent, and not remembered: a temporarily missing remembered folder must not be
-    // replaced by a guess.
-    for (const QString& candidate : candidates) {
-        if (openSongbook(toPath(QDir::cleanPath(candidate)),
-                         {.showErrors = false, .remember = false}))
-            return;
-    }
+    if (!remembered.isEmpty() &&
+        openSongbook(toPath(QDir::cleanPath(remembered)), {.showErrors = true, .remember = false}))
+        return;
     chooseSongbookFolder();
 }
 
@@ -677,25 +667,38 @@ void MainWindow::requestPreview(bool userAsked) {
     previewRunner_->request(std::move(request));
 }
 
+namespace {
+
+bool usableConverter(const QString& path) {
+    const QFileInfo info(path);
+    // Absolute only: PATH may contain "." or empty entries.
+    return !path.isEmpty() && info.isAbsolute() && info.isFile() && info.isExecutable();
+}
+
+} // namespace
+
+std::filesystem::path MainWindow::builtInConverter() const {
+    // Built from the external/chords_converter submodule and put next to the app by CMake
+    // (in the build dir, and by cmake --install).
+    const QString path =
+        QDir(QApplication::applicationDirPath()).filePath(QStringLiteral("chords_converter"));
+    return usableConverter(path) ? toPath(path) : std::filesystem::path{};
+}
+
 std::filesystem::path MainWindow::findConverter() const {
-    const auto usable = [](const QString& path) {
-        const QFileInfo info(path);
-        // Absolute only: PATH may contain "." or empty entries.
-        return !path.isEmpty() && info.isAbsolute() && info.isFile() && info.isExecutable();
-    };
+    // The built-in converter is the version this app is tested with. Another one is used only
+    // when the user chose it in the import dialog; PATH and ~/.cargo/bin are fallbacks for an
+    // app built without it (ZUB_BUILD_CONVERTER=OFF).
+    const auto builtIn = builtInConverter();
     QStringList candidates{
         QSettings{}.value(converterKey).toString(),
+        builtIn.empty() ? QString{} : toQString(builtIn),
         QStandardPaths::findExecutable(QStringLiteral("chords_converter")),
         // cargo install puts it here, which is not always on PATH for GUI apps
         QDir::home().filePath(QStringLiteral(".cargo/bin/chords_converter")),
     };
-    if (!songbookRoot_.empty()) {
-        // The sibling checkout next to the songbook: ../chords_converter
-        candidates << toQString(songbookRoot_.parent_path() / "chords_converter" / "target" /
-                                "release" / "chords_converter");
-    }
     for (const QString& candidate : candidates) {
-        if (usable(candidate))
+        if (usableConverter(candidate))
             return toPath(candidate);
     }
     return {};
@@ -706,11 +709,14 @@ void MainWindow::importSong() {
         QMessageBox::information(this, tr("Import Song"), tr("Open a songbook folder first."));
         return;
     }
-    ImportDialog dialog(findConverter(), this);
+    const auto builtIn = builtInConverter();
+    ImportDialog dialog(findConverter(), builtIn, this);
     const int result = dialog.exec();
-    // Remember only a converter the user picked: a remembered automatic find would shadow a
-    // newer build found later.
-    if (dialog.converterChosen())
+    // Remember only a converter the user picked, and never the built-in one: a remembered
+    // automatic find would shadow the built-in converter after an update.
+    if (dialog.converterReset() || (dialog.converterChosen() && dialog.converter() == builtIn))
+        QSettings{}.remove(converterKey);
+    else if (dialog.converterChosen())
         QSettings{}.setValue(converterKey, toQString(dialog.converter()));
     if (result != QDialog::Accepted)
         return;

@@ -29,8 +29,10 @@ const char* errorStyle = "color: #b00020;";
 using zub::songimport::FailureKind;
 } // namespace
 
-ImportDialog::ImportDialog(std::filesystem::path converter, QWidget* parent)
-    : QDialog(parent), converter_(std::move(converter)), process_(new QProcess(this)),
+ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::path builtIn,
+                           QWidget* parent)
+    : QDialog(parent), converter_(std::move(converter)), builtIn_(std::move(builtIn)),
+      process_(new QProcess(this)),
       watchdog_(new QTimer(this)) {
     setWindowTitle(tr("Import Song"));
     resize(640, 300);
@@ -51,9 +53,12 @@ ImportDialog::ImportDialog(std::filesystem::path converter, QWidget* parent)
 
     converterLabel_ = new QLabel;
     chooseConverter_ = new QPushButton(tr("Choose…"));
+    useBuiltIn_ = new QPushButton(tr("Use Built-in"));
+    useBuiltIn_->setToolTip(tr("Use the chords_converter built with this app"));
     auto* converterRow = new QHBoxLayout;
     converterRow->addWidget(new QLabel(tr("Converter:")));
     converterRow->addWidget(converterLabel_, 1);
+    converterRow->addWidget(useBuiltIn_);
     converterRow->addWidget(chooseConverter_);
 
     botCheck_ = new QGroupBox(tr("Site asks for a bot check"));
@@ -129,6 +134,13 @@ ImportDialog::ImportDialog(std::filesystem::path converter, QWidget* parent)
     connect(source_, &QLineEdit::returnPressed, importButton_, &QPushButton::click);
     connect(browse_, &QPushButton::clicked, this, [this] { chooseSource(); });
     connect(chooseConverter_, &QPushButton::clicked, this, [this] { chooseConverter(); });
+    connect(useBuiltIn_, &QPushButton::clicked, this, [this] {
+        converter_ = builtIn_;
+        converterChosen_ = false;
+        converterReset_ = true;
+        updateConverterLabel();
+        updateImportEnabled();
+    });
     connect(importButton_, &QPushButton::clicked, this, [this] { startImport(); });
     connect(buttons_, &QDialogButtonBox::rejected, this, &ImportDialog::reject);
 
@@ -154,14 +166,16 @@ void ImportDialog::updateConverterLabel() {
         const QString path = toQString(converter_);
         const QFontMetrics metrics(converterLabel_->font());
         converterLabel_->setStyleSheet({});
-        converterLabel_->setText(metrics.elidedText(path, Qt::ElideMiddle, 380));
+        const QString shown = converter_ == builtIn_ ? tr("built-in (%1)").arg(path) : path;
+        converterLabel_->setText(metrics.elidedText(shown, Qt::ElideMiddle, 380));
         converterLabel_->setToolTip(path);
     } else {
         converterLabel_->setStyleSheet(QString::fromLatin1(errorStyle));
-        converterLabel_->setText(tr("chords_converter not found — build it with "
-                                    "cargo build --release, or choose it"));
+        converterLabel_->setText(tr("chords_converter not found — build the app with "
+                                    "ZUB_BUILD_CONVERTER, or choose it"));
         converterLabel_->setToolTip(toQString(converter_));
     }
+    useBuiltIn_->setVisible(!builtIn_.empty() && converter_ != builtIn_);
     converterLabel_->setMinimumWidth(0);
     converterLabel_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
 }
@@ -186,6 +200,7 @@ void ImportDialog::chooseConverter() {
         return;
     converter_ = toPath(file);
     converterChosen_ = true;
+    converterReset_ = false;
     updateConverterLabel();
     updateImportEnabled();
 }
@@ -195,6 +210,7 @@ void ImportDialog::setRunning(bool running) {
     source_->setEnabled(!running);
     browse_->setEnabled(!running);
     chooseConverter_->setEnabled(!running);
+    useBuiltIn_->setEnabled(!running);
     botCheck_->setEnabled(!running);
     updateImportEnabled();
     if (running) {

@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(ZUB_BUILD_APP "Build the Qt application (core and tests build without Qt)" ON)
 option(ZUB_BUILD_TESTS "Build the core unit tests" ON)
+option(ZUB_BUILD_CONVERTER "Build chords_converter (external/chords_converter) with cargo, next to the app" ON)
 
 # Warnings shared by every target of this project
 add_library(zub_warnings INTERFACE)

@@ -24,8 +24,9 @@ Key facts from them:
 - Builds need `lualatex -shell-escape` (lyluatex runs `lilypond`), with `TEXINPUTS` pointing at `zubuvzpevnik/`, `songs/chords/`, the repo root and the project dir. See `projects/velkyzpevnik/build.sh`.
 - Song header parsing in `core/` (`zub::parseSong`, `zub::latex::*`) is a port of `scripts/songfile.py`. Keep them in agreement; if one changes, check the other.
 - Linters: `scripts/checksongs.py`, `scripts/checkkeys.py`, `scripts/checkpaper.py` (read-only, except `checkpaper.py --write`).
-- `chords_converter` is binary-only (no `lib.rs`); the app runs it as a subprocess (`ImportDialog`, `zub::songimport`). It writes `out/latex/<Artist>/<Title>.tex` relative to the **current directory**, prints `Saving output to: <path>`, exits 1 when the song could not be read or written and 2 for a wrong command line (converters before `9d00844` exited 0 after a failed write). `chords_converter convert <source> -o -` prints the song to stdout instead. Captured real outputs are in `tests/data/converter/`. The app finds the converter via the remembered path, PATH, `~/.cargo/bin`, then `../chords_converter/target/release/` — rebuild it there (`cargo build --release`) after converter changes.
-- The converter owns the song actions (tidy, suggest/apply as text-span edits); the app only shows and applies them. See "Song actions" in PLAN.md.
+- `chords_converter` is binary-only (no `lib.rs`); the app runs it as a subprocess (`ImportDialog`, `zub::songimport`). It writes `out/latex/<Artist>/<Title>.tex` relative to the **current directory**, prints `Saving output to: <path>`, exits 1 when the song could not be read or written and 2 for a wrong command line (converters before `9d00844` exited 0 after a failed write). `chords_converter convert <source> -o -` prints the song to stdout instead. Captured real outputs are in `tests/data/converter/`. The app finds the converter via the remembered path (chosen in the import dialog), next to its own executable, PATH, then `~/.cargo/bin`; no guesses.
+- `chords_converter` is also a git submodule at `external/chords_converter` (pinned to a commit on GitHub). CMake builds it with cargo and copies it next to the app (`ZUB_BUILD_CONVERTER`, on by default; skipped without cargo or without `git submodule update --init`). Converter work still happens in `../chords_converter`; once it is pushed, bump the pin with `git submodule update --remote external/chords_converter` and commit that. Never commit inside the submodule. The `[integration]` import test uses the converter in `ZUB_CONVERTER` (e.g. `build/debug/app/chords_converter`).
+- The converter owns the song actions (`tidy`, `suggest`/`apply` as text-span edits); the app only shows and applies them. See "Song actions" in PLAN.md. `suggest --measure` builds the song with `lualatex -shell-escape` (via the songbook's `checkpaper.py`), so it needs the same safety check as the preview.
 
 ## Architecture (hard rule)
 
@@ -54,6 +55,7 @@ build/debug/app/zubuvzpevnik-ui      # run the app
 QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless smoke test (exit 124 = ran fine)
 ```
 
+- Never pass `--songbook` when running the app for a test: a command-line songbook is remembered in the user's settings (`~/.config/Modrozoubek/ZubuvZpevnikUi.conf`, `songbook/path`), so `--songbook tests/data/songbook` leaves the user's app on the 5-song fixture, whose stand-in classes can't build.
 - `-DZUB_BUILD_APP=OFF` builds only core + tests (no Qt needed).
 - Layout: public core headers in `core/include/zub/core/` (`#include <zub/core/...>`), namespace `zub`. App classes in `app/`, one class per `.hpp/.cpp` pair.
 - New tests: add the `.cpp` to `tests/CMakeLists.txt`. Catch2 discovers the test cases.

@@ -37,8 +37,8 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
-    // Opens the songbook given on the command line, else the remembered one, else a guess
-    // next to this repo; if none is valid (or the command-line one is not), asks for a folder.
+    // Opens the songbook given on the command line, else the remembered one (QSettings); if
+    // neither is set or valid, asks for a folder.
     void openInitialSongbook(const QString& commandLinePath);
 
 protected:
@@ -66,6 +66,7 @@ private:
     void showSong(SongEditor* editor, const QString& title, const QString& toolTip);
     void importSong();
     std::filesystem::path findConverter() const;
+    std::filesystem::path builtInConverter() const; // empty if the app was built without it
     void saveCurrent();
     bool closeSong();                      // false if the user cancelled
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
