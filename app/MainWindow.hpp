@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QByteArray>
 #include <QString>
 #include <filesystem>
 #include <map>
@@ -8,14 +9,17 @@
 #include <set>
 #include <string>
 
+class QAction;
 class QComboBox;
 class QLabel;
 class QLockFile;
 class QLineEdit;
 class QModelIndex;
 class QSplitter;
-class QTabWidget;
+class QStackedWidget;
+class QToolBar;
 class QTableView;
+class QWidget;
 class PreviewPane;
 class PreviewRunner;
 class SongEditor;
@@ -54,18 +58,20 @@ private:
     void updateLanguageFilter();
     void updateStatus();
 
-    // Editor tabs
+    // The open song (one at a time)
     void openSong(const QModelIndex& proxyIndex);
-    SongEditor* findEditor(const std::filesystem::path& path) const;
-    void addEditorTab(SongEditor* editor, const QString& title, const QString& toolTip);
+    // Loads `path` into a new editor, warning on failure (nullptr). An empty `title` is taken
+    // from the song header, else the file name.
+    SongEditor* openEditor(const std::filesystem::path& path, const QString& title);
+    void showSong(SongEditor* editor, const QString& title, const QString& toolTip);
     void importSong();
     std::filesystem::path findConverter() const;
-    SongEditor* currentEditor() const;
     void saveCurrent();
-    bool closeTab(int index);              // false if the user cancelled
-    bool closeAllTabs();                   // false if the user cancelled
+    bool closeSong();                      // false if the user cancelled
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
-    void updateTabTitle(SongEditor* editor);
+    void createSongToolBar();
+    void updateSongActions();
+    void updateWindowTitle();
     void refreshSongMetadata(SongEditor* editor, const std::string& content);
 
     // Preview
@@ -73,14 +79,27 @@ private:
     // Builds the current editor's text; clears the pane without one. A song with commands
     // outside the song format is built only when `userAsked` (Rebuild) and confirmed.
     void requestPreview(bool userAsked = false);
-    void requestPreviewIfCurrent(SongEditor* editor);
     std::string inputNameOf(const SongEditor* editor) const; // "Artist/Title"
 
     SongTableModel* model_ = nullptr;
     SongFilterProxy* proxy_ = nullptr;
     QTableView* table_ = nullptr;
-    QTabWidget* tabs_ = nullptr;
-    QSplitter* splitter_ = nullptr;
+    QStackedWidget* pages_ = nullptr;
+    QWidget* listPage_ = nullptr;
+    QWidget* songPage_ = nullptr;
+    QToolBar* songToolBar_ = nullptr;
+    QSplitter* songSplitter_ = nullptr; // editor | preview
+    QByteArray songSplitterState_;      // restored when a song opens
+    SongEditor* editor_ = nullptr;      // the open song, if any
+    QLabel* inputLabel_ = nullptr;
+    QAction* closeSongAction_ = nullptr;
+    QAction* saveAction_ = nullptr;
+    QAction* undoAction_ = nullptr;
+    QAction* redoAction_ = nullptr;
+    QAction* cutAction_ = nullptr;
+    QAction* copyAction_ = nullptr;
+    QAction* pasteAction_ = nullptr;
+    QString listTitle_; // window title on the list page
     // Syntax definitions and themes, shared by all editors (must outlive them).
     std::unique_ptr<KSyntaxHighlighting::Repository> repository_;
     PreviewPane* preview_ = nullptr;

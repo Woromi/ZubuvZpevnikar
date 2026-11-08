@@ -46,7 +46,24 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 - [ ] Rebuild the converter from the app, or warn when its binary is older than its sources.
 - [ ] Run `chords_converter convert <source> -o -` (song on stdout) instead of a temp work dir plus parsing `Saving output to:`. Needs a converter new enough to have `convert`; keep or drop the old form then.
 
-## 5. Song actions
+## 5. Window layout: a song list page and a song page
+
+Decided with the user (2026-11-07): three full columns (table | editor | PDF) side by side are too
+much, and several songs open at once isn't needed. The window shows one page at a time:
+
+- **Song list**: the table with search and language filter, full window.
+- **Song**: the one open song, editor and PDF preview side by side.
+
+Closing the song returns to the list. Not chosen: a narrow names-only list beside the editor,
+editor tabs for several songs, a quick-open popup.
+
+- [x] Song list page (full window). Double-click / Enter opens the song and switches to the song page; Import Song… does too.
+- [x] Song page: editor and PDF preview side by side in a splitter (sizes remembered in QSettings); no editor tabs. The window title shows the song, with `*` when modified.
+- [x] Close Song (Ctrl+W and a toolbar button) returns to the list, asking Save/Discard/Cancel when modified. Opening or importing a song while one is open closes it first (same question). Reload when the file changes outside the app keeps working.
+- [x] Editor toolbar on the song page: Back to list (= Close Song), Save, Undo, Redo, Cut, Copy, Paste, and the song's "Artist/Title" on the right. Buttons are enabled only when they apply (undo/redo available, text selected, modified, not read-only). Rebuild stays in the preview pane's own bar (Ctrl+R). "Open Existing" on the song already open just keeps it. The song actions (§6) will add their buttons here.
+- [ ] Songbooks (§7) become a third page later; decide then how to reach it (e.g. a button on the song list page).
+
+## 6. Song actions
 
 Optional, undoable edits that turn a song (an import or any open song) into a finished one: a
 checklist in the import dialog, and a menu for any open song. Nothing is saved until Ctrl+S, and
@@ -92,7 +109,7 @@ never committed as raw converter output, so this shows edits after a first hand 
 Converter-side, still open there: chord placement (15+ manual chord fixes after import point to
 reading problems) and metadata the site provides but the parser misses (capo, meter).
 
-## 6. Songbook assembler
+## 7. Songbook assembler
 
 - [ ] core: parse a project `.tex` (class, options, ordered `\input` list), and write it back, changing only the `\input` lines.
 - [ ] app: project view where you add or remove songs from the library and keep the list alphabetical by title.

@@ -63,6 +63,11 @@ bool SongTableModel::updateSong(const std::filesystem::path& path, zub::SongMeta
     return true;
 }
 
+int SongTableModel::rowOf(const std::filesystem::path& path) const {
+    const auto it = std::ranges::find(rows_, path, [](const Row& row) { return row.entry.path; });
+    return it == rows_.end() ? -1 : static_cast<int>(it - rows_.begin());
+}
+
 const zub::SongEntry* SongTableModel::song(int row) const {
     if (row < 0 || static_cast<std::size_t>(row) >= rows_.size())
         return nullptr;
