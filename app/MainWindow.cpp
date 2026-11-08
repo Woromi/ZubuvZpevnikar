@@ -16,6 +16,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
 #include <QFileDialog>
@@ -37,6 +38,7 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QTableView>
+#include <QTextDocument>
 #include <QToolBar>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -53,6 +55,7 @@
 #include <zub/core/song.hpp>
 #include <zub/core/songimport.hpp>
 #include <zub/core/songsuggest.hpp>
+#include <zub/core/songtodo.hpp>
 #include <zub/core/songtidy.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -176,6 +179,10 @@ void MainWindow::createCentralWidget() {
             [this] { proxy_->setLanguage(language_->currentData().toString()); });
     filters->addWidget(language_);
 
+    auto* todoOnly = new QCheckBox(tr("Only songs with TODOs"), filters);
+    todoOnly->setToolTip(tr("Songs with a TODO comment, e.g. imported songs not checked yet"));
+    connect(todoOnly, &QCheckBox::toggled, proxy_, &SongFilterProxy::setTodoOnly);
+    filters->addWidget(todoOnly);
 
 
     table_ = new QTableView(listPage_);
@@ -188,6 +195,7 @@ void MainWindow::createCentralWidget() {
     table_->verticalHeader()->hide();
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Title, QHeaderView::Stretch);
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Artist, QHeaderView::Stretch);
+    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Todo, QHeaderView::Stretch);
     connect(table_, &QAbstractItemView::activated, this, &MainWindow::openSong);
 
     listLayout->addWidget(filters);
@@ -436,7 +444,10 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
     QPlainTextEdit* edit = editor->textEdit();
     connect(edit, &QPlainTextEdit::undoAvailable, this,
             [this](bool available) { undoAction_->setEnabled(available); });
-    connect(edit, &QPlainTextEdit::textChanged, this, [this] { refreshChanges(); });
+    connect(edit, &QPlainTextEdit::textChanged, this, [this] {
+        refreshChanges();
+        updateMarkChecked();
+    });
     connect(edit, &QPlainTextEdit::redoAvailable, this,
             [this](bool available) { redoAction_->setEnabled(available); });
     connect(edit, &QPlainTextEdit::copyAvailable, this, [this, edit](bool available) {
@@ -602,6 +613,21 @@ void MainWindow::createSongToolBar() {
     connect(checkAction_, &QAction::triggered, this, [this] { startProposals(SongAction::Check); });
     songToolBar_->addAction(checkAction_);
 
+    markCheckedAction_ = new QAction(QIcon::fromTheme(QStringLiteral("checkmark")),
+                                     tr("Mark Checked"), this);
+    markCheckedAction_->setToolTip(
+        tr("The song is ready for the songbook: remove its \"not checked yet\" TODO line "
+           "(one undo step; save to keep it)"));
+    connect(markCheckedAction_, &QAction::triggered, this, [this] {
+        if (!editor_ || editor_->textEdit()->isReadOnly())
+            return;
+        const std::string content = editor_->content();
+        if (!zub::todo::hasNotCheckedMark(content))
+            return;
+        editor_->replaceContent(zub::todo::removeNotCheckedMark(content));
+        statusBar()->showMessage(tr("Marked as checked. Save to keep it."), 8000);
+    });
+    songToolBar_->addAction(markCheckedAction_);
 
     changesAction_ =
         new QAction(QIcon::fromTheme(QStringLiteral("document-compare")), tr("Changes"), this);
@@ -631,7 +657,7 @@ void MainWindow::updateSongActions() {
     if (!open) {
         for (QAction* action :
              {undoAction_, redoAction_, cutAction_, copyAction_, pasteAction_, tidyAction_,
-              makeSmallerAction_, joinLinesAction_, checkAction_})
+              makeSmallerAction_, joinLinesAction_, checkAction_, markCheckedAction_})
             action->setEnabled(false);
         return;
     }
@@ -651,6 +677,18 @@ void MainWindow::updateSongActions() {
     for (QAction* action : {makeSmallerAction_, joinLinesAction_})
         action->setEnabled(converterFree && !songbookRoot_.empty());
     checkAction_->setEnabled(converterFree); // check needs no songbook
+    updateMarkChecked();
+}
+
+void MainWindow::updateMarkChecked() {
+    // Searched in the document: cheap enough for every keystroke of a song-sized text.
+    const bool marked =
+        editor_ && !editor_->textEdit()->isReadOnly() && !changesAction_->isChecked() &&
+        !editor_->textEdit()
+             ->document()
+             ->find(QStringLiteral("% TODO: ") + toQString(zub::todo::kNotChecked))
+             .isNull();
+    markCheckedAction_->setEnabled(marked);
 }
 
 void MainWindow::startTidy(const QString& note) {
@@ -843,9 +881,10 @@ void MainWindow::refreshSongMetadata(SongEditor* editor, const std::string& cont
         inputLabel_->setText(toQString(inputNameOf(editor)));
         updateWindowTitle();
     }
-    if (!model_->updateSong(editor->path(), *meta)) {
+    auto todos = zub::todo::notes(content);
+    if (!model_->updateSong(editor->path(), *meta, todos)) {
         // A new song's first save: it joins the table now.
-        model_->addSong({editor->path(), inputNameOf(editor), std::move(*meta)});
+        model_->addSong({editor->path(), inputNameOf(editor), std::move(*meta), std::move(todos)});
         updateLanguageFilter();
     }
 }
@@ -1286,7 +1325,9 @@ void MainWindow::importSong() {
     // earlier in the session to whatever was at this path.
     approvedConstructs_.erase(target);
     auto* editor = new SongEditor(target, *repository_);
-    editor->openNew(imported.content);
+    // Not ready for the songbook until the user says so (Mark Checked): a TODO line under the
+    // header, which the song list can filter on.
+    editor->openNew(zub::todo::addNotCheckedMark(imported.content));
     const auto meta = zub::parseSong(imported.content);
     const QString title =
         meta ? toQString(zub::latex::toDisplayText(meta->title)) : toQString(target.stem());

@@ -12,20 +12,22 @@ class SongTableModel : public QAbstractTableModel {
     Q_OBJECT
 
 public:
-    enum Column { Title, Artist, Language, Key, ColumnCount };
+    enum Column { Title, Artist, Language, Key, Todo, ColumnCount };
     enum Role {
         LanguageRole = Qt::UserRole, // raw lang value, e.g. "czech"
         SearchTextRole,              // all columns, case- and accent-folded, for filtering
         InputNameRole,               // "Artist/Title"
+        HasTodoRole,                 // bool: the song has TODO comments
     };
 
     explicit SongTableModel(QObject* parent = nullptr);
 
     void setSongs(std::vector<zub::SongEntry> songs);
     const zub::SongEntry* song(int row) const;
-    // Replaces the metadata of the song stored at `path` (e.g. after it was edited).
-    // Returns false if no song in the model has that path.
-    bool updateSong(const std::filesystem::path& path, zub::SongMetadata meta);
+    // Replaces the metadata and TODO notes of the song stored at `path` (e.g. after it was
+    // edited). Returns false if no song in the model has that path.
+    bool updateSong(const std::filesystem::path& path, zub::SongMetadata meta,
+                    std::vector<std::string> todos);
     // Row of the song stored at `path`, -1 if absent.
     int rowOf(const std::filesystem::path& path) const;
     // Adds a song (e.g. a newly imported one after its first save).
@@ -44,7 +46,7 @@ public:
 private:
     struct Row {
         zub::SongEntry entry;
-        QString title, artist, language, key, searchText, toolTip;
+        QString title, artist, language, key, todo, todoToolTip, searchText, toolTip;
     };
     static Row makeRow(zub::SongEntry entry);
     std::vector<Row> rows_;

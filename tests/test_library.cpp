@@ -36,6 +36,7 @@ TEST_CASE("scanLibrary reads the fixture songbook", "[library]") {
     REQUIRE(emc2);
     CHECK(zub::latex::toDisplayText(emc2->meta.title) == "E=mc2");
     CHECK(emc2->path == fixtureRepo / "songs/chords/Ayreon/EMc2.tex");
+    CHECK(emc2->todos.empty());
 
     const auto* abba = find(*library, "Abba/OurLastSummer");
     REQUIRE(abba);
@@ -89,6 +90,8 @@ TEST_CASE("scanLibrary reads the real songbook without issues", "[.integration]"
         UNSCOPED_INFO(issue.path << ": " << issue.message);
     CHECK(library->issues.empty());
     CHECK(library->songs.size() >= 200);
+    // "% TODO: Solo" and the like (8 songs on 2026-11-08)
+    CHECK(std::ranges::count_if(library->songs, [](const auto& s) { return !s.todos.empty(); }) >= 8);
     for (const auto& song : library->songs) {
         INFO(song.inputName);
         CHECK_FALSE(song.meta.title.empty());

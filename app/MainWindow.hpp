@@ -14,6 +14,7 @@
 #include <zub/core/songtidy.hpp>
 
 class QAction;
+class QCheckBox;
 class QComboBox;
 class QLabel;
 class QListWidget;
@@ -81,6 +82,7 @@ private:
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
     void createSongToolBar();
     void updateSongActions();
+    void updateMarkChecked(); // enabled while the editor text has the "not checked yet" line
     // Tidy (chords_converter tidy on the open song, one undo step) and the Changes view
     void startTidy(const QString& note = {});
     void onConverterFinished(const std::expected<ConverterOutput, QString>& output);
@@ -144,6 +146,7 @@ private:
     QAction* tidyAction_ = nullptr;
     QAction* makeSmallerAction_ = nullptr;
     QAction* checkAction_ = nullptr;
+    QAction* markCheckedAction_ = nullptr; // removes the import's "not checked yet" TODO line
     QAction* joinLinesAction_ = nullptr;
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any

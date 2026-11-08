@@ -13,6 +13,7 @@ add_executable(zub_core_tests
     test_songoutline.cpp
     test_songsuggest.cpp
     test_songtidy.cpp
+    test_songtodo.cpp
     test_textfile.cpp
     test_version.cpp
 )

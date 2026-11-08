@@ -28,8 +28,14 @@ SongTableModel::Row SongTableModel::makeRow(zub::SongEntry entry) {
     row.artist = toQString(zub::latex::toDisplayText(entry.meta.value("by")));
     row.language = toQString(entry.meta.value("lang"));
     row.key = toQString(zub::latex::toDisplayText(entry.meta.value("key")));
-    row.searchText = foldForSearch(
-        QStringList{row.title, row.artist, row.language, row.key}.join(QLatin1Char('\n')));
+    QStringList todos;
+    for (const auto& note : entry.todos)
+        todos << toQString(note);
+    row.todo = todos.join(QStringLiteral("; "));
+    row.todoToolTip = todos.join(QLatin1Char('\n'));
+    row.searchText = foldForSearch(QStringList{row.title, row.artist, row.language, row.key,
+                                               row.todo}
+                                       .join(QLatin1Char('\n')));
     row.toolTip = toQString(entry.inputName) + QLatin1Char('\n') + toQString(entry.path);
     row.entry = std::move(entry);
     return row;
@@ -51,12 +57,14 @@ void SongTableModel::addSong(zub::SongEntry song) {
     endInsertRows();
 }
 
-bool SongTableModel::updateSong(const std::filesystem::path& path, zub::SongMetadata meta) {
+bool SongTableModel::updateSong(const std::filesystem::path& path, zub::SongMetadata meta,
+                                std::vector<std::string> todos) {
     const auto it = std::ranges::find(rows_, path, [](const Row& row) { return row.entry.path; });
     if (it == rows_.end())
         return false;
     zub::SongEntry entry = std::move(it->entry);
     entry.meta = std::move(meta);
+    entry.todos = std::move(todos);
     *it = makeRow(std::move(entry));
     const int row = static_cast<int>(it - rows_.begin());
     emit dataChanged(index(row, 0), index(row, ColumnCount - 1));
@@ -98,11 +106,17 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
             return row.language;
         case Key:
             return row.key;
+        case Todo:
+            return row.todo;
         default:
             return {};
         }
     case Qt::ToolTipRole:
+        if (index.column() == Todo && !row.todoToolTip.isEmpty())
+            return row.todoToolTip;
         return row.toolTip;
+    case HasTodoRole:
+        return !row.entry.todos.empty();
     case LanguageRole:
         return row.language;
     case SearchTextRole:
@@ -126,6 +140,8 @@ QVariant SongTableModel::headerData(int section, Qt::Orientation orientation, in
         return tr("Language");
     case Key:
         return tr("Key");
+    case Todo:
+        return tr("TODO");
     default:
         return {};
     }

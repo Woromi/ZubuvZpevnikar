@@ -1,4 +1,5 @@
 #include "zub/core/library.hpp"
+#include "zub/core/songtodo.hpp"
 
 #include "zub/core/latex.hpp"
 #include "zub/core/textfile.hpp"
@@ -103,7 +104,8 @@ std::expected<Library, std::string> scanLibrary(const fs::path& root) {
                                                     " \\beginsong; only the first one is listed"});
             }
             auto inputName = utf8(artistDir.filename() / file.stem());
-            library.songs.push_back({file, std::move(inputName), std::move(*meta)});
+            library.songs.push_back(
+                {file, std::move(inputName), std::move(*meta), todo::notes(*content)});
         }
     }
     std::ranges::sort(library.songs, {}, &SongEntry::inputName);
