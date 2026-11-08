@@ -100,9 +100,9 @@ TEST_CASE("applyEdits", "[songoutline]") {
 }
 
 TEST_CASE("preview marks the parts a real proposal changes", "[songoutline]") {
-    const std::string song = slurp(converterData / "suggest-input.tex");
+    const std::string song = slurp(converterData / "shrink-input.tex");
     const auto suggestions =
-        zub::songsuggest::interpretSuggest(0, slurp(converterData / "suggest.json"), "");
+        zub::songsuggest::interpretProposals(0, slurp(converterData / "shrink.json"), "");
     REQUIRE(suggestions);
     REQUIRE(suggestions->proposals.size() == 2);
 
@@ -111,7 +111,7 @@ TEST_CASE("preview marks the parts a real proposal changes", "[songoutline]") {
                              "Verse 2 someoff|Pre-chorus 2|Chorus 2|Instrumental 2|"
                              "Pre-chorus 3|Chorus 3|");
 
-    // chordsoffonsmallpage@50: the 2nd pre-chorus (line 50) loses its chords on small paper
+    // chordsoffonsmallpage@48: the 2nd pre-chorus (line 48) loses its chords on small paper
     const auto chordsOff = so::preview(song, suggestions->proposals[0].edits);
     REQUIRE(chordsOff);
     CHECK_FALSE(chordsOff->songChanged);
@@ -119,17 +119,31 @@ TEST_CASE("preview marks the parts a real proposal changes", "[songoutline]") {
     for (std::size_t i = 0; i < chordsOff->changed.size(); ++i)
         CHECK(chordsOff->changed[i] == (i == 5));
     CHECK(chordsOff->after.parts[5].chords == Chords::OffOnSmallPage);
-    CHECK(chordsOff->after.parts[5].line == 50);
+    CHECK(chordsOff->after.parts[5].line == 48);
+    CHECK(std::ranges::none_of(chordsOff->source, [](bool b) { return b; }));
+    // with its source: the 1st pre-chorus (line 24)
+    const auto withSource = so::preview(song, suggestions->proposals[0].edits,
+                                        suggestions->proposals[0].sources);
+    REQUIRE(withSource);
+    for (std::size_t i = 0; i < withSource->source.size(); ++i)
+        CHECK(withSource->source[i] == (i == 1));
 
-    // smalleronsmallpage@18: song-wide, no part touched
+    // smalleronsmallpage@16: song-wide, no part touched
     const auto smaller = so::preview(song, suggestions->proposals[1].edits);
     REQUIRE(smaller);
     CHECK(smaller->songChanged);
     CHECK(smaller->after.smallerOnSmallPage);
-    // \smalleronsmallpage and a blank line go in before line 18: lines stay the editor's
-    CHECK(smaller->after.parts[0].line == 18);
-    CHECK(smaller->after.parts[9].line == 71);
+    // \smalleronsmallpage and a blank line go in before line 16: lines stay the editor's
+    CHECK(smaller->after.parts[0].line == 16);
+    CHECK(smaller->after.parts[9].line == 69);
     CHECK(std::ranges::none_of(smaller->changed, [](bool b) { return b; }));
+    // a source after an insertion before it is found at its moved place
+    const zub::songsuggest::Source verse2{40, song.find("\\beginverse", song.find("\\begininstrumental")), 0};
+    const auto moved = so::preview(song, suggestions->proposals[1].edits,
+                                   std::span(&verse2, 1));
+    REQUIRE(moved);
+    CHECK(moved->source[4]);
+    CHECK(std::ranges::count(moved->source, true) == 1);
 }
 
 TEST_CASE("preview of a chorus shortened to a reminder", "[songoutline]") {
@@ -234,4 +248,29 @@ TEST_CASE("outline reads every real song", "[.integration]") {
         }
     }
     CHECK(count >= 200);
+}
+
+TEST_CASE("outline shows the first lines of each part with their chords", "[songoutline]") {
+    const auto outline = so::outline(slurp(converterData / "shrink-input.tex"));
+    REQUIRE(outline.parts.size() == 10);
+    const auto& verse = outline.parts[0];
+    CHECK(verse.label == "1.");
+    REQUIRE(verse.shown.size() == 1);
+    CHECK(verse.shown[0].text == "Light the lamp in me, see boats upo…");
+    CHECK(verse.shown[0].chords == "Am                F       G"); // C at 41 is left out
+    CHECK(outline.parts[1].label == "P:");
+    CHECK(outline.parts[2].label == "R:");
+    CHECK(outline.parts[3].label.empty());
+}
+
+TEST_CASE("shown lines: no space before the cut, chords whole", "[songoutline]") {
+    // the cut falls right after "the " (35 code points kept)
+    const std::string song = "\\beginsong{T}[by=X]\n\\beginverse\n"
+                             "\\[D]Our paper lantern floated down the \\[D6]river of night\n"
+                             "\\endverse\n\\endsong\n";
+    const auto outline = so::outline(song);
+    REQUIRE(outline.parts.size() == 1);
+    REQUIRE(outline.parts[0].shown.size() == 1);
+    CHECK(outline.parts[0].shown[0].text == "Our paper lantern floated down the…");
+    CHECK(outline.parts[0].shown[0].chords == "D"); // D6 at 35 would cross the edge
 }

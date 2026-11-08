@@ -29,14 +29,30 @@ enum class Repeat {
     Reminder, // \insertchorus*: the chorus's first line
 };
 
+// A line as printed, for a sketch of the part: the text and, above it, the chords at the
+// characters (code points) they sit over ("Am      F" over "Our paper lanterns float").
+struct ShownLine {
+    std::string chords; // spaces between chord names; empty without chords; a chord that would
+                        // cross kShownColumns is left out
+    std::string text;   // plain UTF-8, TeX markup removed; ends in "…" when cut
+    bool operator==(const ShownLine&) const = default;
+};
+
+inline constexpr std::size_t kShownLines = 1;    // per part
+inline constexpr std::size_t kShownColumns = 36; // code points per shown line
+
 struct Part {
     std::string kind; // "verse", "chorus", "bridge", ... as in \begin<kind>; "verse*" unnumbered
     std::string name; // "Verse 3", "Chorus 2", "Chorus R2 (1)", "Bridge 1"
+    std::string label; // as printed before the part: "3." for a verse, "R:", "R2:", "*", "P:", ""
+    // Its first lines (kShownLines at most). A repeat shows the chorus it repeats (a reminder its
+    // first line, with "..."); chords are shown whatever `chords` says.
+    std::vector<ShownLine> shown;
     Chords chords = Chords::On; // as the part starts (setup before its first line)
     bool chordsOffPartWay = false; // a \chordsoff(onsmallpage) after its first line: some lines
                                    // without chords
     Repeat repeat = Repeat::None;
-    int lines = 0; // source lines with text in a written-out part (0 for a repeat)
+    int lines = 0; // printed source lines (text or chords) of a written-out part; 0 for a repeat
     int line = 0;          // where it starts (1-based)
     std::size_t begin = 0; // byte span in the text, \begin<kind> to after \end<kind>
     std::size_t end = 0;
@@ -69,10 +85,14 @@ struct Preview {
     // per part of `after`: its `lines` before the change; -1 when the parts can't be matched
     // (the change added or removed parts)
     std::vector<int> linesBefore;
+    // per part of `after`: one of the proposal's sources (the part it relies on)
+    std::vector<bool> source;
 };
 
-// What a proposal does, for showing: the outline after its edits, with the touched parts.
+// What a proposal does, for showing: the outline after its edits, with the touched parts and
+// the parts it relies on (`sources`, positions in `before`).
 std::expected<Preview, std::string> preview(std::string_view before,
-                                            std::span<const songsuggest::Edit> edits);
+                                            std::span<const songsuggest::Edit> edits,
+                                            std::span<const songsuggest::Source> sources = {});
 
 } // namespace zub::songoutline

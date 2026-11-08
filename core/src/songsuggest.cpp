@@ -97,6 +97,13 @@ converter::Command suggestCommand(const std::filesystem::path& converter,
     return command;
 }
 
+converter::Command joinCommand(const std::filesystem::path& converter,
+                               const std::filesystem::path& songFile,
+                               const std::filesystem::path& songbookRoot) {
+    return {utf8(converter),
+            {"join", utf8(songFile), "--songbook", utf8(songbookRoot), "--json"}};
+}
+
 converter::Command applyCommand(const std::filesystem::path& converter,
                                 const std::filesystem::path& songFile, std::string_view id) {
     return {utf8(converter), {"apply", utf8(songFile), "--id", std::string(id), "-o", "-"}};
@@ -156,6 +163,7 @@ std::expected<Suggestions, std::string> interpretSuggest(int exitCode, std::stri
         proposal.score = *score;
         proposal.grade = *grade;
         proposal.kind = stringMember(entry, "kind").value_or(std::string{});
+        proposal.category = stringMember(entry, "category").value_or("fit");
         proposal.line = intMember(entry, "line").value_or(0);
         if (const json::Value* edits = entry.find("edits"); edits && !edits->isNull()) {
             if (!edits->asArray())
@@ -168,6 +176,19 @@ std::expected<Suggestions, std::string> interpretSuggest(int exitCode, std::stri
                     return badOutput("a bad edit in a proposal");
                 proposal.edits.push_back({static_cast<std::size_t>(*start),
                                           static_cast<std::size_t>(*end), *replacement});
+            }
+        }
+        if (const json::Value* sources = entry.find("sources"); sources && !sources->isNull()) {
+            if (!sources->asArray())
+                return badOutput("a proposal's \"sources\" is not a list");
+            for (const json::Value& source : *sources->asArray()) {
+                const auto line = intMember(source, "line");
+                const auto start = intMember(source, "start");
+                const auto end = intMember(source, "end");
+                if (!line || !start || !end || *start < 0 || *end < *start)
+                    return badOutput("a bad source in a proposal");
+                proposal.sources.push_back({*line, static_cast<std::size_t>(*start),
+                                            static_cast<std::size_t>(*end)});
             }
         }
         result.proposals.push_back(std::move(proposal));

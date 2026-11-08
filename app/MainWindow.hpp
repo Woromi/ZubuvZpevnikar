@@ -85,8 +85,11 @@ private:
     void startTidy(const QString& note = {});
     void onConverterFinished(const std::expected<ConverterOutput, QString>& output);
     void onTidyFinished(const std::expected<ConverterOutput, QString>& output);
-    // Make Smaller: suggest (a dialog to pick one), then apply the picked one
-    void startShrink();
+    // Make Smaller, Restructure, Join Lines: suggest or join (a dialog to pick one proposal), then
+    // apply the picked one (one undo step)
+    enum class SongAction { Shrink, Restructure, Join };
+    void startProposals(SongAction action);
+    QString actionName(SongAction action) const;
     void onSuggestFinished(const std::expected<ConverterOutput, QString>& output);
     void startApply(const std::string& id, const QString& description);
     void onApplyFinished(const std::expected<ConverterOutput, QString>& output);
@@ -136,8 +139,11 @@ private:
     std::string runInput_;           // the bytes that were sent
     QString tidyNote_;               // appended to the status message when a tidy is done
     QString applyDescription_;       // of the proposal being applied
+    SongAction songAction_ = SongAction::Shrink; // the action whose suggest/join/apply runs
     QAction* tidyAction_ = nullptr;
     QAction* makeSmallerAction_ = nullptr;
+    QAction* restructureAction_ = nullptr;
+    QAction* joinLinesAction_ = nullptr;
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any
     QLabel* inputLabel_ = nullptr;

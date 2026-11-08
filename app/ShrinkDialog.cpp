@@ -3,6 +3,7 @@
 #include "convert.hpp"
 
 #include <QDialogButtonBox>
+#include <algorithm>
 #include <QLabel>
 #include <QListWidget>
 #include <QPalette>
@@ -65,14 +66,15 @@ QString ShrinkDialog::summary(const zub::songsuggest::Suggestions& suggestions) 
 }
 
 ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
-                           const std::string& songText, QWidget* parent)
+                           const std::string& songText, const QString& title,
+                           const QString& heading, QWidget* parent)
     : QDialog(parent), suggestions_(suggestions) {
     for (const auto& proposal : suggestions_.proposals) {
-        auto preview = zub::songoutline::preview(songText, proposal.edits);
+        auto preview = zub::songoutline::preview(songText, proposal.edits, proposal.sources);
         previews_.push_back(preview ? std::optional(std::move(*preview)) : std::nullopt);
     }
-    setWindowTitle(tr("Make Smaller"));
-    resize(960, 520);
+    setWindowTitle(title);
+    resize(1180, 600);
     setSizeGripEnabled(true);
 
     auto* layout = new QVBoxLayout(this);
@@ -82,17 +84,18 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
         label->setWordWrap(true);
         layout->addWidget(label);
     }
-    layout->addWidget(new QLabel(
-        tr("Pick one change, most readable first (score 0–100: how readable the song stays):"),
-        this));
+    auto* headingLabel = new QLabel(heading, this);
+    headingLabel->setWordWrap(true);
+    layout->addWidget(headingLabel);
 
     list_ = new QListWidget(this);
     for (std::size_t i = 0; i < suggestions_.proposals.size(); ++i) {
         const auto& proposal = suggestions_.proposals[i];
         // "57 fair: the pre-chorus repeats ... — saves 1 line (small paper only)"
         QString text = tr("%1 %2: ").arg(proposal.score).arg(toQString(proposal.grade)) +
-                       toQString(proposal.description) + QStringLiteral(" — ") +
-                       tr("saves %n line(s)", nullptr, proposal.gainLines);
+                       toQString(proposal.description);
+        if (proposal.gainLines > 0) // a restructuring saves nothing by itself
+            text += QStringLiteral(" — ") + tr("saves %n line(s)", nullptr, proposal.gainLines);
         if (proposal.stage == 2)
             text += tr(" (small paper only)");
         auto* item = new QListWidgetItem(text, list_);
@@ -105,8 +108,8 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     splitter->addWidget(list_);
     splitter->addWidget(outline_);
-    splitter->setStretchFactor(0, 3);
-    splitter->setStretchFactor(1, 2);
+    splitter->setStretchFactor(0, 1);
+    splitter->setStretchFactor(1, 1);
     splitter->setChildrenCollapsible(false);
     layout->addWidget(splitter, 1);
 
@@ -137,7 +140,23 @@ const zub::songsuggest::Proposal& ShrinkDialog::selected() const {
     return suggestions_.proposals.at(static_cast<std::size_t>(row < 0 ? 0 : row));
 }
 
+namespace {
+
+QColor mix(const QColor& a, const QColor& b, double share) {
+    return QColor::fromRgbF(static_cast<float>(a.redF() * share + b.redF() * (1 - share)),
+                            static_cast<float>(a.greenF() * share + b.greenF() * (1 - share)),
+                            static_cast<float>(a.blueF() * share + b.blueF() * (1 - share)));
+}
+
+QString span(const QString& text, const QString& style) {
+    return QStringLiteral("<span style=\"%1\">%2</span>").arg(style, text.toHtmlEscaped());
+}
+
+} // namespace
+
 void ShrinkDialog::showOutline(int row) {
+    using zub::songoutline::Chords;
+    using zub::songoutline::Repeat;
     if (row < 0 || static_cast<std::size_t>(row) >= previews_.size()) {
         outline_->clear();
         return;
@@ -147,19 +166,40 @@ void ShrinkDialog::showOutline(int row) {
         outline_->setPlainText(tr("The proposal does not fit the song text."));
         return;
     }
-    const QColor mark = palette().color(QPalette::Highlight);
-    const QString markStyle = QStringLiteral("background-color:%1; color:%2; font-weight:bold;")
-                                  .arg(mark.name(), palette().color(QPalette::HighlightedText).name());
-    const QString dim = palette().color(QPalette::PlaceholderText).name();
+    const QPalette& pal = palette();
+    const QString sourceTint =
+        mix(pal.color(QPalette::Link), pal.color(QPalette::Base), 0.12).name();
+    const QString marked = mix(pal.color(QPalette::Highlight), pal.color(QPalette::Base), 0.3).name();
+    const QString dim = QStringLiteral("color:%1").arg(pal.color(QPalette::PlaceholderText).name());
+    const QString chordStyle =
+        QStringLiteral("color:%1; font-weight:bold").arg(pal.color(QPalette::Link).name());
+    const QString offStyle = dim + QStringLiteral("; text-decoration:line-through");
 
-    QString html = QStringLiteral("<p><b>%1</b></p><table cellspacing=0 cellpadding=3 width=100%>")
+    // A sketch of the printed song: labels in a column, choruses indented, each part's first
+    // lines with their chords; the parts the change touches on a highlighted background.
+    QString html = QStringLiteral("<p><b>%1</b></p><table cellspacing=0 cellpadding=4 width=100%>")
                        .arg(tr("The song after this change:").toHtmlEscaped());
-    const auto row_ = [&](const QString& name, const QString& state, int line, bool changed) {
-        html += QStringLiteral("<tr style=\"%1\"><td>%2</td><td>%3</td><td align=right style=\"color:%4\">%5</td></tr>")
-                    .arg(changed ? markStyle : QString(), name.toHtmlEscaped(), state.toHtmlEscaped(),
-                         changed ? QString() : dim,
-                         line > 0 ? tr("line %1").arg(line) : QString());
+    bool anchored = false;
+    bool firstRow = true;
+    bool scroll = false; // not when the first row is the marked one: the heading stays visible
+    const auto addRow = [&](const QString& sketch, const QString& note, bool changed,
+                            bool source = false) {
+        // scrolled into view: the first changed part, or the source above it
+        const bool shown = changed || source;
+        const QString anchor = shown && !anchored ? QStringLiteral("<a name=\"changed\"></a>")
+                                                   : QString();
+        if (shown && !anchored)
+            scroll = !firstRow;
+        anchored = anchored || shown;
+        firstRow = false;
+        html += QStringLiteral("<tr%1><td>%2<pre style=\"margin:0\">%3</pre></td>"
+                               "<td align=right valign=top style=\"%4\">%5</td></tr>")
+                    .arg(changed  ? QStringLiteral(" bgcolor=\"%1\"").arg(marked)
+                         : source ? QStringLiteral(" bgcolor=\"%1\"").arg(sourceTint)
+                                  : QString(),
+                         anchor, sketch, dim, note);
     };
+
     if (preview->songChanged || preview->after.smallerOnSmallPage) {
         QStringList state;
         if (preview->after.smallerOnSmallPage)
@@ -168,20 +208,59 @@ void ShrinkDialog::showOutline(int row) {
             state << tr("normal type size");
         if (preview->songChanged && !preview->smallerChanged)
             state << tr("changed between the parts");
-        row_(tr("Whole song"), state.join(QStringLiteral(", ")), 0, preview->songChanged);
+        addRow(span(tr("Whole song: %1").arg(state.join(QStringLiteral(", "))), QString()),
+               QString(), preview->songChanged);
     }
+
     for (std::size_t i = 0; i < preview->after.parts.size(); ++i) {
         const auto& part = preview->after.parts[i];
-        QString state = partState(part);
-        const int linesBefore = preview->linesBefore.at(i);
-        if (preview->changed[i] && part.repeat == zub::songoutline::Repeat::None &&
-            linesBefore > 0 && linesBefore != part.lines) {
-            // "12 → 6 lines" (joined lines)
-            const QString count = tr("%1 → %2 lines").arg(linesBefore).arg(part.lines);
-            state = state.isEmpty() ? count : state + QStringLiteral(", ") + count;
+        const bool chorus = part.kind == "chorus";
+        const QString indent = chorus ? QStringLiteral("    ") : QString();
+        const QString label = toQString(part.label).leftJustified(4, QLatin1Char(' '));
+        const QString blank(label.size(), QLatin1Char(' '));
+        const bool showChords = part.repeat != Repeat::Reminder && part.chords != Chords::Off;
+        const QString chordsLook = part.chords == Chords::OffOnSmallPage ? offStyle : chordStyle;
+
+        QStringList lines;
+        for (std::size_t n = 0; n < part.shown.size(); ++n) {
+            const auto& shown = part.shown[n];
+            if (showChords && !shown.chords.empty())
+                lines << (indent + blank).toHtmlEscaped() + span(toQString(shown.chords), chordsLook);
+            QString text = toQString(shown.text);
+            // the part goes on: "…" at the end of its last shown lyrics
+            const bool goesOn = part.repeat == Repeat::Full ||
+                                (part.repeat == Repeat::None &&
+                                 part.lines > static_cast<int>(part.shown.size()));
+            const bool lyrics = std::ranges::any_of(text, [](QChar c) { return c.isLetter(); });
+            if (n + 1 == part.shown.size() && goesOn && lyrics &&
+                !text.endsWith(QStringLiteral("…")) && !text.endsWith(QStringLiteral("..."))) {
+                // like the songbook's reminder line: trailing punctuation goes, then the dots
+                while (!text.isEmpty() && QStringLiteral(",.;:!?").contains(text.back()))
+                    text.chop(1);
+                text += QStringLiteral("…");
+            }
+            if (!text.isEmpty() || shown.chords.empty() || !showChords)
+                lines << (indent + (n == 0 ? label : blank) + text).toHtmlEscaped();
         }
-        row_(toQString(part.name), state, part.line, preview->changed[i]);
+        if (part.shown.empty())
+            lines << (indent + label).toHtmlEscaped() + span(toQString(part.name), dim);
+
+        QStringList note;
+        const QString state = partState(part);
+        if (!state.isEmpty())
+            note << state.toHtmlEscaped();
+        const int linesBefore = preview->linesBefore.at(i);
+        if (preview->changed[i] && part.repeat == Repeat::None && linesBefore > 0 &&
+            linesBefore != part.lines)
+            note << tr("%1 → %2 lines").arg(linesBefore).arg(part.lines).toHtmlEscaped();
+        if (preview->source.at(i))
+            note << tr("the change relies on this part").toHtmlEscaped();
+        note << tr("line %1").arg(part.line).toHtmlEscaped();
+        addRow(lines.join(QStringLiteral("\n")), note.join(QStringLiteral("<br>")), preview->changed[i],
+               preview->source.at(i));
     }
     html += QStringLiteral("</table>");
     outline_->setHtml(html);
+    if (scroll)
+        outline_->scrollToAnchor(QStringLiteral("changed"));
 }

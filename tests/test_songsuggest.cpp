@@ -65,17 +65,21 @@ TEST_CASE("suggest interprets a real run with both papers measured", "[songsugge
     const auto& first = result->proposals[0];
     CHECK(first.id == "chordsoffonsmallpage@50");
     CHECK(first.kind == "chordsoffonsmallpage");
+    CHECK(first.category == "fit");
     CHECK(first.stage == 2);
     CHECK(first.line == 50);
     CHECK(first.gainLines == 1);
-    CHECK(first.score == 57);
-    CHECK(first.grade == "fair");
+    CHECK(first.score == 48);
+    CHECK(first.grade == "poor");
+    CHECK(first.sources == std::vector<ss::Source>{{26, 699, 834}});
     CHECK(first.edits == std::vector<ss::Edit>{{1676, 1676, "\\chordsoffonsmallpage"}});
-    CHECK(first.description == "the pre-chorus repeats the chords of line 26: \\chordsoffonsmallpage");
+    CHECK(first.description == "the 2nd pre-chorus repeats the chords of the 1st pre-chorus (11 lines "
+                               "away): \\chordsoffonsmallpage");
     CHECK(result->proposals[1].id == "smalleronsmallpage@18");
     CHECK(result->proposals[1].gainLines == 6);
     CHECK(result->proposals[1].score == 20);
     CHECK(result->proposals[1].grade == "last resort");
+    CHECK(result->proposals[1].sources.empty());
 }
 
 TEST_CASE("suggest interprets a run where only A4 was measured", "[songsuggest]") {
@@ -85,11 +89,51 @@ TEST_CASE("suggest interprets a run where only A4 was measured", "[songsuggest]"
     CHECK(result->fits == false);
     REQUIRE(result->a4);
     CHECK(result->a4->pages == 2);
-    CHECK_FALSE(result->a5);
+    CHECK_FALSE(result->a5); // not measured while A4 does not fit (it was in 0.4.0)
     REQUIRE(result->proposals.size() == 1);
     CHECK(result->proposals[0].id == "chordsoff@81");
     CHECK(result->proposals[0].stage == 1);
     CHECK(result->proposals[0].gainLines == 2);
+    CHECK(result->proposals[0].sources == std::vector<ss::Source>{{76, 2816, 3047}});
+}
+
+TEST_CASE("suggest offers restructuring apart, without measuring", "[songsuggest]") {
+    const auto result = ss::interpretSuggest(exitCode("restructure"),
+                                             slurp(converterData / "restructure.json"), "");
+    REQUIRE(result);
+    CHECK_FALSE(result->a4);
+    CHECK_FALSE(result->a5);
+    REQUIRE(result->proposals.size() == 4);
+    const auto& restructure = result->proposals[0];
+    CHECK(restructure.id == "restructure@18");
+    CHECK(restructure.category == "restructure");
+    CHECK(restructure.gainLines == 0);
+    CHECK(restructure.sources == std::vector<ss::Source>{{8, 145, 242}});
+    for (std::size_t i = 1; i < result->proposals.size(); ++i)
+        CHECK(result->proposals[i].category == "fit");
+
+    const auto applied = ss::interpretApply(exitCode("restructure-apply"),
+                                            slurp(converterData / "restructure-apply.out"),
+                                            slurp(converterData / "restructure-apply.err"));
+    REQUIRE(applied);
+    CHECK(applied->find("\\beginverse*") == std::string::npos);
+}
+
+TEST_CASE("join lists joined lines in suggest's shape", "[songsuggest]") {
+    const auto command = ss::joinCommand("/opt/cc", "/tmp/x/S.tex", "/sb");
+    CHECK(command.arguments ==
+          std::vector<std::string>{"join", "/tmp/x/S.tex", "--songbook", "/sb", "--json"});
+    const auto result =
+        ss::interpretSuggest(exitCode("join"), slurp(converterData / "join.json"), "");
+    REQUIRE(result);
+    REQUIRE(result->a4);
+    REQUIRE(result->a5);
+    CHECK(result->a5->pages == 4);
+    REQUIRE(result->proposals.size() == 2);
+    CHECK(result->proposals[0].kind == "joinlines");
+    CHECK(result->proposals[1].id == "joinlines@3");
+    CHECK(result->proposals[1].gainLines == 48);
+    CHECK(result->proposals[1].edits.size() == 24);
 }
 
 TEST_CASE("suggest copes with null fits, null wrap lines and nothing measured", "[songsuggest]") {
@@ -151,6 +195,8 @@ TEST_CASE("suggest reports failures", "[songsuggest]") {
         CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[{"id":"a"}]})", ""));
         CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,
             "score":1,"grade":"g","description":"d","edits":[{"start":5,"end":4,"replacement":""}]}]})", ""));
+        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,
+            "score":1,"grade":"g","description":"d","sources":[{"line":1,"start":2}]}]})", ""));
         // a 0.2.0 proposal: no score and grade
         CHECK_FALSE(ss::interpretSuggest(
             0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,"description":"d"}]})", ""));
@@ -186,14 +232,14 @@ TEST_CASE("apply interprets real runs", "[songsuggest]") {
 TEST_CASE("version output is parsed", "[converter]") {
     const auto version = cv::parseVersion(slurp(converterData / "version.out"));
     REQUIRE(version);
-    CHECK(*version == cv::Version{0, 3, 0});
-    CHECK(cv::toString(*version) == "0.3.0");
+    CHECK(*version == cv::Version{0, 5, 0});
+    CHECK(cv::toString(*version) == "0.5.0");
     CHECK(*version >= cv::kRequired);
 
     CHECK(cv::parseVersion("chords_converter 0.10.3\r\nmore")->minor == 10);
     CHECK(cv::parseVersion("chords_converter 1.0.0-beta")->major == 1);
-    CHECK(*cv::parseVersion("chords_converter 0.2.0") < cv::kRequired);
-    CHECK(*cv::parseVersion("chords_converter 0.3.1") > cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.4.0") < cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.5.1") > cv::kRequired);
 }
 
 TEST_CASE("unparseable version output gives nothing", "[converter]") {

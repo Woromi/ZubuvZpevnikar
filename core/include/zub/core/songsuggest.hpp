@@ -38,9 +38,19 @@ struct Edit {
     bool operator==(const Edit&) const = default;
 };
 
+// A part a proposal relies on (0.4.0): the part whose chords stay shown for a part that loses
+// them, or the chorus an \insertchorus* stands for. Bytes from its \begin... to after \end...
+struct Source {
+    int line = 0;
+    std::size_t start = 0;
+    std::size_t end = 0;
+    bool operator==(const Source&) const = default;
+};
+
 struct Proposal {
     std::string id;
     std::string kind;
+    std::string category = "fit"; // "fit", or "restructure": changes what a part is (0.5.0)
     std::string description;
     int stage = 0; // 2: for small paper only
     int line = 0;  // in the text suggest ran on
@@ -48,6 +58,7 @@ struct Proposal {
     int score = 0;     // 0-100: how readable the song stays (higher is better)
     std::string grade; // "good", "fair", "poor" or "last resort"; shown as is
     std::vector<Edit> edits; // what apply would change; for showing it (apply makes the change)
+    std::vector<Source> sources;
     bool operator==(const Proposal&) const = default;
 };
 
@@ -65,11 +76,16 @@ converter::Command suggestCommand(const std::filesystem::path& converter,
                                   const std::filesystem::path& songFile,
                                   std::optional<Paper> fit, bool measure,
                                   const std::filesystem::path& songbookRoot);
+// {"join", file, "--songbook", root, "--json"}: joining lines in pairs (0.5.0). Always builds the
+// song on A4 and A5 (seconds), so it needs the preview's safety approval; its output is suggest's.
+converter::Command joinCommand(const std::filesystem::path& converter,
+                               const std::filesystem::path& songFile,
+                               const std::filesystem::path& songbookRoot);
 // {"apply", file, "--id", id, "-o", "-"}
 converter::Command applyCommand(const std::filesystem::path& converter,
                                 const std::filesystem::path& songFile, std::string_view id);
 
-// Exit code 0 and stdout = the JSON. Non-zero exit, malformed JSON or a missing field gives an
+// Exit code 0 and stdout = the JSON (of suggest or join). Non-zero exit, malformed JSON or a missing field gives an
 // error message (stderr trimmed, or a description). stderr is ignored on success.
 std::expected<Suggestions, std::string> interpretSuggest(int exitCode, std::string_view stdOut,
                                                          std::string_view stdErr);

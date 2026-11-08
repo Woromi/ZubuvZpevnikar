@@ -134,6 +134,148 @@ std::string kindName(std::string_view kind) {
     return std::string(kind);
 }
 
+bool isContinuation(char c) {
+    return (static_cast<unsigned char>(c) & 0xC0) == 0x80;
+}
+
+std::size_t codePoints(std::string_view s) {
+    return static_cast<std::size_t>(std::ranges::count_if(s, [](char c) { return !isContinuation(c); }));
+}
+
+// The first `count` code points of `s` (whole UTF-8 sequences).
+std::string_view firstCodePoints(std::string_view s, std::size_t count) {
+    std::size_t i = 0;
+    for (std::size_t n = 0; i < s.size(); ++i) {
+        if (!isContinuation(s[i]) && n++ == count)
+            break;
+    }
+    return s.substr(0, i);
+}
+
+// Commands whose arguments are not printed text (file names, part kinds, numbers).
+bool dropsArguments(std::string_view name) {
+    static constexpr std::string_view names[] = {
+        "lilypondfile", "narrowlilypondfile", "usechords", "copychords", "setchordwidth",
+        "transpose", "capo", "memorize", "replay", "baselineadj", "addtocounter", "mbar", "role"};
+    return std::ranges::find(names, name) != std::end(names);
+}
+
+// One source line as printed: chords placed over the text, markup removed.
+ShownLine shownLine(std::string_view line) {
+    ShownLine shown;
+    std::string& text = shown.text;
+    const auto space = [&text] {
+        if (!text.empty() && text.back() != ' ')
+            text += ' ';
+    };
+    for (std::size_t i = 0; i < line.size();) {
+        const char c = line[i];
+        if (c == '\\' && i + 1 < line.size() && line[i + 1] == '[') {
+            const auto close = latex::findMatching(line, i + 1);
+            const std::size_t end = close ? *close : line.size();
+            const std::string chord = latex::toDisplayText(line.substr(i + 2, end - i - 2));
+            const std::size_t column = codePoints(text);
+            std::size_t have = codePoints(shown.chords);
+            if (have > 0 && have >= column) {
+                shown.chords += ' ';
+                ++have;
+            }
+            shown.chords.append(column > have ? column - have : 0, ' ');
+            shown.chords += chord;
+            i = close ? *close + 1 : line.size();
+        } else if (c == '\\' && i + 1 < line.size() && isLetter(line[i + 1])) {
+            std::size_t end = i + 1;
+            while (end < line.size() && isLetter(line[end]))
+                ++end;
+            const std::string_view name = line.substr(i + 1, end - i - 1);
+            if (name == "lrep") {
+                text += "|: ";
+            } else if (name == "rrep") {
+                space();
+                text += ":|";
+            } else if (name == "rep") {
+                if (end < line.size() && line[end] == '{') {
+                    if (const auto close = latex::findMatching(line, end)) {
+                        space();
+                        text += "(×" + std::string(line.substr(end + 1, *close - end - 1)) + ")";
+                        end = *close + 1;
+                    }
+                }
+            } else {
+                // options are never printed text, nor the arguments of some commands
+                while (end < line.size() && (line[end] == '[' || (dropsArguments(name) && line[end] == '{'))) {
+                    const auto close = latex::findMatching(line, end);
+                    if (!close)
+                        break;
+                    end = *close + 1;
+                }
+            }
+            i = end;
+        } else if (c == '\\') {
+            if (i + 1 < line.size() && std::string_view("&%#$_").find(line[i + 1]) != std::string_view::npos)
+                text += line[i + 1];
+            else
+                space();
+            i += 2;
+        } else if (c == ' ' || c == '\t' || c == '\r' || c == '~') {
+            space();
+            ++i;
+        } else if (c == '{' || c == '}') {
+            ++i;
+        } else {
+            text += c;
+            ++i;
+        }
+    }
+    while (!text.empty() && text.back() == ' ')
+        text.pop_back();
+    while (!shown.chords.empty() && shown.chords.back() == ' ')
+        shown.chords.pop_back();
+    if (codePoints(text) > kShownColumns) {
+        text.resize(firstCodePoints(text, kShownColumns - 1).size());
+        while (!text.empty() && text.back() == ' ')
+            text.pop_back();
+        text += "…";
+    }
+    if (codePoints(shown.chords) > kShownColumns) {
+        // whole chords only, no "…": the dots belong to the lyrics
+        const std::size_t cut = firstCodePoints(shown.chords, kShownColumns).size();
+        if (shown.chords[cut] != ' ') {
+            const auto gap = shown.chords.rfind(' ', cut);
+            shown.chords.resize(gap == std::string::npos ? 0 : gap);
+        } else {
+            shown.chords.resize(cut);
+        }
+        while (!shown.chords.empty() && shown.chords.back() == ' ')
+            shown.chords.pop_back();
+    }
+    return shown;
+}
+
+std::vector<ShownLine> shownLines(std::string_view body) {
+    std::vector<ShownLine> lines;
+    for (std::size_t from = 0; from < body.size() && lines.size() < kShownLines;) {
+        const auto newline = std::min(body.find('\n', from), body.size());
+        auto shown = shownLine(body.substr(from, newline - from));
+        if (!shown.text.empty() || !shown.chords.empty())
+            lines.push_back(std::move(shown));
+        from = newline + 1;
+    }
+    return lines;
+}
+
+std::string label(std::string_view kind, int verse, std::optional<int> chorusNumber) {
+    if (kind == "verse")
+        return std::to_string(verse) + ".";
+    if (kind == "chorus")
+        return chorusNumber ? "R" + std::to_string(*chorusNumber) + ":" : "R:";
+    if (kind == "bridge")
+        return "*";
+    if (kind == "prechorus")
+        return "P:";
+    return {};
+}
+
 int lineAt(std::string_view text, std::size_t offset) {
     return 1 +
            static_cast<int>(std::count(
@@ -160,6 +302,7 @@ Outline outline(std::string_view songText) {
     int verses = 0;
     std::optional<int> latestChorus;
     std::map<std::string, int> seen; // name key -> how often so far
+    std::map<std::optional<int>, std::vector<ShownLine>> choruses; // by number, for repeats
 
     const auto chorusName = [&](std::optional<int> chorusNumber) {
         const std::string key = "chorus#" + (chorusNumber ? std::to_string(*chorusNumber) : "");
@@ -203,6 +346,18 @@ Outline outline(std::string_view songText) {
             }
             part.chords = chords;
             part.name = chorusName(chorusNumber);
+            part.label = label("chorus", 0, chorusNumber);
+            if (const auto it = choruses.find(chorusNumber); it != choruses.end()) {
+                part.shown = it->second;
+                if (star && !part.shown.empty()) {
+                    part.shown.resize(1);
+                    part.shown[0].chords.clear();
+                    auto& first = part.shown[0].text;
+                    if (first.ends_with("…"))
+                        first.resize(first.size() - std::string_view("…").size());
+                    first += "...";
+                }
+            }
             part.end = after;
             part.line = lineAt(text, part.begin);
             token->end = after;
@@ -253,22 +408,25 @@ Outline outline(std::string_view songText) {
             const std::string_view body = song.substr(after, endAt - after);
             for (std::size_t from = 0; from < body.size();) {
                 const auto newline = std::min(body.find('\n', from), body.size());
-                if (body.substr(from, newline - from).find_first_not_of(" \t\r") !=
-                    std::string_view::npos)
+                const auto shown = shownLine(body.substr(from, newline - from));
+                if (!shown.text.empty() || !shown.chords.empty())
                     ++part.lines;
                 from = newline + 1;
             }
             const PartChords chords = chordsIn(body, songChords);
             part.chords = chords.chords;
             part.chordsOffPartWay = chords.offPartWay;
+            part.shown = shownLines(body);
             if (kind == "chorus") {
                 latestChorus = chorusNumber;
                 part.name = chorusName(chorusNumber);
+                choruses[chorusNumber] = part.shown;
             } else if (part.kind == "verse") {
                 part.name = "Verse " + std::to_string(++verses);
             } else {
                 part.name = kindName(part.kind) + " " + std::to_string(++seen[part.kind]);
             }
+            part.label = label(part.kind, verses, chorusNumber);
             part.begin = token->begin;
             part.end = terminated ? endAt + endCommand.size() : endAt;
             if (part.end <= part.begin)
@@ -319,7 +477,8 @@ std::expected<std::string, std::string> applyEdits(std::string_view text,
 }
 
 std::expected<Preview, std::string> preview(std::string_view before,
-                                            std::span<const songsuggest::Edit> edits) {
+                                            std::span<const songsuggest::Edit> edits,
+                                            std::span<const songsuggest::Source> sources) {
     const auto sorted = sortedEdits(edits);
     auto afterText = applySorted(before, sorted);
     if (!afterText)
@@ -384,6 +543,24 @@ std::expected<Preview, std::string> preview(std::string_view before,
             if (!sameLook(old.parts[i], parts[i]))
                 result.changed[i] = true;
             result.linesBefore[i] = old.parts[i].lines;
+        }
+    }
+    // A source's start in the new text: behind the edits wholly before it.
+    result.source.assign(parts.size(), false);
+    for (const auto& source : sources) {
+        long long moved = 0;
+        for (const auto& edit : sorted) {
+            if (edit.end > source.start)
+                break;
+            moved += static_cast<long long>(edit.replacement.size()) -
+                     static_cast<long long>(edit.end - edit.start);
+        }
+        const long long at = static_cast<long long>(source.start) + moved;
+        for (std::size_t i = 0; i < parts.size(); ++i) {
+            const auto begin = static_cast<long long>(parts[i].begin);
+            const auto end = static_cast<long long>(parts[i].end);
+            if (at >= begin && at < end)
+                result.source[i] = true;
         }
     }
     result.smallerChanged = old.smallerOnSmallPage != result.after.smallerOnSmallPage;

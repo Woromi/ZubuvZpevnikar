@@ -21,9 +21,9 @@ struct Version {
     auto operator<=>(const Version&) const = default;
 };
 
-// The oldest converter whose tidy/suggest/apply interface this app uses (0.3.0: proposals carry
-// score and grade).
-inline constexpr Version kRequired{0, 3, 0};
+// The oldest converter whose tidy/suggest/apply interface this app uses (0.5.0: proposals carry
+// score, grade, sources and category; join is its own command).
+inline constexpr Version kRequired{0, 5, 0};
 
 // Reads the output of "chords_converter --version": "chords_converter 0.2.0" (first line; an
 // optional "-suffix" after the patch number is ignored). Nullopt for anything else, which is
