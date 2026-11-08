@@ -1,0 +1,243 @@
+#include <catch2/catch_test_macros.hpp>
+#include <filesystem>
+#include <fstream>
+#include <random>
+#include <sstream>
+#include <string>
+#include <zub/core/converter.hpp>
+#include <zub/core/preview.hpp>
+#include <zub/core/songsuggest.hpp>
+
+namespace fs = std::filesystem;
+namespace ss = zub::songsuggest;
+namespace cv = zub::converter;
+
+namespace {
+
+const fs::path converterData = fs::path(ZUB_TEST_DATA_DIR) / "converter";
+
+std::string slurp(const fs::path& path) {
+    std::ifstream in(path, std::ios::binary);
+    REQUIRE(in);
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    return buffer.str();
+}
+
+int exitCode(const char* name) {
+    return std::stoi(slurp(converterData / (std::string(name) + ".code")));
+}
+
+} // namespace
+
+TEST_CASE("suggest and apply build the command lines", "[songsuggest]") {
+    const auto full = ss::suggestCommand("/opt/cc", "/tmp/x/S.tex", ss::Paper::A5, true, "/sb");
+    CHECK(full.program == "/opt/cc");
+    CHECK(full.arguments == std::vector<std::string>{"suggest", "/tmp/x/S.tex", "--fit", "a5",
+                                                     "--measure", "--songbook", "/sb", "--json"});
+    const auto plain = ss::suggestCommand("/opt/cc", "/tmp/x/S.tex", std::nullopt, false, "/sb");
+    CHECK(plain.arguments ==
+          std::vector<std::string>{"suggest", "/tmp/x/S.tex", "--songbook", "/sb", "--json"});
+    const auto a4 = ss::suggestCommand("/opt/cc", "S.tex", ss::Paper::A4, false, "/sb");
+    CHECK(a4.arguments[2] == "--fit");
+    CHECK(a4.arguments[3] == "a4");
+    const auto apply = ss::applyCommand("/opt/cc", "/tmp/x/S.tex", "chordsoff@81");
+    CHECK(apply.arguments == std::vector<std::string>{"apply", "/tmp/x/S.tex", "--id",
+                                                      "chordsoff@81", "-o", "-"});
+}
+
+TEST_CASE("suggest interprets a real run with both papers measured", "[songsuggest]") {
+    const auto result = ss::interpretSuggest(exitCode("suggest"), slurp(converterData / "suggest.json"),
+                                             slurp(converterData / "suggest.err"));
+    REQUIRE(result);
+    CHECK(result->fits == false);
+    CHECK(result->note == "It fits A4: the changes for small paper only.");
+    REQUIRE(result->a4);
+    CHECK(result->a4->pages == 1);
+    CHECK(result->a4->fits);
+    CHECK(result->a4->wrapLines.empty());
+    REQUIRE(result->a5);
+    CHECK(result->a5->pages == 2);
+    CHECK_FALSE(result->a5->fits);
+    CHECK(result->a5->wrapLines == std::vector<int>{23, 27, 47, 51, 62, 63, 67, 68});
+    CHECK(result->a5->chorusWraps == 0);
+    REQUIRE(result->proposals.size() == 2);
+    const auto& first = result->proposals[0];
+    CHECK(first.id == "chordsoffonsmallpage@50");
+    CHECK(first.kind == "chordsoffonsmallpage");
+    CHECK(first.stage == 2);
+    CHECK(first.line == 50);
+    CHECK(first.gainLines == 1);
+    CHECK(first.score == 57);
+    CHECK(first.grade == "fair");
+    CHECK(first.edits == std::vector<ss::Edit>{{1676, 1676, "\\chordsoffonsmallpage"}});
+    CHECK(first.description == "the pre-chorus repeats the chords of line 26: \\chordsoffonsmallpage");
+    CHECK(result->proposals[1].id == "smalleronsmallpage@18");
+    CHECK(result->proposals[1].gainLines == 6);
+    CHECK(result->proposals[1].score == 20);
+    CHECK(result->proposals[1].grade == "last resort");
+}
+
+TEST_CASE("suggest interprets a run where only A4 was measured", "[songsuggest]") {
+    const auto result = ss::interpretSuggest(exitCode("suggest-a4only"),
+                                             slurp(converterData / "suggest-a4only.json"), "");
+    REQUIRE(result);
+    CHECK(result->fits == false);
+    REQUIRE(result->a4);
+    CHECK(result->a4->pages == 2);
+    CHECK_FALSE(result->a5);
+    REQUIRE(result->proposals.size() == 1);
+    CHECK(result->proposals[0].id == "chordsoff@81");
+    CHECK(result->proposals[0].stage == 1);
+    CHECK(result->proposals[0].gainLines == 2);
+}
+
+TEST_CASE("suggest copes with null fits, null wrap lines and nothing measured", "[songsuggest]") {
+    const auto result = ss::interpretSuggest(
+        0,
+        R"({"file":"x.tex","fit":null,"fits":null,"note":"","proposals":[],
+            "measured":{"a5":{"fits":false,"pages":3,
+              "wraps":[{"in_chorus":true,"line":null},{"in_chorus":false,"line":9},
+                       {"in_chorus":true,"line":null}]}}})",
+        "");
+    REQUIRE(result);
+    CHECK_FALSE(result->fits);
+    CHECK_FALSE(result->a4);
+    REQUIRE(result->a5);
+    CHECK(result->a5->pages == 3);
+    CHECK(result->a5->chorusWraps == 2);
+    CHECK(result->a5->wrapLines == std::vector<int>{9});
+    CHECK(result->proposals.empty());
+
+    const auto bare = ss::interpretSuggest(0, R"({"proposals":[]})", "");
+    REQUIRE(bare);
+    CHECK_FALSE(bare->fits);
+    CHECK(bare->note.empty());
+}
+
+TEST_CASE("suggest decodes escapes in descriptions", "[songsuggest]") {
+    const auto result = ss::interpretSuggest(
+        0,
+        R"({"proposals":[{"id":"a@1","kind":"k","stage":1,"line":1,"gain_lines":2,
+            "score":80,"grade":"good","description":"quote \" backslash \\ caron \u010d"}]})",
+        "");
+    REQUIRE(result);
+    CHECK(result->proposals[0].description == "quote \" backslash \\ caron \xC4\x8D");
+}
+
+TEST_CASE("suggest reports failures", "[songsuggest]") {
+    SECTION("non-zero exit uses stderr") {
+        const auto result = ss::interpretSuggest(1, "", "  Failed to read file\n");
+        REQUIRE_FALSE(result);
+        CHECK(result.error() == "Failed to read file");
+    }
+    SECTION("non-zero exit without a message") {
+        const auto result = ss::interpretSuggest(2, "", "");
+        REQUIRE_FALSE(result);
+        CHECK(result.error() == "chords_converter suggest exited with code 2");
+    }
+    SECTION("truncated json") {
+        const std::string json = slurp(converterData / "suggest.json");
+        CHECK_FALSE(ss::interpretSuggest(0, json.substr(0, json.size() / 2), ""));
+        CHECK_FALSE(ss::interpretSuggest(0, "", ""));
+    }
+    SECTION("trailing garbage") {
+        CHECK_FALSE(ss::interpretSuggest(0, slurp(converterData / "suggest.json") + "x", ""));
+    }
+    SECTION("wrong shape") {
+        CHECK_FALSE(ss::interpretSuggest(0, "[]", ""));
+        CHECK_FALSE(ss::interpretSuggest(0, "{}", ""));
+        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":{}})", ""));
+        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[{"id":"a"}]})", ""));
+        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,
+            "score":1,"grade":"g","description":"d","edits":[{"start":5,"end":4,"replacement":""}]}]})", ""));
+        // a 0.2.0 proposal: no score and grade
+        CHECK_FALSE(ss::interpretSuggest(
+            0, R"({"proposals":[{"id":"a@1","stage":1,"gain_lines":2,"description":"d"}]})", ""));
+        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[],"fits":"yes"})", ""));
+        CHECK_FALSE(ss::interpretSuggest(0, R"({"proposals":[],"measured":{"a4":{"pages":1}}})", ""));
+    }
+}
+
+TEST_CASE("apply interprets real runs", "[songsuggest]") {
+    const auto ok = ss::interpretApply(exitCode("apply"), slurp(converterData / "apply.out"),
+                                       slurp(converterData / "apply.err"));
+    REQUIRE(ok);
+    CHECK(*ok == slurp(converterData / "apply.out"));
+    CHECK(ok->find("\\beginprechorus\\chordsoffonsmallpage") != std::string::npos);
+
+    const auto stale = ss::interpretApply(exitCode("apply-stale"),
+                                          slurp(converterData / "apply-stale.out"),
+                                          slurp(converterData / "apply-stale.err"));
+    REQUIRE_FALSE(stale);
+    CHECK(stale.error().starts_with("No proposal 'nosuch@999'"));
+
+    for (const char* out : {"", "\n", "garbage"}) {
+        const auto empty = ss::interpretApply(0, out, "");
+        REQUIRE_FALSE(empty);
+        CHECK(empty.error() == "chords_converter apply printed no song");
+    }
+
+    const auto silent = ss::interpretApply(1, "", "");
+    REQUIRE_FALSE(silent);
+    CHECK(silent.error() == "chords_converter apply exited with code 1");
+}
+
+TEST_CASE("version output is parsed", "[converter]") {
+    const auto version = cv::parseVersion(slurp(converterData / "version.out"));
+    REQUIRE(version);
+    CHECK(*version == cv::Version{0, 3, 0});
+    CHECK(cv::toString(*version) == "0.3.0");
+    CHECK(*version >= cv::kRequired);
+
+    CHECK(cv::parseVersion("chords_converter 0.10.3\r\nmore")->minor == 10);
+    CHECK(cv::parseVersion("chords_converter 1.0.0-beta")->major == 1);
+    CHECK(*cv::parseVersion("chords_converter 0.2.0") < cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.3.1") > cv::kRequired);
+}
+
+TEST_CASE("unparseable version output gives nothing", "[converter]") {
+    CHECK_FALSE(cv::parseVersion(""));
+    CHECK_FALSE(cv::parseVersion("error: unexpected argument '--version' found"));
+    CHECK_FALSE(cv::parseVersion("chords_converter"));
+    CHECK_FALSE(cv::parseVersion("chords_converter 0.2"));
+    CHECK_FALSE(cv::parseVersion("chords_converter a.b.c"));
+    CHECK_FALSE(cv::parseVersion("chords_converter 0.2.0x"));
+    CHECK_FALSE(cv::parseVersion("other 0.2.0"));
+    CHECK_FALSE(cv::parseVersion("\nchords_converter 0.2.0"));
+}
+
+namespace {
+struct TempRoot {
+    fs::path path;
+    TempRoot() {
+        std::random_device device;
+        path = fs::temp_directory_path() / ("zub-paper-test-" + std::to_string(device()));
+        fs::create_directories(path / "zubuvzpevnik");
+    }
+    ~TempRoot() {
+        std::error_code ec;
+        fs::remove_all(path, ec);
+    }
+    void write(const std::string& cls, const std::string& text) const {
+        std::ofstream(path / "zubuvzpevnik" / (cls + ".cls"), std::ios::binary) << text;
+    }
+};
+} // namespace
+
+TEST_CASE("paperOf reads the base class options", "[songsuggest][preview]") {
+    TempRoot root;
+    root.write("small", "\\ProvidesClass{small}\n\\LoadClass[a5paper,twoside,10pt]{book}\n");
+    root.write("big", "\\LoadClass[a4paper]{article}\n");
+    root.write("commented", "% \\LoadClass[a4paper]{article}\n\\LoadClass[a5paper]{book}\n");
+    root.write("none", "\\LoadClass{article}\n");
+    root.write("later", "\\PassOptionsToClass{a4paper}{x}\n\\LoadClass[10pt]{book}\n");
+    CHECK(zub::preview::paperOf(root.path, "small") == ss::Paper::A5);
+    CHECK(zub::preview::paperOf(root.path, "big") == ss::Paper::A4);
+    CHECK(zub::preview::paperOf(root.path, "commented") == ss::Paper::A5);
+    CHECK_FALSE(zub::preview::paperOf(root.path, "none"));
+    CHECK_FALSE(zub::preview::paperOf(root.path, "later"));
+    CHECK_FALSE(zub::preview::paperOf(root.path, "missing"));
+    CHECK_FALSE(zub::preview::paperOf(root.path, "../small"));
+    CHECK_FALSE(zub::preview::paperOf(root.path, ""));
+}

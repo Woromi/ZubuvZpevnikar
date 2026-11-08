@@ -7,6 +7,7 @@
 #include <optional>
 #include <zub/core/songimport.hpp>
 
+class QCheckBox;
 class QDialogButtonBox;
 class QGroupBox;
 class QLabel;
@@ -39,6 +40,8 @@ public:
     bool converterChosen() const { return converterChosen_; }
     // The user went back to the built-in converter (forget the chosen one).
     bool converterReset() const { return converterReset_; }
+    // The "Tidy the song" box (remembered in the settings): run tidy on the imported song.
+    bool tidy() const;
 
 protected:
     void reject() override; // Cancel/Esc: stops a running conversion first
@@ -63,6 +66,7 @@ private:
     QLabel* converterLabel_ = nullptr;
     QPushButton* chooseConverter_ = nullptr;
     QPushButton* useBuiltIn_ = nullptr; // shown while another converter is in use
+    QCheckBox* tidy_ = nullptr;
     QGroupBox* botCheck_ = nullptr; // checkable; holds the cookie and user-agent fields
     QLineEdit* cookie_ = nullptr;
     QLineEdit* userAgent_ = nullptr;

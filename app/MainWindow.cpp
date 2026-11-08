@@ -1,8 +1,12 @@
 #include "MainWindow.hpp"
 
+#include "ConverterRunner.hpp"
+#include "ConverterVersion.hpp"
+#include "DiffView.hpp"
 #include "ImportDialog.hpp"
 #include "PreviewPane.hpp"
 #include "PreviewRunner.hpp"
+#include "ShrinkDialog.hpp"
 #include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongTableModel.hpp"
@@ -21,6 +25,7 @@
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QLockFile>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -33,15 +38,19 @@
 #include <QStatusBar>
 #include <QTableView>
 #include <QToolBar>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <set>
 #include <system_error>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
+#include <zub/core/linediff.hpp>
 #include <zub/core/preview.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/songimport.hpp>
+#include <zub/core/songsuggest.hpp>
+#include <zub/core/songtidy.hpp>
 #include <zub/core/textfile.hpp>
 
 namespace {
@@ -73,14 +82,15 @@ MainWindow::MainWindow(QWidget* parent)
     statusBar()->addPermanentWidget(issuesLabel_);
     updateStatus();
 
-    // Window size and pane widths as the user left them. The splitter holds no editor yet,
-    // so its state is applied when a song opens.
+    // Window size and pane widths as the user left them.
     const QSettings settings;
     restoreGeometry(settings.value(geometryKey).toByteArray());
-    songSplitterState_ = settings.value(songSplitterKey).toByteArray();
+    songSplitter_->restoreState(settings.value(songSplitterKey).toByteArray());
 }
 
 MainWindow::~MainWindow() {
+    converterRunner_->cancel();
+    disconnect(converterRunner_, nullptr, this, nullptr);
     // Members are destroyed before QWidget deletes the children, so without this the editors
     // (and its highlighter) would outlive repository_. Disconnect first: no signal may reach
     // a half-destroyed window.
@@ -185,9 +195,49 @@ void MainWindow::createCentralWidget() {
     auto* songLayout = new QVBoxLayout(songPage_);
     songLayout->setContentsMargins(0, 0, 0, 0);
     songLayout->setSpacing(0);
-    // The editor goes in at index 0 when a song opens (createSongToolBar adds the toolbar).
+    // The editor goes in at index 0 of editorArea_ when a song opens (createSongToolBar adds
+    // the toolbar).
     songSplitter_ = new QSplitter(Qt::Horizontal, songPage_);
+    auto* editorHost = new QWidget(songSplitter_);
+    auto* hostLayout = new QVBoxLayout(editorHost);
+    hostLayout->setContentsMargins(0, 0, 0, 0);
+    hostLayout->setSpacing(0);
+    editorArea_ = new QStackedWidget(editorHost);
+    diffView_ = new DiffView(editorArea_);
+    editorArea_->addWidget(diffView_);
+    hostLayout->addWidget(editorArea_, 1);
+
+    tidyPanel_ = new QWidget(editorHost);
+    auto* tidyLayout = new QVBoxLayout(tidyPanel_);
+    tidyLayout->setContentsMargins(4, 2, 4, 2);
+    tidyLayout->setSpacing(2);
+    auto* tidyHeader = new QHBoxLayout;
+    tidyHeader->addWidget(new QLabel(tr("Tidy changed:"), tidyPanel_), 1);
+    auto* tidyClose = new QToolButton(tidyPanel_);
+    tidyClose->setText(QStringLiteral("×"));
+    tidyClose->setAutoRaise(true);
+    tidyClose->setToolTip(tr("Hide this list"));
+    tidyHeader->addWidget(tidyClose);
+    tidyLayout->addLayout(tidyHeader);
+    tidyList_ = new QListWidget(tidyPanel_);
+    tidyList_->setMaximumHeight(130);
+    tidyLayout->addWidget(tidyList_);
+    tidyPanel_->hide();
+    hostLayout->addWidget(tidyPanel_);
+    connect(tidyClose, &QToolButton::clicked, this, &MainWindow::clearTidyChanges);
+    connect(tidyList_, &QListWidget::itemDoubleClicked, this,
+            [this](QListWidgetItem* item) { jumpToLine(item->data(Qt::UserRole).toInt()); });
+
+    converterRunner_ = new ConverterRunner(this);
+    connect(converterRunner_, &ConverterRunner::finished, this, &MainWindow::onConverterFinished);
+
+    songSplitter_->addWidget(editorHost);
     songSplitter_->addWidget(preview_);
+    // A collapsed editor would be saved in the state and every later start would open it hidden.
+    songSplitter_->setCollapsible(0, false);
+    songSplitter_->setStretchFactor(0, 1);
+    songSplitter_->setStretchFactor(1, 1);
+    songSplitter_->setSizes({1, 1});
     songLayout->addWidget(songSplitter_);
 
     pages_->addWidget(listPage_);
@@ -353,20 +403,16 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
     editor->setWindowTitle(title.isEmpty() ? editor->windowTitle() : title);
     inputLabel_->setText(toolTip);
 
-    songSplitter_->insertWidget(0, editor);
-    // A collapsed editor would be saved in the state and every later song would open hidden.
-    songSplitter_->setCollapsible(0, false);
-    songSplitter_->setStretchFactor(0, 1);
-    songSplitter_->setStretchFactor(1, 1);
-    songSplitter_->setSizes({1, 1});
-    if (!songSplitterState_.isEmpty())
-        songSplitter_->restoreState(songSplitterState_);
+    editorArea_->insertWidget(0, editor);
+    editorArea_->setCurrentWidget(editor);
+    songPageShown_ = true;
 
     connect(editor, &SongEditor::modificationChanged, this, [this] {
         updateWindowTitle();
         updateSongActions();
     });
     connect(editor, &SongEditor::saved, this, [this, editor](const std::string& content) {
+        changesAction_->setChecked(false);
         refreshSongMetadata(editor, content);
         requestPreview();
     });
@@ -376,6 +422,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
             5000);
         if (auto content = zub::readTextFile(editor->path()))
             refreshSongMetadata(editor, *content);
+        clearTidyChanges(); // its line numbers were for the old text
         updateSongActions();
         requestPreview();
     });
@@ -384,6 +431,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
     QPlainTextEdit* edit = editor->textEdit();
     connect(edit, &QPlainTextEdit::undoAvailable, this,
             [this](bool available) { undoAction_->setEnabled(available); });
+    connect(edit, &QPlainTextEdit::textChanged, this, [this] { refreshChanges(); });
     connect(edit, &QPlainTextEdit::redoAvailable, this,
             [this](bool available) { redoAction_->setEnabled(available); });
     connect(edit, &QPlainTextEdit::copyAvailable, this, [this, edit](bool available) {
@@ -438,14 +486,19 @@ bool MainWindow::closeSong() {
     if (!confirmClose(editor))
         return false;
     const std::filesystem::path path = editor->path();
+    if (converterRunner_->isRunning())
+        statusBar()->clearMessage(); // "Tidying…"; cancel() reports nothing
+    converterRunner_->cancel();
+    runEditor_.clear();
+    clearTidyChanges();
+    changesAction_->setChecked(false);
     // No more reload dialogs from an editor that is gone but not yet deleted.
     editor->stopWatching();
     approvedConstructs_.erase(path); // approvals last as long as the song is open
     disconnect(editor, nullptr, this, nullptr);
     disconnect(editor->textEdit(), nullptr, this, nullptr);
-    songSplitterState_ = songSplitter_->saveState();
     editor_ = nullptr;
-    editor->setParent(nullptr); // out of the splitter now; the next song takes index 0
+    editor->setParent(nullptr); // out of the stack now; the next song takes index 0
     editor->deleteLater();
 
     pages_->setCurrentWidget(listPage_);
@@ -472,11 +525,11 @@ void MainWindow::closeEvent(QCloseEvent* event) {
         event->ignore();
         return;
     }
-    if (editor_)
-        songSplitterState_ = songSplitter_->saveState();
     QSettings settings;
     settings.setValue(geometryKey, saveGeometry());
-    settings.setValue(songSplitterKey, songSplitterState_);
+    // Before the song page was shown the splitter has no real sizes; keep what is stored.
+    if (songPageShown_)
+        settings.setValue(songSplitterKey, songSplitter_->saveState());
     event->accept();
 }
 
@@ -511,6 +564,28 @@ void MainWindow::createSongToolBar() {
                              [](QPlainTextEdit* e) { e->copy(); });
     pasteAction_ = editAction(tr("Paste"), QStringLiteral("edit-paste"), tr("Paste (Ctrl+V)"),
                               [](QPlainTextEdit* e) { e->paste(); });
+    songToolBar_->addSeparator();
+
+    tidyAction_ = new QAction(QIcon::fromTheme(QStringLiteral("tools-wizard")), tr("Tidy"), this);
+    tidyAction_->setToolTip(tr(
+        "Tidy the song with chords_converter: repeated choruses, chord positions (one undo step)"));
+    connect(tidyAction_, &QAction::triggered, this, [this] { startTidy(); });
+    songToolBar_->addAction(tidyAction_);
+
+    makeSmallerAction_ =
+        new QAction(QIcon::fromTheme(QStringLiteral("zoom-out")), tr("Make Smaller"), this);
+    makeSmallerAction_->setToolTip(tr("Ask chords_converter for changes that make the song print "
+                                      "smaller; apply one (one undo step), then ask again"));
+    connect(makeSmallerAction_, &QAction::triggered, this, [this] { startShrink(); });
+    songToolBar_->addAction(makeSmallerAction_);
+
+    changesAction_ =
+        new QAction(QIcon::fromTheme(QStringLiteral("document-compare")), tr("Changes"), this);
+    changesAction_->setCheckable(true);
+    changesAction_->setToolTip(
+        tr("Show what changed since the song was saved (an import: since it was imported)"));
+    connect(changesAction_, &QAction::toggled, this, &MainWindow::showChanges);
+    songToolBar_->addAction(changesAction_);
 
     // The song's input name ("Artist/Title"), at the right end.
     inputLabel_ = new QLabel(songToolBar_);
@@ -525,19 +600,195 @@ void MainWindow::updateSongActions() {
     const bool open = editor_ != nullptr;
     closeSongAction_->setEnabled(open);
     saveAction_->setEnabled(open && editor_->isModified());
+    const bool modified = open && editor_->isModified();
+    changesAction_->setEnabled(modified);
+    if (!modified && changesAction_->isChecked())
+        changesAction_->setChecked(false);
     if (!open) {
-        for (QAction* action : {undoAction_, redoAction_, cutAction_, copyAction_, pasteAction_})
+        for (QAction* action :
+             {undoAction_, redoAction_, cutAction_, copyAction_, pasteAction_, tidyAction_,
+              makeSmallerAction_})
             action->setEnabled(false);
         return;
     }
     const QPlainTextEdit* edit = editor_->textEdit();
     const bool readOnly = edit->isReadOnly();
     const bool selection = edit->textCursor().hasSelection();
-    undoAction_->setEnabled(edit->document()->isUndoAvailable());
-    redoAction_->setEnabled(edit->document()->isRedoAvailable());
+    // While the Changes view is shown, the editor is hidden: no edits it can't show.
+    const bool editable = !readOnly && !changesAction_->isChecked();
+    undoAction_->setEnabled(editable && edit->document()->isUndoAvailable());
+    redoAction_->setEnabled(editable && edit->document()->isRedoAvailable());
     copyAction_->setEnabled(selection);
-    cutAction_->setEnabled(selection && !readOnly);
-    pasteAction_->setEnabled(!readOnly);
+    cutAction_->setEnabled(selection && editable);
+    pasteAction_->setEnabled(editable);
+    const bool converterFree =
+        !readOnly && !converterRunner_->isRunning() && !findConverter().empty();
+    tidyAction_->setEnabled(converterFree);
+    makeSmallerAction_->setEnabled(converterFree && !songbookRoot_.empty());
+}
+
+void MainWindow::startTidy(const QString& note) {
+    SongEditor* editor = editor_;
+    if (!editor || editor->textEdit()->isReadOnly() || converterRunner_->isRunning())
+        return;
+    const std::filesystem::path converter = findConverter();
+    if (converter.empty()) {
+        statusBar()->showMessage(tr("Tidy needs chords_converter, which was not found."), 8000);
+        return;
+    }
+    if (!converterUsable(converter, tr("Tidy")))
+        return;
+    runKind_ = RunKind::Tidy;
+    runEditor_ = editor;
+    runInput_ = editor->content();
+    tidyNote_ = note;
+    // Before start(): a failure to start may be reported from inside it, and the result
+    // handler then replaces this message.
+    statusBar()->showMessage(tr("Tidying…"));
+    if (!converterRunner_->start(
+            [converter](const std::filesystem::path& file) {
+                return zub::songtidy::prepare(converter, file);
+            },
+            runInput_, toQString(editor->path().stem())))
+        return;
+    updateSongActions();
+}
+
+void MainWindow::onConverterFinished(const std::expected<ConverterOutput, QString>& output) {
+    switch (runKind_) {
+    case RunKind::Tidy:
+        onTidyFinished(output);
+        break;
+    case RunKind::Suggest:
+        onSuggestFinished(output);
+        break;
+    case RunKind::Apply:
+        onApplyFinished(output);
+        break;
+    }
+}
+
+bool MainWindow::converterUsable(const std::filesystem::path& converter, const QString& action) {
+    const QString problem = converterProblem(converter);
+    if (problem.isEmpty())
+        return true;
+    QMessageBox::warning(this, action, problem);
+    return false;
+}
+
+SongEditor* MainWindow::takeRun(std::string& input, const QString& what) {
+    SongEditor* editor = runEditor_.data();
+    input = std::move(runInput_);
+    runEditor_.clear();
+    runInput_.clear();
+    if (!editor || editor != editor_ || editor->content() != input) {
+        // The song was closed, switched or edited while the converter ran: its result no longer
+        // fits the text.
+        statusBar()->showMessage(tr("%1 discarded: the song changed while it ran.").arg(what), 8000);
+        return nullptr;
+    }
+    return editor;
+}
+
+void MainWindow::onTidyFinished(const std::expected<ConverterOutput, QString>& output) {
+    std::string input;
+    const QString note = std::move(tidyNote_);
+    tidyNote_.clear();
+    const auto finishUp = [this] { updateSongActions(); };
+
+    SongEditor* editor = takeRun(input, tr("Tidy"));
+    if (!editor) {
+        finishUp();
+        return;
+    }
+    std::expected<zub::songtidy::Tidied, QString> result = std::unexpected(output.error_or({}));
+    if (output) {
+        auto interpreted = zub::songtidy::interpret(output->exitCode, output->out, output->err);
+        if (interpreted)
+            result = std::move(*interpreted);
+        else
+            result = std::unexpected(toQString(interpreted.error()));
+    }
+    if (!result) {
+        statusBar()->clearMessage();
+        QMessageBox::warning(this, tr("Tidy failed"), result.error());
+        finishUp();
+        return;
+    }
+
+    const zub::songtidy::Tidied& tidied = *result;
+    editor->replaceContent(tidied.content);
+    // Against what the editor now holds, not the raw output: a CRLF song keeps CRLF even where
+    // the converter wrote a lone LF.
+    const std::string after = editor->content();
+    const auto lines = zub::diff::lines(input, after);
+
+    tidyList_->clear();
+    for (const auto& change : tidied.changes) {
+        const int line = zub::diff::mapOldLine(lines, change.line);
+        auto* item = new QListWidgetItem(
+            tr("line %1: %2").arg(line).arg(toQString(change.description)), tidyList_);
+        item->setData(Qt::UserRole, line);
+    }
+    tidyPanel_->setVisible(!tidied.changes.empty());
+
+    QString message;
+    if (tidied.changes.empty())
+        message = tr("Tidy: nothing to change");
+    else if (tidied.changes.size() == 1)
+        message = tr("Tidy: 1 change");
+    else
+        message = tr("Tidy: %1 changes").arg(tidied.changes.size());
+    // tidy moves chords to their syllable's start only for these languages (it hyphenates), and
+    // skips that rule silently otherwise: say so, or "nothing to change" looks like "all fine".
+    std::string lang;
+    if (const auto meta = zub::parseSong(after)) {
+        if (const auto it = meta->keys.find("lang"); it != meta->keys.end())
+            lang = it->second;
+    }
+    if (lang.empty())
+        message += tr(" (chord positions not checked: set lang in the song header)");
+    else if (lang != "czech" && lang != "slovak" && lang != "english")
+        message += tr(" (chord positions are only checked for lang czech, slovak or english)");
+    if (!note.isEmpty())
+        message += QStringLiteral(" — ") + note;
+    statusBar()->showMessage(message, 10000);
+    finishUp();
+    requestPreview();
+}
+
+void MainWindow::clearTidyChanges() {
+    tidyList_->clear();
+    tidyPanel_->hide();
+}
+
+void MainWindow::showChanges(bool show) {
+    if (!editor_)
+        return;
+    if (show) {
+        diffView_->setTexts(editor_->baselineContent(), editor_->content(), noChangesText());
+        editorArea_->setCurrentWidget(diffView_);
+    } else {
+        editorArea_->setCurrentWidget(editor_);
+    }
+    updateSongActions();
+}
+
+QString MainWindow::noChangesText() const {
+    return editor_ && editor_->isNew() ? tr("No changes since the import")
+                                       : tr("No unsaved changes");
+}
+
+void MainWindow::refreshChanges() {
+    if (editor_ && changesAction_->isChecked())
+        diffView_->setTexts(editor_->baselineContent(), editor_->content(), noChangesText());
+}
+
+void MainWindow::jumpToLine(int line) {
+    if (!editor_)
+        return;
+    changesAction_->setChecked(false); // the editor must be showing
+    editor_->goToLine(line);
 }
 
 void MainWindow::updateWindowTitle() {
@@ -589,7 +840,7 @@ void MainWindow::createPreview() {
                 // Only if the error belongs to the song that is open now.
                 SongEditor* editor = editor_;
                 if (editor && toQString(inputNameOf(editor)) == inputName)
-                    editor->goToLine(line);
+                    jumpToLine(line);
             });
 
     // One work dir per running instance: two instances building in the same dir would
@@ -627,35 +878,19 @@ void MainWindow::requestPreview(bool userAsked) {
     std::string content = editor->content();
     // Songs build with -shell-escape, so a song is code. Unknown commands (e.g. from an
     // imported song) are never built automatically, and only after confirmation on Rebuild.
-    std::set<std::string>& approved = approvedConstructs_[editor->path()];
-    QStringList unapproved;
-    for (const std::string& construct : zub::safety::unknownConstructs(content)) {
-        if (!approved.contains(construct))
-            unapproved << toQString(construct);
-    }
-    if (!unapproved.isEmpty()) {
-        const QString list = unapproved.join(QStringLiteral(", "));
-        const bool build =
-            userAsked &&
-            QMessageBox::warning(
-                this, tr("Build this song?"),
-                tr("This song uses commands that songs normally don't: %1").arg(list),
-                QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) == QMessageBox::Yes;
-        if (!build) {
-            previewRunner_->cancel();
-            preview_->clear(); // the PDF shown may be another song's
-            PreviewResult blocked;
-            blocked.inputName = inputNameOf(editor);
-            blocked.message =
-                tr("Not built automatically: the song uses %1, which songs normally don't. "
-                   "Building runs it with full access to your files. Check the song, then "
-                   "press Rebuild to build it anyway.")
-                    .arg(list);
-            preview_->showResult(blocked);
-            return;
-        }
-        for (const QString& construct : unapproved)
-            approved.insert(toStdString(construct));
+    QString list;
+    if (!approveBuild(editor, content, userAsked, &list)) {
+        previewRunner_->cancel();
+        preview_->clear(); // the PDF shown may be another song's
+        PreviewResult blocked;
+        blocked.inputName = inputNameOf(editor);
+        blocked.message =
+            tr("Not built automatically: the song uses %1, which songs normally don't. "
+               "Building runs it with full access to your files. Check the song, then "
+               "press Rebuild to build it anyway.")
+                .arg(list);
+        preview_->showResult(blocked);
+        return;
     }
 
     zub::preview::Request request;
@@ -665,6 +900,180 @@ void MainWindow::requestPreview(bool userAsked) {
     request.songContent = std::move(content);
     request.documentClass = toStdString(preview_->documentClass());
     previewRunner_->request(std::move(request));
+}
+
+bool MainWindow::approveBuild(SongEditor* editor, const std::string& content, bool askUser,
+                              QString* unapprovedList, const QString& yesText,
+                              const QString& noText) {
+    std::set<std::string>& approved = approvedConstructs_[editor->path()];
+    QStringList unapproved;
+    for (const std::string& construct : zub::safety::unknownConstructs(content)) {
+        if (!approved.contains(construct))
+            unapproved << toQString(construct);
+    }
+    if (unapproved.isEmpty())
+        return true;
+    const QString list = unapproved.join(QStringLiteral(", "));
+    if (unapprovedList)
+        *unapprovedList = list;
+    bool build = false;
+    if (askUser) {
+        QMessageBox box(QMessageBox::Warning, tr("Build this song?"),
+                        tr("This song uses commands that songs normally don't: %1").arg(list),
+                        QMessageBox::Yes | QMessageBox::Cancel, this);
+        if (!yesText.isEmpty())
+            box.button(QMessageBox::Yes)->setText(yesText);
+        if (!noText.isEmpty())
+            box.button(QMessageBox::Cancel)->setText(noText);
+        box.setDefaultButton(QMessageBox::Cancel);
+        build = box.exec() == QMessageBox::Yes;
+    }
+    if (!build)
+        return false;
+    for (const QString& construct : unapproved)
+        approved.insert(toStdString(construct));
+    return true;
+}
+
+void MainWindow::startShrink() {
+    SongEditor* editor = editor_;
+    if (!editor || editor->textEdit()->isReadOnly() || converterRunner_->isRunning() ||
+        songbookRoot_.empty())
+        return;
+    const std::filesystem::path converter = findConverter();
+    if (converter.empty()) {
+        statusBar()->showMessage(tr("Make Smaller needs chords_converter, which was not found."),
+                                 8000);
+        return;
+    }
+    if (!converterUsable(converter, tr("Make Smaller")))
+        return;
+    const std::string content = editor->content();
+    // --measure builds the song with lualatex -shell-escape: the same rule as for a preview.
+    // Declined, the proposals are still useful, just without page counts.
+    const bool measure =
+        approveBuild(editor, content, true, nullptr, tr("Measure"), tr("Suggest Without Measuring"));
+    if (measure)
+        requestPreview(); // approved now: the pane's "Not built automatically" message goes away
+    // No paper known (a class without a paper option): no --fit, the converter measures both.
+    const auto paper = zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
+    const std::filesystem::path root = songbookRoot_;
+
+    runKind_ = RunKind::Suggest;
+    runEditor_ = editor;
+    runInput_ = content;
+    statusBar()->showMessage(tr("Looking for ways to make the song smaller…"));
+    if (!converterRunner_->start(
+            [converter, paper, measure, root](const std::filesystem::path& file) {
+                return zub::songsuggest::suggestCommand(converter, file, paper, measure, root);
+            },
+            content, toQString(editor->path().stem())))
+        return;
+    updateSongActions();
+}
+
+void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>& output) {
+    std::string input;
+    QPointer<SongEditor> editor = takeRun(input, tr("Make Smaller"));
+    if (!editor) {
+        updateSongActions();
+        return;
+    }
+    std::expected<zub::songsuggest::Suggestions, QString> result = std::unexpected(output.error_or({}));
+    if (output) {
+        auto interpreted = zub::songsuggest::interpretSuggest(output->exitCode, output->out, output->err);
+        if (interpreted)
+            result = std::move(*interpreted);
+        else
+            result = std::unexpected(toQString(interpreted.error()));
+    }
+    updateSongActions();
+    if (!result) {
+        statusBar()->clearMessage();
+        QMessageBox::warning(this, tr("Make Smaller failed"), result.error());
+        return;
+    }
+    const zub::songsuggest::Suggestions& suggestions = *result;
+    if (suggestions.proposals.empty()) {
+        statusBar()->clearMessage();
+        const QString summary = ShrinkDialog::summary(suggestions);
+        QString text = tr("No more changes to suggest.");
+        if (suggestions.fits == true) {
+            const bool a5 = suggestions.a5.has_value();
+            text = tr("The song fits on %1 already.").arg(a5 ? tr("A5") : tr("A4")) +
+                   QStringLiteral(" ") + text;
+        }
+        if (!summary.isEmpty())
+            text += QStringLiteral("\n\n") + summary;
+        QMessageBox::information(this, tr("Make Smaller"), text);
+        return;
+    }
+    statusBar()->clearMessage();
+    ShrinkDialog dialog(suggestions, input, this);
+    // Show where each proposal is (moving the cursor does not change the text).
+    connect(&dialog, &ShrinkDialog::proposalSelected, this, &MainWindow::jumpToLine);
+    if (const int line = suggestions.proposals.front().line; line > 0)
+        jumpToLine(line);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    // The same text the suggestions were computed for (the dialog is modal, but the editor may
+    // have been closed or changed by other means).
+    if (!editor || editor != editor_ || editor->content() != input) {
+        statusBar()->showMessage(tr("Make Smaller discarded: the song changed."), 8000);
+        return;
+    }
+    const auto& proposal = dialog.selected();
+    runEditor_ = editor.data();
+    runInput_ = input;
+    startApply(proposal.id, toQString(proposal.description));
+}
+
+void MainWindow::startApply(const std::string& id, const QString& description) {
+    const std::filesystem::path converter = findConverter();
+    if (converter.empty() || !runEditor_) {
+        runEditor_.clear();
+        runInput_.clear();
+        return;
+    }
+    runKind_ = RunKind::Apply;
+    applyDescription_ = description;
+    statusBar()->showMessage(tr("Applying…"));
+    if (!converterRunner_->start(
+            [converter, id](const std::filesystem::path& file) {
+                return zub::songsuggest::applyCommand(converter, file, id);
+            },
+            runInput_, toQString(runEditor_->path().stem())))
+        return;
+    updateSongActions();
+}
+
+void MainWindow::onApplyFinished(const std::expected<ConverterOutput, QString>& output) {
+    std::string input;
+    const QString description = std::move(applyDescription_);
+    applyDescription_.clear();
+    SongEditor* editor = takeRun(input, tr("Make Smaller"));
+    if (!editor) {
+        updateSongActions();
+        return;
+    }
+    std::expected<std::string, QString> result = std::unexpected(output.error_or({}));
+    if (output) {
+        auto interpreted = zub::songsuggest::interpretApply(output->exitCode, output->out, output->err);
+        if (interpreted)
+            result = std::move(*interpreted);
+        else
+            result = std::unexpected(toQString(interpreted.error()));
+    }
+    updateSongActions();
+    if (!result) {
+        statusBar()->clearMessage();
+        QMessageBox::warning(this, tr("Make Smaller failed"), result.error());
+        return;
+    }
+    editor->replaceContent(*result); // one undo step; nothing is saved
+    statusBar()->showMessage(tr("Applied: %1").arg(description), 10000);
+    updateSongActions();
+    requestPreview();
 }
 
 namespace {
@@ -721,6 +1130,7 @@ void MainWindow::importSong() {
     if (result != QDialog::Accepted)
         return;
     const zub::songimport::Imported& imported = dialog.imported();
+    const bool tidy = dialog.tidy();
 
     const auto dest = zub::songimport::destination(songbookRoot_, imported.inputName);
     std::filesystem::path target = dest.path;
@@ -773,9 +1183,13 @@ void MainWindow::importSong() {
     QStringList notes;
     for (const std::string& warning : imported.warnings)
         notes << toQString(warning);
-    statusBar()->showMessage(
+    const QString message =
         notes.isEmpty()
             ? tr("Imported %1. Check it, then save with Ctrl+S.").arg(toQString(imported.inputName))
-            : notes.join(QStringLiteral(" ")),
-        10000);
+            : notes.join(QStringLiteral(" "));
+    statusBar()->showMessage(message, 10000);
+    // A separate step on the new editor, so Ctrl+Z shows the raw draft; its message keeps the
+    // converter's warnings.
+    if (tidy)
+        startTidy(message);
 }

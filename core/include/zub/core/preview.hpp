@@ -7,6 +7,7 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <zub/core/songsuggest.hpp>
 
 // Single-song preview builds. core prepares the build and reads its log; the app runs the
 // command (QProcess), so it can run in the background and be cancelled.
@@ -39,6 +40,12 @@ std::expected<Command, std::string> prepare(const Request& request);
 
 // Document classes the songbook provides: the stems of zubuvzpevnik/*.cls, sorted.
 std::vector<std::string> documentClasses(const std::filesystem::path& songbookRoot);
+
+// The paper size of a document class: zubuvzpevnik/<className>.cls loads its base class with
+// \LoadClass[...a5paper...] (A5) or a4paper (A4). Nullopt when the file is unreadable, the
+// name is not a plain class name, or no paper option is found.
+std::optional<songsuggest::Paper> paperOf(const std::filesystem::path& songbookRoot,
+                                          std::string_view className);
 
 struct Error {
     std::string message;              // e.g. "Undefined control sequence."

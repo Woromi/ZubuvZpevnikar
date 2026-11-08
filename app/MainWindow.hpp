@@ -2,16 +2,22 @@
 
 #include <QMainWindow>
 #include <QByteArray>
+#include <QPointer>
 #include <QString>
 #include <filesystem>
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
+#include <expected>
+#include <zub/core/songsuggest.hpp>
+#include <zub/core/songtidy.hpp>
 
 class QAction;
 class QComboBox;
 class QLabel;
+class QListWidget;
+class QListWidgetItem;
 class QLockFile;
 class QLineEdit;
 class QModelIndex;
@@ -20,11 +26,14 @@ class QStackedWidget;
 class QToolBar;
 class QTableView;
 class QWidget;
+class DiffView;
 class PreviewPane;
 class PreviewRunner;
 class SongEditor;
 class SongFilterProxy;
 class SongTableModel;
+class ConverterRunner;
+struct ConverterOutput;
 
 namespace KSyntaxHighlighting {
 class Repository;
@@ -72,6 +81,25 @@ private:
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
     void createSongToolBar();
     void updateSongActions();
+    // Tidy (chords_converter tidy on the open song, one undo step) and the Changes view
+    void startTidy(const QString& note = {});
+    void onConverterFinished(const std::expected<ConverterOutput, QString>& output);
+    void onTidyFinished(const std::expected<ConverterOutput, QString>& output);
+    // Make Smaller: suggest (a dialog to pick one), then apply the picked one
+    void startShrink();
+    void onSuggestFinished(const std::expected<ConverterOutput, QString>& output);
+    void startApply(const std::string& id, const QString& description);
+    void onApplyFinished(const std::expected<ConverterOutput, QString>& output);
+    // Takes over the state of the run that just finished; the editor it belongs to, or nullptr
+    // (after a status message) when the song changed meanwhile. `input` gets the bytes sent.
+    SongEditor* takeRun(std::string& input, const QString& what);
+    // False and a message box when the converter is older than zub::converter::kRequired.
+    bool converterUsable(const std::filesystem::path& converter, const QString& action);
+    void clearTidyChanges();
+    void showChanges(bool show); // the diff of the saved file vs the editor text, or the editor
+    void refreshChanges();
+    QString noChangesText() const; // the Changes view's text when nothing changed
+    void jumpToLine(int line);
     void updateWindowTitle();
     void refreshSongMetadata(SongEditor* editor, const std::string& content);
 
@@ -80,6 +108,12 @@ private:
     // Builds the current editor's text; clears the pane without one. A song with commands
     // outside the song format is built only when `userAsked` (Rebuild) and confirmed.
     void requestPreview(bool userAsked = false);
+    // Whether the song may be built: it has no commands outside the song format that the user
+    // has not approved, or (askUser) the user approves them now (remembered while the song is
+    // open). `unapproved` gets the commands that still need approval, comma-separated.
+    bool approveBuild(SongEditor* editor, const std::string& content, bool askUser,
+                      QString* unapproved = nullptr, const QString& yesText = {},
+                      const QString& noText = {});
     std::string inputNameOf(const SongEditor* editor) const; // "Artist/Title"
 
     SongTableModel* model_ = nullptr;
@@ -89,8 +123,22 @@ private:
     QWidget* listPage_ = nullptr;
     QWidget* songPage_ = nullptr;
     QToolBar* songToolBar_ = nullptr;
-    QSplitter* songSplitter_ = nullptr; // editor | preview
-    QByteArray songSplitterState_;      // restored when a song opens
+    QSplitter* songSplitter_ = nullptr; // editor area | preview
+    bool songPageShown_ = false;        // the splitter has been laid out (its state is worth saving)
+    QStackedWidget* editorArea_ = nullptr; // {editor, diff view}
+    DiffView* diffView_ = nullptr;
+    QWidget* tidyPanel_ = nullptr; // "Tidy changed:" list under the editor area
+    QListWidget* tidyList_ = nullptr;
+    ConverterRunner* converterRunner_ = nullptr;
+    enum class RunKind { Tidy, Suggest, Apply };
+    RunKind runKind_ = RunKind::Tidy;
+    QPointer<SongEditor> runEditor_; // the editor the running converter belongs to
+    std::string runInput_;           // the bytes that were sent
+    QString tidyNote_;               // appended to the status message when a tidy is done
+    QString applyDescription_;       // of the proposal being applied
+    QAction* tidyAction_ = nullptr;
+    QAction* makeSmallerAction_ = nullptr;
+    QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any
     QLabel* inputLabel_ = nullptr;
     QAction* closeSongAction_ = nullptr;

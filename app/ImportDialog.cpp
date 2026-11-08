@@ -1,7 +1,9 @@
 #include "ImportDialog.hpp"
 
+#include "ConverterVersion.hpp"
 #include "convert.hpp"
 
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -16,6 +18,7 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QPushButton>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -27,6 +30,8 @@ constexpr const char* supportedSites =
 const char* errorStyle = "color: #b00020;";
 
 using zub::songimport::FailureKind;
+
+const auto tidyKey = QStringLiteral("import/tidy");
 } // namespace
 
 ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::path builtIn,
@@ -60,6 +65,9 @@ ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::pat
     converterRow->addWidget(converterLabel_, 1);
     converterRow->addWidget(useBuiltIn_);
     converterRow->addWidget(chooseConverter_);
+
+    tidy_ = new QCheckBox(tr("Tidy the song (repeated choruses, chord positions)"));
+    tidy_->setChecked(QSettings{}.value(tidyKey, true).toBool());
 
     botCheck_ = new QGroupBox(tr("Site asks for a bot check"));
     botCheck_->setCheckable(true);
@@ -103,6 +111,7 @@ ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::pat
     layout->addLayout(sourceRow);
     layout->addWidget(hint);
     layout->addLayout(converterRow);
+    layout->addWidget(tidy_);
     layout->addWidget(botCheck_);
     layout->addWidget(status_);
     layout->addWidget(details_, 1);
@@ -161,14 +170,33 @@ bool ImportDialog::converterExists() const {
            QFileInfo(toQString(converter_)).isFile();
 }
 
+bool ImportDialog::tidy() const {
+    return tidy_->isChecked();
+}
+
 void ImportDialog::updateConverterLabel() {
     if (converterExists()) {
         const QString path = toQString(converter_);
         const QFontMetrics metrics(converterLabel_->font());
         converterLabel_->setStyleSheet({});
-        const QString shown = converter_ == builtIn_ ? tr("built-in (%1)").arg(path) : path;
-        converterLabel_->setText(metrics.elidedText(shown, Qt::ElideMiddle, 380));
-        converterLabel_->setToolTip(path);
+        QString shown = converter_ == builtIn_ ? tr("built-in (%1)").arg(path) : path;
+        shown = metrics.elidedText(shown, Qt::ElideMiddle, 380);
+        const auto answer = converterVersion(converter_);
+        QString tip = path;
+        if (answer.version) {
+            shown += QStringLiteral("  ") +
+                     tr("version %1").arg(toQString(zub::converter::toString(*answer.version)));
+        } else {
+            shown += QStringLiteral("  ") + tr("version unknown");
+        }
+        const QString problem = converterProblem(converter_);
+        if (!problem.isEmpty()) {
+            // Importing still works with an older converter; tidy and Make Smaller refuse it.
+            converterLabel_->setStyleSheet(QString::fromLatin1(errorStyle));
+            tip += QStringLiteral("\n") + problem;
+        }
+        converterLabel_->setText(shown);
+        converterLabel_->setToolTip(tip);
     } else {
         converterLabel_->setStyleSheet(QString::fromLatin1(errorStyle));
         converterLabel_->setText(tr("chords_converter not found — build the app with "
@@ -211,6 +239,7 @@ void ImportDialog::setRunning(bool running) {
     browse_->setEnabled(!running);
     chooseConverter_->setEnabled(!running);
     useBuiltIn_->setEnabled(!running);
+    tidy_->setEnabled(!running);
     botCheck_->setEnabled(!running);
     updateImportEnabled();
     if (running) {
@@ -296,6 +325,8 @@ void ImportDialog::onFinished() {
                                              toPath(workDir_->path()));
     if (result) {
         imported_ = std::move(*result);
+        // Remembered only for an import that happened, not for a click in a cancelled dialog.
+        QSettings{}.setValue(tidyKey, tidy_->isChecked());
         accept();
         return;
     }

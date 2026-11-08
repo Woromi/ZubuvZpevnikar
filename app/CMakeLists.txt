@@ -12,6 +12,14 @@ qt_add_executable(zubuvzpevnik-ui
     PreviewPane.cpp
     PreviewRunner.hpp
     PreviewRunner.cpp
+    ConverterRunner.hpp
+    ConverterRunner.cpp
+    ConverterVersion.hpp
+    ConverterVersion.cpp
+    ShrinkDialog.hpp
+    ShrinkDialog.cpp
+    DiffView.hpp
+    DiffView.cpp
     SongEditor.hpp
     SongEditor.cpp
     SongFilterProxy.hpp

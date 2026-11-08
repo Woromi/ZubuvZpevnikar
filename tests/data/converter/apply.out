@@ -1,0 +1,76 @@
+\beginsong{Paper Lanterns}[
+    by={Test Artist},
+    lang={english},
+    tem={140},
+    tun={Standard},
+    key={Em},
+    cap={7},
+    chr={
+            \gtab{Dadd9/F\shrp}{200230:100230}
+            \gtab{C6}{X32210:042310}
+            \gtab{Csus2}{X30013:030014}
+        },
+    pap={a4},
+]
+
+\beginverse
+    \[Am]Light the lamp in \[F]me, see \[G]boats upon the \[C]stream\[G/B]
+    \[Am]You and I are \[F]carried by a \[Dadd9/F#]quiet autumn \[Am/E]wi\[E]nd
+    \chordsoff
+    \[Am]Fold the sheet in \[F]two and \[G]send it down the \[C]hill\[G/B]
+    \[Am]Let's walk out be\[F]yond the fence and \[Dadd9/F#]follow all the \[Am/E]lan\[E]terns
+\endverse
+
+\beginprechorus
+    \[F]Hold the \[G]rope, we \[E]cross the \[Am]bridge, no \[F]need to \[Dm]look be\[Am/E]hi\[E]nd
+\endprechorus
+
+\beginchorus
+    \[C]Paper lamps that \[C6]float on the \[Csus2]river of \[C]night
+    \[C]Carry our \[F/C]small wishes \[G/C]out of the \[C]light
+    \[C]Slow as the \[F]breath of a \[G]sleeping \[Am]town
+    \[F]Drift to the \[Dm]sea and \[G]settle \[C]down
+\endchorus
+
+\begininstrumental
+    | \[C]\[]\[]\[] | \[Am]\[]\[]\[] | \[G]\[]\[]\[] | \[F]\[]\[G]\[] | \rep{2}
+    | \[C]\[]\[]\[] | \[C]\[]\[]\[G/B] |
+\endinstrumental
+
+\beginverse
+    \[Am]Paint a star on \[F]mine, let it \[G]glow above the \[C]roofs\[G/B]
+    \[Am]You and I are \[F]travelling with a \[Dadd9/F#]swarm of little \[Am/E]fli\[E]es
+    \chordsoff
+    \[Am]Light the wick in \[F]three and \[G]watch the water \[C]shine\[G/B]
+    \[Am]Free the string from the \[F]branches that were \[Dadd9/F#]tangled in the \[Am/E]wil\[E]low
+\endverse
+
+\beginprechorus\chordsoffonsmallpage
+    \[F]Hold the \[G]rope, we \[E]cross the \[Am]bridge, no \[F]need to \[Dm]look be\[Am/E]hi\[E]nd
+\endprechorus
+
+\beginchorus
+    \[C]Paper lamps that \[C6]float on the \[Csus2]river of \[C]night
+    \[C]Carry our \[F/C]small wishes \[G/C]out of the \[C]light
+    \[C]Slow as the \[F]breath of a \[G]sleeping \[Am]town
+    \[F]Drift to the \[Dm]sea and \[G]settle \[F]down
+\endchorus
+
+\begininstrumental
+    | \[F]\[] | \[]\[] | \[Am]\[] | \[]\[] | \[G]\[] | \[]\[] | \[Em]\[] | \[G]\[] |
+    | \[F]\[] | \[]\[] | \[Am]\[] | \[]\[] | \[G]\[] | \[]\[] | \[Esus4]\[] | \[E]\[] |
+\endinstrumental
+
+\beginprechorus
+    \[F]Hold the \[G]rope, we \[E]cross the \[Am]bridge, no \[F]need to \[Dm/F]look be\[Am/E]hi\[E]nd
+    \[F]Hold the \[G]rope, we \[E]cross the \[Am]bridge, and \[F]trust the \[Dm/F]lamps a\[Am/E]he\[E]ad
+\endprechorus
+
+\beginchorus
+    Paper \[D]lamps that \[D6]float on the \[Dsus2]river of \[D]night
+    \[D]Carried our \[G/D]small wishes \[A/D]out of the \[D]light
+    \[D]Slow as the \[G]breath of a \[A]sleeping \[Bm]town
+    We \[G]drifted to the \[Em]sea, our \[A]own and \[D]quiet shore
+\endchorus
+
+\endsong

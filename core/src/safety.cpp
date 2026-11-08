@@ -81,6 +81,8 @@ constexpr std::array kKnown = std::to_array<std::string_view>({
     "replay",
     "rightarrow",
     "role",
+    "rolesoff", // two-voice role labels off (feature/hlasy.cfg); tidy writes it
+    "roleson",
     "rrep",
     "setchordwidth",
     "setmainfont",

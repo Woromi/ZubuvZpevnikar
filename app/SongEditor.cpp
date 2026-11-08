@@ -86,6 +86,7 @@ void SongEditor::openNew(const std::string& content) {
     setContent(content); // also refuses content that would not round-trip
     diskContent_.clear();
     isNew_ = true;
+    newContent_ = currentContent(); // as the editor holds it, so an untouched draft diffs empty
     edit_->document()->setModified(true);
 }
 
@@ -196,19 +197,77 @@ void SongEditor::updateBanner() {
     }
 }
 
-void SongEditor::setContent(const std::string& bytes) {
-    // CRLF only if every line ends that way; mixed files are caught by checkLossless().
-    const auto crlfCount = std::ranges::count(bytes, '\n');
+namespace {
+
+// CRLF only if every line ends that way; mixed files are caught by checkLossless().
+bool usesCrlf(const std::string& bytes) {
+    const auto lfCount = std::ranges::count(bytes, '\n');
     std::size_t crlfPairs = 0;
     for (std::size_t pos = bytes.find("\r\n"); pos != std::string::npos;
          pos = bytes.find("\r\n", pos + 2)) {
         ++crlfPairs;
     }
-    crlf_ = crlfPairs > 0 && static_cast<std::ptrdiff_t>(crlfPairs) == crlfCount;
+    return crlfPairs > 0 && static_cast<std::ptrdiff_t>(crlfPairs) == lfCount;
+}
+
+// File bytes -> editor text (LF line ends).
+QString toEditorText(const std::string& bytes, bool crlf) {
     QString text = toQString(bytes);
-    if (crlf_) {
+    if (crlf) {
         text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
     }
+    return text;
+}
+
+} // namespace
+
+void SongEditor::replaceContent(const std::string& bytes) {
+    if (lossy_) {
+        return;
+    }
+    const QString text = toEditorText(bytes, crlf_);
+    QTextDocument* document = edit_->document();
+    // The raw text has one U+2029 per line break, one character each like the document positions.
+    const QString oldText = document->toRawText();
+    QString newText = text;
+    newText.replace(QLatin1Char('\n'), QChar::ParagraphSeparator);
+    if (oldText == newText) {
+        return;
+    }
+    qsizetype prefix = 0;
+    const qsizetype limit = std::min(oldText.size(), newText.size());
+    while (prefix < limit && oldText[prefix] == newText[prefix]) {
+        ++prefix;
+    }
+    // Do not split a surrogate pair.
+    if (prefix > 0 && oldText[prefix - 1].isHighSurrogate()) {
+        --prefix;
+    }
+    qsizetype suffix = 0;
+    while (suffix < limit - prefix &&
+           oldText[oldText.size() - 1 - suffix] == newText[newText.size() - 1 - suffix]) {
+        ++suffix;
+    }
+    if (suffix > 0 && newText[newText.size() - suffix].isLowSurrogate()) {
+        --suffix;
+    }
+    QString middle = newText.mid(prefix, newText.size() - prefix - suffix);
+    middle.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+
+    QTextCursor cursor(document);
+    cursor.beginEditBlock();
+    cursor.setPosition(static_cast<int>(prefix));
+    cursor.setPosition(static_cast<int>(oldText.size() - suffix), QTextCursor::KeepAnchor);
+    cursor.removeSelectedText();
+    if (!middle.isEmpty()) {
+        cursor.insertText(middle);
+    }
+    cursor.endEditBlock();
+}
+
+void SongEditor::setContent(const std::string& bytes) {
+    crlf_ = usesCrlf(bytes);
+    const QString text = toEditorText(bytes, crlf_);
 
     // A reload keeps the cursor and the scroll position (clamped to the new text).
     const bool reload = !edit_->document()->isEmpty();

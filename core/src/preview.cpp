@@ -256,6 +256,34 @@ std::vector<std::string> documentClasses(const fs::path& songbookRoot) {
     return names;
 }
 
+std::optional<songsuggest::Paper> paperOf(const fs::path& songbookRoot,
+                                          std::string_view className) {
+    if (className.empty() || className.find_first_of("/\\") != std::string_view::npos ||
+        className.find("..") != std::string_view::npos)
+        return std::nullopt;
+    const auto content =
+        readTextFile(songbookRoot / "zubuvzpevnik" / (std::string(className) + ".cls"));
+    if (!content)
+        return std::nullopt;
+    for (const std::string_view line : splitLines(*content)) {
+        const auto first = line.find_first_not_of(" \t");
+        if (first == std::string_view::npos || line[first] == '%')
+            continue;
+        const auto load = line.find("\\LoadClass", first);
+        if (load == std::string_view::npos)
+            continue;
+        const auto close = line.find(']', load);
+        const auto options = line.substr(load, close == std::string_view::npos
+                                                   ? std::string_view::npos
+                                                   : close - load);
+        if (options.find("a5paper") != std::string_view::npos)
+            return songsuggest::Paper::A5;
+        if (options.find("a4paper") != std::string_view::npos)
+            return songsuggest::Paper::A4;
+    }
+    return std::nullopt;
+}
+
 std::optional<Error> firstError(std::string_view log, const fs::path& songCopy) {
     const auto lines = splitLines(log);
     for (std::size_t i = 0; i < lines.size(); ++i) {

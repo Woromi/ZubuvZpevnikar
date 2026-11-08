@@ -50,6 +50,16 @@ public:
     bool isModified() const;
     // The editor text as it would be saved (UTF-8).
     std::string content() const { return currentContent(); }
+    // The bytes last loaded from or saved to disk; empty for a song that is not saved yet.
+    const std::string& savedContent() const { return diskContent_; }
+    // What the Changes view compares against: the saved bytes, or for a song opened with
+    // openNew() and not saved yet, the content it was opened with (e.g. the raw import).
+    const std::string& baselineContent() const { return isNew_ ? newContent_ : diskContent_; }
+    bool isNew() const { return isNew_; }
+    // Replaces the editor text with `bytes` (file bytes, converted like load() does) as ONE
+    // undo step; only the differing middle is replaced, so cursor and scroll stay. The document
+    // becomes modified. Does nothing for equal content or a read-only (lossy) editor.
+    void replaceContent(const std::string& bytes);
     // Moves the cursor to the start of the 1-based `line`, centres it and focuses the editor.
     void goToLine(int line);
     QPlainTextEdit* textEdit() const { return edit_; }
@@ -84,4 +94,5 @@ private:
     bool modifiedBeforeMissing_ = false;
     bool stopped_ = false;
     bool isNew_ = false; // opened with openNew() and not saved yet
+    std::string newContent_; // what openNew() was given, as the editor holds it
 };
