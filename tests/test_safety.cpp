@@ -20,6 +20,7 @@ TEST_CASE("known song commands are sorted and plausible", "[safety]") {
     CHECK(std::ranges::is_sorted(known));
     CHECK(std::ranges::binary_search(known, std::string_view("beginsong")));
     CHECK(std::ranges::binary_search(known, std::string_view("lilypondfile")));
+    CHECK(std::ranges::binary_search(known, std::string_view("textquotedbl")));
     CHECK_FALSE(std::ranges::binary_search(known, std::string_view("directlua")));
 }
 

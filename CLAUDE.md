@@ -24,7 +24,8 @@ Key facts from them:
 - Builds need `lualatex -shell-escape` (lyluatex runs `lilypond`), with `TEXINPUTS` pointing at `zubuvzpevnik/`, `songs/chords/`, the repo root and the project dir. See `projects/velkyzpevnik/build.sh`.
 - Song header parsing in `core/` (`zub::parseSong`, `zub::latex::*`) is a port of `scripts/songfile.py`. Keep them in agreement; if one changes, check the other.
 - Linters: `scripts/checksongs.py`, `scripts/checkkeys.py`, `scripts/checkpaper.py` (read-only, except `checkpaper.py --write`).
-- `chords_converter` is binary-only (no `lib.rs`); the app runs it as a subprocess (`ImportDialog`, `zub::songimport`). It writes `out/latex/<Artist>/<Title>.tex` relative to the **current directory**, prints `Saving output to: <path>`, and exits 0 even when writing failed; captured real outputs are in `tests/data/converter/`. The app finds it via the remembered path, PATH, `~/.cargo/bin`, then `../chords_converter/target/release/` — rebuild it there (`cargo build --release`) after converter changes.
+- `chords_converter` is binary-only (no `lib.rs`); the app runs it as a subprocess (`ImportDialog`, `zub::songimport`). It writes `out/latex/<Artist>/<Title>.tex` relative to the **current directory**, prints `Saving output to: <path>`, exits 1 when the song could not be read or written and 2 for a wrong command line (converters before `9d00844` exited 0 after a failed write). `chords_converter convert <source> -o -` prints the song to stdout instead. Captured real outputs are in `tests/data/converter/`. The app finds the converter via the remembered path, PATH, `~/.cargo/bin`, then `../chords_converter/target/release/` — rebuild it there (`cargo build --release`) after converter changes.
+- The converter owns the song actions (tidy, suggest/apply as text-span edits); the app only shows and applies them. See "Song actions" in PLAN.md.
 
 ## Architecture (hard rule)
 
@@ -83,4 +84,6 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless
 
 ## Open decisions
 
-None right now. Record new ones here (what, the options, who decides).
+Record new ones here (what, the options, who decides).
+
+- Run `chords_converter tidy` over the whole songbook? It would change 87 songs (62 choruses → `\insertchorus`, 147 chord moves). Options: run it (then review the diff), or leave it to song-by-song use from the editor. The user decides; never run it on `../ZubuvZpevnik` without asking.

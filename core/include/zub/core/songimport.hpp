@@ -11,8 +11,9 @@
 // and interprets its result; the app runs the process (QProcess) in a fresh work dir.
 //
 // The converter writes out/latex/<Artist>/<Title>.tex relative to its working directory and
-// prints "Saving output to: <path>" on success. It exits 0 even when writing the file failed,
-// so success also requires the file to exist.
+// prints "Saving output to: <path>" on success. It exits 1 when the song could not be read or
+// written, 2 for a wrong command line. Older versions exited 0 after a failed write, so success
+// also requires the file to exist.
 namespace zub::songimport {
 
 struct Request {

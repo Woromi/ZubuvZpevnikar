@@ -34,18 +34,65 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 - [x] app: PDF preview pane (QPdfView) with a class chooser; rebuilt on open, tab switch, save, reload, class change, Rebuild/Ctrl+R. A failed build keeps the last good PDF.
 - [x] app: build errors listed under the PDF; double-click jumps to the song line. Full log via "Log".
 - [x] Safety: songs using commands outside the allowlist are not built automatically (Rebuild asks first). Preview builds are cancelled with their tab; LilyPond children are killed with lualatex; each app instance has its own work dir.
-- [x] chords_converter: chord names keep only chord characters, comment text stays on one line (`src/printers/latex.rs`, approved by the user). The change is left uncommitted in that repo, to be finished there in its own session.
+- [x] chords_converter: chord names keep only chord characters, comment text stays on one line (`src/printers/latex.rs`, approved by the user). Committed there as `c62d66d`.
 - [ ] Rebuild while typing (debounced) — easy now, since the preview already builds the editor text.
 
 ## 4. Import from a URL
 
 - [x] The converter runs as a subprocess (`chords_converter <source> latex`) in a fresh temp dir; no changes to that repo needed.
-- [x] core (`zub::songimport`): prepare the run, interpret exit code/stdout/stderr (bot check, unsupported site, network, HTTP, invalid input; exit 0 without a written file is a failure), read the output, find the destination and an existing song (case-insensitive). Tests on real captured converter outputs.
+- [x] core (`zub::songimport`): prepare the run, interpret exit code/stdout/stderr (bot check, unsupported site, network, HTTP, invalid input; a non-zero exit is a failure, and so is exit 0 without a written file, as a safety net for older converters), read the output, find the destination and an existing song (case-insensitive). Tests on real captured converter outputs.
 - [x] app: File → Import Song… (Ctrl+I): URL or saved page, cancel, optional cookie/user agent for bot checks; the result opens as a new unsaved tab at `songs/chords/<Artist>/<Title>.tex`; the first save creates the folder and adds it to the table.
 - [x] Existing song: Open Existing or Import Anyway (saving then asks before overwriting).
 - [ ] Rebuild the converter from the app, or warn when its binary is older than its sources.
+- [ ] Run `chords_converter convert <source> -o -` (song on stdout) instead of a temp work dir plus parsing `Saving output to:`. Needs a converter new enough to have `convert`; keep or drop the old form then.
 
-## 5. Songbook assembler
+## 5. Song actions
+
+Optional, undoable edits that turn a song (an import or any open song) into a finished one: a
+checklist in the import dialog, and a menu for any open song. Nothing is saved until Ctrl+S, and
+untouched text stays byte-exact.
+
+**Decided with the user (2026-11-07): the converter owns the song actions**, in three tiers
+(details: `../chords_converter/docs/PLAN.md`):
+
+1. **Always**, in the converter's printer (done): `\enquote` (an unclosed quote becomes
+   `\textquotedbl{}`), chord-only parts as `\begininstrumental` in bars
+   (`| \[G]\[] | \[Em]\[] |`), part content indented by 4 spaces (latexindent leaves a draft
+   unchanged), single spacing, `lang` where the site gives it (kytary; English songs get English
+   chord names).
+2. **`convert --tidy` / `chords_converter tidy <song.tex>`** (done 2026-11-08, `8511329`, `fc9c865`): automatic fixes, e.g. an
+   *identical* repeated chorus → `\insertchorus`, a chord moved to the start of its syllable.
+3. **`chords_converter suggest <song.tex> [--fit a4|a5] --json` / `apply --id …`** (planned):
+   proposals the user accepts or rejects, mainly fitting a page: first fit A4 with edits for all
+   sizes (`\insertchorus*`, `\chordsoff`), then small paper only (`\chordsoffonsmallpage`,
+   `\smalleronsmallpage`).
+
+Tiers 2 and 3 edit **text spans** of the existing file (UTF-8 byte offsets) and never print the
+song again, so untouched text stays byte-exact. A proposal is
+`{id, kind, description, gain_lines, edits: [{start, end, replacement}]}`, applied as one undo
+step. The app shows and applies proposals; it does not compute them. So the chorus `\chordsoff`,
+fit-to-page and `lang` detection, and the song-body parser they needed, are not app work.
+
+**Before any code: confirm the details with the user** (what the app shows, defaults at import,
+what stays app-side, e.g. a properties panel).
+
+- [ ] Agree on the app side with the user and record it here.
+- [ ] app: run `tidy` on a draft / an open song and replace the editor text as one undo step. Interface: write the editor text to a temp file, run `chords_converter tidy TEMP -o -`; stdout is the song (unchanged when nothing applies; untouched bytes come back identical, a second run changes nothing), each change is a `<file>:<line>: <description>` line on stderr (show them), exit 1 if the file can't be read or written. A fresh import can use `convert <source> --tidy`. What it does: a chorus identical to the previous one → `\insertchorus` (already allowlisted); a chord inside its syllable moves to the syllable's start (czech/slovak/english songs only; this changes where the chord prints).
+- [ ] app: list `suggest` proposals for an open song; apply one as one undo step, re-query after edits (when the converter has it).
+
+Possibly app-side (from the songbook's history, `songbook-latex` agent, 2026-11-07; songs were
+never committed as raw converter output, so this shows edits after a first hand pass):
+
+| Candidate | Evidence |
+|---|---|
+| Song properties panel for `key`, `tem`, `met`, `cap`, `lang` | `met` (33) and `cap` (12) are the most common later edits |
+| Remove placeholder comments (`% tem={}`, `% [TAB]` …); keep `% note=…` style comments | 0 placeholders in finished songs; 19 note comments kept |
+| Chord memory: `\memorize` on the first verse, `^` in later verses with the same chords | 83 songs use `^` (could also be a converter tier 2/3 item) |
+
+Converter-side, still open there: chord placement (15+ manual chord fixes after import point to
+reading problems) and metadata the site provides but the parser misses (capo, meter).
+
+## 6. Songbook assembler
 
 - [ ] core: parse a project `.tex` (class, options, ordered `\input` list), and write it back, changing only the `\input` lines.
 - [ ] app: project view where you add or remove songs from the library and keep the list alphabetical by title.
@@ -56,4 +103,5 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 
 - Run the linters (`checksongs.py`, `checkkeys.py`) from the app and show the results inline.
 - Transpose a song, and an editor for chord diagrams.
+- Find & replace in the editor (Ctrl+F / Ctrl+H), with a toolbar button.
 - Packaging (AppImage / Flatpak), then Windows and macOS.

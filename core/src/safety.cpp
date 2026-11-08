@@ -64,6 +64,7 @@ constexpr std::array kKnown = std::to_array<std::string_view>({
     "memorize",
     "meter",
     "multivoice",
+    "multivoiceinline",
     "multivoiceinlineonsmallpage",
     "multivoiceoff",
     "multivoiceon",
@@ -88,6 +89,7 @@ constexpr std::array kKnown = std::to_array<std::string_view>({
     "smalleronsmallpage",
     "texorpdfstring",
     "textnote",
+    "textquotedbl", // the converter's quotation mark that the source never closes
     "textsuperscript",
     "transpose",
     "usechords",

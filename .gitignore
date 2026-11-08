@@ -1,6 +1,6 @@
 # Build output (CMake presets put everything under build/)
 build/
-out/
+/out/
 cmake-build-*/
 compile_commands.json
 .cache/

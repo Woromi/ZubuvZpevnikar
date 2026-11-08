@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <zub/core/safety.hpp>
 #include <zub/core/songimport.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -140,6 +141,15 @@ TEST_CASE("interpret reads a successful run", "[songimport]") {
     CHECK(imported->warnings.empty());
 }
 
+TEST_CASE("a current converter draft passes the safety check", "[songimport][safety]") {
+    // The captured draft has a chord-only intro (instrumental in bars) and an unclosed
+    // quotation mark (\textquotedbl{}), so new converter output is built automatically.
+    const auto content = slurp(successTex);
+    REQUIRE(content.contains("\\textquotedbl{}"));
+    REQUIRE(content.contains("\\begininstrumental"));
+    CHECK(zub::safety::unknownConstructs(content).empty());
+}
+
 TEST_CASE("interpret collects warnings and tolerates CRLF", "[songimport]") {
     const auto imported =
         si::interpret(0,
@@ -161,6 +171,7 @@ TEST_CASE("interpret classifies the captured failures", "[songimport]") {
         {"unsupported", si::FailureKind::UnsupportedSite},
         {"network", si::FailureKind::Network},
         {"botcheck", si::FailureKind::BotCheck},
+        {"botcheckfile", si::FailureKind::BotCheck},
         {"http404", si::FailureKind::Http},
         {"readonly", si::FailureKind::Other},
     };
@@ -191,9 +202,17 @@ TEST_CASE("interpret failure messages", "[songimport]") {
         CHECK(result.error().message.contains("CHORDS_COOKIE"));
         CHECK(result.error().message.contains("CHORDS_USER_AGENT"));
     }
-    SECTION("exit 0 without writing the file") {
+    SECTION("a failed write") {
         const auto run = capture("readonly");
+        CHECK(run.code == 1);
         const auto result = si::interpret(run.code, run.out, run.err, successWorkDir);
+        REQUIRE_FALSE(result);
+        CHECK(result.error().message.contains("Failed to create file"));
+    }
+    SECTION("exit 0 without writing the file (older converters)") {
+        const auto result = si::interpret(
+            0, "Saving output to: out/latex/KarelKryl/BratrickuZavirejVratka.tex\n",
+            "Failed to create file: Permission denied (os error 13)\n", successWorkDir);
         REQUIRE_FALSE(result);
         CHECK(result.error().message.contains("Failed to create file"));
     }
