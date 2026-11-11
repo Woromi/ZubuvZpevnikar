@@ -10,3 +10,6 @@ the songbook `/songbook`. Personal paths were replaced.
 | missing-endverse.log | first `\endverse` deleted | song line 24 (the next `\beginverse`) |
 | unclosed-chord.log | `]` of the first chord on line 18 removed | song line 18 |
 | missing-song.log | `\input{Nobody/NoSuchSong}` | `! LaTeX Error: File ... not found.`, located at `./preview.tex:4` (not in the song) |
+
+The song text quoted in the error context lines (`l.18 ...`) was replaced with made-up words of the same shape,
+so the logs carry no real lyrics.

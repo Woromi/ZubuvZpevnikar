@@ -62,23 +62,23 @@ TEST_CASE("shrink interprets a real run with both papers measured", "[songsugges
     REQUIRE(result->a5);
     CHECK(result->a5->pages == 2);
     CHECK_FALSE(result->a5->fits);
-    CHECK(result->a5->wrapLines == std::vector<int>{23, 27, 47, 51, 62, 63, 67, 68});
+    CHECK(result->a5->wrapLines == std::vector<int>{45, 60, 61, 66});
     CHECK(result->a5->chorusWraps == 0);
     REQUIRE(result->proposals.size() == 2);
     const auto& first = result->proposals[0];
-    CHECK(first.id == "chordsoffonsmallpage@50");
+    CHECK(first.id == "chordsoffonsmallpage@48");
     CHECK(first.kind == "chordsoffonsmallpage");
     CHECK(first.category == "fit");
     CHECK(first.stage == 2);
-    CHECK(first.line == 50);
+    CHECK(first.line == 48);
     CHECK(first.gainLines == 1);
     CHECK(first.score == 48);
     CHECK(first.grade == "poor");
-    CHECK(first.sources == std::vector<ss::Source>{{26, 699, 834}});
-    CHECK(first.edits == std::vector<ss::Edit>{{1676, 1676, "\\chordsoffonsmallpage"}});
+    CHECK(first.sources == std::vector<ss::Source>{{24, 657, 786}});
+    CHECK(first.edits == std::vector<ss::Edit>{{1615, 1615, "\\chordsoffonsmallpage"}});
     CHECK(first.description == "the 2nd pre-chorus repeats the chords of the 1st pre-chorus (11 lines "
                                "away): \\chordsoffonsmallpage");
-    CHECK(result->proposals[1].id == "smalleronsmallpage@18");
+    CHECK(result->proposals[1].id == "smalleronsmallpage@16");
     CHECK(result->proposals[1].gainLines == 6);
     CHECK(result->proposals[1].score == 20);
     CHECK(result->proposals[1].grade == "last resort");
@@ -97,7 +97,7 @@ TEST_CASE("shrink interprets a run where only A4 was measured", "[songsuggest]")
     CHECK(result->proposals[0].id == "chordsoff@81");
     CHECK(result->proposals[0].stage == 1);
     CHECK(result->proposals[0].gainLines == 2);
-    CHECK(result->proposals[0].sources == std::vector<ss::Source>{{76, 2816, 3047}});
+    CHECK(result->proposals[0].sources == std::vector<ss::Source>{{76, 2717, 2932}});
 }
 
 TEST_CASE("check lists corrections in song order", "[songsuggest]") {

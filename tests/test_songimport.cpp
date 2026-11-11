@@ -57,7 +57,7 @@ Capture capture(const std::string& name) {
 
 const fs::path successWorkDir = converterData / "success-workdir";
 const fs::path successTex =
-    successWorkDir / "out" / "latex" / "KarelKryl" / "BratrickuZavirejVratka.tex";
+    successWorkDir / "out" / "latex" / "MartaVymyslena" / "LampionPodMostem.tex";
 
 } // namespace
 
@@ -135,9 +135,9 @@ TEST_CASE("interpret reads a successful run", "[songimport]") {
     REQUIRE(run.code == 0);
     const auto imported = si::interpret(run.code, run.out, run.err, successWorkDir);
     REQUIRE(imported);
-    CHECK(imported->inputName == "KarelKryl/BratrickuZavirejVratka");
+    CHECK(imported->inputName == "MartaVymyslena/LampionPodMostem");
     CHECK(imported->content == slurp(successTex));
-    CHECK(imported->content.contains("\\beginsong{Bratříčku, zavírej vrátka}"));
+    CHECK(imported->content.contains("\\beginsong{Lampión pod mostem}"));
     CHECK(imported->warnings.empty());
 }
 
@@ -154,10 +154,10 @@ TEST_CASE("interpret collects warnings and tolerates CRLF", "[songimport]") {
     const auto imported =
         si::interpret(0,
                       "Saving output to: "
-                      "out/latex/KarelKryl/BratrickuZavirejVratka.tex\r\nSuccessfully saved!\r\n",
+                      "out/latex/MartaVymyslena/LampionPodMostem.tex\r\nSuccessfully saved!\r\n",
                       "Warning: first\r\nsomething else\nWarning: second\n", successWorkDir);
     REQUIRE(imported);
-    CHECK(imported->inputName == "KarelKryl/BratrickuZavirejVratka");
+    CHECK(imported->inputName == "MartaVymyslena/LampionPodMostem");
     CHECK(imported->warnings == std::vector<std::string>{"Warning: first", "Warning: second"});
 }
 
@@ -211,7 +211,7 @@ TEST_CASE("interpret failure messages", "[songimport]") {
     }
     SECTION("exit 0 without writing the file (older converters)") {
         const auto result = si::interpret(
-            0, "Saving output to: out/latex/KarelKryl/BratrickuZavirejVratka.tex\n",
+            0, "Saving output to: out/latex/MartaVymyslena/LampionPodMostem.tex\n",
             "Failed to create file: Permission denied (os error 13)\n", successWorkDir);
         REQUIRE_FALSE(result);
         CHECK(result.error().message.contains("Failed to create file"));
@@ -252,7 +252,7 @@ TEST_CASE("interpret ignores a dumped page on stdout when no parser exists", "[s
 
 TEST_CASE("interpret rejects unexpected output paths", "[songimport]") {
     for (const char* path :
-         {"out/latex/KarelKryl.tex", "out/latex/a/b/c.tex", "/etc/passwd", "out/latex/../x/y.tex",
+         {"out/latex/MartaVymyslena.tex", "out/latex/a/b/c.tex", "/etc/passwd", "out/latex/../x/y.tex",
           "out/latex/A/B.txt", "out/pdf/A/B.tex", "out/latex/A/.tex", "out/latex//B.tex"}) {
         CAPTURE(path);
         const auto result =
@@ -316,8 +316,8 @@ TEST_CASE("the real converter imports a text file", "[.integration][songimport]"
     }
     TempDir temp;
     const fs::path input = temp.path / "in.txt";
-    std::ofstream(input) << "Karel Kryl - Bratříčku, zavírej vrátka\n"
-                            "======================================\n\n"
+    std::ofstream(input) << "Marta Vymyšlená - Lampión pod mostem\n"
+                            "===================================\n\n"
                             "[Ami]Lampióne, sví[G]tíš nad vodou,\n";
     const fs::path workDir = temp.path / "work";
     const auto command = si::prepare({env, workDir, input.string()});
@@ -330,8 +330,8 @@ TEST_CASE("the real converter imports a text file", "[.integration][songimport]"
     const auto imported =
         si::interpret(0, slurp(workDir / "stdout.txt"), slurp(workDir / "stderr.txt"), workDir);
     REQUIRE(imported);
-    CHECK(imported->inputName == "KarelKryl/BratrickuZavirejVratka");
-    CHECK(imported->content.contains("\\beginsong{Bratříčku, zavírej vrátka}"));
+    CHECK(imported->inputName == "MartaVymyslena/LampionPodMostem");
+    CHECK(imported->content.contains("\\beginsong{Lampión pod mostem}"));
 #endif
 }
 
@@ -348,7 +348,7 @@ TEST_CASE("interpret rejects names the songbook cannot use", "[songimport]") {
 TEST_CASE("interpret recognizes a page without a song", "[songimport]") {
     const std::string warning = "Warning: no song found on http://x.cz/s.";
     SECTION("by the warning") {
-        const auto result = si::interpret(0, "Saving output to: out/latex/KarelKryl/X.tex\n",
+        const auto result = si::interpret(0, "Saving output to: out/latex/MartaVymyslena/X.tex\n",
                                           warning + "\n", successWorkDir);
         REQUIRE_FALSE(result);
         CHECK(result.error().kind == si::FailureKind::Other);
