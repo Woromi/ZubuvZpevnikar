@@ -7,7 +7,11 @@
 #include "PreviewPane.hpp"
 #include "PreviewRunner.hpp"
 #include "ShrinkDialog.hpp"
+#include "SongbookExporter.hpp"
 #include "SongbookScan.hpp"
+#include "SongbookSorter.hpp"
+#include "SongbookStore.hpp"
+#include "SongbooksPage.hpp"
 #include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongTableModel.hpp"
@@ -143,6 +147,7 @@ void MainWindow::createMenus() {
     file->addSeparator();
     QAction* quit = file->addAction(tr("&Quit"));
     QMenu* songs = menuBar()->addMenu(tr("&Songs"));
+    songs->addAction(songbooksAction_);
     QAction* scan = songs->addAction(tr("&Scan Songbook…"));
     scan->setToolTip(tr("Find the songs Tidy, Check Song or Make Smaller would change"));
     connect(scan, &QAction::triggered, this, &MainWindow::scanSongbook);
@@ -199,6 +204,16 @@ void MainWindow::createCentralWidget() {
     connect(changesOnly_, &QCheckBox::toggled, proxy_, &SongFilterProxy::setChangesOnly);
     changesOnlyAction_ = filters->addWidget(changesOnly_);
     changesOnlyAction_->setVisible(false);
+
+    filters->addSeparator();
+    songbooksAction_ = new QAction(QIcon::fromTheme(QStringLiteral("view-media-playlist"),
+                                                    QIcon::fromTheme(QStringLiteral("folder-documents"))),
+                                   tr("&Songbooks…"), this);
+    songbooksAction_->setShortcut(QKeySequence(QStringLiteral("Ctrl+B")));
+    songbooksAction_->setToolTip(tr("Assemble songbooks (Ctrl+B)"));
+    connect(songbooksAction_, &QAction::triggered, this, &MainWindow::showSongbooks);
+    filters->addAction(songbooksAction_);
+    filters->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
     table_ = new QTableView(listPage_);
     table_->setModel(proxy_);
@@ -271,8 +286,21 @@ void MainWindow::createCentralWidget() {
     songSplitter_->setSizes({1, 1});
     songLayout->addWidget(songSplitter_);
 
+    songbookStore_ = new SongbookStore({}, this);
+    songbookSorter_ = new SongbookSorter(this);
+    songbookExporter_ = new SongbookExporter(this);
+    songbooksPage_ = new SongbooksPage(model_, songbookStore_, songbookSorter_, songbookExporter_,
+                                       pages_);
+    connect(songbooksPage_, &SongbooksPage::backRequested, this, [this] {
+        pages_->setCurrentWidget(listPage_);
+        updateWindowTitle();
+    });
+    connect(songbookExporter_, &SongbookExporter::finished, this,
+            [this](const QString& message) { statusBar()->showMessage(message, 15000); });
+
     pages_->addWidget(listPage_);
     pages_->addWidget(songPage_);
+    pages_->addWidget(songbooksPage_);
     setCentralWidget(pages_);
 
     connect(proxy_, &QAbstractItemModel::rowsInserted, this, &MainWindow::updateStatus);
@@ -330,6 +358,9 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
         return false;
 
     songbookRoot_ = root;
+    songbooksPage_->setSongbookRoot(root);
+    songbookExporter_->setSongbookRoot(root);
+    songbookSorter_->setTools(root, QStandardPaths::findExecutable(QStringLiteral("texlua")));
     if (options.remember)
         QSettings{}.setValue(songbookPathKey, toQString(root));
 
@@ -356,6 +387,13 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
 void MainWindow::reloadSongbook() {
     if (!songbookRoot_.empty())
         openSongbook(songbookRoot_, {.showErrors = true, .remember = false});
+}
+
+void MainWindow::showSongbooks() {
+    if (editor_ || songbookRoot_.empty()) // a song is open: back to the list first
+        return;
+    songbooksPage_->reloadList();
+    pages_->setCurrentWidget(songbooksPage_);
 }
 
 void MainWindow::updateLanguageFilter() {

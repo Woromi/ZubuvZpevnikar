@@ -38,4 +38,8 @@ struct Value {
 // it is an error). The error message names the byte offset.
 std::expected<Value, std::string> parse(std::string_view text);
 
+// `text` as a JSON string literal, quotes included: escapes " and \ and control characters below
+// 0x20 (\n, \t, \r, \b, \f or \u00XX); UTF-8 passes through unchanged.
+std::string quote(std::string_view text);
+
 } // namespace zub::json

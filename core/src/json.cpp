@@ -313,6 +313,32 @@ private:
 
 } // namespace
 
+std::string quote(std::string_view text) {
+    std::string out = "\"";
+    for (const char c : text) {
+        switch (c) {
+        case '"': out += "\\\""; break;
+        case '\\': out += "\\\\"; break;
+        case '\n': out += "\\n"; break;
+        case '\t': out += "\\t"; break;
+        case '\r': out += "\\r"; break;
+        case '\b': out += "\\b"; break;
+        case '\f': out += "\\f"; break;
+        default:
+            if (static_cast<unsigned char>(c) < 0x20) {
+                constexpr std::string_view hex = "0123456789abcdef";
+                out += "\\u00";
+                out += hex[static_cast<unsigned char>(c) >> 4];
+                out += hex[static_cast<unsigned char>(c) & 0xF];
+            } else {
+                out += c;
+            }
+        }
+    }
+    out += '"';
+    return out;
+}
+
 std::expected<Value, std::string> parse(std::string_view text) {
     return Parser(text).run();
 }

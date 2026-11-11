@@ -31,6 +31,12 @@ void SongFilterProxy::setChangesOnly(bool changesOnly) {
     endFilterChange(QSortFilterProxyModel::Direction::Rows);
 }
 
+void SongFilterProxy::setOnlyNames(std::optional<std::set<std::string>> names) {
+    beginFilterChange();
+    onlyNames_ = std::move(names);
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+}
+
 bool SongFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const {
     const QModelIndex index = sourceModel()->index(sourceRow, 0, sourceParent);
     if (!language_.isEmpty() && index.data(SongTableModel::LanguageRole).toString() != language_)
@@ -38,6 +44,9 @@ bool SongFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceP
     if (todoOnly_ && !index.data(SongTableModel::HasTodoRole).toBool())
         return false;
     if (changesOnly_ && !index.data(SongTableModel::HasChangesRole).toBool())
+        return false;
+    if (onlyNames_ &&
+        !onlyNames_->contains(index.data(SongTableModel::InputNameRole).toString().toStdString()))
         return false;
     const QString haystack = index.data(SongTableModel::SearchTextRole).toString();
     for (const QString& word : searchWords_) {

@@ -19,6 +19,18 @@ qt_add_executable(zubuvzpevnik-ui
     ShrinkDialog.hpp
     ShrinkDialog.cpp
     SongbookScan.cpp
+    SongbookStore.hpp
+    SongbookStore.cpp
+    SongbookSorter.hpp
+    SongbookSorter.cpp
+    SongbookExporter.hpp
+    SongbookExporter.cpp
+    SongbookTree.hpp
+    SongbookTree.cpp
+    SongbooksPage.hpp
+    SongbooksPage.cpp
+    SongPickerModel.hpp
+    SongPickerModel.cpp
     DiffView.hpp
     DiffView.cpp
     SongEditor.hpp

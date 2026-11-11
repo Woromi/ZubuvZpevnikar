@@ -2,6 +2,9 @@
 
 #include <QSortFilterProxyModel>
 #include <QString>
+#include <optional>
+#include <set>
+#include <string>
 
 // Filters the song table by a search text (case- and accent-insensitive, across all
 // columns), by language and to songs with TODO comments. Sorting is locale-aware.
@@ -15,6 +18,8 @@ public:
     void setLanguage(const QString& language); // empty = all languages
     void setTodoOnly(bool todoOnly);           // only songs with TODO comments
     void setChangesOnly(bool changesOnly);     // only songs a scan found changes in
+    // Only the songs with these input names ("Artist/Title"); nullopt = no such filter.
+    void setOnlyNames(std::optional<std::set<std::string>> names);
 
 protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override;
@@ -24,4 +29,5 @@ private:
     QString language_;
     bool todoOnly_ = false;
     bool changesOnly_ = false;
+    std::optional<std::set<std::string>> onlyNames_;
 };

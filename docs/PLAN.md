@@ -132,12 +132,19 @@ reading problems) and metadata the site provides but the parser misses (capo, me
 
 ## 7. Songbook assembler
 
-- [ ] core: parse a project `.tex` (class, options, ordered `\input` list), and write it back, changing only the `\input` lines.
-- [ ] app: project view where you add or remove songs from the library and keep the list alphabetical by title.
-- [ ] app: build the whole songbook through the project's own `build.sh`, and show the output and the resulting PDF.
-- [ ] Create a new songbook project from a template (e.g. the next camp year).
+Decided with the user (2026-11-11): the app stores songbooks itself (`AppDataLocation/songbooks/<id>.json`); nothing in `ZubuvZpevnik/projects/` is read or written. A songbook has a class (velkyzpevnik / malyzpevnik / taborovyzpevnik), title, author, options, and one unnamed section or several named ones (`\songsection`, one `songs` environment each, one shared title + author index); songs are in title-index order within a section (the songbook's own `scripts/songidx.lua`, as `checkorder.py` runs it). Songs are picked on a Songbooks page, not in the main list (there a click opens a song). Export: PDF (built in the app's cache dir with the repo's `scripts/build.sh`, never in `ZubuvZpevnik/build/`), or LaTeX: just the `.tex` (builds inside a checkout) or a self-contained folder (songs + their `.ly`, `zubuvzpevnik/`, the build scripts, the class's image, a `build.sh` and README).
+
+- [x] core (`zub::songbook`): model + JSON, `.tex` generation per class, index-order input/output for `songidx.lua`, files a song references, folder-export plan, build command.
+- [x] app: Songbooks page (list, settings, a tree with the songs outside sections at its root and the named sections below; a picker with Ctrl/Shift selection, Add/Remove and dragging onto the tree; drag to reorder within a section, into another section a song goes to its alphabetical place; Sort Alphabetically for the book or one section), sorting with `texlua songidx.lua`.
+- [x] app: export PDF / `.tex` / folder.
+- [x] Cover image (none by default; png/jpg/pdf), a title page per named section, the title index split into sections, the author index optional (2026-11-11). The camp booklet falls back to one title index when the split would not fit its single index page.
 
 ## Later ideas
+- Section images (asked by the user 2026-11-11): each named section can have an image on its title page (like the cover: optional, png/jpg/pdf; copied next to the generated .tex as `section<k>.<ext>`, also into the folder export). `\zubsectionpage` would take it as a third argument and place it under the title (sized to fit the page; check A5 and the malyzpevnik right-hand title page). Stored per section in the songbook JSON (`image`).
+- Rename to **ZubuvZpevnikar** (decided by the user 2026-11-11; display name "Zpěvníkář", executable `zpevnikar`): GitHub repo name, CMake project, executable, window title, `QCoreApplication` application name, and a one-time migration of the settings (`~/.config/Modrozoubek/ZubuvZpevnikUi.conf`) and data (songbooks) to the new name; the folder `../ZubuvZpevnikUi` and the mentions of it in the docs and the converter's notes. Not taken elsewhere as far as a web search shows (unlike "Zpěvníkátor" and the Slovak "Spevníkovač-3000").
+- Czech UI (asked by the user 2026-11-11): Qt Linguist translations. `qt_add_translations` in app/CMakeLists.txt with `app/i18n/zubuvzpevnik_cs.ts` (and an English `.ts` for the plural forms: `tr("%n song(s)", nullptr, n)` shows "(s)" until a translation gives "1 song / 2 songs"; Czech needs three forms: 1 píseň, 2 písně, 5 písní); a QTranslator for the app and Qt's own `qtbase_cs` (standard dialog buttons); the language follows the system, with a choice in the settings. Texts that come from core or the converter (error messages, proposal descriptions) stay English unless they get translated at the source.
+- Songbook key (asked by the user 2026-11-11): set a songbook to a certain key and transpose every song to match it. The semitones per song come from its `key` header (and `\transpose` it already has); the generated `.tex` would put `\transpose{n}` before each `\input` (the songs package's transposition; check how it interacts with `capo`, a song's own `\transpose`, and minor keys: matching relative major/minor or the written key). Open: one key for the whole book or per section/song, and what "match" means for minor songs.
+- Import an existing project (`projects/*/*.tex`: class, title, `\input` lists, `\songsection`s) as an app songbook. Not now (decided 2026-11-11).
 
 - Run the linters (`checksongs.py`, `checkkeys.py`) from the app and show the results inline.
 - Transpose a song, and an editor for chord diagrams.

@@ -9,6 +9,7 @@ add_executable(zub_core_tests
     test_preview.cpp
     test_safety.cpp
     test_song.cpp
+    test_songbook.cpp
     test_songimport.cpp
     test_songoutline.cpp
     test_songsuggest.cpp

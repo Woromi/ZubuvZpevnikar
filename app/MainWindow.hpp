@@ -31,7 +31,11 @@ class DiffView;
 class PreviewPane;
 class PreviewRunner;
 class SongEditor;
+class SongbookExporter;
 class SongbookScan;
+class SongbookSorter;
+class SongbookStore;
+class SongbooksPage;
 class SongFilterProxy;
 class SongTableModel;
 class ConverterRunner;
@@ -87,6 +91,7 @@ private:
     // Songs → Scan Songbook…: runs tidy/check/shrink on many songs and marks the ones with
     // possible changes in the list (this session only); changes nothing.
     void scanSongbook();
+    void showSongbooks(); // the songbook assembler page
     // Tidy (chords_converter tidy on the open song, one undo step) and the Changes view
     void startTidy(const QString& note = {});
     void onConverterFinished(const std::expected<ConverterOutput, QString>& output);
@@ -131,6 +136,11 @@ private:
     QStackedWidget* pages_ = nullptr;
     QWidget* listPage_ = nullptr;
     QWidget* songPage_ = nullptr;
+    SongbooksPage* songbooksPage_ = nullptr; // the songbook assembler
+    SongbookStore* songbookStore_ = nullptr;
+    SongbookSorter* songbookSorter_ = nullptr;
+    SongbookExporter* songbookExporter_ = nullptr;
+    QAction* songbooksAction_ = nullptr;
     QToolBar* songToolBar_ = nullptr;
     QSplitter* songSplitter_ = nullptr; // editor area | preview
     bool songPageShown_ = false;        // the splitter has been laid out (its state is worth saving)
