@@ -166,7 +166,10 @@ void MainWindow::createMenus() {
     connect(quit, &QAction::triggered, this, &QWidget::close);
 
     // The language applies at the next start (the translators are installed in main()).
-    QMenu* languageMenu = menuBar()->addMenu(tr("&Settings"))->addMenu(tr("&Language"));
+    // The choices sit directly in the menu under a heading: a lone submenu was so narrow that its
+    // arrow ran into the text.
+    QMenu* languageMenu = menuBar()->addMenu(tr("&Settings"));
+    languageMenu->addSection(tr("Language"));
     auto* languages = new QActionGroup(this);
     languages->setExclusive(true);
     const QString current = QSettings().value(languageKey).toString();

@@ -244,10 +244,6 @@ Použijte vestavěný.</translation>
         <translation>&amp;Nastavení</translation>
     </message>
     <message>
-        <source>&amp;Language</source>
-        <translation>&amp;Jazyk</translation>
-    </message>
-    <message>
         <source>System Default</source>
         <translation>Podle systému</translation>
     </message>
