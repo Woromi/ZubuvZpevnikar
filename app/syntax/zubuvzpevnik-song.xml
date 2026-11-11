@@ -6,7 +6,7 @@
   Stock LaTeX highlighting does not fit: it reads the chord \[G] as display math.
 -->
 <language name="ZubuvZpevnik Song" section="Markup" version="1" kateversion="5.0"
-          extensions="" author="ZubuvZpevnikar" license="GPL-2.0">
+          extensions="" author="ZubuvZpevnikar" license="GPL-3.0-or-later">
   <highlighting>
     <contexts>
       <context name="Normal" attribute="Normal Text" lineEndContext="#stay">
