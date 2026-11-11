@@ -58,6 +58,8 @@ public:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
+    // The mouse's back button anywhere in this window goes back, like in a browser.
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     void createMenus();
@@ -84,6 +86,9 @@ private:
     std::filesystem::path builtInConverter() const; // empty if the app was built without it
     void saveCurrent();
     bool closeSong();                      // false if the user cancelled
+    // Back to the song list from the song page (closing the song) or the Songbooks page; the
+    // mouse's back button and Alt+Left.
+    void goBack();
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
     void createSongToolBar();
     void updateSongActions();

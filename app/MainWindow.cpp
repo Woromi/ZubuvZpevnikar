@@ -37,6 +37,7 @@
 #include <QLockFile>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPlainTextEdit>
 #include <QProgressDialog>
 #include <QPushButton>
@@ -89,6 +90,14 @@ MainWindow::MainWindow(QWidget* parent)
     createMenus();
     createSongToolBar();
     updateSongActions();
+
+    // Back like in a browser: the mouse's back button (seen before any child widget handles
+    // the press) and Alt+Left.
+    qApp->installEventFilter(this);
+    auto* back = new QAction(this);
+    back->setShortcut(QKeySequence::Back);
+    connect(back, &QAction::triggered, this, &MainWindow::goBack);
+    addAction(back);
 
     // Labels rather than showMessage(): a temporary message is cleared by menu hover.
     countLabel_ = new QLabel(this);
@@ -549,6 +558,28 @@ bool MainWindow::confirmClose(SongEditor* editor) {
         }
     }
     return true;
+}
+
+void MainWindow::goBack() {
+    if (pages_->currentWidget() == songPage_) {
+        closeSong();
+    } else if (pages_->currentWidget() == songbooksPage_) {
+        pages_->setCurrentWidget(listPage_);
+        updateWindowTitle();
+    }
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (event->type() == QEvent::MouseButtonPress &&
+        static_cast<QMouseEvent*>(event)->button() == Qt::BackButton) {
+        // Only for this window: a dialog on top (import, export, a question) keeps it.
+        const auto* widget = qobject_cast<QWidget*>(watched);
+        if (widget && widget->window() == this) {
+            goBack();
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 bool MainWindow::closeSong() {
