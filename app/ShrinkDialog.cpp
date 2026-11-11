@@ -290,7 +290,7 @@ void ShrinkDialog::showOutline() {
         const int linesBefore = preview->linesBefore.at(i);
         if (preview->changed[i] && part.repeat == Repeat::None && linesBefore > 0 &&
             linesBefore != part.lines)
-            note << tr("%1 → %2 lines").arg(linesBefore).arg(part.lines).toHtmlEscaped();
+            note << tr("%1 → %n line(s)", nullptr, part.lines).arg(linesBefore).toHtmlEscaped();
         if (preview->source.at(i))
             note << tr("the change relies on this part").toHtmlEscaped();
         note << tr("line %1").arg(part.line).toHtmlEscaped();

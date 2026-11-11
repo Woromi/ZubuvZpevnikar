@@ -210,7 +210,8 @@ void SongbookExporter::exportTexFile(const QString& stem, const zub::songbook::S
         existing << coverPath;
     if (!existing.isEmpty() &&
         QMessageBox::question(window_, tr("Export LaTeX"),
-                              tr("Replace the existing file(s)?\n%1").arg(existing.join(QLatin1Char('\n')))) !=
+                              tr("Replace the existing file(s)?\n%1", nullptr, static_cast<int>(existing.size()))
+                                  .arg(existing.join(QLatin1Char('\n')))) !=
             QMessageBox::Yes)
         return;
 
@@ -361,7 +362,7 @@ void SongbookExporter::exportFolder(const QString& stem, const zub::songbook::So
     for (const auto& section : book.sections)
         all.insert(section.songs.begin(), section.songs.end());
     const int songs = static_cast<int>(all.size() - plan->skipped.size() - plan->invalid.size());
-    QString text = tr("Exported to %1\n%2 songs").arg(target).arg(songs) +
+    QString text = tr("Exported to %1\n%n song(s)", nullptr, songs).arg(target) +
                    skippedText(plan->skipped, plan->invalid) + warningsText(plan->warnings);
     if (!missing.isEmpty())
         text += tr("\n\nMissing files (not copied): %1").arg(missing.join(QStringLiteral(", ")));
@@ -399,7 +400,7 @@ bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution
     if (unsafeSongs == 0)
         return true;
     if (unsafeSongs > lines.size())
-        lines << tr("… and %1 more").arg(unsafeSongs - static_cast<int>(lines.size()));
+        lines << tr("… and %n more", nullptr, unsafeSongs - static_cast<int>(lines.size()));
     QMessageBox box(QMessageBox::Warning, tr("Unknown commands in songs"),
                     tr("Some songs use commands outside the song format or cannot be read:\n\n%1"
                        "\n\nBuild anyway? These commands run with your rights "
@@ -554,14 +555,14 @@ void SongbookExporter::exportPdf(const QString& id, zub::songbook::Songbook book
         static const QRegularExpression pages(QStringLiteral(R"(Finished: .*\((\d+) pages?\))"));
         const auto match = pages.match(QString::fromUtf8(output));
         if (match.hasMatch())
-            message += tr(" (%1 pages)").arg(match.captured(1));
+            message += tr(" (%n page(s))", nullptr, match.captured(1).toInt());
         QFile logFile(toQString(command.log));
         if (logFile.open(QIODevice::ReadOnly)) {
             const QByteArray bytes = logFile.readAll();
             const int warnings = zub::songbook::paperWarnings(
                 std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())));
             if (warnings > 0)
-                message += tr(", %1 songs not marked as fitting this paper").arg(warnings);
+                message += tr(", %n song(s) not marked as fitting this paper", nullptr, warnings);
         }
         succeeded = true;
         dialog.accept();

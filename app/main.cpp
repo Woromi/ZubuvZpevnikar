@@ -6,6 +6,9 @@
 #include <QStandardPaths>
 #include <QByteArrayView>
 #include <QCommandLineParser>
+#include <QLibraryInfo>
+#include <QLocale>
+#include <QTranslator>
 #include <QString>
 #include <QTimer>
 #include <zub/core/version.hpp>
@@ -36,6 +39,20 @@ void migrateFromOldName() {
     }
 }
 
+// ui/language: "" or missing = the system language, else "cs" or "en". The translators are
+// installed on the application, so they must outlive it: the caller owns them.
+void installTranslators(QApplication& app, QTranslator& appTranslator, QTranslator& qtTranslator) {
+    const QString language = QSettings().value(QStringLiteral("ui/language")).toString();
+    const QLocale locale = language.isEmpty() ? QLocale::system() : QLocale(language);
+    // English too: the .ts for it holds the plural forms ("1 song", "2 songs").
+    if (appTranslator.load(locale, QStringLiteral("zpevnikar"), QStringLiteral("_"),
+                           QStringLiteral(":/i18n")))
+        app.installTranslator(&appTranslator);
+    if (qtTranslator.load(locale, QStringLiteral("qtbase"), QStringLiteral("_"),
+                          QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
+        app.installTranslator(&qtTranslator);
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
@@ -60,6 +77,9 @@ int main(int argc, char* argv[]) {
     parser.addOption(songbookOption);
     parser.process(app);
     migrateFromOldName();
+    QTranslator appTranslator;
+    QTranslator qtTranslator;
+    installTranslators(app, appTranslator, qtTranslator);
 
     MainWindow window;
     window.show();

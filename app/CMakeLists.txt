@@ -1,4 +1,4 @@
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Pdf PdfWidgets)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Pdf PdfWidgets LinguistTools)
 find_package(KF6SyntaxHighlighting REQUIRED)
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -42,6 +42,17 @@ qt_add_executable(zpevnikar
     convert.hpp
 )
 target_link_libraries(zpevnikar PRIVATE Zub::core zub_warnings Qt6::Widgets Qt6::Pdf Qt6::PdfWidgets KF6::SyntaxHighlighting)
+
+# UI translations (source language English). zpevnikar_cs.ts is the Czech translation,
+# zpevnikar_en.ts only holds the plural forms of the English texts ("%n song(s)"). The .qm files
+# are compiled by the normal build and embedded under ":/i18n". Target update_translations runs
+# lupdate over the sources and rewrites the .ts files.
+qt_add_translations(zpevnikar
+    TS_FILES i18n/zpevnikar_cs.ts
+    PLURALS_TS_FILE i18n/zpevnikar_en.ts
+    LUPDATE_OPTIONS -no-obsolete -locations none
+    RESOURCE_PREFIX /i18n
+)
 
 # Song syntax highlighting, found by KSyntaxHighlighting::Repository in this resource path.
 qt_add_resources(zpevnikar syntax

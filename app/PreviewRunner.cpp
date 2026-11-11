@@ -49,7 +49,7 @@ PreviewRunner::PreviewRunner(QObject* parent)
         PreviewResult result;
         result.inputName = inputName_;
         result.elapsedMs = clock_.isValid() ? clock_.elapsed() : 0;
-        result.message = QStringLiteral("Cannot start lualatex: %1. Is TeX Live installed?")
+        result.message = tr("Cannot start lualatex: %1. Is TeX Live installed?")
                              .arg(process_->errorString());
         timedOut_ = false;
         command_.reset();
@@ -169,9 +169,9 @@ void PreviewRunner::onProcessFinished() {
 
     if (timedOut_) {
         result.message =
-            QStringLiteral("The build took longer than %1 s and was stopped.").arg(timeoutSeconds);
+            tr("The build took longer than %1 s and was stopped.").arg(timeoutSeconds);
     } else if (process_->exitStatus() == QProcess::CrashExit) {
-        result.message = QStringLiteral("lualatex crashed.");
+        result.message = tr("lualatex crashed.");
     }
 
     result.success = !timedOut_ && process_->exitStatus() == QProcess::NormalExit &&
@@ -190,7 +190,7 @@ void PreviewRunner::onProcessFinished() {
         result.pdf.clear();
         result.error = zub::preview::firstError(logText, cmd.songCopy);
         if (!result.error && result.message.isEmpty())
-            result.message = QStringLiteral("The build failed; see the log.");
+            result.message = tr("The build failed; see the log.");
     }
 
     timedOut_ = false;

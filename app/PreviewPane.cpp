@@ -135,9 +135,8 @@ void PreviewPane::showResult(const PreviewResult& builtResult) {
             view_->pageNavigator()->jump(std::min(page, pages - 1), location);
 
         status_->setStyleSheet({});
-        status_->setText(tr("Built in %1 s · %2 page(s)")
-                             .arg(static_cast<double>(result.elapsedMs) / 1000.0, 0, 'f', 1)
-                             .arg(pages));
+        status_->setText(tr("Built in %1 s · %n page(s)", nullptr, pages)
+                             .arg(static_cast<double>(result.elapsedMs) / 1000.0, 0, 'f', 1));
         errors_->clear();
         errors_->hide();
         return;

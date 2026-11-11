@@ -93,7 +93,8 @@ void SongbooksPage::buildUi() {
 
     auto* bar = new QToolBar(this);
     bar->setMovable(false);
-    QAction* back = bar->addAction(QIcon::fromTheme(QStringLiteral("go-previous")), tr("Back"));
+    QAction* back = bar->addAction(QIcon::fromTheme(QStringLiteral("go-previous")),
+                                  tr("Back", "go back to the song list"));
     back->setToolTip(tr("Back to the song list"));
     bar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     connect(back, &QAction::triggered, this, &SongbooksPage::backRequested);
@@ -774,9 +775,9 @@ void SongbooksPage::removeSection(int s) {
     const auto& section = book_.sections[static_cast<std::size_t>(s)];
     if (!section.songs.empty() &&
         QMessageBox::question(this, tr("Remove Section"),
-                              tr("Remove the section %1 and its %2 songs from the songbook?")
-                                  .arg(toQString(section.name))
-                                  .arg(section.songs.size())) != QMessageBox::Yes)
+                              tr("Remove the section %1 and its %n song(s) from the songbook?", nullptr,
+                                 static_cast<int>(section.songs.size()))
+                                  .arg(toQString(section.name))) != QMessageBox::Yes)
         return;
     jobs_.erase(id_ + QLatin1Char('/') + QString::number(sectionUids_[static_cast<std::size_t>(s)]));
     book_.sections.erase(book_.sections.begin() + s);

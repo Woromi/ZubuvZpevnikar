@@ -135,8 +135,9 @@ ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::pat
             return;
         watchdog_->stop();
         setRunning(false);
-        showFailure({FailureKind::Other, "Cannot run " + toStdString(toQString(converter_)) + ": " +
-                                             toStdString(process_->errorString())});
+        showFailure({FailureKind::Other,
+                     toStdString(tr("Cannot run %1: %2")
+                                     .arg(toQString(converter_), process_->errorString()))});
     });
 
     connect(source_, &QLineEdit::textChanged, this, [this] { updateImportEnabled(); });
@@ -313,12 +314,13 @@ void ImportDialog::onFinished() {
     }
     const std::string stderrText = err_.toStdString();
     if (timedOut_) {
-        showFailure(
-            {FailureKind::Other, "The converter did not finish within 3 minutes and was stopped."});
+        showFailure({FailureKind::Other,
+                     toStdString(tr("The converter did not finish within 3 minutes and was "
+                                    "stopped."))});
         return;
     }
     if (process_->exitStatus() == QProcess::CrashExit) {
-        showFailure({FailureKind::Other, "chords_converter crashed.\n" + stderrText});
+        showFailure({FailureKind::Other, toStdString(tr("chords_converter crashed.")) + "\n" + stderrText});
         return;
     }
     auto result = zub::songimport::interpret(process_->exitCode(), out_.toStdString(), stderrText,

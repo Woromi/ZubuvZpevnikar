@@ -66,6 +66,12 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zpevnikar   # headless smoke
 - Warnings: every target links `zub_warnings` (`-Wall -Wextra -Wpedantic -Wshadow -Wconversion ...`). Keep the build warning-free.
 - Formatting is `.clang-format` (a hook runs clang-format on C++ files Claude edits). clangd reads `build/debug/compile_commands.json` via `.clangd`.
 
+## Translations
+
+- UI texts in `app/` go through `tr()` (`QCoreApplication::translate` with a fixed context outside QObject classes). Counts use `tr("%n song(s)", nullptr, n)`, never `.arg(n)` plus "(s)". Give short ambiguous texts a disambiguation comment.
+- After changing UI texts run `cmake --build --preset debug --target update_translations` and translate the new entries in `app/i18n/zpevnikar_cs.ts` (Czech, three plural forms). `zpevnikar_en.ts` only holds the English plural forms; fill the new `%n` entries there too.
+- Core and converter messages stay English. The language is `ui/language` in the settings ("" = system, "cs", "en"), applied at start in `main()`.
+
 ## Guardrails
 
 - **Sibling repos are not ours to restructure.** ZubuvZpevnik has CI and GitHub releases. Never commit, push, or change their layout, scripts or class files without asking. Editing song `.tex` files and project `\input` lists is the app's job and is fine when the task is about that.

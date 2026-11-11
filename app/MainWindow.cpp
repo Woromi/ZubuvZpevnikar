@@ -19,6 +19,7 @@
 
 #include <KSyntaxHighlighting/Repository>
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QCheckBox>
@@ -75,6 +76,7 @@ const auto songbookPathKey = QStringLiteral("songbook/path");
 const auto previewClassKey = QStringLiteral("preview/class");
 const auto converterKey = QStringLiteral("converter/path");
 const auto geometryKey = QStringLiteral("window/geometry");
+const auto languageKey = QStringLiteral("ui/language");
 const auto songSplitterKey = QStringLiteral("window/songSplitter");
 
 } // namespace
@@ -162,6 +164,31 @@ void MainWindow::createMenus() {
     connect(scan, &QAction::triggered, this, &MainWindow::scanSongbook);
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
+
+    // The language applies at the next start (the translators are installed in main()).
+    QMenu* languageMenu = menuBar()->addMenu(tr("&Settings"))->addMenu(tr("&Language"));
+    auto* languages = new QActionGroup(this);
+    languages->setExclusive(true);
+    const QString current = QSettings().value(languageKey).toString();
+    // The language names are not translated: everybody must find their own language.
+    const std::pair<QString, QString> choices[] = {
+        {QString(), tr("System Default")},
+        {QStringLiteral("cs"), QStringLiteral("Čeština")},
+        {QStringLiteral("en"), QStringLiteral("English")},
+    };
+    for (const auto& [code, name] : choices) {
+        QAction* action = languageMenu->addAction(name);
+        action->setCheckable(true);
+        action->setChecked(code == current);
+        languages->addAction(action);
+        connect(action, &QAction::triggered, this, [this, code] {
+            QSettings().setValue(languageKey, code);
+            QMessageBox::information(
+                this, tr("Language"),
+                tr("The language changes when %1 is started again.")
+                    .arg(QApplication::applicationDisplayName()));
+        });
+    }
 
     QAction* find = new QAction(this);
     find->setShortcut(QKeySequence::Find);
@@ -432,15 +459,12 @@ void MainWindow::updateStatus() {
     }
     const int shown = proxy_->rowCount();
     const int total = model_->rowCount();
-    // Plain English plurals; tr("%n song(s)") would need a translation file to resolve.
-    const QString songs = total == 1 ? tr("1 song") : tr("%1 songs").arg(total);
+    const QString songs = tr("%n song(s)", nullptr, total);
     countLabel_->setText(shown == total ? songs : tr("%1 of %2").arg(shown).arg(songs));
     if (issueCount_ == 0)
         issuesLabel_->clear();
-    else if (issueCount_ == 1)
-        issuesLabel_->setText(tr("⚠ 1 file with issues (hover for details)"));
     else
-        issuesLabel_->setText(tr("⚠ %1 files with issues (hover for details)").arg(issueCount_));
+        issuesLabel_->setText(tr("⚠ %n file(s) with issues (hover for details)", nullptr, issueCount_));
 }
 
 void MainWindow::openSong(const QModelIndex& proxyIndex) {
@@ -886,10 +910,8 @@ void MainWindow::onTidyFinished(const std::expected<ConverterOutput, QString>& o
     QString message;
     if (tidied.changes.empty())
         message = tr("Tidy: nothing to change");
-    else if (tidied.changes.size() == 1)
-        message = tr("Tidy: 1 change");
     else
-        message = tr("Tidy: %1 changes").arg(tidied.changes.size());
+        message = tr("Tidy: %n change(s)", nullptr, static_cast<int>(tidied.changes.size()));
     // tidy moves chords to their syllable's start only for these languages (it hyphenates), and
     // skips that rule silently otherwise: say so, or "nothing to change" looks like "all fine".
     std::string lang;
