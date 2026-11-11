@@ -100,7 +100,9 @@ std::string shellQuote(std::string text) {
     return quoted + "'";
 }
 
-const QString exportMarker = QStringLiteral(".zubuvzpevnikui-export");
+const QString exportMarker = QStringLiteral(".zubuvzpevnikar-export");
+// Folders exported before the app was renamed (2026-11) carry this marker instead.
+const QString oldExportMarker = QStringLiteral(".zubuvzpevnikui-export");
 
 QString lastExportDir() {
     const QString dir = QSettings{}.value(exportDirKey).toString();
@@ -286,8 +288,11 @@ void SongbookExporter::exportFolder(const QString& stem, const zub::songbook::So
     if (targetDir.exists() &&
         !targetDir.isEmpty(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden)) {
         // Only replace a folder an earlier export made (it holds the marker).
-        const QFileInfo marker(targetDir.filePath(exportMarker));
-        if (!marker.isFile() || marker.isSymLink()) {
+        const auto isMarker = [&targetDir](const QString& name) {
+            const QFileInfo marker(targetDir.filePath(name));
+            return marker.isFile() && !marker.isSymLink();
+        };
+        if (!isMarker(exportMarker) && !isMarker(oldExportMarker)) {
             QMessageBox::warning(window_, tr("Export LaTeX"),
                                  tr("%1 is not empty and was not made by an earlier export, so it "
                                     "is left alone. Choose another file name or folder.")
@@ -311,7 +316,7 @@ void SongbookExporter::exportFolder(const QString& stem, const zub::songbook::So
     {
         QString error;
         if (!writeFile(targetDir.filePath(exportMarker),
-                       "Exported by ZubuvZpevnikUi; this folder is replaced by the next export of "
+                       "Exported by Zpěvníkář (ZubuvZpevnikar); this folder is replaced by the next export of "
                        "the same name.\n",
                        &error)) {
             QMessageBox::warning(window_, tr("Export LaTeX"), error);

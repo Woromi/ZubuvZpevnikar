@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(ZubuvZpevnikUi VERSION 0.1.0 LANGUAGES CXX)
+project(ZubuvZpevnikar VERSION 0.1.0 LANGUAGES CXX)
 
 # C++23 for std::expected (GCC 13 only provides it in C++23 mode)
 set(CMAKE_CXX_STANDARD 23)

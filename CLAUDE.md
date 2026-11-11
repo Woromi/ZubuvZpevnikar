@@ -1,4 +1,4 @@
-# ZubuvZpevnikUi
+# ZubuvZpevnikar (Zpěvníkář)
 
 A desktop app (Linux first, other platforms later) for working on my LaTeX songbook:
 
@@ -53,11 +53,11 @@ tests/   Catch2 v3 unit tests for core/ (no Qt needed to build or run them).
 cmake --preset debug                 # configure (Ninja, build/debug, compile_commands.json)
 cmake --build --preset debug         # build
 ctest --preset debug                 # run core unit tests (Catch2)
-build/debug/app/zubuvzpevnik-ui      # run the app
-QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zubuvzpevnik-ui   # headless smoke test (exit 124 = ran fine)
+build/debug/app/zpevnikar      # run the app
+QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zpevnikar   # headless smoke test (exit 124 = ran fine)
 ```
 
-- Never pass `--songbook` when running the app for a test: a command-line songbook is remembered in the user's settings (`~/.config/Modrozoubek/ZubuvZpevnikUi.conf`, `songbook/path`), so `--songbook tests/data/songbook` leaves the user's app on the 5-song fixture, whose stand-in classes can't build.
+- Never pass `--songbook` when running the app for a test: a command-line songbook is remembered in the user's settings (`~/.config/Modrozoubek/ZubuvZpevnikar.conf`, `songbook/path`), so `--songbook tests/data/songbook` leaves the user's app on the 5-song fixture, whose stand-in classes can't build.
 - `-DZUB_BUILD_APP=OFF` builds only core + tests (no Qt needed).
 - Layout: public core headers in `core/include/zub/core/` (`#include <zub/core/...>`), namespace `zub`. App classes in `app/`, one class per `.hpp/.cpp` pair.
 - New tests: add the `.cpp` to `tests/CMakeLists.txt`. Catch2 discovers the test cases.

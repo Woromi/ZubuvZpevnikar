@@ -1,6 +1,6 @@
 ---
 name: new-feature
-description: Implement one feature of ZubuvZpevnikUi end to end with the plan → implement → test → review loop. Use when starting a milestone item from docs/PLAN.md.
+description: Implement one feature of ZubuvZpevnikar end to end with the plan → implement → test → review loop. Use when starting a milestone item from docs/PLAN.md.
 argument-hint: "<feature or milestone item>"
 disable-model-invocation: true
 ---

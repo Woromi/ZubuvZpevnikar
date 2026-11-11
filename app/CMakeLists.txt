@@ -2,7 +2,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Pdf PdfWidgets)
 find_package(KF6SyntaxHighlighting REQUIRED)
 qt_standard_project_setup(REQUIRES 6.5)
 
-qt_add_executable(zubuvzpevnik-ui
+qt_add_executable(zpevnikar
     main.cpp
     ImportDialog.hpp
     ImportDialog.cpp
@@ -41,10 +41,10 @@ qt_add_executable(zubuvzpevnik-ui
     SongTableModel.cpp
     convert.hpp
 )
-target_link_libraries(zubuvzpevnik-ui PRIVATE Zub::core zub_warnings Qt6::Widgets Qt6::Pdf Qt6::PdfWidgets KF6::SyntaxHighlighting)
+target_link_libraries(zpevnikar PRIVATE Zub::core zub_warnings Qt6::Widgets Qt6::Pdf Qt6::PdfWidgets KF6::SyntaxHighlighting)
 
 # Song syntax highlighting, found by KSyntaxHighlighting::Repository in this resource path.
-qt_add_resources(zubuvzpevnik-ui syntax
+qt_add_resources(zpevnikar syntax
     PREFIX /org.kde.syntax-highlighting/syntax-addons
     BASE syntax
     FILES syntax/zubuvzpevnik-song.xml
@@ -53,7 +53,7 @@ qt_add_resources(zubuvzpevnik-ui syntax
 # cmake --install build/release --prefix ~/.local installs the app and its converter side by side
 # (the app looks for chords_converter next to itself), so the converter also works from a shell.
 include(GNUInstallDirs)
-install(TARGETS zubuvzpevnik-ui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS zpevnikar RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # chords_converter from the git submodule, built with cargo and copied next to the app, where
 # MainWindow::findConverter() looks for it. Skipped (with a message) without cargo or without
@@ -75,7 +75,7 @@ if(ZUB_BUILD_CONVERTER)
                     --target-dir ${converter_target_dir}
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     ${converter_target_dir}/release/chords_converter${CMAKE_EXECUTABLE_SUFFIX}
-                    $<TARGET_FILE_DIR:zubuvzpevnik-ui>
+                    $<TARGET_FILE_DIR:zpevnikar>
             COMMENT "Building chords_converter with cargo"
             USES_TERMINAL
         )
