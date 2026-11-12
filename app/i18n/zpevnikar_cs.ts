@@ -874,7 +874,7 @@ Použijte vestavěný.</translation>
     </message>
     <message>
         <source>Log</source>
-        <translation>Protokol</translation>
+        <translation>Logy</translation>
     </message>
     <message>
         <source>Building…</source>
@@ -910,7 +910,7 @@ Použijte vestavěný.</translation>
     </message>
     <message>
         <source>Build log</source>
-        <translation>Protokol sestavení</translation>
+        <translation>Log sestavení</translation>
     </message>
 </context>
 <context>
@@ -929,7 +929,7 @@ Použijte vestavěný.</translation>
     </message>
     <message>
         <source>The build failed; see the log.</source>
-        <translation>Sestavení selhalo; viz protokol.</translation>
+        <translation>Sestavení selhalo; viz log.</translation>
     </message>
 </context>
 <context>
@@ -1383,7 +1383,7 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     </message>
     <message>
         <source>Open Log</source>
-        <translation>Otevřít protokol</translation>
+        <translation>Otevřít log</translation>
     </message>
     <message>
         <source>Close</source>
