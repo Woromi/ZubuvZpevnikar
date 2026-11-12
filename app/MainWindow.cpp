@@ -45,6 +45,7 @@
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QScrollBar>
 #include <QSettings>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -784,15 +785,28 @@ void MainWindow::createEditMenu() {
             editor_->insertChord();
     });
     edit->addSeparator();
-    // Like code editors: the lines with the cursor or the selection move as a block.
-    add(tr("Move Line Up"), {QKeySequence(Qt::CTRL | Qt::Key_Up)}, [this] {
+    // Like VSCodium: Alt+Up/Down move the lines with the cursor or the selection as a block,
+    // Ctrl+Up/Down scroll the view by a line without moving the cursor.
+    add(tr("Move Line Up"), {QKeySequence(Qt::ALT | Qt::Key_Up)}, [this] {
         if (editor_)
             editor_->moveLines(-1);
     });
-    add(tr("Move Line Down"), {QKeySequence(Qt::CTRL | Qt::Key_Down)}, [this] {
+    add(tr("Move Line Down"), {QKeySequence(Qt::ALT | Qt::Key_Down)}, [this] {
         if (editor_)
             editor_->moveLines(+1);
     });
+    for (const auto& [key, step] : {std::pair{Qt::Key_Up, -1}, std::pair{Qt::Key_Down, +1}}) {
+        auto* scroll = new QAction(this);
+        scroll->setShortcut(QKeySequence(Qt::CTRL | key));
+        scroll->setShortcutContext(Qt::WindowShortcut);
+        connect(scroll, &QAction::triggered, this, [this, step] {
+            if (editor_ && pages_->currentWidget() == songPage_) {
+                QScrollBar* bar = editor_->textEdit()->verticalScrollBar();
+                bar->setValue(bar->value() + step * bar->singleStep());
+            }
+        });
+        addAction(scroll);
+    }
     edit->addSeparator();
     using zub::songedit::Step;
     // Arrows: the same keys on every layout. Alt+Left is Back elsewhere (disabled on this page).
