@@ -17,8 +17,10 @@
 #include <QVBoxLayout>
 #include <algorithm>
 
-// The SVG, as wide as the view (but at most twice its own size, so a short score is not blown
-// up), with the height that keeps its proportions.
+// The SVG on a white sheet, as wide as the view (but at most twice its own size, so a short score
+// is not blown up), with the height that keeps its proportions. The sheet is white like the
+// printed page whatever the colour scheme: LilyPond draws white patches behind tablature fret
+// numbers (so the staff line does not cross them), which show as squares on a dark background.
 class SvgCanvas : public QWidget {
 public:
     explicit SvgCanvas(QWidget* parent = nullptr) : QWidget(parent), renderer_(this) {
@@ -48,9 +50,11 @@ public:
         if (!hasImage())
             return 0;
         const QSize size = renderer_.defaultSize();
-        return shownWidth(width) * size.height() / size.width();
+        return shownWidth(width) * size.height() / size.width() + 2 * margin;
     }
-    QSize sizeHint() const override { return hasImage() ? renderer_.defaultSize() : QSize(0, 0); }
+    QSize sizeHint() const override {
+        return hasImage() ? renderer_.defaultSize() + QSize(2 * margin, 2 * margin) : QSize(0, 0);
+    }
 
 protected:
     void paintEvent(QPaintEvent*) override {
@@ -59,12 +63,15 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         const int width = shownWidth(this->width());
-        renderer_.render(&painter, QRectF(0, 0, width, heightForWidth(this->width())));
+        const int height = heightForWidth(this->width());
+        painter.fillRect(QRect(0, 0, width + 2 * margin, height), Qt::white);
+        renderer_.render(&painter, QRectF(margin, margin, width, height - 2 * margin));
     }
 
 private:
+    static constexpr int margin = 12; // white paper around the score
     int shownWidth(int available) const {
-        return std::max(1, std::min(available, renderer_.defaultSize().width() * 2));
+        return std::max(1, std::min(available - 2 * margin, renderer_.defaultSize().width() * 2));
     }
 
     QSvgRenderer renderer_;
