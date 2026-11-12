@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # The std-only core library and its unit tests: no Qt needed, fast.
+  core:
+    name: Core and tests (Ubuntu)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ catch2
+      - name: Configure
+        run: >
+          cmake --preset debug
+          -DZUB_BUILD_APP=OFF -DZUB_BUILD_CONVERTER=OFF
+          -DCMAKE_CXX_FLAGS=-Werror
+      - name: Build
+        run: cmake --build --preset debug
+      - name: Test
+        run: ctest --preset debug
+
+  # The whole app. Ubuntu's runner image has Qt 6.4 and no KF6, so the build
+  # runs in a Fedora container with Qt >= 6.5 and KF6 SyntaxHighlighting.
+  app:
+    name: App (Fedora)
+    runs-on: ubuntu-24.04
+    container: fedora:42
+    steps:
+      - name: Install dependencies
+        run: |
+          dnf install -y git gcc-c++ cmake ninja-build \
+            qt6-qtbase-devel qt6-qtsvg-devel qt6-qtpdf-devel qt6-qttools-devel \
+            qt6-linguist kf6-syntax-highlighting-devel catch-devel \
+            cargo rust
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # external/chords_converter
+      - name: Configure
+        run: cmake --preset debug -DCMAKE_CXX_FLAGS=-Werror
+      - name: Build
+        run: cmake --build --preset debug
+      - name: Test
+        run: ctest --preset debug
+      - name: Start the app headless
+        run: |
+          # It runs until the timeout kills it: exit 124 means it started fine.
+          set +e
+          QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zpevnikar
+          status=$?
+          set -e
+          echo "exit status: $status"
+          test "$status" -eq 124
+      - name: Translations complete
+        run: |
+          if grep -n 'type="unfinished"' app/i18n/zpevnikar_cs.ts; then
+            echo "Untranslated Czech texts: translate them in app/i18n/zpevnikar_cs.ts"
+            exit 1
+          fi
