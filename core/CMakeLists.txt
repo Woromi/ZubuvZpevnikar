@@ -10,6 +10,7 @@ add_library(zub_core STATIC
     src/safety.cpp
     src/linediff.cpp
     src/songbook.cpp
+    src/songedit.cpp
     src/songimport.cpp
     src/songoutline.cpp
     src/songsuggest.cpp

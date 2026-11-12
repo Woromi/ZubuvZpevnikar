@@ -428,3 +428,139 @@ void SongEditor::goToLine(int line) {
     edit_->centerCursor();
     edit_->setFocus();
 }
+
+namespace {
+
+// A block's text as UTF-8 and conversions between a position in the block (UTF-16 units) and a
+// byte offset in that UTF-8. Positions must not split a surrogate pair (a cursor never does).
+std::size_t byteOffset(const QString& text, int utf16Pos) {
+    return static_cast<std::size_t>(text.left(utf16Pos).toUtf8().size());
+}
+
+int utf16Position(const std::string& utf8, std::size_t byteOffset) {
+    return static_cast<int>(
+        QString::fromUtf8(utf8.data(), static_cast<qsizetype>(byteOffset)).size());
+}
+
+// Replaces the text of `block` (not its line break) and puts the cursor at `utf16Pos` in it.
+void replaceBlockText(QPlainTextEdit* edit, const QTextBlock& block, const QString& text,
+                      int utf16Pos) {
+    const int number = block.blockNumber();
+    QTextCursor cursor(block);
+    cursor.beginEditBlock();
+    if (block.text() != text) {
+        cursor.movePosition(QTextCursor::StartOfBlock);
+        cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+        cursor.insertText(text);
+    }
+    cursor.endEditBlock();
+    const QTextBlock after = edit->document()->findBlockByNumber(number);
+    QTextCursor placed(after);
+    placed.setPosition(after.position() + utf16Pos);
+    edit->setTextCursor(placed);
+}
+
+} // namespace
+
+void SongEditor::insertChord() {
+    if (edit_->isReadOnly())
+        return;
+    const QTextCursor cursor = edit_->textCursor();
+    const QTextBlock block = cursor.block();
+    const QString text = block.text();
+    const int start = block.position();
+    int selStart = cursor.position() - start;
+    int selEnd = selStart;
+    // A selection over several lines is not wrapped: the chord goes at the cursor.
+    if (cursor.hasSelection() && cursor.selectionStart() >= start &&
+        cursor.selectionEnd() <= start + text.size()) {
+        selStart = cursor.selectionStart() - start;
+        selEnd = cursor.selectionEnd() - start;
+    }
+    const std::string line = text.toUtf8().toStdString();
+    const auto change =
+        zub::songedit::insertChord(line, byteOffset(text, cursor.position() - start),
+                                   byteOffset(text, selStart), byteOffset(text, selEnd));
+    const QString updated =
+        QString::fromUtf8(change.text.data(), static_cast<qsizetype>(change.text.size()));
+    replaceBlockText(edit_, block, updated, utf16Position(change.text, change.cursor));
+}
+
+bool SongEditor::moveChord(int direction, zub::songedit::Step step) {
+    if (edit_->isReadOnly())
+        return false;
+    const QTextCursor cursor = edit_->textCursor();
+    const QTextBlock block = cursor.block();
+    const QString text = block.text();
+    const std::string line = text.toUtf8().toStdString();
+    const auto change = zub::songedit::moveChord(
+        line, byteOffset(text, cursor.position() - block.position()), direction, step);
+    if (!change)
+        return false;
+    const QString updated =
+        QString::fromUtf8(change->text.data(), static_cast<qsizetype>(change->text.size()));
+    replaceBlockText(edit_, block, updated, utf16Position(change->text, change->cursor));
+    return true;
+}
+
+void SongEditor::insertPart(zub::songedit::Part part) {
+    if (edit_->isReadOnly())
+        return;
+    QTextDocument* document = edit_->document();
+    const QTextCursor cursor = edit_->textCursor();
+    QTextBlock first = cursor.block();
+    QTextBlock last = first;
+    const bool selection = cursor.hasSelection();
+    if (selection) {
+        first = document->findBlock(cursor.selectionStart());
+        last = document->findBlock(cursor.selectionEnd());
+        // A selection that ends at the start of a line does not include that line.
+        if (last != first && cursor.selectionEnd() == last.position())
+            last = last.previous();
+    }
+
+    QString selected;
+    if (selection) {
+        for (QTextBlock block = first;; block = block.next()) {
+            selected += block.text();
+            if (block == last)
+                break;
+            selected += QLatin1Char('\n');
+        }
+    }
+    const auto snippet = zub::songedit::partSnippet(part, selected.toUtf8().toStdString());
+    // The snippet ends with a line break, which the text after the insertion point already has.
+    std::string body = snippet.text;
+    body.pop_back();
+
+    QTextCursor edit(document);
+    edit.beginEditBlock();
+    int cursorPos = 0;
+    if (selection) {
+        edit.setPosition(first.position());
+        edit.setPosition(last.position() + last.length() - 1, QTextCursor::KeepAnchor);
+        edit.insertText(QString::fromUtf8(body.data(), static_cast<qsizetype>(body.size())));
+        cursorPos = first.position() + utf16Position(snippet.text, snippet.cursor);
+    } else if (first.text().trimmed().isEmpty()) {
+        edit.setPosition(first.position());
+        edit.insertText(
+            QString::fromUtf8(snippet.text.data(), static_cast<qsizetype>(snippet.text.size())));
+        cursorPos = first.position() + utf16Position(snippet.text, snippet.cursor);
+    } else {
+        const int end = first.position() + first.length() - 1;
+        edit.setPosition(end);
+        edit.insertText(QLatin1Char('\n') +
+                        QString::fromUtf8(body.data(), static_cast<qsizetype>(body.size())));
+        cursorPos = end + 1 + utf16Position(snippet.text, snippet.cursor);
+    }
+    edit.endEditBlock();
+    QTextCursor placed(document);
+    placed.setPosition(std::min(cursorPos, document->characterCount() - 1));
+    edit_->setTextCursor(placed);
+    edit_->centerCursor();
+    edit_->setFocus();
+}
+
+bool SongEditor::hasSongHeader() const {
+    return !edit_->document()->find(QStringLiteral("\\beginsong")).isNull();
+}

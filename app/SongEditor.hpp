@@ -5,6 +5,7 @@
 #include <expected>
 #include <filesystem>
 #include <string>
+#include <zub/core/songedit.hpp>
 
 class QFileSystemWatcher;
 class QLabel;
@@ -64,6 +65,17 @@ public:
     void goToLine(int line);
     QPlainTextEdit* textEdit() const { return edit_; }
 
+    // Song-editing helpers (zub::songedit on the cursor's line); each is one undo step and does
+    // nothing in a read-only editor.
+    // Inserts "\[]" at the cursor, or wraps a selection within one line in a chord.
+    void insertChord();
+    // Moves the chord at the cursor; false when there is none or it cannot move.
+    bool moveChord(int direction, zub::songedit::Step step);
+    // Inserts a part template: around the selected lines, else at the start of the cursor's
+    // line when that is empty, else on a new line after it.
+    void insertPart(zub::songedit::Part part);
+    bool hasSongHeader() const; // the text has a \beginsong
+
 signals:
     void modificationChanged(bool modified);
     // After a successful save(); `content` is the UTF-8 that was written.
@@ -93,6 +105,6 @@ private:
     bool missing_ = false; // the file vanished from disk
     bool modifiedBeforeMissing_ = false;
     bool stopped_ = false;
-    bool isNew_ = false; // opened with openNew() and not saved yet
+    bool isNew_ = false;     // opened with openNew() and not saved yet
     std::string newContent_; // what openNew() was given, as the editor holds it
 };

@@ -9,6 +9,8 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <vector>
+#include <zub/core/songedit.hpp>
 #include <expected>
 #include <zub/core/songsuggest.hpp>
 #include <zub/core/songtidy.hpp>
@@ -92,6 +94,9 @@ private:
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
     void createSongToolBar();
     void updateSongActions();
+    void createEditMenu(); // Edit: chords and parts
+    void moveChord(int direction, zub::songedit::Step step);
+    void showPartMenu(); // Edit → Insert Part…, at the cursor
     void updateMarkChecked(); // enabled while the editor text has the "not checked yet" line
     // Songs → Scan Songbook…: runs tidy/check/shrink on many songs and marks the ones with
     // possible changes in the list (this session only); changes nothing.
@@ -174,6 +179,7 @@ private:
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any
     QLabel* inputLabel_ = nullptr;
+    std::vector<QAction*> editActions_; // Edit menu: enabled while the song can be edited
     QAction* closeSongAction_ = nullptr;
     QAction* saveAction_ = nullptr;
     QAction* undoAction_ = nullptr;

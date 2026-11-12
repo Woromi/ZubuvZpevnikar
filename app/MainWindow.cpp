@@ -39,7 +39,9 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QMenu>
 #include <QPlainTextEdit>
+#include <QPointer>
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QRadioButton>
@@ -96,10 +98,15 @@ MainWindow::MainWindow(QWidget* parent)
     // Back like in a browser: the mouse's back button (seen before any child widget handles
     // the press) and Alt+Left.
     qApp->installEventFilter(this);
+    // Alt+Left is Back on the list and the Songbooks page only: on the song page it moves a
+    // chord (Edit menu), and a key that closes the song while typing would be a trap anyway.
     auto* back = new QAction(this);
     back->setShortcut(QKeySequence::Back);
     connect(back, &QAction::triggered, this, &MainWindow::goBack);
     addAction(back);
+    const auto updateBack = [this, back] { back->setEnabled(pages_->currentWidget() != songPage_); };
+    connect(pages_, &QStackedWidget::currentChanged, this, updateBack);
+    updateBack();
 
     // Labels rather than showMessage(): a temporary message is cleared by menu hover.
     countLabel_ = new QLabel(this);
@@ -164,6 +171,8 @@ void MainWindow::createMenus() {
     connect(scan, &QAction::triggered, this, &MainWindow::scanSongbook);
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
+
+    createEditMenu();
 
     // The language applies at the next start (the translators are installed in main()).
     // The choices sit directly in the menu under a heading: a lone submenu was so narrow that its
@@ -760,6 +769,74 @@ void MainWindow::createSongToolBar() {
     static_cast<QVBoxLayout*>(songPage_->layout())->insertWidget(0, songToolBar_);
 }
 
+void MainWindow::createEditMenu() {
+    QMenu* edit = menuBar()->addMenu(tr("Ed&it"));
+    const auto add = [this, edit](const QString& text, const QList<QKeySequence>& keys,
+                                  const std::function<void()>& run) {
+        QAction* action = edit->addAction(text);
+        action->setShortcuts(keys);
+        action->setShortcutContext(Qt::WindowShortcut);
+        connect(action, &QAction::triggered, this, run);
+        editActions_.push_back(action);
+    };
+    add(tr("Insert Chord"), {QKeySequence(Qt::ALT | Qt::Key_A)}, [this] {
+        if (editor_)
+            editor_->insertChord();
+    });
+    edit->addSeparator();
+    using zub::songedit::Step;
+    // Arrows: the same keys on every layout. Alt+Left is Back elsewhere (disabled on this page).
+    add(tr("Move Chord Left"), {QKeySequence(Qt::ALT | Qt::Key_Left)},
+        [this] { moveChord(-1, Step::Letter); });
+    add(tr("Move Chord Right"), {QKeySequence(Qt::ALT | Qt::Key_Right)},
+        [this] { moveChord(+1, Step::Letter); });
+    add(tr("Move Chord to Previous Word"), {QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Left)},
+        [this] { moveChord(-1, Step::Word); });
+    add(tr("Move Chord to Next Word"), {QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Right)},
+        [this] { moveChord(+1, Step::Word); });
+    edit->addSeparator();
+    add(tr("Insert Part…"),
+        {QKeySequence(Qt::CTRL | Qt::Key_Return), QKeySequence(Qt::CTRL | Qt::Key_Enter)},
+        [this] { showPartMenu(); });
+}
+
+void MainWindow::moveChord(int direction, zub::songedit::Step step) {
+    if (editor_ && !editor_->moveChord(direction, step))
+        statusBar()->showMessage(tr("No chord at the cursor"), 3000);
+}
+
+void MainWindow::showPartMenu() {
+    if (!editor_)
+        return;
+    using zub::songedit::Part;
+    auto* menu = new QMenu(editor_->textEdit());
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    const QPointer<SongEditor> editor = editor_;
+    const auto add = [&](const QString& text, Part part) {
+        connect(menu->addAction(text), &QAction::triggered, menu, [editor, part] {
+            if (editor)
+                editor->insertPart(part);
+        });
+    };
+    add(tr("Verse"), Part::Verse);
+    add(tr("Unnumbered Verse"), Part::VerseUnnumbered);
+    add(tr("Chorus"), Part::Chorus);
+    add(tr("Pre-chorus"), Part::PreChorus);
+    add(tr("Bridge"), Part::Bridge);
+    add(tr("Intro"), Part::Intro);
+    add(tr("Outro"), Part::Outro);
+    add(tr("Instrumental"), Part::Instrumental);
+    menu->addSeparator();
+    add(tr("Chorus Again (\\insertchorus)"), Part::ChorusAgain);
+    add(tr("Chorus Reminder (\\insertchorus*)"), Part::ChorusReminder);
+    if (!editor_->hasSongHeader()) {
+        menu->addSeparator();
+        add(tr("Song Header"), Part::SongHeader);
+    }
+    QPlainTextEdit* edit = editor_->textEdit();
+    menu->popup(edit->viewport()->mapToGlobal(edit->cursorRect().bottomLeft()));
+}
+
 void MainWindow::updateSongActions() {
     const bool open = editor_ != nullptr;
     closeSongAction_->setEnabled(open);
@@ -773,6 +850,8 @@ void MainWindow::updateSongActions() {
              {undoAction_, redoAction_, cutAction_, copyAction_, pasteAction_, tidyAction_,
               makeSmallerAction_, joinLinesAction_, checkAction_, markCheckedAction_})
             action->setEnabled(false);
+        for (QAction* action : editActions_)
+            action->setEnabled(false);
         return;
     }
     const QPlainTextEdit* edit = editor_->textEdit();
@@ -785,6 +864,8 @@ void MainWindow::updateSongActions() {
     copyAction_->setEnabled(selection);
     cutAction_->setEnabled(selection && editable);
     pasteAction_->setEnabled(editable);
+    for (QAction* action : editActions_)
+        action->setEnabled(editable);
     const bool converterFree =
         !readOnly && !converterRunner_->isRunning() && !findConverter().empty();
     tidyAction_->setEnabled(converterFree);

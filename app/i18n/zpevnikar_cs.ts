@@ -458,6 +458,82 @@ Použijte vestavěný.</translation>
         <translation>Zobrazit, co se změnilo od uložení písně (u importu: od importu)</translation>
     </message>
     <message>
+        <source>Ed&amp;it</source>
+        <translation>Úp&amp;ravy</translation>
+    </message>
+    <message>
+        <source>Insert Chord</source>
+        <translation>Vložit akord</translation>
+    </message>
+    <message>
+        <source>Move Chord Left</source>
+        <translation>Posunout akord doleva</translation>
+    </message>
+    <message>
+        <source>Move Chord Right</source>
+        <translation>Posunout akord doprava</translation>
+    </message>
+    <message>
+        <source>Move Chord to Previous Word</source>
+        <translation>Posunout akord na předchozí slovo</translation>
+    </message>
+    <message>
+        <source>Move Chord to Next Word</source>
+        <translation>Posunout akord na další slovo</translation>
+    </message>
+    <message>
+        <source>Insert Part…</source>
+        <translation>Vložit část…</translation>
+    </message>
+    <message>
+        <source>No chord at the cursor</source>
+        <translation>U kurzoru není akord</translation>
+    </message>
+    <message>
+        <source>Verse</source>
+        <translation>Sloka</translation>
+    </message>
+    <message>
+        <source>Unnumbered Verse</source>
+        <translation>Sloka bez čísla</translation>
+    </message>
+    <message>
+        <source>Chorus</source>
+        <translation>Refrén</translation>
+    </message>
+    <message>
+        <source>Pre-chorus</source>
+        <translation>Předrefrén</translation>
+    </message>
+    <message>
+        <source>Bridge</source>
+        <translation>Bridge</translation>
+    </message>
+    <message>
+        <source>Intro</source>
+        <translation>Předehra</translation>
+    </message>
+    <message>
+        <source>Outro</source>
+        <translation>Dohra</translation>
+    </message>
+    <message>
+        <source>Instrumental</source>
+        <translation>Mezihra</translation>
+    </message>
+    <message>
+        <source>Chorus Again (\insertchorus)</source>
+        <translation>Refrén znovu (\insertchorus)</translation>
+    </message>
+    <message>
+        <source>Chorus Reminder (\insertchorus*)</source>
+        <translation>Připomínka refrénu (\insertchorus*)</translation>
+    </message>
+    <message>
+        <source>Song Header</source>
+        <translation>Hlavička písně</translation>
+    </message>
+    <message>
         <source>Tidy needs chords_converter, which was not found.</source>
         <translation>Učesání potřebuje chords_converter, který nebyl nalezen.</translation>
     </message>

@@ -26,6 +26,7 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 - [x] Save (Ctrl+S, atomic via `zub::writeTextFileAtomic`, byte-exact: nbsp, tabs, CRLF, missing final newline), `*` dirty marker, Save/Discard/Cancel on closing a tab, the window, or switching songbook; the table row refreshes after saving.
 - [x] Reload when the file changes outside the app (silently if unmodified, asks if modified).
 - [x] Custom syntax definition for songs (`app/syntax/zubuvzpevnik-song.xml`, bundled as a Qt resource): whole chords `\[…]` and `^`, song parts, bar lines/repeats, header keys and values, comments. The stock LaTeX one read `\[D]` as display math.
+- [x] Edit menu with song-editing helpers (core `zub::songedit`, one undo step each, only while the song is editable): Insert Chord Alt+A (wraps a one-line selection); Move Chord Left/Right Alt+Left / Alt+Right (a letter, or a neighbour chord); to Previous/Next Word Alt+Shift+Left / Alt+Shift+Right (Alt+Left is Back only off the song page); Insert Part… Ctrl+Return (a popup at the cursor: verse, unnumbered verse, chorus, pre-chorus, bridge, intro, outro, instrumental, `\insertchorus`, `\insertchorus*`, song header when there is none; the selected lines go inside).
 
 ## 3. Live preview
 
