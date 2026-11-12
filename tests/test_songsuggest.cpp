@@ -121,17 +121,23 @@ TEST_CASE("check lists corrections in song order", "[songsuggest]") {
     REQUIRE(result);
     CHECK_FALSE(result->a4);
     CHECK_FALSE(result->a5);
-    REQUIRE(result->proposals.size() == 4);
+    REQUIRE(result->proposals.size() == 5);
     std::vector<std::string> ids;
     for (const auto& proposal : result->proposals) {
         ids.push_back(proposal.id);
         CHECK(proposal.score == 0);
         CHECK(proposal.grade == "correction");
     }
-    CHECK(ids == std::vector<std::string>{"typo@14", "apostrophes@15", "restructure@18", "typo@29"});
+    CHECK(ids == std::vector<std::string>{"typo@14", "apostrophes@15", "tie@15", "restructure@18",
+                                          "typo@29"});
     CHECK(result->proposals[0].category == "typo");
     CHECK(result->proposals[0].edits.size() == 1);
-    const auto& restructure = result->proposals[2];
+    // the song says lang=english without braces: read since converter 41651cd, so "~" is a finding
+    const auto& tie = result->proposals[2];
+    CHECK(tie.kind == "tie");
+    CHECK(tie.category == "typo");
+    CHECK(tie.edits == std::vector<ss::Edit>{{340, 341, " "}});
+    const auto& restructure = result->proposals[3];
     CHECK(restructure.category == "restructure");
     CHECK(restructure.gainLines == 0);
     CHECK(restructure.sources == std::vector<ss::Source>{{8, 155, 258}});
@@ -142,8 +148,8 @@ TEST_CASE("check lists corrections in song order", "[songsuggest]") {
         CHECK(proposal.dismiss->replacement.contains("% nocheck"));
     }
     // a typo with a chord inside the word: to fix by hand, nothing to apply
-    CHECK(result->proposals[3].edits.empty());
-    CHECK(result->proposals[3].description.ends_with("so fix it by hand"));
+    CHECK(result->proposals[4].edits.empty());
+    CHECK(result->proposals[4].description.ends_with("so fix it by hand"));
 
     const auto applied = ss::interpretApply(exitCode("check-apply"),
                                             slurp(converterData / "check-apply.out"),

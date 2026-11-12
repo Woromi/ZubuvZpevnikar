@@ -47,3 +47,5 @@ Ami             G
 ```
 
 Note: the unsupported case prints no dumped HTML on stdout (older versions did).
+
+With converter `41651cd` (still 0.10.0, 2026-11-13) `check.json` was re-captured: the song says `lang=english` without braces, which the converter now reads, so the `~` finding (`tie@15`) appears; and the import draft (`success-workdir`) ends its prelude with `pap={},`. The other captures did not change.
