@@ -17,6 +17,7 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QTextBlock>
+#include <QStringList>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTimer>
@@ -461,6 +462,52 @@ void replaceBlockText(QPlainTextEdit* edit, const QTextBlock& block, const QStri
 }
 
 } // namespace
+
+bool SongEditor::moveLines(int direction) {
+    if (edit_->isReadOnly())
+        return false;
+    const QTextCursor cursor = edit_->textCursor();
+    QTextDocument* document = edit_->document();
+    const QTextBlock first = document->findBlock(cursor.selectionStart());
+    QTextBlock last = document->findBlock(cursor.selectionEnd());
+    // A selection that ends at the start of a line does not take that line along.
+    if (cursor.hasSelection() && last != first && cursor.selectionEnd() == last.position())
+        last = last.previous();
+    const QTextBlock neighbour = direction < 0 ? first.previous() : last.next();
+    if (!neighbour.isValid())
+        return false;
+
+    QStringList moved;
+    for (QTextBlock block = first;; block = block.next()) {
+        moved << block.text();
+        if (block == last)
+            break;
+    }
+    const QString other = neighbour.text();
+    const QTextBlock top = direction < 0 ? neighbour : first;
+    const QTextBlock bottom = direction < 0 ? last : neighbour;
+    const int topPosition = top.position();
+    const int bottomEnd = bottom.position() + bottom.length() - 1; // before its line break
+    const int anchorOffset = cursor.anchor() - first.position();
+    const int positionOffset = cursor.position() - first.position();
+
+    // One undo step: the lines and their neighbour are written again in the new order.
+    QTextCursor writer(document);
+    writer.beginEditBlock();
+    writer.setPosition(topPosition);
+    writer.setPosition(bottomEnd, QTextCursor::KeepAnchor);
+    const QString lines = moved.join(QLatin1Char('\n'));
+    writer.insertText(direction < 0 ? lines + QLatin1Char('\n') + other
+                                    : other + QLatin1Char('\n') + lines);
+    writer.endEditBlock();
+
+    const int movedStart = direction < 0 ? topPosition : topPosition + int(other.size()) + 1;
+    QTextCursor result(document);
+    result.setPosition(movedStart + anchorOffset);
+    result.setPosition(movedStart + positionOffset, QTextCursor::KeepAnchor);
+    edit_->setTextCursor(result);
+    return true;
+}
 
 void SongEditor::insertChord() {
     if (edit_->isReadOnly())

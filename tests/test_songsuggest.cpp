@@ -93,11 +93,24 @@ TEST_CASE("shrink interprets a run where only A4 was measured", "[songsuggest]")
     REQUIRE(result->a4);
     CHECK(result->a4->pages == 2);
     CHECK_FALSE(result->a5); // not measured while A4 does not fit
-    REQUIRE(result->proposals.size() == 1);
-    CHECK(result->proposals[0].id == "chordsoff@81");
-    CHECK(result->proposals[0].stage == 1);
-    CHECK(result->proposals[0].gainLines == 2);
-    CHECK(result->proposals[0].sources == std::vector<ss::Source>{{76, 2717, 2932}});
+    // 0.9.0: both stages are listed when the song does not fit A4
+    CHECK(result->note.contains("small paper only"));
+    REQUIRE(result->proposals.size() == 5);
+    CHECK(result->proposals[0].id == "chordsoff@86");
+    CHECK(result->proposals[1].id == "chordsoff@81");
+    CHECK(result->proposals[1].stage == 1);
+    CHECK(result->proposals[1].gainLines == 2);
+    CHECK(result->proposals[1].sources == std::vector<ss::Source>{{76, 2717, 2932}});
+    CHECK(result->proposals[2].id == "chordsoffonsmallpage@86");
+    CHECK(result->proposals[2].stage == 2);
+    CHECK(result->proposals[3].stage == 2);
+    const auto& smaller = result->proposals[4];
+    CHECK(smaller.id == "smalleronsmallpage@9");
+    CHECK(smaller.stage == 2);
+    CHECK(smaller.score == 20);
+    CHECK(smaller.grade == "last resort");
+    for (const auto& proposal : result->proposals)
+        CHECK_FALSE(proposal.dismiss); // not corrections
 }
 
 TEST_CASE("check lists corrections in song order", "[songsuggest]") {
@@ -122,6 +135,12 @@ TEST_CASE("check lists corrections in song order", "[songsuggest]") {
     CHECK(restructure.category == "restructure");
     CHECK(restructure.gainLines == 0);
     CHECK(restructure.sources == std::vector<ss::Source>{{8, 155, 258}});
+    // every finding can be marked right with a "% nocheck" line, also the one to fix by hand
+    for (const auto& proposal : result->proposals) {
+        REQUIRE(proposal.dismiss);
+        CHECK(proposal.dismiss->start == proposal.dismiss->end);
+        CHECK(proposal.dismiss->replacement.contains("% nocheck"));
+    }
     // a typo with a chord inside the word: to fix by hand, nothing to apply
     CHECK(result->proposals[3].edits.empty());
     CHECK(result->proposals[3].description.ends_with("so fix it by hand"));
@@ -133,6 +152,40 @@ TEST_CASE("check lists corrections in song order", "[songsuggest]") {
     CHECK(applied->find("\\beginverse*") == std::string::npos);
     CHECK(applied->find("Ill be") == std::string::npos);
     CHECK(applied->find("\xE2\x80\x99") == std::string::npos); // no ’ left
+}
+
+TEST_CASE("check finds a missing comma in a Czech song", "[songsuggest]") {
+    const auto result =
+        ss::interpretProposals(exitCode("check-cs"), slurp(converterData / "check-cs.json"), "");
+    REQUIRE(result);
+    REQUIRE(result->proposals.size() == 1);
+    const auto& comma = result->proposals[0];
+    CHECK(comma.id == "comma@5");
+    CHECK(comma.kind == "comma");
+    CHECK(comma.category == "typo");
+    CHECK(comma.grade == "correction");
+    CHECK(comma.line == 5);
+    CHECK(comma.edits == std::vector<ss::Edit>{{112, 112, ","}});
+    CHECK(comma.dismiss == ss::Edit{103, 103, "% nocheck\n"});
+    const std::string text = slurp(converterData / "check-cs-input.tex");
+    CHECK(text.substr(103, 5) == "\\[Am]");
+}
+
+TEST_CASE("a malformed dismiss edit is an error, null is none", "[songsuggest]") {
+    const auto make = [](std::string_view dismiss) {
+        return std::string(R"({"proposals":[{"id":"a@1","description":"d","stage":1,"gain_lines":0,)"
+                           R"("score":0,"grade":"correction","dismiss":)") +
+               std::string(dismiss) + "}]}";
+    };
+    const auto none = ss::interpretProposals(0, make("null"), "");
+    REQUIRE(none);
+    CHECK_FALSE(none->proposals[0].dismiss);
+    const auto good =
+        ss::interpretProposals(0, make(R"({"start":3,"end":3,"replacement":"% nocheck\n"})"), "");
+    REQUIRE(good);
+    CHECK(good->proposals[0].dismiss == ss::Edit{3, 3, "% nocheck\n"});
+    CHECK_FALSE(ss::interpretProposals(0, make(R"({"start":3,"end":3})"), ""));
+    CHECK_FALSE(ss::interpretProposals(0, make(R"({"start":5,"end":3,"replacement":""})"), ""));
 }
 
 TEST_CASE("join lists joined lines in shrink's shape", "[songsuggest]") {
@@ -248,14 +301,14 @@ TEST_CASE("apply interprets real runs", "[songsuggest]") {
 TEST_CASE("version output is parsed", "[converter]") {
     const auto version = cv::parseVersion(slurp(converterData / "version.out"));
     REQUIRE(version);
-    CHECK(*version == cv::Version{0, 8, 0});
-    CHECK(cv::toString(*version) == "0.8.0");
+    CHECK(*version == cv::Version{0, 10, 0});
+    CHECK(cv::toString(*version) == "0.10.0");
     CHECK(*version >= cv::kRequired);
 
     CHECK(cv::parseVersion("chords_converter 0.10.3\r\nmore")->minor == 10);
     CHECK(cv::parseVersion("chords_converter 1.0.0-beta")->major == 1);
-    CHECK(*cv::parseVersion("chords_converter 0.7.0") < cv::kRequired);
-    CHECK(*cv::parseVersion("chords_converter 0.8.1") > cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.9.0") < cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.10.1") > cv::kRequired);
 }
 
 TEST_CASE("unparseable version output gives nothing", "[converter]") {

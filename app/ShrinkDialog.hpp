@@ -21,9 +21,15 @@ class ShrinkDialog : public QDialog {
 
 public:
     // `songText` is the text the proposals were listed for (the proposals' edits point into it). `title` and
-    // `heading` name the action (Make Smaller, Restructure, Join Lines).
+    // `heading` name the action (Make Smaller, Restructure, Join Lines). `canDismiss` adds the
+    // Mark as Correct button.
     ShrinkDialog(const zub::songsuggest::Suggestions& suggestions, const std::string& songText,
-                 const QString& title, const QString& heading, QWidget* parent = nullptr);
+                 const QString& title, const QString& heading, QWidget* parent = nullptr,
+                 bool canDismiss = false);
+
+    // True when the dialog was closed with Mark as Correct (only offered with `canDismiss`, for
+    // Check Song): the caller adds the selected proposals' dismiss edits instead of applying them.
+    bool dismissed() const { return dismissed_; }
 
     // The selected proposals in list order (Ctrl/Shift+click picks several); valid after the
     // dialog was accepted, never empty then.
@@ -43,6 +49,8 @@ private:
     QListWidget* list_ = nullptr;
     QTextBrowser* outline_ = nullptr;
     QPushButton* apply_ = nullptr;
+    QPushButton* dismiss_ = nullptr;
+    bool dismissed_ = false;
 
     std::vector<int> selectedRows() const; // sorted
     // The sketch of the song with all selected proposals made; Apply only when they fit together.

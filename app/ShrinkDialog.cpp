@@ -69,7 +69,7 @@ QString ShrinkDialog::summary(const zub::songsuggest::Suggestions& suggestions) 
 
 ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
                            const std::string& songText, const QString& title,
-                           const QString& heading, QWidget* parent)
+                           const QString& heading, QWidget* parent, bool canDismiss)
     : QDialog(parent), suggestions_(suggestions), songText_(songText) {
     setWindowTitle(title);
     resize(1180, 600);
@@ -120,6 +120,15 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     auto* buttons = new QDialogButtonBox(this);
     apply_ = buttons->addButton(tr("Apply"), QDialogButtonBox::AcceptRole);
     apply_->setDefault(true);
+    if (canDismiss) {
+        dismiss_ = buttons->addButton(tr("Mark as Correct"), QDialogButtonBox::ActionRole);
+        dismiss_->setToolTip(tr("The selected findings are right as they are: add a \"% nocheck\" "
+                                "line so Check Song leaves them out"));
+        connect(dismiss_, &QPushButton::clicked, this, [this] {
+            dismissed_ = true;
+            accept();
+        });
+    }
     buttons->addButton(QDialogButtonBox::Cancel);
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -174,6 +183,11 @@ void ShrinkDialog::showOutline() {
     apply_->setText(chosen.size() > 1 ? tr("Apply %n Changes", nullptr, static_cast<int>(chosen.size()))
                                       : tr("Apply"));
     apply_->setEnabled(false);
+    if (dismiss_)
+        dismiss_->setEnabled(!chosen.empty() &&
+                             std::ranges::all_of(chosen, [](const auto& proposal) {
+                                 return proposal.dismiss.has_value();
+                             }));
     if (chosen.empty()) {
         outline_->setPlainText(tr("Pick a change to see the song with it."));
         return;

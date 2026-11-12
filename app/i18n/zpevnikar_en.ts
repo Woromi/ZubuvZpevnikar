@@ -25,6 +25,13 @@
         </translation>
     </message>
     <message numerus="yes">
+        <source>Marked as correct: %n finding(s)</source>
+        <translation>
+            <numerusform>Marked as correct: %n finding</numerusform>
+            <numerusform>Marked as correct: %n findings</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>%n changes</source>
         <translation>
             <numerusform>%n change</numerusform>

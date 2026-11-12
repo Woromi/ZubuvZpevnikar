@@ -197,6 +197,15 @@ std::expected<Suggestions, std::string> interpretProposals(int exitCode, std::st
                                           static_cast<std::size_t>(*end), *replacement});
             }
         }
+        if (const json::Value* dismiss = entry.find("dismiss"); dismiss && !dismiss->isNull()) {
+            const auto start = intMember(*dismiss, "start");
+            const auto end = intMember(*dismiss, "end");
+            const auto replacement = stringMember(*dismiss, "replacement");
+            if (!start || !end || !replacement || *start < 0 || *end < *start)
+                return badOutput("a bad dismiss edit in a proposal");
+            proposal.dismiss =
+                Edit{static_cast<std::size_t>(*start), static_cast<std::size_t>(*end), *replacement};
+        }
         if (const json::Value* sources = entry.find("sources"); sources && !sources->isNull()) {
             if (!sources->asArray())
                 return badOutput("a proposal's \"sources\" is not a list");

@@ -784,6 +784,16 @@ void MainWindow::createEditMenu() {
             editor_->insertChord();
     });
     edit->addSeparator();
+    // Like code editors: the lines with the cursor or the selection move as a block.
+    add(tr("Move Line Up"), {QKeySequence(Qt::CTRL | Qt::Key_Up)}, [this] {
+        if (editor_)
+            editor_->moveLines(-1);
+    });
+    add(tr("Move Line Down"), {QKeySequence(Qt::CTRL | Qt::Key_Down)}, [this] {
+        if (editor_)
+            editor_->moveLines(+1);
+    });
+    edit->addSeparator();
     using zub::songedit::Step;
     // Arrows: the same keys on every layout. Alt+Left is Back elsewhere (disabled on this page).
     add(tr("Move Chord Left"), {QKeySequence(Qt::ALT | Qt::Key_Left)},
@@ -1334,7 +1344,7 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
                      "the column on A4 and A5):");
         break;
     }
-    ShrinkDialog dialog(suggestions, input, name, heading, this);
+    ShrinkDialog dialog(suggestions, input, name, heading, this, action == SongAction::Check);
     // Show where each proposal is (moving the cursor does not change the text).
     connect(&dialog, &ShrinkDialog::proposalSelected, this, &MainWindow::jumpToLine);
     if (const int line = suggestions.proposals.front().line; line > 0)
@@ -1350,6 +1360,27 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
     const auto chosen = dialog.selected();
     if (chosen.empty())
         return;
+    if (dialog.dismissed()) {
+        // Mark as Correct: the "% nocheck" lines go in locally, as one undo step.
+        std::vector<zub::songsuggest::Edit> marks;
+        for (const auto& proposal : chosen)
+            if (proposal.dismiss)
+                marks.push_back(*proposal.dismiss);
+        const auto marked = zub::songoutline::applyEdits(input, marks);
+        if (!marked) {
+            QMessageBox::warning(this, tr("%1 failed").arg(name), toQString(marked.error()));
+            return;
+        }
+        editor->replaceContent(*marked); // one undo step; nothing is saved
+        statusBar()->showMessage(
+            chosen.size() == 1
+                ? tr("Marked as correct: %1").arg(toQString(chosen.front().description))
+                : tr("Marked as correct: %n finding(s)", nullptr, static_cast<int>(chosen.size())),
+            10000);
+        updateSongActions();
+        requestPreview();
+        return;
+    }
     std::vector<std::string> ids;
     for (const auto& proposal : chosen)
         ids.push_back(proposal.id);

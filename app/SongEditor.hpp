@@ -75,6 +75,9 @@ public:
     // line when that is empty, else on a new line after it.
     void insertPart(zub::songedit::Part part);
     bool hasSongHeader() const; // the text has a \beginsong
+    // Moves the cursor's line, or every line the selection touches, one line up (-1) or down
+    // (+1), keeping the selection on the moved lines; false at the top or bottom.
+    bool moveLines(int direction);
 
 signals:
     void modificationChanged(bool modified);

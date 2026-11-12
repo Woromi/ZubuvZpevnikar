@@ -466,6 +466,14 @@ Použijte vestavěný.</translation>
         <translation>Vložit akord</translation>
     </message>
     <message>
+        <source>Move Line Up</source>
+        <translation>Posunout řádek nahoru</translation>
+    </message>
+    <message>
+        <source>Move Line Down</source>
+        <translation>Posunout řádek dolů</translation>
+    </message>
+    <message>
         <source>Move Chord Left</source>
         <translation>Posunout akord doleva</translation>
     </message>
@@ -672,6 +680,18 @@ Použijte vestavěný.</translation>
     <message>
         <source>%1 discarded: the song changed.</source>
         <translation>Výsledek akce „%1“ byl zahozen: píseň se změnila.</translation>
+    </message>
+    <message>
+        <source>Marked as correct: %1</source>
+        <translation>Označeno jako správné: %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>Marked as correct: %n finding(s)</source>
+        <translation>
+            <numerusform>Označeno jako správné: %n nález</numerusform>
+            <numerusform>Označeno jako správné: %n nálezy</numerusform>
+            <numerusform>Označeno jako správné: %n nálezů</numerusform>
+        </translation>
     </message>
     <message numerus="yes">
         <source>%n changes</source>
@@ -1040,6 +1060,14 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>Apply</source>
         <translation>Použít</translation>
+    </message>
+    <message>
+        <source>Mark as Correct</source>
+        <translation>Označit jako správné</translation>
+    </message>
+    <message>
+        <source>The selected findings are right as they are: add a &quot;% nocheck&quot; line so Check Song leaves them out</source>
+        <translation>Vybrané nálezy jsou správně tak, jak jsou: přidá se řádek &quot;% nocheck&quot; a Zkontrolovat píseň je příště vynechá</translation>
     </message>
     <message numerus="yes">
         <source>Apply %n Changes</source>

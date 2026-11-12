@@ -65,6 +65,9 @@ struct Proposal {
     // to make by hand (a typo with a chord inside the word): nothing to apply.
     std::vector<Edit> edits;
     std::vector<Source> sources;
+    // 0.10.0, check findings: the "% nocheck" line that marks the finding right, so check leaves
+    // it out from then on. Nullopt for proposals that are not corrections.
+    std::optional<Edit> dismiss;
     bool operator==(const Proposal&) const = default;
 };
 
