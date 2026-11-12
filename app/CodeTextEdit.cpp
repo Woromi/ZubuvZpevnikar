@@ -1,5 +1,6 @@
 #include "CodeTextEdit.hpp"
 
+#include <QKeyEvent>
 #include <QPainter>
 #include <QTextBlock>
 #include <algorithm>
@@ -50,6 +51,31 @@ void CodeTextEdit::updateArea(const QRect& rect, int dy) {
         area_->update(0, rect.y(), area_->width(), rect.height());
     if (rect.contains(viewport()->rect()))
         updateAreaWidth();
+}
+
+void CodeTextEdit::keyPressEvent(QKeyEvent* event) {
+    const bool enter = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter;
+    const auto others = event->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier);
+    if (!enter || others != Qt::NoModifier || isReadOnly()) {
+        QPlainTextEdit::keyPressEvent(event);
+        return;
+    }
+    // The new line starts with the current line's leading spaces and tabs (only up to the cursor,
+    // when the cursor stands inside them), as one undo step with the line break.
+    QTextCursor cursor = textCursor();
+    const QString line = cursor.block().text();
+    const int column = cursor.selectionStart() - cursor.block().position();
+    int indent = 0;
+    while (indent < line.size() && indent < column &&
+           (line[indent] == QLatin1Char(' ') || line[indent] == QLatin1Char('\t')))
+        ++indent;
+    cursor.beginEditBlock();
+    cursor.removeSelectedText();
+    cursor.insertBlock();
+    cursor.insertText(line.left(indent));
+    cursor.endEditBlock();
+    setTextCursor(cursor);
+    ensureCursorVisible();
 }
 
 void CodeTextEdit::resizeEvent(QResizeEvent* event) {

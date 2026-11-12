@@ -5,6 +5,7 @@
 
 // A QPlainTextEdit with a line-number area on the left (Qt's "Code Editor" example). The
 // numbers are the 1-based block numbers, which are the file's lines (the editor does not wrap).
+// Enter keeps the current line's indentation.
 class CodeTextEdit : public QPlainTextEdit {
     Q_OBJECT
 
@@ -16,6 +17,7 @@ public:
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     friend class LineNumberArea;
