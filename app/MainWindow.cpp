@@ -1614,6 +1614,11 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     fullButton->setObjectName(QStringLiteral("scoreWidthFull"));
     auto* narrowButton = new QRadioButton(tr("Narrow"), widthBar);
     narrowButton->setObjectName(QStringLiteral("scoreWidthNarrow"));
+    fullButton->setToolTip(tr("The score spans the whole width of the page (\\lilypondfile)."));
+    narrowButton->setToolTip(
+        tr("On A4 the score is narrowed to 80 % of the width, so that it does not run into the "
+           "song's details on the right (chord diagrams, tuning, tempo). On A5 it is full width "
+           "anyway (\\narrowlilypondfile)."));
     widthLayout->addWidget(fullButton);
     widthLayout->addWidget(narrowButton);
     widthLayout->addStretch();

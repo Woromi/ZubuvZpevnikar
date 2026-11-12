@@ -663,7 +663,15 @@ Použijte vestavěný.</translation>
     </message>
     <message>
         <source>Narrow</source>
-        <translation>Úzká</translation>
+        <translation>Zúžená</translation>
+    </message>
+    <message>
+        <source>The score spans the whole width of the page (\lilypondfile).</source>
+        <translation>Notová ukázka zabírá celou šířku stránky (\lilypondfile).</translation>
+    </message>
+    <message>
+        <source>On A4 the score is narrowed to 80 % of the width, so that it does not run into the song&apos;s details on the right (chord diagrams, tuning, tempo). On A5 it is full width anyway (\narrowlilypondfile).</source>
+        <translation>Na A4 se notová ukázka zúží na 80 % šířky, aby nezasahovala do údajů o písni vpravo (diagramy akordů, ladění, tempo). Na A5 má i tak plnou šířku (\narrowlilypondfile).</translation>
     </message>
     <message>
         <source>%1 cannot be opened: %2</source>
