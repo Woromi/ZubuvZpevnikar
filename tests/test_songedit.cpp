@@ -165,3 +165,175 @@ TEST_CASE("partSnippet repeats and header", "[songedit]") {
     const auto withText = partSnippet(Part::SongHeader, "\\beginverse\n\\endverse");
     CHECK(withText.text.find("]\n\n\\beginverse\n\\endverse\n\\endsong\n") != std::string::npos);
 }
+
+TEST_CASE("removeScoreReference removes a command alone on its line", "[songedit]") {
+    const std::string text = "A\n  \\lilypondfile{Artist/X.ly}  \nB\n";
+    CHECK(removeScoreReference(text, "Artist/X.ly") == "A\nB\n");
+}
+
+TEST_CASE("removeScoreReference removes only the command inline", "[songedit]") {
+    CHECK(removeScoreReference("Text \\lilypondfile{Artist/X.ly} more\n", "Artist/X.ly") ==
+          "Text  more\n");
+}
+
+TEST_CASE("removeScoreReference handles options and narrow", "[songedit]") {
+    CHECK(removeScoreReference("A\n\\lilypondfile[width=5cm]{Artist/X.ly}\nB\n", "Artist/X.ly") ==
+          "A\nB\n");
+    CHECK(removeScoreReference("A\n\\narrowlilypondfile{Artist/X.ly}\nB\n", "Artist/X.ly") ==
+          "A\nB\n");
+}
+
+TEST_CASE("removeScoreReference removes several and keeps others", "[songedit]") {
+    const std::string text = "\\lilypondfile{Artist/X.ly}\n\\lilypondfile{Artist/"
+                             "Y.ly}\n\\narrowlilypondfile{Artist/X.ly}";
+    CHECK(removeScoreReference(text, "Artist/X.ly") == "\\lilypondfile{Artist/Y.ly}");
+    CHECK(removeScoreReference(text, "Artist/Z.ly") == text);
+    CHECK(removeScoreReference("\\lilypondfile{Artist/X2.ly}\n", "Artist/X.ly") ==
+          "\\lilypondfile{Artist/X2.ly}\n");
+}
+
+TEST_CASE("removeScoreReference at the end without a line break", "[songedit]") {
+    CHECK(removeScoreReference("A\n\\lilypondfile{Artist/X.ly}", "Artist/X.ly") == "A");
+}
+
+TEST_CASE("removeScoreReference leaves comments alone", "[songedit]") {
+    const std::string text = "% \\lilypondfile{Artist/X.ly}\n";
+    CHECK(removeScoreReference(text, "Artist/X.ly") == text);
+}
+
+TEST_CASE("setScoreWidth switches both ways", "[songedit]") {
+    CHECK(setScoreWidth("A\n\\lilypondfile{Artist/X.ly}\nB\n", "Artist/X.ly", true) ==
+          "A\n\\narrowlilypondfile{Artist/X.ly}\nB\n");
+    CHECK(setScoreWidth("\\narrowlilypondfile{Artist/X.ly}", "Artist/X.ly", false) ==
+          "\\lilypondfile{Artist/X.ly}");
+}
+
+TEST_CASE("setScoreWidth keeps options, other files and no-ops", "[songedit]") {
+    const std::string text =
+        "\\lilypondfile[width=5cm]{Artist/X.ly}\n\\lilypondfile{Artist/Y.ly}\n";
+    CHECK(setScoreWidth(text, "Artist/X.ly", true) ==
+          "\\narrowlilypondfile[width=5cm]{Artist/X.ly}\n\\lilypondfile{Artist/Y.ly}\n");
+    CHECK(setScoreWidth(text, "Artist/X.ly", false) == text);
+    CHECK(setScoreWidth("% \\lilypondfile{Artist/X.ly}\n", "Artist/X.ly", true) ==
+          "% \\lilypondfile{Artist/X.ly}\n");
+}
+
+TEST_CASE("scoreIsNarrow reports the first reference", "[songedit]") {
+    const std::string text = "\\narrowlilypondfile{Artist/X.ly}\n\\lilypondfile{Artist/X.ly}\n";
+    CHECK(scoreIsNarrow(text, "Artist/X.ly") == true);
+    CHECK(scoreIsNarrow("\\lilypondfile{Artist/X.ly}", "Artist/X.ly") == false);
+    CHECK_FALSE(scoreIsNarrow(text, "Artist/Z.ly").has_value());
+}
+
+TEST_CASE("insertChord inside a chord goes after it", "[songedit]") {
+    const std::string line = "ab\\[Am]cd"; // chord = bytes 2..7
+    for (const std::size_t cursor : {3U, 4U, 6U}) {
+        const auto change = insertChord(line, cursor, cursor, cursor);
+        CHECK(change.text == "ab\\[Am]\\[]cd");
+        CHECK(change.cursor == 9);
+    }
+    const auto selected = insertChord(line, 6, 4, 6); // a selection inside the chord is ignored
+    CHECK(selected.text == "ab\\[Am]\\[]cd");
+    CHECK(selected.cursor == 9);
+    CHECK(insertChord(line, 2, 2, 2).text == "ab\\[]\\[Am]cd"); // at its start: before it
+    CHECK(insertChord(line, 7, 7, 7).text == "ab\\[Am]\\[]cd"); // at its end
+}
+
+TEST_CASE("insertMultivoice", "[songedit]") {
+    const auto plain = insertMultivoice("Víno na ku", 3, 3, 3); // after "Ví"
+    CHECK(plain.text == "Ví{\\multivoice{}{}}no na ku");
+    CHECK(plain.cursor == 3 + 13);
+
+    const auto selected = insertMultivoice("Víno na ku", 0, 0, 5); // "Víno"
+    CHECK(selected.text == "{\\multivoice{Víno}{}} na ku");
+    CHECK(selected.cursor == 13 + 5 + 2);
+
+    const std::string line = "\\[Am]ab"; // chord = 0..5
+    const auto inChord = insertMultivoice(line, 3, 3, 3);
+    CHECK(inChord.text == "\\[Am]{\\multivoice{}{}}ab");
+    CHECK(inChord.cursor == 5 + 13);
+    const auto selInChord = insertMultivoice(line, 4, 2, 4);
+    CHECK(selInChord.text == "\\[Am]{\\multivoice{}{}}ab");
+}
+
+TEST_CASE("insertRole", "[songedit]") {
+    const auto plain = insertRole("Žluťoučký kůň  ", 0, 0, 0);
+    CHECK(plain.text == "Žluťoučký kůň \\role{}");
+    CHECK(plain.cursor == plain.text.size() - 1);
+
+    const auto empty = insertRole("  ", 0, 0, 0);
+    CHECK(empty.text == "\\role{}");
+    CHECK(empty.cursor == 6);
+
+    const auto selected = insertRole("Ayreon text", 0, 0, 6);
+    CHECK(selected.text == "Ayreon text \\role{Ayreon}");
+    CHECK(selected.cursor == selected.text.size() - 1);
+
+    const auto unbalanced = insertRole("a { b", 0, 2, 3);
+    CHECK(unbalanced.text == "a { b \\role{}");
+
+    const std::string has = "dark \\role{Ayreon}";
+    const auto existing = insertRole(has, 0, 0, 0);
+    CHECK(existing.text == has);
+    CHECK(existing.cursor == 11);
+    const std::string two = "dark \\role{A}{B}  ";
+    const auto existing2 = insertRole(two, 0, 0, 0);
+    CHECK(existing2.text == two);
+    CHECK(existing2.cursor == 11);
+    // a role in the middle is not "at the end"
+    CHECK(insertRole("\\role{A} dál", 0, 0, 0).text == "\\role{A} dál \\role{}");
+}
+
+TEST_CASE("removeElementAt a chord", "[songedit]") {
+    const std::string line = "ab\\[Am]cd"; // 2..7
+    for (const std::size_t cursor : {2U, 4U, 7U}) {
+        const auto change = removeElementAt(line, cursor);
+        REQUIRE(change);
+        CHECK(change->text == "abcd");
+        CHECK(change->cursor == 2);
+    }
+    CHECK_FALSE(removeElementAt(line, 1));
+    CHECK_FALSE(removeElementAt(line, 8));
+    CHECK_FALSE(removeElementAt("plain text", 3));
+    // two chords that meet: the one starting at the cursor
+    CHECK(removeElementAt("\\[A]\\[B]", 4)->text == "\\[A]");
+}
+
+TEST_CASE("removeElementAt a role", "[songedit]") {
+    const auto one = removeElementAt("dark \\role{Ayreon}", 12);
+    REQUIRE(one);
+    CHECK(one->text == "dark");
+    CHECK(one->cursor == 4);
+    const auto two = removeElementAt("ř \\role{A}{B}", 13);
+    REQUIRE(two);
+    CHECK(two->text == "ř");
+    CHECK(two->cursor == 2);
+    CHECK(removeElementAt("\\role{A} x", 0)->text == " x"); // no space before it
+    CHECK_FALSE(removeElementAt("ab \\role{A}", 1));
+}
+
+TEST_CASE("removeElementAt a multivoice", "[songedit]") {
+    const std::string line = "\\[Am]{\\multivoice{Víno na ku}{Víno}}\\[C]x";
+    const auto change = removeElementAt(line, 10);
+    REQUIRE(change);
+    CHECK(change->text == "\\[Am]Víno na ku\\[C]x");
+    CHECK(change->cursor == 5);
+    // just inside the outer braces
+    CHECK(removeElementAt(line, 6)->text == "\\[Am]Víno na ku\\[C]x");
+    // without the outer braces
+    const auto bare = removeElementAt("a \\multivoice{A}{B} b", 5);
+    REQUIRE(bare);
+    CHECK(bare->text == "a A b");
+    CHECK(bare->cursor == 2);
+}
+
+TEST_CASE("removeElementAt takes the innermost element", "[songedit]") {
+    const std::string line = "{\\multivoice{a\\[Dm]b}{c}}";
+    const auto chord = removeElementAt(line, 17); // inside the chord
+    REQUIRE(chord);
+    CHECK(chord->text == "{\\multivoice{ab}{c}}");
+    CHECK(chord->cursor == 14);
+    const auto voice = removeElementAt(line, 15 + 8); // after the chord: the multivoice
+    REQUIRE(voice);
+    CHECK(voice->text == "a\\[Dm]b");
+}

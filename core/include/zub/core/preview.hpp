@@ -19,6 +19,10 @@ struct Request {
     std::string inputName;              // "Artist/Title", as in \input{}
     std::string songContent;            // the song text to build (e.g. unsaved editor content)
     std::string documentClass;          // "velkyzpevnik", "malyzpevnik", ...
+    // (relative path, content) of score files (.ly) to build instead of the real ones, e.g. the
+    // unsaved text of score editors. Written next to the song copy in override/, which comes
+    // before songs/chords on TEXINPUTS, so \lilypondfile finds them first.
+    std::vector<std::pair<std::string, std::string>> fileOverrides;
 };
 
 struct Command {

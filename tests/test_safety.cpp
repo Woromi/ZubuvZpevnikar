@@ -59,3 +59,56 @@ TEST_CASE("harmless text is not reported", "[safety]") {
     CHECK(scan("\\[B&] \\[\\nochord] \\beginverse* \\endverse").empty());
     CHECK(scan("a \\\\ b \\, c \\& d \\ e").empty());
 }
+
+namespace {
+Constructs scanLy(std::string_view s) {
+    return zub::safety::lilypondRisks(s);
+}
+} // namespace
+
+TEST_CASE("lilypond scores: code is reported", "[safety][lilypond]") {
+    CHECK(scanLy("x = #(system \"echo hi\")") == Constructs{"#(system"});
+    CHECK(scanLy("#( system \"a\") #(system \"b\") #(ly:parser-include-string \"x\")") ==
+          Constructs{"#(system", "#(ly:parser-include-string"});
+    CHECK(scanLy("$(system \"a\")") == Constructs{"$(system"});
+    CHECK(scanLy("$foo") == Constructs{"$foo"});
+    CHECK(scanLy("#.(system \"a\")") == Constructs{"#."});
+    CHECK(scanLy("#(define-music-function (p) () (#(system \"x\")))") ==
+          Constructs{"#(define-music-function", "#(system"});
+    // an allowed head does not allow what is nested in it
+    CHECK(scanLy("#(ly:make-moment (system \"x\") 4)") == Constructs{"#(ly:make-moment"});
+    CHECK(scanLy("#{ #(system \"x\") #}") == Constructs{"#(system"});
+    CHECK(scanLy("\\include \"/etc/passwd\"") == Constructs{"\\include \"/etc/passwd\""});
+    CHECK(scanLy("\\include \"other.ily\"\n\\include \"zubuvzpevnik.ily\"") ==
+          Constructs{"\\include \"other.ily\""});
+    CHECK(scanLy("\\include#(system \"x\")") == Constructs{"\\include \"\"", "#(system"});
+}
+
+TEST_CASE("lilypond scores: data is fine", "[safety][lilypond]") {
+    CHECK(scanLy("\\include \"zubuvzpevnik.ily\"\n\\include \"tinwhistle.ily\"").empty());
+    CHECK(scanLy("\\set X = #(ly:make-moment 1 4) \\partial #(ly:make-moment 3 8)").empty());
+    CHECK(scanLy("#'sym #'(a b c) ##t ##f #-6 #3 #1.5 #\"text\" #UP #RIGHT").empty());
+    CHECK(scanLy("\\override X #'y = #begin-of-line-invisible").empty());
+    CHECK(scanLy("#fret-number-tablature-format #banjo-open-g-tuning").empty());
+    CHECK(scanLy("{ c4 d % #(system \"x\")\n e }").empty());
+    CHECK(scanLy("%{ #(system \"x\") %} c4").empty());
+    CHECK(scanLy("\\markup \"#(system $x \\\" #(system)\" c4").empty());
+    CHECK(scanLy("\\score { c4 } 5 $ 3").empty());
+}
+
+TEST_CASE("every real score passes the lilypond check", "[.integration][safety][lilypond]") {
+    const fs::path songs = fs::path(ZUB_REAL_SONGBOOK_DIR) / "songs";
+    if (!fs::is_directory(songs))
+        SKIP("no songbook checkout at " << songs);
+    int count = 0;
+    for (const auto& entry : fs::recursive_directory_iterator(songs)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".ly")
+            continue;
+        const auto content = zub::readTextFile(entry.path());
+        REQUIRE(content);
+        INFO(entry.path().string());
+        CHECK(scanLy(*content).empty());
+        ++count;
+    }
+    CHECK(count > 0);
+}

@@ -16,15 +16,18 @@ class Repository;
 class SyntaxHighlighter;
 } // namespace KSyntaxHighlighting
 
-// Edits one song .tex file. Saving is byte-exact: what was not edited is written back
-// unchanged (non-breaking spaces, tabs, a missing final newline, CRLF line endings).
+// Edits one song .tex file, or one score .ly file (Kind::Score: LilyPond highlighting, score
+// wording in the dialogs, no song-editing helpers). Saving is byte-exact: what was not edited is
+// written back unchanged (non-breaking spaces, tabs, a missing final newline, CRLF line endings).
 class SongEditor : public QWidget {
     Q_OBJECT
 
 public:
+    enum class Kind { Song, Score };
+
     // `repository` is shared by all editors and must outlive them.
     SongEditor(std::filesystem::path path, KSyntaxHighlighting::Repository& repository,
-               QWidget* parent = nullptr);
+               QWidget* parent = nullptr, Kind kind = Kind::Song);
     ~SongEditor() override;
 
     // Loads the file into the editor (clears the modified state). On failure the editor
@@ -47,6 +50,7 @@ public:
     // Stops watching the file and its directory for good (the tab is going away).
     void stopWatching();
 
+    Kind kind() const { return kind_; }
     const std::filesystem::path& path() const { return path_; }
     bool isModified() const;
     // The editor text as it would be saved (UTF-8).
@@ -63,12 +67,20 @@ public:
     void replaceContent(const std::string& bytes);
     // Moves the cursor to the start of the 1-based `line`, centres it and focuses the editor.
     void goToLine(int line);
+    // Puts the cursor at `byteOffset` of the editor text (UTF-8, LF line ends) and focuses it.
+    void setCursorByteOffset(std::size_t byteOffset);
     QPlainTextEdit* textEdit() const { return edit_; }
 
     // Song-editing helpers (zub::songedit on the cursor's line); each is one undo step and does
     // nothing in a read-only editor.
     // Inserts "\[]" at the cursor, or wraps a selection within one line in a chord.
     void insertChord();
+    // Insert a multivoice (around a one-line selection), or a role at the end of the cursor's
+    // line.
+    void insertMultivoice();
+    void insertRole();
+    // Removes the chord, role or multivoice at the cursor; false when there is none.
+    bool removeElement();
     // Moves the chord at the cursor; false when there is none or it cannot move.
     bool moveChord(int direction, zub::songedit::Step step);
     // Inserts a part template: around the selected lines, else at the start of the cursor's
@@ -96,6 +108,7 @@ private:
     void checkLossless(const std::string& bytes);
 
     std::filesystem::path path_;
+    Kind kind_ = Kind::Song;
     QPlainTextEdit* edit_ = nullptr;
     KSyntaxHighlighting::SyntaxHighlighter* highlighter_ = nullptr;
     QFileSystemWatcher* watcher_ = nullptr;

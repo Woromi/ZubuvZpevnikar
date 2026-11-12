@@ -8,6 +8,7 @@ add_executable(zub_core_tests
     test_linediff.cpp
     test_preview.cpp
     test_safety.cpp
+    test_score.cpp
     test_song.cpp
     test_songbook.cpp
     test_songedit.cpp

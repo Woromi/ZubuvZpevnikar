@@ -6,40 +6,43 @@
 #include "ImportDialog.hpp"
 #include "PreviewPane.hpp"
 #include "PreviewRunner.hpp"
+#include "ScorePreviewPane.hpp"
+#include "ScoreRunner.hpp"
 #include "ShrinkDialog.hpp"
+#include "SongEditor.hpp"
+#include "SongFilterProxy.hpp"
+#include "SongTableModel.hpp"
 #include "SongbookExporter.hpp"
 #include "SongbookScan.hpp"
 #include "SongbookSorter.hpp"
 #include "SongbookStore.hpp"
 #include "SongbooksPage.hpp"
-#include "SongEditor.hpp"
-#include "SongFilterProxy.hpp"
-#include "SongTableModel.hpp"
 #include "convert.hpp"
 
 #include <KSyntaxHighlighting/Repository>
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
-#include <QCloseEvent>
 #include <QCheckBox>
+#include <QCloseEvent>
+#include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
-#include <QComboBox>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QIcon>
+#include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QLockFile>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMouseEvent>
-#include <QMenu>
 #include <QPlainTextEdit>
 #include <QPointer>
 #include <QProgressDialog>
@@ -51,12 +54,18 @@
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QTabBar>
+#include <QTabWidget>
 #include <QTableView>
+#include <QTextBlock>
+#include <QTextCursor>
 #include <QTextDocument>
+#include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <set>
 #include <system_error>
@@ -66,11 +75,14 @@
 #include <zub/core/linediff.hpp>
 #include <zub/core/preview.hpp>
 #include <zub/core/safety.hpp>
+#include <zub/core/score.hpp>
 #include <zub/core/song.hpp>
+#include <zub/core/songbook.hpp>
+#include <zub/core/songedit.hpp>
 #include <zub/core/songimport.hpp>
 #include <zub/core/songsuggest.hpp>
-#include <zub/core/songtodo.hpp>
 #include <zub/core/songtidy.hpp>
+#include <zub/core/songtodo.hpp>
 #include <zub/core/textfile.hpp>
 
 namespace {
@@ -105,7 +117,9 @@ MainWindow::MainWindow(QWidget* parent)
     back->setShortcut(QKeySequence::Back);
     connect(back, &QAction::triggered, this, &MainWindow::goBack);
     addAction(back);
-    const auto updateBack = [this, back] { back->setEnabled(pages_->currentWidget() != songPage_); };
+    const auto updateBack = [this, back] {
+        back->setEnabled(pages_->currentWidget() != songPage_);
+    };
     connect(pages_, &QStackedWidget::currentChanged, this, updateBack);
     updateBack();
 
@@ -128,6 +142,15 @@ MainWindow::~MainWindow() {
     // Members are destroyed before QWidget deletes the children, so without this the editors
     // (and its highlighter) would outlive repository_. Disconnect first: no signal may reach
     // a half-destroyed window.
+    scoreRunner_->cancel();
+    for (const ScoreTab& tab : scoreTabs_) {
+        if (tab.editor) {
+            disconnect(tab.editor, nullptr, this, nullptr);
+            disconnect(tab.editor->textEdit(), nullptr, this, nullptr);
+            delete tab.editor;
+        }
+    }
+    scoreTabs_.clear();
     if (editor_) {
         disconnect(editor_, nullptr, this, nullptr);
         disconnect(editor_->textEdit(), nullptr, this, nullptr);
@@ -196,10 +219,9 @@ void MainWindow::createMenus() {
         languages->addAction(action);
         connect(action, &QAction::triggered, this, [this, code] {
             QSettings().setValue(languageKey, code);
-            QMessageBox::information(
-                this, tr("Language"),
-                tr("The language changes when %1 is started again.")
-                    .arg(QApplication::applicationDisplayName()));
+            QMessageBox::information(this, tr("Language"),
+                                     tr("The language changes when %1 is started again.")
+                                         .arg(QApplication::applicationDisplayName()));
         });
     }
 
@@ -255,9 +277,10 @@ void MainWindow::createCentralWidget() {
     changesOnlyAction_->setVisible(false);
 
     filters->addSeparator();
-    songbooksAction_ = new QAction(QIcon::fromTheme(QStringLiteral("view-media-playlist"),
-                                                    QIcon::fromTheme(QStringLiteral("folder-documents"))),
-                                   tr("&Songbooks…"), this);
+    songbooksAction_ =
+        new QAction(QIcon::fromTheme(QStringLiteral("view-media-playlist"),
+                                     QIcon::fromTheme(QStringLiteral("folder-documents"))),
+                    tr("&Songbooks…"), this);
     songbooksAction_->setShortcut(QKeySequence(QStringLiteral("Ctrl+B")));
     songbooksAction_->setToolTip(tr("Assemble songbooks (Ctrl+B)"));
     connect(songbooksAction_, &QAction::triggered, this, &MainWindow::showSongbooks);
@@ -275,8 +298,7 @@ void MainWindow::createCentralWidget() {
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Title, QHeaderView::Stretch);
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Artist, QHeaderView::Stretch);
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Todo, QHeaderView::Stretch);
-    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Changes,
-                                                     QHeaderView::Stretch);
+    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Changes, QHeaderView::Stretch);
     table_->setColumnHidden(SongTableModel::Changes, true); // until a songbook scan
     connect(table_, &QAbstractItemView::activated, this, &MainWindow::openSong);
 
@@ -297,12 +319,26 @@ void MainWindow::createCentralWidget() {
     auto* hostLayout = new QVBoxLayout(editorHost);
     hostLayout->setContentsMargins(0, 0, 0, 0);
     hostLayout->setSpacing(0);
-    editorArea_ = new QStackedWidget(editorHost);
+    // Tab "Song": the editor (or the Changes view) and the Tidy list. A score of the song gets a
+    // tab of its own, after it.
+    tabs_ = new QTabWidget(editorHost);
+    tabs_->setDocumentMode(true);
+    tabs_->tabBar()->setAutoHide(true); // no tab bar for a song without scores
+    tabs_->setTabsClosable(true);
+    auto* songTab = new QWidget(tabs_);
+    auto* songTabLayout = new QVBoxLayout(songTab);
+    songTabLayout->setContentsMargins(0, 0, 0, 0);
+    songTabLayout->setSpacing(0);
+    editorArea_ = new QStackedWidget(songTab);
     diffView_ = new DiffView(editorArea_);
     editorArea_->addWidget(diffView_);
-    hostLayout->addWidget(editorArea_, 1);
+    songTabLayout->addWidget(editorArea_, 1);
+    tabs_->addTab(songTab, tr("Song"));
+    tabs_->tabBar()->setTabButton(0, QTabBar::RightSide, nullptr);
+    tabs_->tabBar()->setTabButton(0, QTabBar::LeftSide, nullptr);
+    hostLayout->addWidget(tabs_, 1);
 
-    tidyPanel_ = new QWidget(editorHost);
+    tidyPanel_ = new QWidget(songTab);
     auto* tidyLayout = new QVBoxLayout(tidyPanel_);
     tidyLayout->setContentsMargins(4, 2, 4, 2);
     tidyLayout->setSpacing(2);
@@ -318,16 +354,43 @@ void MainWindow::createCentralWidget() {
     tidyList_->setMaximumHeight(130);
     tidyLayout->addWidget(tidyList_);
     tidyPanel_->hide();
-    hostLayout->addWidget(tidyPanel_);
+    songTabLayout->addWidget(tidyPanel_);
     connect(tidyClose, &QToolButton::clicked, this, &MainWindow::clearTidyChanges);
     connect(tidyList_, &QListWidget::itemDoubleClicked, this,
             [this](QListWidgetItem* item) { jumpToLine(item->data(Qt::UserRole).toInt()); });
 
+    previewStack_ = new QStackedWidget(songSplitter_);
+    previewStack_->addWidget(preview_);
+    scorePreview_ = new ScorePreviewPane(previewStack_);
+    previewStack_->addWidget(scorePreview_);
+
     converterRunner_ = new ConverterRunner(this);
     connect(converterRunner_, &ConverterRunner::finished, this, &MainWindow::onConverterFinished);
 
+    // Scores: the song's \lilypondfile references become tabs (a moment after the text stops
+    // changing); the score preview rebuilds a moment after the score text stops changing.
+    scoreSyncTimer_ = new QTimer(this);
+    scoreSyncTimer_->setSingleShot(true);
+    scoreSyncTimer_->setInterval(600);
+    connect(scoreSyncTimer_, &QTimer::timeout, this, &MainWindow::syncScoreTabs);
+    scorePreviewTimer_ = new QTimer(this);
+    scorePreviewTimer_->setSingleShot(true);
+    scorePreviewTimer_->setInterval(600);
+    connect(scorePreviewTimer_, &QTimer::timeout, this, [this] { requestScorePreview(); });
+    scoreRunner_ = new ScoreRunner(this);
+    connect(scoreRunner_, &ScoreRunner::started, scorePreview_, &ScorePreviewPane::showBuilding);
+    connect(scoreRunner_, &ScoreRunner::finished, this, &MainWindow::showScoreResult);
+    connect(scorePreview_, &ScorePreviewPane::rebuildRequested, this,
+            [this] { requestScorePreview(true); });
+    connect(scorePreview_, &ScorePreviewPane::errorActivated, this, [this](int line, int) {
+        if (SongEditor* editor = currentEditor(); editor && !onSongTab())
+            editor->goToLine(line);
+    });
+    connect(tabs_, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
+    connect(tabs_, &QTabWidget::tabCloseRequested, this, &MainWindow::closeScoreTab);
+
     songSplitter_->addWidget(editorHost);
-    songSplitter_->addWidget(preview_);
+    songSplitter_->addWidget(previewStack_);
     // A collapsed editor would be saved in the state and every later start would open it hidden.
     songSplitter_->setCollapsible(0, false);
     songSplitter_->setStretchFactor(0, 1);
@@ -338,8 +401,8 @@ void MainWindow::createCentralWidget() {
     songbookStore_ = new SongbookStore({}, this);
     songbookSorter_ = new SongbookSorter(this);
     songbookExporter_ = new SongbookExporter(this);
-    songbooksPage_ = new SongbooksPage(model_, songbookStore_, songbookSorter_, songbookExporter_,
-                                       pages_);
+    songbooksPage_ =
+        new SongbooksPage(model_, songbookStore_, songbookSorter_, songbookExporter_, pages_);
     connect(songbooksPage_, &SongbooksPage::backRequested, this, [this] {
         pages_->setCurrentWidget(listPage_);
         updateWindowTitle();
@@ -477,7 +540,8 @@ void MainWindow::updateStatus() {
     if (issueCount_ == 0)
         issuesLabel_->clear();
     else
-        issuesLabel_->setText(tr("⚠ %n file(s) with issues (hover for details)", nullptr, issueCount_));
+        issuesLabel_->setText(
+            tr("⚠ %n file(s) with issues (hover for details)", nullptr, issueCount_));
 }
 
 void MainWindow::openSong(const QModelIndex& proxyIndex) {
@@ -520,6 +584,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
 
     editorArea_->insertWidget(0, editor);
     editorArea_->setCurrentWidget(editor);
+    tabs_->setCurrentIndex(0);
     songPageShown_ = true;
 
     connect(editor, &SongEditor::modificationChanged, this, [this] {
@@ -529,6 +594,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
     connect(editor, &SongEditor::saved, this, [this, editor](const std::string& content) {
         changesAction_->setChecked(false);
         refreshSongMetadata(editor, content);
+        syncScoreTabs();
         requestPreview();
     });
     connect(editor, &SongEditor::reloadedFromDisk, this, [this, editor] {
@@ -539,25 +605,24 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
             refreshSongMetadata(editor, *content);
         clearTidyChanges(); // its line numbers were for the old text
         updateSongActions();
+        syncScoreTabs();
         requestPreview();
     });
 
     // Toolbar state follows the editor; dies with it (context: this, disconnected on close).
     QPlainTextEdit* edit = editor->textEdit();
-    connect(edit, &QPlainTextEdit::undoAvailable, this,
-            [this](bool available) { undoAction_->setEnabled(available); });
+    connect(edit, &QPlainTextEdit::undoAvailable, this, [this] { updateEditState(); });
     connect(edit, &QPlainTextEdit::textChanged, this, [this] {
         refreshChanges();
         updateMarkChecked();
+        scoreSyncTimer_->start(); // a \lilypondfile may have been typed
+        updateScoreWidthBars();
     });
-    connect(edit, &QPlainTextEdit::redoAvailable, this,
-            [this](bool available) { redoAction_->setEnabled(available); });
-    connect(edit, &QPlainTextEdit::copyAvailable, this, [this, edit](bool available) {
-        copyAction_->setEnabled(available);
-        cutAction_->setEnabled(available && !edit->isReadOnly());
-    });
+    connect(edit, &QPlainTextEdit::redoAvailable, this, [this] { updateEditState(); });
+    connect(edit, &QPlainTextEdit::copyAvailable, this, [this] { updateEditState(); });
 
     pages_->setCurrentWidget(songPage_);
+    syncScoreTabs();
     updateSongActions(); // after load: the editor may have made itself read-only
     updateWindowTitle();
     edit->setFocus();
@@ -565,11 +630,13 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
 }
 
 void MainWindow::saveCurrent() {
-    SongEditor* editor = editor_;
+    SongEditor* editor = currentEditor();
     if (!editor)
         return;
     if (auto saved = editor->save(); !saved) {
-        QMessageBox::warning(this, tr("Cannot save song"), saved.error());
+        QMessageBox::warning(this,
+                             editor == editor_ ? tr("Cannot save song") : tr("Cannot save score"),
+                             saved.error());
         return;
     } else if (*saved != SongEditor::SaveResult::Saved) {
         return;
@@ -588,13 +655,100 @@ bool MainWindow::confirmClose(SongEditor* editor) {
         return false;
     if (answer == QMessageBox::Save) {
         if (auto saved = editor->save(); !saved) {
-            QMessageBox::warning(this, tr("Cannot save song"), saved.error());
+            QMessageBox::warning(this,
+                                 editor->kind() == SongEditor::Kind::Score ? tr("Cannot save score")
+                                                                           : tr("Cannot save song"),
+                                 saved.error());
             return false;
         } else if (*saved == SongEditor::SaveResult::Cancelled) {
             return false;
         }
     }
     return true;
+}
+
+bool MainWindow::confirmCloseAll() {
+    // Scores first: discarding a new one edits the song, which is asked about after.
+    // Copies: saving a score may change the tabs.
+    std::vector<std::pair<std::string, QPointer<SongEditor>>> scores;
+    for (const ScoreTab& tab : scoreTabs_)
+        if (tab.editor)
+            scores.emplace_back(tab.name, tab.editor);
+    for (const auto& [name, score] : scores) {
+        if (!score || !(score->isModified() || score->isNew()))
+            continue;
+        if (const int index = scoreTabIndex(name); index > 0)
+            tabs_->setCurrentIndex(index); // show what is being asked about
+        if (!confirmCloseScore(name, score))
+            return false;
+    }
+    return !(editor_ && !confirmClose(editor_));
+}
+
+bool MainWindow::confirmCloseScore(const std::string& name, SongEditor* score) {
+    if (!score->isNew())
+        return confirmClose(score);
+    const auto answer = QMessageBox::question(
+        this, tr("Unsaved changes"),
+        tr("Discard the new score %1? Its \\lilypondfile line is removed from the song too.")
+            .arg(toQString(name)),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
+    if (answer == QMessageBox::Cancel)
+        return false;
+    if (answer == QMessageBox::Save) {
+        if (auto saved = score->save(); !saved) {
+            QMessageBox::warning(this, tr("Cannot save score"), saved.error());
+            return false;
+        } else if (*saved == SongEditor::SaveResult::Cancelled) {
+            return false;
+        }
+        return true;
+    }
+    removeScoreReference(name);
+    return true;
+}
+
+void MainWindow::removeScoreReference(const std::string& name) {
+    if (!editor_ || editor_->textEdit()->isReadOnly())
+        return;
+    replaceSongText(zub::songedit::removeScoreReference(editor_->content(), name));
+}
+
+void MainWindow::replaceSongText(const std::string& after) {
+    if (!editor_ || editor_->textEdit()->isReadOnly())
+        return;
+    const std::string before = editor_->content();
+    if (after == before)
+        return;
+    // One undo step: replace only the changed middle part of the text.
+    std::size_t prefix = 0;
+    while (prefix < before.size() && prefix < after.size() && before[prefix] == after[prefix])
+        ++prefix;
+    std::size_t suffix = 0;
+    while (suffix < before.size() - prefix && suffix < after.size() - prefix &&
+           before[before.size() - 1 - suffix] == after[after.size() - 1 - suffix])
+        ++suffix;
+    // Never split a UTF-8 sequence.
+    const auto continuation = [](char c) { return (static_cast<unsigned char>(c) & 0xC0) == 0x80; };
+    while (prefix > 0 && prefix < before.size() && continuation(before[prefix]))
+        --prefix;
+    while (suffix > 0 && continuation(before[before.size() - suffix]))
+        --suffix;
+    const auto chars = [](const std::string& text, std::size_t bytes) {
+        return static_cast<int>(
+            QString::fromUtf8(text.data(), static_cast<qsizetype>(bytes)).size());
+    };
+    const int from = chars(before, prefix);
+    const int to = from + chars(before.substr(prefix, before.size() - prefix - suffix),
+                                before.size() - prefix - suffix);
+    const QString replacement = QString::fromUtf8(
+        after.data() + prefix, static_cast<qsizetype>(after.size() - prefix - suffix));
+    QTextCursor cursor(editor_->textEdit()->document());
+    cursor.beginEditBlock();
+    cursor.setPosition(from);
+    cursor.setPosition(to, QTextCursor::KeepAnchor);
+    cursor.insertText(replacement);
+    cursor.endEditBlock();
 }
 
 void MainWindow::goBack() {
@@ -623,7 +777,7 @@ bool MainWindow::closeSong() {
     SongEditor* editor = editor_;
     if (!editor)
         return true;
-    if (!confirmClose(editor))
+    if (!confirmCloseAll())
         return false;
     const std::filesystem::path path = editor->path();
     if (converterRunner_->isRunning())
@@ -635,6 +789,7 @@ bool MainWindow::closeSong() {
     // No more reload dialogs from an editor that is gone but not yet deleted.
     editor->stopWatching();
     approvedConstructs_.erase(path); // approvals last as long as the song is open
+    removeScoreTabs();
     disconnect(editor, nullptr, this, nullptr);
     disconnect(editor->textEdit(), nullptr, this, nullptr);
     editor_ = nullptr;
@@ -661,7 +816,7 @@ bool MainWindow::closeSong() {
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
-    if (editor_ && !confirmClose(editor_)) {
+    if (!confirmCloseAll()) {
         event->ignore();
         return;
     }
@@ -683,8 +838,8 @@ void MainWindow::createSongToolBar() {
         auto* action = new QAction(QIcon::fromTheme(icon), text, this);
         action->setToolTip(toolTip);
         connect(action, &QAction::triggered, this, [this, slot] {
-            if (editor_)
-                slot(editor_->textEdit());
+            if (SongEditor* editor = currentEditor())
+                slot(editor->textEdit());
         });
         songToolBar_->addAction(action);
         return action;
@@ -737,8 +892,8 @@ void MainWindow::createSongToolBar() {
     connect(checkAction_, &QAction::triggered, this, [this] { startProposals(SongAction::Check); });
     songToolBar_->addAction(checkAction_);
 
-    markCheckedAction_ = new QAction(QIcon::fromTheme(QStringLiteral("checkmark")),
-                                     tr("Mark Checked"), this);
+    markCheckedAction_ =
+        new QAction(QIcon::fromTheme(QStringLiteral("checkmark")), tr("Mark Checked"), this);
     markCheckedAction_->setToolTip(
         tr("The song is ready for the songbook: remove its \"not checked yet\" TODO line "
            "(one undo step; save to keep it)"));
@@ -772,36 +927,56 @@ void MainWindow::createSongToolBar() {
 
 void MainWindow::createEditMenu() {
     QMenu* edit = menuBar()->addMenu(tr("Ed&it"));
+    // songOnly: the action edits the song's text (chords, parts), not a score's.
     const auto add = [this, edit](const QString& text, const QList<QKeySequence>& keys,
-                                  const std::function<void()>& run) {
+                                  const std::function<void()>& run, bool songOnly = true) {
         QAction* action = edit->addAction(text);
         action->setShortcuts(keys);
         action->setShortcutContext(Qt::WindowShortcut);
         connect(action, &QAction::triggered, this, run);
-        editActions_.push_back(action);
+        (songOnly ? songEditActions_ : editActions_).push_back(action);
     };
     add(tr("Insert Chord"), {QKeySequence(Qt::ALT | Qt::Key_A)}, [this] {
         if (editor_)
             editor_->insertChord();
     });
+    add(tr("Insert Multivoice"), {QKeySequence(Qt::ALT | Qt::Key_M)}, [this] {
+        if (editor_)
+            editor_->insertMultivoice();
+    });
+    add(tr("Insert Role"), {QKeySequence(Qt::ALT | Qt::Key_L)}, [this] {
+        if (editor_)
+            editor_->insertRole();
+    });
+    add(tr("Remove Element at Cursor"), {QKeySequence(Qt::ALT | Qt::Key_Delete)}, [this] {
+        if (editor_ && !editor_->removeElement())
+            statusBar()->showMessage(tr("Nothing to remove at the cursor"), 3000);
+    });
     edit->addSeparator();
     // Like VSCodium: Alt+Up/Down move the lines with the cursor or the selection as a block,
     // Ctrl+Up/Down scroll the view by a line without moving the cursor.
-    add(tr("Move Line Up"), {QKeySequence(Qt::ALT | Qt::Key_Up)}, [this] {
-        if (editor_)
-            editor_->moveLines(-1);
-    });
-    add(tr("Move Line Down"), {QKeySequence(Qt::ALT | Qt::Key_Down)}, [this] {
-        if (editor_)
-            editor_->moveLines(+1);
-    });
+    add(
+        tr("Move Line Up"), {QKeySequence(Qt::ALT | Qt::Key_Up)},
+        [this] {
+            if (SongEditor* editor = currentEditor())
+                editor->moveLines(-1);
+        },
+        false);
+    add(
+        tr("Move Line Down"), {QKeySequence(Qt::ALT | Qt::Key_Down)},
+        [this] {
+            if (SongEditor* editor = currentEditor())
+                editor->moveLines(+1);
+        },
+        false);
     for (const auto& [key, step] : {std::pair{Qt::Key_Up, -1}, std::pair{Qt::Key_Down, +1}}) {
         auto* scroll = new QAction(this);
         scroll->setShortcut(QKeySequence(Qt::CTRL | key));
         scroll->setShortcutContext(Qt::WindowShortcut);
         connect(scroll, &QAction::triggered, this, [this, step] {
-            if (editor_ && pages_->currentWidget() == songPage_) {
-                QScrollBar* bar = editor_->textEdit()->verticalScrollBar();
+            if (SongEditor* editor = currentEditor();
+                editor && pages_->currentWidget() == songPage_) {
+                QScrollBar* bar = editor->textEdit()->verticalScrollBar();
                 bar->setValue(bar->value() + step * bar->singleStep());
             }
         });
@@ -822,6 +997,8 @@ void MainWindow::createEditMenu() {
     add(tr("Insert Part…"),
         {QKeySequence(Qt::CTRL | Qt::Key_Return), QKeySequence(Qt::CTRL | Qt::Key_Enter)},
         [this] { showPartMenu(); });
+    edit->addSeparator();
+    add(tr("New Score…"), {}, [this] { newScore(); });
 }
 
 void MainWindow::moveChord(int direction, zub::songedit::Step step) {
@@ -861,37 +1038,79 @@ void MainWindow::showPartMenu() {
     menu->popup(edit->viewport()->mapToGlobal(edit->cursorRect().bottomLeft()));
 }
 
-void MainWindow::updateSongActions() {
-    const bool open = editor_ != nullptr;
-    closeSongAction_->setEnabled(open);
-    saveAction_->setEnabled(open && editor_->isModified());
-    const bool modified = open && editor_->isModified();
-    changesAction_->setEnabled(modified);
-    if (!modified && changesAction_->isChecked())
-        changesAction_->setChecked(false);
-    if (!open) {
-        for (QAction* action :
-             {undoAction_, redoAction_, cutAction_, copyAction_, pasteAction_, tidyAction_,
-              makeSmallerAction_, joinLinesAction_, checkAction_, markCheckedAction_})
-            action->setEnabled(false);
-        for (QAction* action : editActions_)
+SongEditor* MainWindow::currentEditor() const {
+    if (!editor_)
+        return nullptr;
+    const int index = tabs_->currentIndex();
+    if (index <= 0 || index > static_cast<int>(scoreTabs_.size()))
+        return editor_;
+    return scoreTabs_[static_cast<std::size_t>(index - 1)].editor.data();
+}
+
+bool MainWindow::onSongTab() const {
+    return editor_ && tabs_->currentIndex() <= 0;
+}
+
+bool MainWindow::anyModified() const {
+    if (!editor_)
+        return false;
+    return editor_->isModified() || std::ranges::any_of(scoreTabs_, [](const ScoreTab& tab) {
+               return tab.editor && tab.editor->isModified();
+           });
+}
+
+void MainWindow::updateEditState() {
+    SongEditor* current = currentEditor();
+    if (!current) {
+        for (QAction* action : {undoAction_, redoAction_, cutAction_, copyAction_, pasteAction_})
             action->setEnabled(false);
         return;
     }
-    const QPlainTextEdit* edit = editor_->textEdit();
-    const bool readOnly = edit->isReadOnly();
+    const QPlainTextEdit* edit = current->textEdit();
     const bool selection = edit->textCursor().hasSelection();
-    // While the Changes view is shown, the editor is hidden: no edits it can't show.
-    const bool editable = !readOnly && !changesAction_->isChecked();
+    // While the Changes view is shown, the song editor is hidden: no edits it can't show.
+    const bool editable =
+        !edit->isReadOnly() && !(current == editor_ && changesAction_->isChecked());
     undoAction_->setEnabled(editable && edit->document()->isUndoAvailable());
     redoAction_->setEnabled(editable && edit->document()->isRedoAvailable());
     copyAction_->setEnabled(selection);
     cutAction_->setEnabled(selection && editable);
     pasteAction_->setEnabled(editable);
+}
+
+void MainWindow::updateSongActions() {
+    const bool open = editor_ != nullptr;
+    updateScoreWidthBars();
+    SongEditor* current = currentEditor();
+    const bool songTab = onSongTab();
+    closeSongAction_->setEnabled(open);
+    saveAction_->setEnabled(current && current->isModified());
+    saveAction_->setText(current && !songTab ? tr("&Save Score") : tr("&Save Song"));
+    const bool modified = open && editor_->isModified();
+    changesAction_->setEnabled(modified && songTab);
+    if (!modified && changesAction_->isChecked())
+        changesAction_->setChecked(false);
+    updateEditState();
+    if (!open) {
+        for (QAction* action :
+             {tidyAction_, makeSmallerAction_, joinLinesAction_, checkAction_, markCheckedAction_})
+            action->setEnabled(false);
+        for (QAction* action : editActions_)
+            action->setEnabled(false);
+        for (QAction* action : songEditActions_)
+            action->setEnabled(false);
+        return;
+    }
+    const bool readOnly = current ? current->textEdit()->isReadOnly() : true;
+    const bool editable =
+        current && !readOnly && !(current == editor_ && changesAction_->isChecked());
     for (QAction* action : editActions_)
         action->setEnabled(editable);
-    const bool converterFree =
-        !readOnly && !converterRunner_->isRunning() && !findConverter().empty();
+    for (QAction* action : songEditActions_)
+        action->setEnabled(editable && songTab);
+    // The song actions work on the song's text.
+    const bool converterFree = songTab && !editor_->textEdit()->isReadOnly() &&
+                               !converterRunner_->isRunning() && !findConverter().empty();
     tidyAction_->setEnabled(converterFree);
     for (QAction* action : {makeSmallerAction_, joinLinesAction_})
         action->setEnabled(converterFree && !songbookRoot_.empty());
@@ -901,12 +1120,12 @@ void MainWindow::updateSongActions() {
 
 void MainWindow::updateMarkChecked() {
     // Searched in the document: cheap enough for every keystroke of a song-sized text.
-    const bool marked =
-        editor_ && !editor_->textEdit()->isReadOnly() && !changesAction_->isChecked() &&
-        !editor_->textEdit()
-             ->document()
-             ->find(QStringLiteral("% TODO: ") + toQString(zub::todo::kNotChecked))
-             .isNull();
+    const bool marked = onSongTab() && !editor_->textEdit()->isReadOnly() &&
+                        !changesAction_->isChecked() &&
+                        !editor_->textEdit()
+                             ->document()
+                             ->find(QStringLiteral("% TODO: ") + toQString(zub::todo::kNotChecked))
+                             .isNull();
     markCheckedAction_->setEnabled(marked);
 }
 
@@ -967,7 +1186,8 @@ SongEditor* MainWindow::takeRun(std::string& input, const QString& what) {
     if (!editor || editor != editor_ || editor->content() != input) {
         // The song was closed, switched or edited while the converter ran: its result no longer
         // fits the text.
-        statusBar()->showMessage(tr("%1 discarded: the song changed while it ran.").arg(what), 8000);
+        statusBar()->showMessage(tr("%1 discarded: the song changed while it ran.").arg(what),
+                                 8000);
         return nullptr;
     }
     return editor;
@@ -1068,6 +1288,7 @@ void MainWindow::refreshChanges() {
 void MainWindow::jumpToLine(int line) {
     if (!editor_)
         return;
+    tabs_->setCurrentIndex(0);         // the line is in the song
     changesAction_->setChecked(false); // the editor must be showing
     editor_->goToLine(line);
 }
@@ -1081,7 +1302,7 @@ void MainWindow::updateWindowTitle() {
     // "[*]" is replaced by Qt with a marker while the window is modified.
     setWindowTitle(editor_->windowTitle() + QStringLiteral("[*] — ") +
                    QApplication::applicationDisplayName());
-    setWindowModified(editor_->isModified());
+    setWindowModified(anyModified());
 }
 
 void MainWindow::refreshSongMetadata(SongEditor* editor, const std::string& content) {
@@ -1139,6 +1360,11 @@ void MainWindow::createPreview() {
                                 ? QStringLiteral("preview")
                                 : QStringLiteral("preview-%1").arg(QApplication::applicationPid());
     previewWorkDir_ = toPath(QDir(cache).absoluteFilePath(dirName));
+    // The score preview's work dir follows the same rule.
+    scoreWorkDir_ = toPath(QDir(cache).absoluteFilePath(
+        dirName == QStringLiteral("preview")
+            ? QStringLiteral("score")
+            : QStringLiteral("score-%1").arg(QApplication::applicationPid())));
 }
 
 std::string MainWindow::inputNameOf(const SongEditor* editor) const {
@@ -1149,6 +1375,20 @@ std::string MainWindow::inputNameOf(const SongEditor* editor) const {
     return {u8.begin(), u8.end()};
 }
 
+namespace {
+
+std::filesystem::path pathOfName(const std::string& name) {
+    return std::filesystem::path(std::u8string(name.begin(), name.end()));
+}
+
+// "Artist/X.ly": the name a \lilypondfile can carry that the app edits as a score.
+bool validScoreName(const std::string& name) {
+    return !zub::invalidInputName(name) && name.size() > 3 && name.ends_with(".ly") &&
+           name[name.size() - 4] != '/';
+}
+
+} // namespace
+
 void MainWindow::requestPreview(bool userAsked) {
     SongEditor* editor = editor_;
     if (!editor || songbookRoot_.empty()) {
@@ -1158,8 +1398,26 @@ void MainWindow::requestPreview(bool userAsked) {
     }
 
     std::string content = editor->content();
-    // Songs build with -shell-escape, so a song is code. Unknown commands (e.g. from an
-    // imported song) are never built automatically, and only after confirmation on Rebuild.
+    // A reference to a score that exists nowhere would fail the build with a LaTeX error.
+    for (const std::string& name : zub::songbook::referencedFiles(content)) {
+        if (!validScoreName(name) || !scorePath(name).empty())
+            continue;
+        const int tab = scoreTabIndex(name);
+        if (tab > 0 && scoreTabs_[static_cast<std::size_t>(tab - 1)].editor)
+            continue;
+        previewRunner_->cancel();
+        preview_->clear();
+        PreviewResult missing;
+        missing.inputName = inputNameOf(editor);
+        missing.message = tr("The score %1 does not exist: create it, or remove its "
+                             "\\lilypondfile line from the song.")
+                              .arg(toQString(name));
+        preview_->showResult(missing);
+        return;
+    }
+    // Songs build with -shell-escape, so a song is code, and so are its scores. Unknown commands
+    // (e.g. from an imported song) are never built automatically, and only after confirmation on
+    // Rebuild.
     QString list;
     if (!approveBuild(editor, content, userAsked, &list)) {
         previewRunner_->cancel();
@@ -1181,17 +1439,70 @@ void MainWindow::requestPreview(bool userAsked) {
     request.inputName = inputNameOf(editor);
     request.songContent = std::move(content);
     request.documentClass = toStdString(preview_->documentClass());
+    // Unsaved scores are built as they are in their editors.
+    for (const ScoreTab& tab : scoreTabs_) {
+        if (tab.editor && (tab.editor->isModified() || tab.editor->isNew()))
+            request.fileOverrides.emplace_back(tab.name, tab.editor->content());
+    }
+    pdfStale_ = false;
     previewRunner_->request(std::move(request));
 }
 
 bool MainWindow::approveBuild(SongEditor* editor, const std::string& content, bool askUser,
                               QString* unapprovedList, const QString& yesText,
                               const QString& noText) {
-    std::set<std::string>& approved = approvedConstructs_[editor->path()];
+    return approveRisks(songBuildRisks(editor, content), askUser, unapprovedList, yesText, noText);
+}
+
+std::vector<MainWindow::RiskSource> MainWindow::songBuildRisks(SongEditor* editor,
+                                                               const std::string& content) const {
+    std::vector<RiskSource> sources;
+    sources.push_back({editor->path(), {}, zub::safety::unknownConstructs(content)});
+    for (const std::string& name : zub::songbook::referencedFiles(content)) {
+        if (!validScoreName(name))
+            continue;
+        // What the editor holds, and the file on disk (the converter's measuring builds that).
+        std::vector<std::string> texts;
+        std::filesystem::path key = scorePath(name);
+        const int tab = scoreTabIndex(name);
+        if (tab > 0) {
+            if (const SongEditor* score = scoreTabs_[static_cast<std::size_t>(tab - 1)].editor) {
+                texts.push_back(score->content());
+                key = score->path();
+            }
+        }
+        if (!scorePath(name).empty()) {
+            if (auto disk = zub::readTextFile(scorePath(name)))
+                texts.push_back(std::move(*disk));
+        }
+        RiskSource source{key, toQString(name), {}};
+        for (const std::string& text : texts) {
+            for (std::string& risk : zub::safety::lilypondRisks(text)) {
+                if (std::ranges::find(source.risks, risk) == source.risks.end())
+                    source.risks.push_back(std::move(risk));
+            }
+        }
+        if (!source.risks.empty() && !key.empty())
+            sources.push_back(std::move(source));
+    }
+    return sources;
+}
+
+bool MainWindow::approveRisks(const std::vector<RiskSource>& sources, bool askUser,
+                              QString* unapprovedList, const QString& yesText,
+                              const QString& noText, bool forScore) {
     QStringList unapproved;
-    for (const std::string& construct : zub::safety::unknownConstructs(content)) {
-        if (!approved.contains(construct))
-            unapproved << toQString(construct);
+    std::vector<std::pair<std::filesystem::path, std::string>> toApprove;
+    for (const RiskSource& source : sources) {
+        const std::set<std::string>& approved = approvedConstructs_[source.key];
+        for (const std::string& construct : source.risks) {
+            if (approved.contains(construct))
+                continue;
+            toApprove.emplace_back(source.key, construct);
+            unapproved << (source.label.isEmpty() ? QString()
+                                                  : source.label + QStringLiteral(": ")) +
+                              toQString(construct);
+        }
     }
     if (unapproved.isEmpty())
         return true;
@@ -1200,9 +1511,11 @@ bool MainWindow::approveBuild(SongEditor* editor, const std::string& content, bo
         *unapprovedList = list;
     bool build = false;
     if (askUser) {
-        QMessageBox box(QMessageBox::Warning, tr("Build this song?"),
-                        tr("This song uses commands that songs normally don't: %1").arg(list),
-                        QMessageBox::Yes | QMessageBox::Cancel, this);
+        QMessageBox box(
+            QMessageBox::Warning, forScore ? tr("Build this score?") : tr("Build this song?"),
+            forScore ? tr("This score uses code that scores normally don't: %1").arg(list)
+                     : tr("This song uses commands that songs normally don't: %1").arg(list),
+            QMessageBox::Yes | QMessageBox::Cancel, this);
         if (!yesText.isEmpty())
             box.button(QMessageBox::Yes)->setText(yesText);
         if (!noText.isEmpty())
@@ -1212,9 +1525,417 @@ bool MainWindow::approveBuild(SongEditor* editor, const std::string& content, bo
     }
     if (!build)
         return false;
-    for (const QString& construct : unapproved)
-        approved.insert(toStdString(construct));
+    for (const auto& [key, construct] : toApprove)
+        approvedConstructs_[key].insert(construct);
     return true;
+}
+
+// ---- Scores ----
+
+std::filesystem::path MainWindow::scorePath(const std::string& name) const {
+    if (songbookRoot_.empty() || !validScoreName(name))
+        return {};
+    const bool tinwhistle = editor_ && editor_->path().native().starts_with(
+                                           (songbookRoot_ / "songs/tinwhistle").native());
+    std::error_code ec;
+    for (const char* dir : tinwhistle ? std::array{"songs/tinwhistle", "songs/chords"}
+                                      : std::array{"songs/chords", "songs/tinwhistle"}) {
+        const std::filesystem::path candidate = songbookRoot_ / dir / pathOfName(name);
+        if (std::filesystem::is_regular_file(candidate, ec))
+            return candidate;
+    }
+    return {};
+}
+
+std::filesystem::path MainWindow::newScorePath(const std::string& name) const {
+    const bool tinwhistle = editor_ && editor_->path().native().starts_with(
+                                           (songbookRoot_ / "songs/tinwhistle").native());
+    return songbookRoot_ / (tinwhistle ? "songs/tinwhistle" : "songs/chords") / pathOfName(name);
+}
+
+int MainWindow::scoreTabIndex(const std::string& name) const {
+    for (std::size_t i = 0; i < scoreTabs_.size(); ++i) {
+        if (scoreTabs_[i].name == name)
+            return static_cast<int>(i) + 1;
+    }
+    return -1;
+}
+
+void MainWindow::syncScoreTabs() {
+    scoreSyncTimer_->stop();
+    if (!editor_)
+        return;
+    std::vector<std::string> references;
+    for (std::string& name : zub::songbook::referencedFiles(editor_->content())) {
+        if (validScoreName(name) && std::ranges::find(references, name) == references.end())
+            references.push_back(std::move(name));
+    }
+    std::erase_if(dismissedScores_, [&](const std::string& name) {
+        return std::ranges::find(references, name) == references.end();
+    });
+    for (const std::string& name : references) {
+        if (scoreTabIndex(name) < 0 && !dismissedScores_.contains(name))
+            addScoreTab(name);
+    }
+    // A tab whose reference is gone stays while there is something in it worth keeping.
+    for (int index = static_cast<int>(scoreTabs_.size()); index >= 1; --index) {
+        const ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(index - 1)];
+        if (std::ranges::find(references, tab.name) != references.end())
+            continue;
+        if (!tab.editor || (!tab.editor->isModified() && !tab.editor->isNew()))
+            dropScoreTab(index);
+    }
+}
+
+void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
+    auto* page = new QStackedWidget(tabs_);
+    // Index 0: the notice of a missing (or unreadable) file. Index 1: the editor, with room
+    // under it for the fretboard.
+    auto* notice = new QWidget(page);
+    auto* noticeLayout = new QVBoxLayout(notice);
+    auto* noticeText = new QLabel(notice);
+    noticeText->setObjectName(QStringLiteral("scoreNotice"));
+    noticeText->setWordWrap(true);
+    noticeText->setAlignment(Qt::AlignCenter);
+    auto* create = new QPushButton(tr("Create It"), notice);
+    create->setObjectName(QStringLiteral("scoreCreate"));
+    noticeLayout->addStretch();
+    noticeLayout->addWidget(noticeText);
+    noticeLayout->addWidget(create, 0, Qt::AlignCenter);
+    noticeLayout->addStretch();
+    page->addWidget(notice);
+    auto* splitter = new QSplitter(Qt::Vertical, page);
+    auto* widthBar = new QWidget(splitter);
+    widthBar->setObjectName(QStringLiteral("scoreWidthBar"));
+    auto* widthLayout = new QHBoxLayout(widthBar);
+    widthLayout->setContentsMargins(4, 2, 4, 2);
+    widthLayout->addWidget(new QLabel(tr("Width:"), widthBar));
+    auto* fullButton = new QRadioButton(tr("Full"), widthBar);
+    fullButton->setObjectName(QStringLiteral("scoreWidthFull"));
+    auto* narrowButton = new QRadioButton(tr("Narrow"), widthBar);
+    narrowButton->setObjectName(QStringLiteral("scoreWidthNarrow"));
+    widthLayout->addWidget(fullButton);
+    widthLayout->addWidget(narrowButton);
+    widthLayout->addStretch();
+    splitter->addWidget(widthBar);
+    splitter->setCollapsible(0, false);
+    splitter->setStretchFactor(0, 0);
+    connect(fullButton, &QRadioButton::clicked, this, [this, name] { setScoreWidth(name, false); });
+    connect(narrowButton, &QRadioButton::clicked, this,
+            [this, name] { setScoreWidth(name, true); });
+    auto* fretboard = new QWidget(splitter); // step 2: the fretboard goes here
+    fretboard->setObjectName(QStringLiteral("fretboardPlaceholder"));
+    fretboard->hide();
+    splitter->addWidget(fretboard);
+    page->addWidget(splitter);
+
+    const QString fileName = toQString(std::filesystem::path(pathOfName(name)).filename());
+    const int index = tabs_->addTab(page, fileName);
+    scoreTabs_.push_back({name, page, nullptr});
+    connect(create, &QPushButton::clicked, this, [this, name] { createMissingScore(name); });
+
+    if (!editor) {
+        if (const auto path = scorePath(name); !path.empty()) {
+            editor = new SongEditor(path, *repository_, nullptr, SongEditor::Kind::Score);
+            if (auto loaded = editor->load(); !loaded) {
+                delete editor;
+                editor = nullptr;
+                noticeText->setText(
+                    tr("%1 cannot be opened: %2").arg(toQString(name), loaded.error()));
+                create->hide();
+            }
+        } else {
+            noticeText->setText(tr("%1 does not exist yet.").arg(toQString(name)));
+            tabs_->setTabText(index, tr("%1 (missing)").arg(fileName));
+        }
+    }
+    if (editor)
+        attachScoreEditor(index, editor);
+    updateScoreWidthBars();
+}
+
+void MainWindow::updateScoreWidthBars() {
+    const bool enabled = editor_ && !editor_->textEdit()->isReadOnly();
+    const std::string content = editor_ ? editor_->content() : std::string();
+    for (const ScoreTab& tab : scoreTabs_) {
+        auto* full = tab.page->findChild<QRadioButton*>(QStringLiteral("scoreWidthFull"));
+        auto* narrow = tab.page->findChild<QRadioButton*>(QStringLiteral("scoreWidthNarrow"));
+        if (!full || !narrow)
+            continue;
+        const auto isNarrow = zub::songedit::scoreIsNarrow(content, tab.name);
+        // Radio buttons in one parent are exclusive on their own.
+        full->setChecked(isNarrow == false);
+        narrow->setChecked(isNarrow == true);
+        full->setEnabled(enabled && isNarrow.has_value());
+        narrow->setEnabled(enabled && isNarrow.has_value());
+    }
+}
+
+void MainWindow::setScoreWidth(const std::string& name, bool narrow) {
+    if (editor_)
+        replaceSongText(zub::songedit::setScoreWidth(editor_->content(), name, narrow));
+    updateScoreWidthBars();
+    requestPreview();
+}
+
+void MainWindow::attachScoreEditor(int tabIndex, SongEditor* editor) {
+    ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(tabIndex - 1)];
+    auto* page = qobject_cast<QStackedWidget*>(tab.page);
+    auto* splitter = page->widget(1) ? qobject_cast<QSplitter*>(page->widget(1)) : nullptr;
+    editor->setWindowTitle(toQString(editor->path().filename()));
+    splitter->insertWidget(1, editor); // under the width bar
+    splitter->setStretchFactor(1, 1);
+    page->setCurrentWidget(splitter);
+    tab.editor = editor;
+    tabs_->setTabText(tabIndex, toQString(editor->path().filename()) +
+                                    (editor->isModified() ? QStringLiteral("*") : QString()));
+
+    connect(editor, &SongEditor::modificationChanged, this, [this, editor] {
+        updateScoreTabTitle(editor);
+        updateWindowTitle();
+        updateSongActions();
+    });
+    connect(editor, &SongEditor::saved, this, [this] { requestPreview(); });
+    connect(editor, &SongEditor::reloadedFromDisk, this, [this, editor] {
+        statusBar()->showMessage(
+            tr("%1 changed on disk and was reloaded.").arg(toQString(editor->path().filename())),
+            5000);
+        if (currentEditor() == editor)
+            requestScorePreview();
+        requestPreview();
+    });
+    QPlainTextEdit* edit = editor->textEdit();
+    connect(edit, &QPlainTextEdit::textChanged, this, [this, editor] {
+        pdfStale_ = true;
+        if (currentEditor() == editor)
+            scorePreviewTimer_->start();
+    });
+    connect(edit, &QPlainTextEdit::undoAvailable, this, [this] { updateEditState(); });
+    connect(edit, &QPlainTextEdit::redoAvailable, this, [this] { updateEditState(); });
+    connect(edit, &QPlainTextEdit::copyAvailable, this, [this] { updateEditState(); });
+}
+
+void MainWindow::updateScoreTabTitle(const SongEditor* editor) {
+    for (std::size_t i = 0; i < scoreTabs_.size(); ++i) {
+        if (scoreTabs_[i].editor == editor) {
+            tabs_->setTabText(static_cast<int>(i) + 1,
+                              toQString(editor->path().filename()) +
+                                  (editor->isModified() ? QStringLiteral("*") : QString()));
+        }
+    }
+}
+
+void MainWindow::createMissingScore(const std::string& name) {
+    const int index = scoreTabIndex(name);
+    if (index < 0 || scoreTabs_[static_cast<std::size_t>(index - 1)].editor)
+        return;
+    auto* editor =
+        new SongEditor(newScorePath(name), *repository_, nullptr, SongEditor::Kind::Score);
+    const auto skeleton = zub::score::newScore();
+    editor->openNew(skeleton.text);
+    editor->setCursorByteOffset(skeleton.cursor);
+    attachScoreEditor(index, editor);
+    tabs_->setCurrentIndex(index);
+}
+
+void MainWindow::dropScoreTab(int tabIndex) {
+    if (tabIndex < 1 || tabIndex > static_cast<int>(scoreTabs_.size()))
+        return;
+    ScoreTab tab = scoreTabs_[static_cast<std::size_t>(tabIndex - 1)];
+    if (tab.editor) {
+        tab.editor->stopWatching();
+        disconnect(tab.editor, nullptr, this, nullptr);
+        disconnect(tab.editor->textEdit(), nullptr, this, nullptr);
+        approvedConstructs_.erase(tab.editor->path());
+    }
+    {
+        // The tab widget changes its current tab on removal; onTabChanged runs once, after.
+        const QSignalBlocker blocker(tabs_);
+        tabs_->removeTab(tabIndex);
+        scoreTabs_.erase(scoreTabs_.begin() + (tabIndex - 1));
+    }
+    tab.page->hide();
+    tab.page->deleteLater(); // the editor is its child
+    onTabChanged();
+    updateWindowTitle();
+    updateSongActions();
+}
+
+void MainWindow::closeScoreTab(int tabIndex) {
+    if (tabIndex < 1 || tabIndex > static_cast<int>(scoreTabs_.size()))
+        return;
+    const ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(tabIndex - 1)];
+    if (tab.editor && !confirmCloseScore(tab.name, tab.editor))
+        return;
+    // Still in the song: it stays closed until the reference goes and comes back.
+    if (editor_) {
+        const auto references = zub::songbook::referencedFiles(editor_->content());
+        if (std::ranges::find(references, tab.name) != references.end())
+            dismissedScores_.insert(tab.name);
+    }
+    dropScoreTab(tabIndex);
+    requestPreview(); // an unsaved score that was discarded must not stay in the PDF
+}
+
+void MainWindow::removeScoreTabs() {
+    scoreSyncTimer_->stop();
+    scorePreviewTimer_->stop();
+    scoreRunner_->cancel();
+    scorePreview_->clear();
+    dismissedScores_.clear();
+    pdfStale_ = false;
+    {
+        const QSignalBlocker blocker(tabs_);
+        for (const ScoreTab& tab : scoreTabs_) {
+            if (tab.editor) {
+                tab.editor->stopWatching();
+                disconnect(tab.editor, nullptr, this, nullptr);
+                disconnect(tab.editor->textEdit(), nullptr, this, nullptr);
+                approvedConstructs_.erase(tab.editor->path());
+            }
+            tab.page->hide();
+            tab.page->deleteLater();
+        }
+        while (tabs_->count() > 1)
+            tabs_->removeTab(1);
+        scoreTabs_.clear();
+        tabs_->setCurrentIndex(0);
+    }
+    previewStack_->setCurrentWidget(preview_);
+}
+
+void MainWindow::onTabChanged() {
+    const bool song = tabs_->currentIndex() <= 0;
+    previewStack_->setCurrentWidget(song ? static_cast<QWidget*>(preview_) : scorePreview_);
+    scorePreviewTimer_->stop();
+    if (song) {
+        scoreRunner_->cancel();
+        if (pdfStale_ && editor_)
+            requestPreview();
+    } else {
+        scorePreview_->clear();
+        requestScorePreview();
+    }
+    updateSongActions();
+    if (SongEditor* editor = currentEditor())
+        editor->textEdit()->setFocus();
+}
+
+void MainWindow::requestScorePreview(bool userAsked) {
+    scorePreviewTimer_->stop();
+    SongEditor* editor = currentEditor();
+    if (!editor || onSongTab() || songbookRoot_.empty()) {
+        scoreRunner_->cancel();
+        scorePreview_->clear();
+        return;
+    }
+    const std::string name = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name;
+    std::string content = editor->content();
+
+    // lilypond runs Scheme: a score is code, like a song.
+    QString list;
+    if (!approveRisks({{editor->path(), {}, zub::safety::lilypondRisks(content)}}, userAsked, &list,
+                      {}, {}, true)) {
+        scoreRunner_->cancel();
+        scorePreview_->showBlocked(
+            tr("Not built automatically: the score uses %1, which scores normally don't. "
+               "Building runs it with full access to your files. Check the score, then "
+               "press Rebuild to build it anyway.")
+                .arg(list));
+        return;
+    }
+
+    zub::score::Request request;
+    request.songbookRoot = songbookRoot_;
+    request.workDir = scoreWorkDir_;
+    request.inputName = name;
+    request.content = std::move(content);
+    // The note names follow the song's language, like the songbook's LaTeX does.
+    if (const auto meta = zub::parseSong(editor_->content()))
+        request.germanNames = zub::score::germanNames(meta->value("lang"));
+    request.includeDir = songbookRoot_ / "zubuvzpevnik" / "lilypond";
+    scoreRunner_->request(std::move(request));
+}
+
+void MainWindow::showScoreResult(const ScoreResult& result) {
+    // Only the score that is shown: the user may have moved on while it was built.
+    if (onSongTab() || !currentEditor())
+        return;
+    if (scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name != result.inputName)
+        return;
+    scorePreview_->showResult(result);
+}
+
+void MainWindow::newScore() {
+    if (!onSongTab() || editor_->textEdit()->isReadOnly() || songbookRoot_.empty())
+        return;
+    const std::string inputName = inputNameOf(editor_);
+    const auto slash = inputName.rfind('/');
+    if (slash == std::string::npos) {
+        statusBar()->showMessage(tr("The song is not in an artist folder."), 5000);
+        return;
+    }
+    const std::string folder = inputName.substr(0, slash + 1); // "Artist/"
+    const std::string stem = toStdString(toQString(editor_->path().stem()));
+    const auto taken = [&](const std::string& file) {
+        const std::string name = folder + file;
+        return scoreTabIndex(name) >= 0 || !scorePath(name).empty();
+    };
+    std::string suggestion = stem + ".ly";
+    for (int n = 2; taken(suggestion); ++n)
+        suggestion = stem + std::to_string(n) + ".ly";
+
+    bool ok = false;
+    QString entered = QInputDialog::getText(
+        this, tr("New Score"),
+        tr("File name of the new score (in the folder %1):").arg(toQString(folder)),
+        QLineEdit::Normal, toQString(suggestion), &ok);
+    entered = entered.trimmed();
+    if (!ok || entered.isEmpty())
+        return;
+    if (!entered.endsWith(QStringLiteral(".ly")))
+        entered += QStringLiteral(".ly");
+    const std::string file = toStdString(entered);
+    const std::string name = folder + file;
+    if (file.find('/') != std::string::npos || !validScoreName(name)) {
+        QMessageBox::warning(this, tr("New Score"),
+                             tr("\"%1\" is not a valid name for a score file.").arg(entered));
+        return;
+    }
+    if (taken(file)) {
+        QMessageBox::warning(this, tr("New Score"), tr("%1 already exists.").arg(toQString(name)));
+        return;
+    }
+
+    auto* score =
+        new SongEditor(newScorePath(name), *repository_, nullptr, SongEditor::Kind::Score);
+    const auto skeleton = zub::score::newScore();
+    score->openNew(skeleton.text);
+    score->setCursorByteOffset(skeleton.cursor);
+
+    // The reference goes on a new line at the cursor, as one undo step of the song.
+    QPlainTextEdit* edit = editor_->textEdit();
+    QTextCursor cursor = edit->textCursor();
+    const QString reference =
+        QStringLiteral("\\lilypondfile{") + toQString(name) + QLatin1Char('}');
+    cursor.beginEditBlock();
+    if (cursor.block().text().trimmed().isEmpty()) {
+        cursor.movePosition(QTextCursor::StartOfBlock);
+        cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+        cursor.insertText(reference);
+    } else {
+        cursor.movePosition(QTextCursor::EndOfBlock);
+        cursor.insertText(QLatin1Char('\n') + reference);
+    }
+    cursor.endEditBlock();
+    edit->setTextCursor(cursor);
+
+    dismissedScores_.erase(name);
+    addScoreTab(name, score);
+    tabs_->setCurrentIndex(scoreTabIndex(name));
+    score->textEdit()->setFocus();
+    statusBar()->showMessage(
+        tr("New score %1. Save it with Ctrl+S to create the file.").arg(toQString(name)), 8000);
 }
 
 QString MainWindow::actionName(SongAction action) const {
@@ -1302,9 +2023,11 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
         updateSongActions();
         return;
     }
-    std::expected<zub::songsuggest::Suggestions, QString> result = std::unexpected(output.error_or({}));
+    std::expected<zub::songsuggest::Suggestions, QString> result =
+        std::unexpected(output.error_or({}));
     if (output) {
-        auto interpreted = zub::songsuggest::interpretProposals(output->exitCode, output->out, output->err);
+        auto interpreted =
+            zub::songsuggest::interpretProposals(output->exitCode, output->out, output->err);
         if (interpreted)
             result = std::move(*interpreted);
         else
@@ -1398,10 +2121,9 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
     std::vector<std::string> ids;
     for (const auto& proposal : chosen)
         ids.push_back(proposal.id);
-    const QString description =
-        chosen.size() == 1
-            ? toQString(chosen.front().description)
-            : tr("%n changes", nullptr, static_cast<int>(chosen.size()));
+    const QString description = chosen.size() == 1
+                                    ? toQString(chosen.front().description)
+                                    : tr("%n changes", nullptr, static_cast<int>(chosen.size()));
     runEditor_ = editor.data();
     runInput_ = input;
     songAction_ = action;
@@ -1442,7 +2164,8 @@ void MainWindow::onApplyFinished(const std::expected<ConverterOutput, QString>& 
     }
     std::expected<std::string, QString> result = std::unexpected(output.error_or({}));
     if (output) {
-        auto interpreted = zub::songsuggest::interpretApply(output->exitCode, output->out, output->err);
+        auto interpreted =
+            zub::songsuggest::interpretApply(output->exitCode, output->out, output->err);
         if (interpreted)
             result = std::move(*interpreted);
         else
@@ -1590,15 +2313,16 @@ void MainWindow::scanSongbook() {
     const QString name = tr("Scan Songbook");
     const std::filesystem::path converter = findConverter();
     if (converter.empty()) {
-        QMessageBox::warning(this, name, tr("The scan needs chords_converter, which was not found."));
+        QMessageBox::warning(this, name,
+                             tr("The scan needs chords_converter, which was not found."));
         return;
     }
     if (!converterUsable(converter, name))
         return;
     const auto paper = zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
-    const QString paperName = !paper ? tr("its paper")
+    const QString paperName = !paper                                  ? tr("its paper")
                               : *paper == zub::songsuggest::Paper::A5 ? QStringLiteral("A5")
-                                                                       : QStringLiteral("A4");
+                                                                      : QStringLiteral("A4");
 
     // The settings: what to look for, and in which songs.
     QDialog dialog(this);
@@ -1608,8 +2332,8 @@ void MainWindow::scanSongbook() {
         tr("Look for songs where a song action would change something. Nothing is changed: the "
            "songs are marked in the list (this session only), and you decide song by song."),
         &dialog));
-    auto* tidy = new QCheckBox(tr("Tidy: a chorus typed again, chords inside a syllable, spaces"),
-                               &dialog);
+    auto* tidy =
+        new QCheckBox(tr("Tidy: a chorus typed again, chords inside a syllable, spaces"), &dialog);
     auto* check = new QCheckBox(
         tr("Check Song: typos, apostrophes typed two ways, a chorus typed as a verse"), &dialog);
     auto* shrink = new QCheckBox(
@@ -1632,8 +2356,8 @@ void MainWindow::scanSongbook() {
     shownSongs->setEnabled(shown != all);
     layout->addWidget(allSongs);
     layout->addWidget(shownSongs);
-    layout->addWidget(new QLabel(tr("Unsaved edits are not scanned: the scan reads the files."),
-                                 &dialog));
+    layout->addWidget(
+        new QLabel(tr("Unsaved edits are not scanned: the scan reads the files."), &dialog));
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, &dialog);
     QPushButton* start = buttons->addButton(tr("Scan"), QDialogButtonBox::AcceptRole);
     start->setDefault(true);
@@ -1675,7 +2399,8 @@ void MainWindow::scanSongbook() {
     model_->clearScanResults();
     scanFound_ = 0;
     scan_ = new SongbookScan(options, std::move(songs), this);
-    auto* progress = new QProgressDialog(tr("Scanning…"), tr("Cancel"), 0, scan_->stepCount(), this);
+    auto* progress =
+        new QProgressDialog(tr("Scanning…"), tr("Cancel"), 0, scan_->stepCount(), this);
     progress->setWindowTitle(name);
     progress->setWindowModality(Qt::WindowModal);
     progress->setMinimumDuration(0);

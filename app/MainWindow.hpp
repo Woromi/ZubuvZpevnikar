@@ -26,12 +26,17 @@ class QLineEdit;
 class QModelIndex;
 class QSplitter;
 class QStackedWidget;
+class QTabWidget;
+class QTimer;
 class QToolBar;
 class QTableView;
 class QWidget;
 class DiffView;
 class PreviewPane;
 class PreviewRunner;
+class ScorePreviewPane;
+class ScoreRunner;
+struct ScoreResult;
 class SongEditor;
 class SongbookExporter;
 class SongbookScan;
@@ -92,11 +97,43 @@ private:
     // mouse's back button and Alt+Left.
     void goBack();
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
+    bool confirmCloseAll();
+    bool confirmCloseScore(const std::string& name, SongEditor* score);
+    void removeScoreReference(const std::string& name);
+    void replaceSongText(const std::string& after); // one undo step in the song editor
+    void updateScoreWidthBars();
+    void setScoreWidth(const std::string& name, bool narrow); // the song and all its score tabs; false if the user cancelled
     void createSongToolBar();
     void updateSongActions();
+    void updateEditState(); // Undo, Redo, Cut, Copy, Paste: from the current editor
     void createEditMenu(); // Edit: chords and parts
     void moveChord(int direction, zub::songedit::Step step);
     void showPartMenu(); // Edit → Insert Part…, at the cursor
+
+    // Scores (LilyPond): one tab per \lilypondfile of the open song, next to the song.
+    // The editor of the current tab: the song's, a score's, or nullptr (no song, or a score
+    // tab whose file is missing).
+    SongEditor* currentEditor() const;
+    bool onSongTab() const;
+    bool anyModified() const;
+    void
+    syncScoreTabs(); // adds tabs for new \lilypondfile references; drops idle unreferenced ones
+    // Adds the tab of score `name` ("Artist/X.ly"). Without `editor` the score is loaded from
+    // disk, or shown as missing.
+    void addScoreTab(const std::string& name, SongEditor* editor = nullptr);
+    void createMissingScore(const std::string& name); // a missing score's tab becomes a new score
+    void attachScoreEditor(int tabIndex, SongEditor* editor);
+    int scoreTabIndex(const std::string& name) const; // tab widget index, or -1
+    void closeScoreTab(int tabIndex);                 // asks to save a modified score
+    void dropScoreTab(int tabIndex);                  // removes the tab without asking
+    void removeScoreTabs();                           // all, without asking
+    void updateScoreTabTitle(const SongEditor* editor);
+    std::filesystem::path scorePath(const std::string& name) const; // existing file or empty
+    std::filesystem::path newScorePath(const std::string& name) const;
+    void newScore(); // Edit → New Score…
+    void onTabChanged();
+    void requestScorePreview(bool userAsked = false);
+    void showScoreResult(const ScoreResult& result);
     void updateMarkChecked(); // enabled while the editor text has the "not checked yet" line
     // Songs → Scan Songbook…: runs tidy/check/shrink on many songs and marks the ones with
     // possible changes in the list (this session only); changes nothing.
@@ -138,6 +175,17 @@ private:
     bool approveBuild(SongEditor* editor, const std::string& content, bool askUser,
                       QString* unapproved = nullptr, const QString& yesText = {},
                       const QString& noText = {});
+    // Same rule for score files: the .ly texts a build would run (`texts`: name, content).
+    struct RiskSource {
+        std::filesystem::path key; // approvals are remembered per file
+        QString label;             // shown before the construct when it is not the song
+        std::vector<std::string> risks;
+    };
+    bool approveRisks(const std::vector<RiskSource>& sources, bool askUser, QString* unapproved,
+                      const QString& yesText, const QString& noText, bool forScore = false);
+    // The risks of the song `content` and of the scores it references (editor text, and the
+    // file on disk when that differs).
+    std::vector<RiskSource> songBuildRisks(SongEditor* editor, const std::string& content) const;
     std::string inputNameOf(const SongEditor* editor) const; // "Artist/Title"
 
     SongTableModel* model_ = nullptr;
@@ -155,6 +203,21 @@ private:
     QSplitter* songSplitter_ = nullptr; // editor area | preview
     bool songPageShown_ = false;        // the splitter has been laid out (its state is worth saving)
     QStackedWidget* editorArea_ = nullptr; // {editor, diff view}
+    QTabWidget* tabs_ = nullptr;           // song tab (index 0) + one tab per score
+    struct ScoreTab {
+        std::string name;            // "Artist/X.ly", as in \lilypondfile{}
+        QWidget* page = nullptr;     // the tab's widget
+        QPointer<SongEditor> editor; // null while the score is missing
+    };
+    std::vector<ScoreTab> scoreTabs_;        // in tab order, from index 1
+    QTimer* scoreSyncTimer_ = nullptr;       // song text changed: look for new \lilypondfile
+    QTimer* scorePreviewTimer_ = nullptr;    // score text changed: rebuild the score preview
+    std::set<std::string> dismissedScores_;  // closed by the user while still referenced
+    bool pdfStale_ = false;                  // a score changed since the song's PDF was built
+    QStackedWidget* previewStack_ = nullptr; // {song PDF preview, score preview}
+    ScorePreviewPane* scorePreview_ = nullptr;
+    ScoreRunner* scoreRunner_ = nullptr;
+    std::filesystem::path scoreWorkDir_;
     DiffView* diffView_ = nullptr;
     QWidget* tidyPanel_ = nullptr; // "Tidy changed:" list under the editor area
     QListWidget* tidyList_ = nullptr;
@@ -179,7 +242,8 @@ private:
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any
     QLabel* inputLabel_ = nullptr;
-    std::vector<QAction*> editActions_; // Edit menu: enabled while the song can be edited
+    std::vector<QAction*> editActions_;     // Edit menu: enabled while the text can be edited
+    std::vector<QAction*> songEditActions_; // ... and only those of the song (chords, parts)
     QAction* closeSongAction_ = nullptr;
     QAction* saveAction_ = nullptr;
     QAction* undoAction_ = nullptr;

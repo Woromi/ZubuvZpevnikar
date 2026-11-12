@@ -1,5 +1,6 @@
 #include "SongEditor.hpp"
 
+#include "CodeTextEdit.hpp"
 #include "convert.hpp"
 
 #include <KSyntaxHighlighting/Definition>
@@ -28,8 +29,8 @@
 #include <zub/core/textfile.hpp>
 
 SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Repository& repository,
-                       QWidget* parent)
-    : QWidget(parent), path_(std::move(path)) {
+                       QWidget* parent, Kind kind)
+    : QWidget(parent), path_(std::move(path)), kind_(kind) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
 
@@ -41,7 +42,8 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
     banner_->hide();
     layout->addWidget(banner_);
 
-    edit_ = new QPlainTextEdit(this);
+    auto* codeEdit = new CodeTextEdit(this);
+    edit_ = codeEdit;
     layout->addWidget(edit_);
 
     const QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
@@ -50,12 +52,25 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
     edit_->setTabStopDistance(QFontMetricsF(font).horizontalAdvance(QLatin1Char(' ')) * 4);
 
     highlighter_ = new KSyntaxHighlighting::SyntaxHighlighter(edit_->document());
-    // Bundled as a resource (app/syntax/); plain LaTeX only if it is somehow missing.
-    auto definition = repository.definitionForName(QStringLiteral("ZubuvZpevnik Song"));
-    if (!definition.isValid())
-        definition = repository.definitionForName(QStringLiteral("LaTeX"));
+    KSyntaxHighlighting::Definition definition;
+    if (kind_ == Kind::Score) {
+        // KSyntaxHighlighting ships a LilyPond definition; none if it is somehow missing.
+        definition = repository.definitionForName(QStringLiteral("LilyPond"));
+        if (!definition.isValid())
+            definition = repository.definitionForFileName(QStringLiteral("x.ly"));
+    } else {
+        // Bundled as a resource (app/syntax/); plain LaTeX only if it is somehow missing.
+        definition = repository.definitionForName(QStringLiteral("ZubuvZpevnik Song"));
+        if (!definition.isValid())
+            definition = repository.definitionForName(QStringLiteral("LaTeX"));
+    }
     highlighter_->setDefinition(definition);
-    highlighter_->setTheme(repository.themeForPalette(palette()));
+    const auto theme = repository.themeForPalette(palette());
+    highlighter_->setTheme(theme);
+    using Theme = KSyntaxHighlighting::Theme;
+    codeEdit->setLineNumberColors(QColor::fromRgba(theme.editorColor(Theme::IconBorder)),
+                                  QColor::fromRgba(theme.editorColor(Theme::LineNumbers)),
+                                  QColor::fromRgba(theme.editorColor(Theme::CurrentLineNumber)));
 
     watcher_ = new QFileSystemWatcher(this);
     connect(watcher_, &QFileSystemWatcher::fileChanged, this, [this] { onFileChanged(); });
@@ -105,11 +120,14 @@ std::expected<SongEditor::SaveResult, QString> SongEditor::save() {
                                  : onDisk && *onDisk != diskContent_;
     if (conflict) {
         const QString name = toQString(path_.filename());
-        QMessageBox box(
-            QMessageBox::Warning, isNew_ ? tr("Song already exists") : tr("Song changed on disk"),
-            isNew_ ? tr("%1 already exists.").arg(name)
-                   : tr("%1 was changed outside the app since you opened it.").arg(name),
-            {}, this);
+        QMessageBox box(QMessageBox::Warning,
+                        kind_ == Kind::Score
+                            ? (isNew_ ? tr("Score already exists") : tr("Score changed on disk"))
+                            : (isNew_ ? tr("Song already exists") : tr("Song changed on disk")),
+                        isNew_
+                            ? tr("%1 already exists.").arg(name)
+                            : tr("%1 was changed outside the app since you opened it.").arg(name),
+                        {}, this);
         box.setInformativeText(tr("Overwrite it with your version?"));
         QPushButton* overwrite = box.addButton(tr("Overwrite"), QMessageBox::DestructiveRole);
         QPushButton* cancel = box.addButton(tr("Cancel"), QMessageBox::RejectRole);
@@ -387,7 +405,8 @@ void SongEditor::onFileChanged() {
     // On the heap: if this editor is destroyed while the dialog runs, its parent-owned
     // child must not be destroyed a second time.
     QPointer<QMessageBox> box = new QMessageBox(
-        QMessageBox::Warning, tr("Song changed on disk"),
+        QMessageBox::Warning,
+        kind_ == Kind::Score ? tr("Score changed on disk") : tr("Song changed on disk"),
         tr("%1 was changed outside the app.").arg(toQString(path_.filename())), {}, this);
     box->setInformativeText(tr("Reload it and lose your unsaved changes, or keep your version?"));
     QPushButton* reloadButton = box->addButton(tr("Reload"), QMessageBox::DestructiveRole);
@@ -426,6 +445,18 @@ void SongEditor::goToLine(int line) {
     if (!block.isValid())
         return;
     edit_->setTextCursor(QTextCursor(block));
+    edit_->centerCursor();
+    edit_->setFocus();
+}
+
+void SongEditor::setCursorByteOffset(std::size_t byteOffset) {
+    QString text = edit_->document()->toRawText();
+    text.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+    const QByteArray utf8 = text.toUtf8();
+    const auto offset = std::min(static_cast<qsizetype>(byteOffset), utf8.size());
+    QTextCursor cursor(edit_->document());
+    cursor.setPosition(static_cast<int>(QString::fromUtf8(utf8.constData(), offset).size()));
+    edit_->setTextCursor(cursor);
     edit_->centerCursor();
     edit_->setFocus();
 }
@@ -509,32 +540,87 @@ bool SongEditor::moveLines(int direction) {
     return true;
 }
 
-void SongEditor::insertChord() {
-    if (edit_->isReadOnly())
-        return;
-    const QTextCursor cursor = edit_->textCursor();
-    const QTextBlock block = cursor.block();
-    const QString text = block.text();
-    const int start = block.position();
+namespace {
+
+// The cursor's line and the cursor and selection in it (byte offsets); a selection over several
+// lines is ignored (selStart == selEnd == cursor).
+struct LineState {
+    QTextBlock block;
+    QString text;
+    std::string line;
+    std::size_t cursor;
+    std::size_t selStart;
+    std::size_t selEnd;
+};
+
+LineState lineState(const QTextCursor& cursor) {
+    LineState state;
+    state.block = cursor.block();
+    state.text = state.block.text();
+    state.line = state.text.toUtf8().toStdString();
+    const int start = state.block.position();
     int selStart = cursor.position() - start;
     int selEnd = selStart;
-    // A selection over several lines is not wrapped: the chord goes at the cursor.
     if (cursor.hasSelection() && cursor.selectionStart() >= start &&
-        cursor.selectionEnd() <= start + text.size()) {
+        cursor.selectionEnd() <= start + state.text.size()) {
         selStart = cursor.selectionStart() - start;
         selEnd = cursor.selectionEnd() - start;
     }
-    const std::string line = text.toUtf8().toStdString();
-    const auto change =
-        zub::songedit::insertChord(line, byteOffset(text, cursor.position() - start),
-                                   byteOffset(text, selStart), byteOffset(text, selEnd));
+    state.cursor = byteOffset(state.text, cursor.position() - start);
+    state.selStart = byteOffset(state.text, selStart);
+    state.selEnd = byteOffset(state.text, selEnd);
+    return state;
+}
+
+void applyChange(QPlainTextEdit* edit, const LineState& state,
+                 const zub::songedit::Change& change) {
     const QString updated =
         QString::fromUtf8(change.text.data(), static_cast<qsizetype>(change.text.size()));
-    replaceBlockText(edit_, block, updated, utf16Position(change.text, change.cursor));
+    replaceBlockText(edit, state.block, updated, utf16Position(change.text, change.cursor));
+}
+
+} // namespace
+
+void SongEditor::insertChord() {
+    if (edit_->isReadOnly() || kind_ != Kind::Song)
+        return;
+    const auto state = lineState(edit_->textCursor());
+    applyChange(edit_, state,
+                zub::songedit::insertChord(state.line, state.cursor, state.selStart,
+                                           state.selEnd));
+}
+
+void SongEditor::insertMultivoice() {
+    if (edit_->isReadOnly() || kind_ != Kind::Song)
+        return;
+    const auto state = lineState(edit_->textCursor());
+    applyChange(edit_, state,
+                zub::songedit::insertMultivoice(state.line, state.cursor, state.selStart,
+                                                state.selEnd));
+}
+
+void SongEditor::insertRole() {
+    if (edit_->isReadOnly() || kind_ != Kind::Song)
+        return;
+    const auto state = lineState(edit_->textCursor());
+    applyChange(edit_, state,
+                zub::songedit::insertRole(state.line, state.cursor, state.selStart,
+                                          state.selEnd));
+}
+
+bool SongEditor::removeElement() {
+    if (edit_->isReadOnly() || kind_ != Kind::Song)
+        return false;
+    const auto state = lineState(edit_->textCursor());
+    const auto change = zub::songedit::removeElementAt(state.line, state.cursor);
+    if (!change)
+        return false;
+    applyChange(edit_, state, *change);
+    return true;
 }
 
 bool SongEditor::moveChord(int direction, zub::songedit::Step step) {
-    if (edit_->isReadOnly())
+    if (edit_->isReadOnly() || kind_ != Kind::Song)
         return false;
     const QTextCursor cursor = edit_->textCursor();
     const QTextBlock block = cursor.block();
@@ -551,7 +637,7 @@ bool SongEditor::moveChord(int direction, zub::songedit::Step step) {
 }
 
 void SongEditor::insertPart(zub::songedit::Part part) {
-    if (edit_->isReadOnly())
+    if (edit_->isReadOnly() || kind_ != Kind::Song)
         return;
     QTextDocument* document = edit_->document();
     const QTextCursor cursor = edit_->textCursor();

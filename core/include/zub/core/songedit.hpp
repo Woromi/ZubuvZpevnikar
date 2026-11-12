@@ -17,9 +17,30 @@ struct Change {
 };
 
 // Inserts a chord at `cursor`: "\[]" with the cursor between the brackets. With a selection
-// [selStart, selEnd) inside the line: "\[<selected>]" with the cursor after the "]".
+// [selStart, selEnd) inside the line: "\[<selected>]" with the cursor after the "]". Chords do not
+// nest: with the cursor (or the selection's start) inside a chord, the new "\[]" goes right after
+// that chord.
 Change insertChord(std::string_view line, std::size_t cursor, std::size_t selStart,
                    std::size_t selEnd);
+
+// Inserts "{\multivoice{}{}}" at `cursor`, the cursor in the first braces. With a selection
+// inside the line: "{\multivoice{<selected>}{}}", the cursor in the second braces. Inside a
+// chord it goes after the chord (the selection is then ignored).
+Change insertMultivoice(std::string_view line, std::size_t cursor, std::size_t selStart,
+                        std::size_t selEnd);
+
+// Appends " \role{}" to the end of the line (trailing whitespace dropped, no space on an empty
+// line) with the cursor in the braces. A selection inside the line is copied as the name (the
+// text stays). A line that already ends with a \role command only gets the cursor in its first
+// argument.
+Change insertRole(std::string_view line, std::size_t cursor, std::size_t selStart,
+                  std::size_t selEnd);
+
+// Removes the innermost element whose text (start to end, both inclusive) holds `cursor`: a
+// chord, a role (with one space before it), or a multivoice (replaced by its first voice, with or
+// without its outer braces). The cursor ends at the element's former start. nullopt when there is
+// none.
+std::optional<Change> removeElementAt(std::string_view line, std::size_t cursor);
 
 struct ChordSpan {
     std::size_t begin;
@@ -63,5 +84,18 @@ struct Snippet {
 // The text to insert at the start of a line, with the cursor in it. `selected` (whole lines, may
 // be empty) goes inside the environment; without it the cursor sits on an empty line inside.
 Snippet partSnippet(Part part, std::string_view selected);
+
+// Removes the \lilypondfile / \narrowlilypondfile commands (with an optional [..] argument) that
+// name exactly `inputName` ("Artist/X.ly"); commands in comments are left alone. A command alone
+// on its line (plus whitespace) takes the whole line with it, otherwise only the command goes.
+std::string removeScoreReference(std::string_view text, std::string_view inputName);
+
+// The width of the first reference to `inputName` outside comments: true for
+// \narrowlilypondfile, false for \lilypondfile; nullopt without a reference.
+std::optional<bool> scoreIsNarrow(std::string_view text, std::string_view inputName);
+
+// Turns every reference to `inputName` into \narrowlilypondfile (narrow) or \lilypondfile,
+// keeping its [..] argument and file name. Unchanged text when already so.
+std::string setScoreWidth(std::string_view text, std::string_view inputName, bool narrow);
 
 } // namespace zub::songedit

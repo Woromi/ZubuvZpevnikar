@@ -183,6 +183,12 @@ std::expected<Command, std::string> prepare(const Request& request) {
         return std::unexpected("invalid input name: " + *reason);
     if (auto err = validateClass(request.documentClass))
         return std::unexpected(*err);
+    for (const auto& [name, content] : request.fileOverrides) {
+        if (const auto reason = invalidInputName(name))
+            return std::unexpected("invalid override name: " + *reason);
+        if (!name.ends_with(".ly"))
+            return std::unexpected("invalid override name: only .ly files can be overridden");
+    }
 
     const auto& work = request.workDir;
     if (!work.is_absolute())
@@ -203,6 +209,14 @@ std::expected<Command, std::string> prepare(const Request& request) {
         return std::unexpected(utf8(songCopy.parent_path()) + ": " + ec.message());
     if (auto w = writeTextFileAtomic(songCopy, request.songContent); !w)
         return std::unexpected(w.error());
+    for (const auto& [name, content] : request.fileOverrides) {
+        const fs::path target = overrideDir / fs::path(name);
+        fs::create_directories(target.parent_path(), ec);
+        if (ec)
+            return std::unexpected(utf8(target.parent_path()) + ": " + ec.message());
+        if (auto w = writeTextFileAtomic(target, content); !w)
+            return std::unexpected(w.error());
+    }
 
     const std::string wrapper = "\\documentclass[chorded, onesongcolumn, noshading]{" +
                                 request.documentClass +

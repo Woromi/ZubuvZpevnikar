@@ -26,7 +26,8 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 - [x] Save (Ctrl+S, atomic via `zub::writeTextFileAtomic`, byte-exact: nbsp, tabs, CRLF, missing final newline), `*` dirty marker, Save/Discard/Cancel on closing a tab, the window, or switching songbook; the table row refreshes after saving.
 - [x] Reload when the file changes outside the app (silently if unmodified, asks if modified).
 - [x] Custom syntax definition for songs (`app/syntax/zubuvzpevnik-song.xml`, bundled as a Qt resource): whole chords `\[…]` and `^`, song parts, bar lines/repeats, header keys and values, comments. The stock LaTeX one read `\[D]` as display math.
-- [x] Edit menu with song-editing helpers (core `zub::songedit`, one undo step each, only while the song is editable): Insert Chord Alt+A (wraps a one-line selection); Move Line Up/Down Alt+Up / Alt+Down (the cursor's line or the selected lines as a block, like VSCodium), Ctrl+Up / Ctrl+Down scroll the view by a line without moving the cursor; Move Chord Left/Right Alt+Left / Alt+Right (a letter, or a neighbour chord); to Previous/Next Word Alt+Shift+Left / Alt+Shift+Right (Alt+Left is Back only off the song page); Insert Part… Ctrl+Return (a popup at the cursor: verse, unnumbered verse, chorus, pre-chorus, bridge, intro, outro, instrumental, `\insertchorus`, `\insertchorus*`, song header when there is none; the selected lines go inside).
+- [x] Edit menu with song-editing helpers (core `zub::songedit`, one undo step each, only while the song is editable): Insert Chord Alt+A (wraps a one-line selection; inside a chord the new one goes after it, chords do not nest); Insert Multivoice Alt+M (`{\multivoice{}{}}`, a one-line selection becomes the first voice); Insert Role Alt+L (` \role{}` at the end of the line, a selection is copied as the name; an existing trailing role only gets the cursor); Remove Element at Cursor Alt+Delete (the innermost chord, role or multivoice, which keeps its first voice); Move Line Up/Down Alt+Up / Alt+Down (the cursor's line or the selected lines as a block, like VSCodium), Ctrl+Up / Ctrl+Down scroll the view by a line without moving the cursor; Move Chord Left/Right Alt+Left / Alt+Right (a letter, or a neighbour chord); to Previous/Next Word Alt+Shift+Left / Alt+Shift+Right (Alt+Left is Back only off the song page); Insert Part… Ctrl+Return (a popup at the cursor: verse, unnumbered verse, chorus, pre-chorus, bridge, intro, outro, instrumental, `\insertchorus`, `\insertchorus*`, song header when there is none; the selected lines go inside).
+- [x] Line numbers in the song and score editors (`CodeTextEdit`, colours from the syntax theme), since Tidy, Check and the build errors report line numbers.
 
 ## 3. Live preview
 
@@ -140,6 +141,20 @@ Decided with the user (2026-11-11): the app stores songbooks itself (`AppDataLoc
 - [x] app: Songbooks page (list, settings, a tree with the songs outside sections at its root and the named sections below; a picker with Ctrl/Shift selection, Add/Remove and dragging onto the tree; drag to reorder within a section, into another section a song goes to its alphabetical place; Sort Alphabetically for the book or one section), sorting with `texlua songidx.lua`.
 - [x] app: export PDF / `.tex` / folder.
 - [x] Cover image (none by default; png/jpg/pdf), a title page per named section, the title index split into sections, the author index optional (2026-11-11). The camp booklet falls back to one title index when the split would not fit its single index page.
+
+## 8. Scores (LilyPond)
+Asked by the user 2026-11-12: edit the songs' LilyPond scores (40 of the 47 `.ly` files are guitar tablature) in the app, eventually by clicking on a fretboard, with MIDI playback.
+- [x] Step 1: score tabs with a live score preview.
+  - `zub::score` (core): `prepare` (the score copy, the `score.ly` wrapper and the `lilypond -dbackend=svg -dcrop` command; point-and-click links stay in the SVG), `germanNames` (Czech and Slovak songs, as `zubuvzpevnik.sty`), `errors`/`firstError` (LilyPond's `file:line:col: error:`; the command sets `LC_ALL=C`), `newScore` (skeleton). The wrapper always sets `\language` (`english` or `deutsch`): LilyPond itself defaults to Dutch note names.
+  - `zub::safety::lilypondRisks`: Scheme that runs code, `$` variables, `\include` of anything but the shared files. Every real `.ly` passes (`[integration]`).
+  - `zub::preview::Request::fileOverrides`: the song's PDF preview builds unsaved scores as they are in their editors.
+  - `planFolderExport` copied `\lilypondfile` files from `<song folder>/<ref>`, which is wrong (the reference is relative to `songs/chords`); fixed, with a test.
+  - App: a tab per `\lilypondfile` of the open song (missing file: "Create It"), `ScoreRunner` + `ScorePreviewPane` (SVG, errors, log, Rebuild; 600 ms debounce), the safety approval for `.ly` texts, Edit → New Score…, Czech texts.
+- [x] A discarded new score removes its `\lilypondfile` line from the song (one undo step); a score that exists neither on disk nor in an editor stops the PDF preview with a message. Each score tab has Width: Full / Narrow, which switches the song between `\lilypondfile` and `\narrowlilypondfile` (`zub::songedit::setScoreWidth`).
+- Decided with the user 2026-11-13: the width stays a choice in the app. An automatic `\autolilypondfile` was researched (narrow when the score starts beside the A4 metadata box; one pass, works) but matches only 28 of the 38 existing hand-made choices, since what decides is the score's ink, which LaTeX cannot see; not added to the songbook.
+- [ ] Step 2: a fretboard under the score editor (the hidden placeholder in the score tab): click a fret to insert a note, using the point-and-click links (`textedit://` in the SVG) to find the note at the cursor.
+- [ ] Step 3: MIDI playback of the score.
+- Later: `zubuvzpevnik/lilypond` may move into the app; `score::Request::includeDir` is a parameter, so only the caller changes.
 
 ## Name
 

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <charconv>
 #include <cstddef>
@@ -772,9 +773,18 @@ std::expected<FolderExport, std::string> planFolderExport(const Songbook& book,
         for (const auto& ref : referencedFiles(*content)) {
             if (invalidInputName(ref))
                 continue;
-            const fs::path source = song.path.parent_path() / fromUtf8(ref);
-            if (fs::is_regular_file(source, ec))
-                addCopy(source, fs::path("songs") / fromUtf8(ref));
+            // \lilypondfile{Artist/X.ly} is found on TEXINPUTS (songs/chords, songs/tinwhistle),
+            // not next to the song; the song's own tree comes first.
+            const bool tinwhistle =
+                song.path.native().starts_with((repoRoot / "songs/tinwhistle").native());
+            for (const char* dir : tinwhistle ? std::array{"songs/tinwhistle", "songs/chords"}
+                                              : std::array{"songs/chords", "songs/tinwhistle"}) {
+                const fs::path source = repoRoot / dir / fromUtf8(ref);
+                if (fs::is_regular_file(source, ec)) {
+                    addCopy(source, fs::path("songs") / fromUtf8(ref));
+                    break;
+                }
+            }
         }
     }
 

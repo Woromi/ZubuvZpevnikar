@@ -509,6 +509,36 @@ TEST_CASE("planFolderExport", "[songbook]") {
                                [](const FileCopy& c) { return c.to.parent_path() == "img"; }));
 }
 
+TEST_CASE("planFolderExport copies the scores a song includes", "[songbook]") {
+    namespace fs = std::filesystem;
+    const fs::path root = fs::temp_directory_path() / "zub-export-scores-test";
+    fs::remove_all(root);
+    const auto write = [&](const char* rel, const char* text) {
+        fs::create_directories((root / rel).parent_path());
+        std::ofstream(root / rel) << text;
+    };
+    write("songs/chords/Artist/Title.tex",
+          "\\lilypondfile{Artist/Title.ly}\\lilypondfile{Artist/Gone.ly}");
+    write("songs/chords/Artist/Title.ly", "{ c4 }");
+    write("songs/tinwhistle/Other/Tune.tex", "\\lilypondfile{Other/Tune.ly}");
+    write("songs/tinwhistle/Other/Tune.ly", "{ d4 }");
+
+    Songbook b;
+    b.sections = {{"", {"Artist/Title", "Other/Tune"}}};
+    const auto plan = planFolderExport(b, root, "x");
+    fs::remove_all(root);
+    REQUIRE(plan);
+    const auto copyOf = [&](const char* to) -> std::filesystem::path {
+        for (const auto& c : plan->copies)
+            if (c.to == to)
+                return c.from;
+        return {};
+    };
+    CHECK(copyOf("songs/Artist/Title.ly") == root / "songs/chords/Artist/Title.ly");
+    CHECK(copyOf("songs/Other/Tune.ly") == root / "songs/tinwhistle/Other/Tune.ly");
+    CHECK(copyOf("songs/Artist/Gone.ly").empty()); // missing: left out
+}
+
 TEST_CASE("planFolderExport copies the cover", "[songbook]") {
     Songbook b;
     b.sections = {{"", {"TheMamasAndThePapas/CaliforniaDreamin"}}};

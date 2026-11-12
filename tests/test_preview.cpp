@@ -117,6 +117,27 @@ TEST_CASE("prepare writes the wrapper, the song copy and the command", "[preview
     CHECK(cmd->environment[3] == std::pair<std::string, std::string>{"half_error_line", "238"});
 }
 
+TEST_CASE("prepare writes file overrides next to the song copy", "[preview]") {
+    TempDir dir;
+    auto request = requestIn(dir);
+    const auto work = request.workDir;
+    touch(work / "override/Artist/Stale.ly");
+    request.fileOverrides = {{"Artist/Title.ly", "{ c4 }\n"}, {"Other/Score.ly", "{ d4 }\n"}};
+
+    const auto cmd = pv::prepare(request);
+    REQUIRE(cmd);
+    CHECK(slurp(work / "override/Artist/Title.ly") == "{ c4 }\n");
+    CHECK(slurp(work / "override/Other/Score.ly") == "{ d4 }\n");
+    CHECK(slurp(cmd->songCopy) == request.songContent);
+    CHECK_FALSE(fs::exists(work / "override/Artist/Stale.ly")); // removed with the old override/
+
+    for (const char* bad : {"../x.ly", "/abs.ly", "a/b.tex", "a/b", "a\\b.ly", ""}) {
+        request.fileOverrides = {{bad, "x"}};
+        INFO(bad);
+        CHECK_FALSE(pv::prepare(request));
+    }
+}
+
 TEST_CASE("prepare rejects invalid requests", "[preview]") {
     TempDir dir;
     auto request = requestIn(dir);

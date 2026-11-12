@@ -167,4 +167,114 @@ std::vector<std::string> unknownConstructs(std::string_view songContent) {
     return found;
 }
 
+namespace {
+
+bool isIdentStart(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+bool isSpace(char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+// After the "(" of "#(": the head symbol, i.e. up to whitespace or a parenthesis.
+std::string_view schemeHead(std::string_view text, std::size_t open) {
+    auto i = open + 1;
+    while (i < text.size() && isSpace(text[i]))
+        ++i;
+    const auto start = i;
+    while (i < text.size() && !isSpace(text[i]) && text[i] != '(' && text[i] != ')')
+        ++i;
+    return text.substr(start, i - start);
+}
+
+// True when everything from `from` to the closing ")" is a number, a fraction or space.
+bool plainNumbersToClose(std::string_view text, std::size_t from) {
+    for (auto i = from; i < text.size(); ++i) {
+        const char c = text[i];
+        if (c == ')')
+            return true;
+        if (!isSpace(c) && !isDigit(c) && c != '/' && c != '-' && c != '.')
+            return false;
+    }
+    return false;
+}
+
+constexpr std::array kTrustedIncludes =
+    std::to_array<std::string_view>({"zubuvzpevnik.ily", "tinwhistle.ily"});
+
+} // namespace
+
+std::vector<std::string> lilypondRisks(std::string_view ly) {
+    std::vector<std::string> found;
+    const auto report = [&found](std::string construct) {
+        if (std::ranges::find(found, construct) == found.end())
+            found.push_back(std::move(construct));
+    };
+    const auto scheme = [&](std::size_t sigil, std::size_t open) {
+        const auto head = schemeHead(ly, open);
+        const auto afterHead = static_cast<std::size_t>(head.data() - ly.data()) + head.size();
+        if (head == "ly:make-moment" && plainNumbersToClose(ly, afterHead))
+            return;
+        report(std::string(ly.substr(sigil, 2)) + std::string(head));
+    };
+
+    for (std::size_t i = 0; i < ly.size();) {
+        const char c = ly[i];
+        if (c == '%') {
+            if (i + 1 < ly.size() && ly[i + 1] == '{') {
+                const auto close = ly.find("%}", i + 2);
+                i = close == std::string_view::npos ? ly.size() : close + 2;
+            } else {
+                const auto eol = ly.find('\n', i);
+                i = eol == std::string_view::npos ? ly.size() : eol + 1;
+            }
+        } else if (c == '"') {
+            ++i;
+            while (i < ly.size() && ly[i] != '"')
+                i += ly[i] == '\\' ? 2U : 1U;
+            ++i;
+        } else if (c == '\\') {
+            constexpr std::string_view include = "\\include";
+            if (ly.substr(i, include.size()) == include &&
+                (i + include.size() >= ly.size() || !isLetter(ly[i + include.size()]))) {
+                auto j = i + include.size();
+                while (j < ly.size() && isSpace(ly[j]))
+                    ++j;
+                std::string_view name;
+                bool quoted = false;
+                if (j < ly.size() && ly[j] == '"') {
+                    const auto close = ly.find('"', j + 1);
+                    if (close != std::string_view::npos) {
+                        name = ly.substr(j + 1, close - j - 1);
+                        quoted = true;
+                    }
+                }
+                if (!quoted || !std::ranges::contains(kTrustedIncludes, name))
+                    report("\\include \"" + std::string(name) + "\"");
+                i = quoted ? j + name.size() + 2 : j;
+            } else {
+                i += 2; // a command or an escaped character; letters are harmless on their own
+            }
+        } else if (c == '#' || c == '$') {
+            const char next = i + 1 < ly.size() ? ly[i + 1] : '\0';
+            if (next == '(') {
+                scheme(i, i + 1);
+            } else if (c == '$' && isIdentStart(next)) {
+                std::size_t end = i + 1;
+                while (end < ly.size() && (isIdentStart(ly[end]) || isDigit(ly[end]) ||
+                                           ly[end] == '-' || ly[end] == '_' || ly[end] == ':'))
+                    ++end;
+                report(std::string(ly.substr(i, end - i)));
+            } else if (c == '#' && (next == '.' || next == ',' || next == '`')) {
+                report(std::string("#") + next);
+            }
+            i += c == '#' && next == '#' ? 2 : 1; // "##t": the second '#' is not a sigil
+        } else {
+            ++i;
+        }
+    }
+    return found;
+}
+
 } // namespace zub::safety

@@ -366,6 +366,14 @@ Použijte vestavěný.</translation>
         <translation>Píseň</translation>
     </message>
     <message>
+        <source>Cannot save score</source>
+        <translation>Nelze uložit notovou ukázku</translation>
+    </message>
+    <message>
+        <source>Discard the new score %1? Its \lilypondfile line is removed from the song too.</source>
+        <translation>Zahodit novou notovou ukázku %1? Její řádek \lilypondfile se z písně také odstraní.</translation>
+    </message>
+    <message>
         <source>Undo</source>
         <translation>Vrátit</translation>
     </message>
@@ -466,6 +474,22 @@ Použijte vestavěný.</translation>
         <translation>Vložit akord</translation>
     </message>
     <message>
+        <source>Insert Multivoice</source>
+        <translation>Vložit vícehlas</translation>
+    </message>
+    <message>
+        <source>Insert Role</source>
+        <translation>Vložit roli</translation>
+    </message>
+    <message>
+        <source>Remove Element at Cursor</source>
+        <translation>Odstranit prvek u kurzoru</translation>
+    </message>
+    <message>
+        <source>Nothing to remove at the cursor</source>
+        <translation>U kurzoru není nic k odstranění</translation>
+    </message>
+    <message>
         <source>Move Line Up</source>
         <translation>Posunout řádek nahoru</translation>
     </message>
@@ -492,6 +516,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Insert Part…</source>
         <translation>Vložit část…</translation>
+    </message>
+    <message>
+        <source>New Score…</source>
+        <translation>Nová notová ukázka…</translation>
     </message>
     <message>
         <source>No chord at the cursor</source>
@@ -540,6 +568,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Song Header</source>
         <translation>Hlavička písně</translation>
+    </message>
+    <message>
+        <source>&amp;Save Score</source>
+        <translation>&amp;Uložit notovou ukázku</translation>
     </message>
     <message>
         <source>Tidy needs chords_converter, which was not found.</source>
@@ -594,6 +626,10 @@ Použijte vestavěný.</translation>
         <translation>%1: problém v hlavičce písně: %2</translation>
     </message>
     <message>
+        <source>The score %1 does not exist: create it, or remove its \lilypondfile line from the song.</source>
+        <translation>Notová ukázka %1 neexistuje: vytvořte ji, nebo odstraňte její řádek \lilypondfile z písně.</translation>
+    </message>
+    <message>
         <source>Not built automatically: the song uses %1, which songs normally don&apos;t. Building runs it with full access to your files. Check the song, then press Rebuild to build it anyway.</source>
         <translation>Nesestaveno automaticky: píseň používá %1, což písně běžně nepoužívají. Sestavení to spustí s plným přístupem k vašim souborům. Zkontrolujte píseň a pak ji tlačítkem Sestavit znovu přesto sestavte.</translation>
     </message>
@@ -602,8 +638,72 @@ Použijte vestavěný.</translation>
         <translation>Sestavit tuto píseň?</translation>
     </message>
     <message>
+        <source>Build this score?</source>
+        <translation>Sestavit tuto notovou ukázku?</translation>
+    </message>
+    <message>
+        <source>This score uses code that scores normally don&apos;t: %1</source>
+        <translation>Tato notová ukázka používá kód, který notové ukázky běžně nepoužívají: %1</translation>
+    </message>
+    <message>
         <source>This song uses commands that songs normally don&apos;t: %1</source>
         <translation>Tato píseň používá příkazy, které písně běžně nepoužívají: %1</translation>
+    </message>
+    <message>
+        <source>Create It</source>
+        <translation>Vytvořit</translation>
+    </message>
+    <message>
+        <source>Width:</source>
+        <translation>Šířka:</translation>
+    </message>
+    <message>
+        <source>Full</source>
+        <translation>Plná</translation>
+    </message>
+    <message>
+        <source>Narrow</source>
+        <translation>Úzká</translation>
+    </message>
+    <message>
+        <source>%1 cannot be opened: %2</source>
+        <translation>%1 nelze otevřít: %2</translation>
+    </message>
+    <message>
+        <source>%1 does not exist yet.</source>
+        <translation>%1 ještě neexistuje.</translation>
+    </message>
+    <message>
+        <source>%1 (missing)</source>
+        <translation>%1 (chybí)</translation>
+    </message>
+    <message>
+        <source>Not built automatically: the score uses %1, which scores normally don&apos;t. Building runs it with full access to your files. Check the score, then press Rebuild to build it anyway.</source>
+        <translation>Nesestaveno automaticky: notová ukázka používá %1, což notové ukázky běžně nepoužívají. Sestavení to spustí s plným přístupem k vašim souborům. Zkontrolujte notovou ukázku a pak ji tlačítkem Sestavit znovu přesto sestavte.</translation>
+    </message>
+    <message>
+        <source>The song is not in an artist folder.</source>
+        <translation>Píseň není ve složce interpreta.</translation>
+    </message>
+    <message>
+        <source>New Score</source>
+        <translation>Nová notová ukázka</translation>
+    </message>
+    <message>
+        <source>File name of the new score (in the folder %1):</source>
+        <translation>Název souboru nové notové ukázky (ve složce %1):</translation>
+    </message>
+    <message>
+        <source>&quot;%1&quot; is not a valid name for a score file.</source>
+        <translation>„%1“ není platný název souboru notové ukázky.</translation>
+    </message>
+    <message>
+        <source>%1 already exists.</source>
+        <translation>%1 už existuje.</translation>
+    </message>
+    <message>
+        <source>New score %1. Save it with Ctrl+S to create the file.</source>
+        <translation>Nová notová ukázka %1. Uložením (Ctrl+S) se soubor vytvoří.</translation>
     </message>
     <message>
         <source>%1 needs chords_converter, which was not found.</source>
@@ -984,6 +1084,76 @@ Vynecháno (neplatný název písně): %1</translation>
     </message>
 </context>
 <context>
+    <name>ScorePreviewPane</name>
+    <message>
+        <source>Rebuild</source>
+        <translation>Sestavit znovu</translation>
+    </message>
+    <message>
+        <source>Rebuild the score (Ctrl+R)</source>
+        <translation>Sestavit notovou ukázku znovu (Ctrl+R)</translation>
+    </message>
+    <message>
+        <source>Log</source>
+        <translation>Logy</translation>
+    </message>
+    <message>
+        <source>Building…</source>
+        <translation>Sestavuji…</translation>
+    </message>
+    <message>
+        <source>The build produced an image that cannot be displayed.</source>
+        <translation>Sestavení vytvořilo obrázek, který nelze zobrazit.</translation>
+    </message>
+    <message>
+        <source>Built in %1 s</source>
+        <translation>Sestaveno za %1 s</translation>
+    </message>
+    <message>
+        <source>Build failed</source>
+        <translation>Sestavení selhalo</translation>
+    </message>
+    <message>
+        <source> — showing the last successful build</source>
+        <translation> — zobrazeno poslední úspěšné sestavení</translation>
+    </message>
+    <message>
+        <source>Line %1: %2</source>
+        <translation>Řádek %1: %2</translation>
+    </message>
+    <message>
+        <source>Double-click to jump to the line</source>
+        <translation>Dvojklikem přejdete na řádek</translation>
+    </message>
+    <message>
+        <source>Not built</source>
+        <translation>Nesestaveno</translation>
+    </message>
+    <message>
+        <source>Build log</source>
+        <translation>Log sestavení</translation>
+    </message>
+</context>
+<context>
+    <name>ScoreRunner</name>
+    <message>
+        <source>Cannot start lilypond: %1. Is LilyPond installed?</source>
+        <translation>Nelze spustit lilypond: %1. Je LilyPond nainstalován?</translation>
+    </message>
+    <message>
+        <source>The build took longer than %1 s and was stopped.</source>
+        <translation>Sestavení trvalo déle než %1 s a bylo zastaveno.</translation>
+    </message>
+    <message>
+        <source>lilypond crashed.</source>
+        <translation>lilypond spadl.</translation>
+    </message>
+    <message>
+        <source>The build failed; see the log.</source>
+        <translation>Sestavení selhalo; viz log.</translation>
+    </message>
+</context>
+<context>
     <name>ShrinkDialog</name>
     <message numerus="yes">
         <source>fits (%n page(s))</source>
@@ -1139,6 +1309,14 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>%1 is open read-only because it can&apos;t be edited safely here (%2).</source>
         <translation>%1 je otevřen jen pro čtení, protože ho zde nelze bezpečně upravovat (%2).</translation>
+    </message>
+    <message>
+        <source>Score already exists</source>
+        <translation>Notová ukázka už existuje</translation>
+    </message>
+    <message>
+        <source>Score changed on disk</source>
+        <translation>Notová ukázka se změnila na disku</translation>
     </message>
     <message>
         <source>Song already exists</source>
