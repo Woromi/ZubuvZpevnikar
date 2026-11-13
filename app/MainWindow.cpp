@@ -714,12 +714,21 @@ void MainWindow::removeScoreReference(const std::string& name) {
     replaceSongText(zub::songedit::removeScoreReference(editor_->content(), name));
 }
 
-void MainWindow::replaceSongText(const std::string& after) {
+void MainWindow::replaceSongText(const std::string& edited) {
     if (!editor_ || editor_->textEdit()->isReadOnly())
         return;
-    const std::string before = editor_->content();
-    if (after == before)
+    // content() has CRLF for a CRLF song, the document holds bare '\n': compare and measure on
+    // the document's text.
+    const auto lf = [](std::string text) {
+        for (std::size_t at = 0; (at = text.find("\r\n", at)) != std::string::npos;)
+            text.erase(at, 1);
+        return text;
+    };
+    const std::string before = lf(editor_->content());
+    const std::string afterLf = lf(edited);
+    if (afterLf == before)
         return;
+    const std::string& after = afterLf;
     // One undo step: replace only the changed middle part of the text.
     std::size_t prefix = 0;
     while (prefix < before.size() && prefix < after.size() && before[prefix] == after[prefix])
