@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Zpěvníkář
+GenericName=Songbook Editor
+GenericName[cs]=Editor zpěvníku
+Comment=Edit the songs of Zubův Zpěvník and put songbooks together
+Comment[cs]=Úpravy písní Zubova Zpěvníku a sestavování zpěvníků
+Exec=zpevnikar
+Icon=zpevnikar
+Terminal=false
+Categories=AudioVideo;Audio;Music;Qt;
+Keywords=songbook;chords;LaTeX;LilyPond;
+Keywords[cs]=zpěvník;akordy;písně;LaTeX;LilyPond;
+StartupWMClass=zpevnikar

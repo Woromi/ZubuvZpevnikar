@@ -75,10 +75,29 @@ qt_add_resources(zpevnikar syntax
     FILES syntax/zubuvzpevnik-song.xml
 )
 
+# The app icon (from a Gemini-generated image), embedded for the window icon and installed into
+# the hicolor theme for the launcher entry below.
+set(zub_icon_sizes 16 24 32 48 64 128 256 512)
+set(zub_icon_files)
+foreach(size IN LISTS zub_icon_sizes)
+    list(APPEND zub_icon_files icons/zpevnikar-${size}.png)
+endforeach()
+qt_add_resources(zpevnikar icons
+    PREFIX /icons
+    BASE icons
+    FILES ${zub_icon_files}
+)
+
 # cmake --install build/release --prefix ~/.local installs the app and its converter side by side
 # (the app looks for chords_converter next to itself), so the converter also works from a shell.
 include(GNUInstallDirs)
 install(TARGETS zpevnikar RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES zpevnikar.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+foreach(size IN LISTS zub_icon_sizes)
+    install(FILES icons/zpevnikar-${size}.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps
+            RENAME zpevnikar.png)
+endforeach()
 
 # chords_converter from the git submodule, built with cargo and copied next to the app, where
 # MainWindow::findConverter() looks for it. Skipped (with a message) without cargo or without

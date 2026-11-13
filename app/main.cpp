@@ -2,6 +2,7 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QIcon>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QByteArrayView>
@@ -53,6 +54,14 @@ void installTranslators(QApplication& app, QTranslator& appTranslator, QTranslat
         app.installTranslator(&qtTranslator);
 }
 
+/// The app icon in all embedded sizes (an installed theme icon of the same name would be the same).
+QIcon appIcon() {
+    QIcon icon;
+    for (const int size : {16, 24, 32, 48, 64, 128, 256, 512})
+        icon.addFile(QStringLiteral(":/icons/zpevnikar-%1.png").arg(size), QSize(size, size));
+    return icon;
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
@@ -65,6 +74,7 @@ int main(int argc, char* argv[]) {
     QApplication::setApplicationDisplayName(QStringLiteral("Zpěvníkář"));
     QApplication::setDesktopFileName(QStringLiteral("zpevnikar"));
     QApplication::setApplicationVersion(QString::fromUtf8(QByteArrayView{version}));
+    QApplication::setWindowIcon(appIcon());
 
     QCommandLineParser parser;
     parser.setApplicationDescription(

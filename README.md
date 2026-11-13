@@ -57,7 +57,8 @@ Without cargo, or without the submodule (`git submodule update --init`), the con
 built; the app then finds one you installed yourself, or you choose one in the import dialog.
 `-DZUB_BUILD_APP=OFF` builds only the core library and its tests, without Qt.
 
-`cmake --install build/release --prefix ~/.local` installs the app with its converter.
+`cmake --install build/release --prefix ~/.local` installs the app with its converter, a launcher
+entry and the icon.
 
 ## First start
 
@@ -75,4 +76,4 @@ are built in the app's cache folder, never inside the checkout.
 
 ## License
 
-GPL-3.0-or-later; see [LICENSE](LICENSE).
+GPL-3.0-or-later; see [LICENSE](LICENSE). The app icon was made with Google Gemini.
