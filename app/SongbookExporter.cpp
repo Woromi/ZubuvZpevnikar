@@ -385,7 +385,10 @@ bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution
         if (!text) {
             what = tr("cannot read the file");
         } else {
-            const auto unknown = zub::safety::unknownConstructs(*text);
+            // The song's own commands, and what its scores would run through LilyPond.
+            auto unknown = zub::safety::unknownConstructs(*text);
+            for (std::string& risk : zub::songbook::scoreRisks(root_, song.path, *text))
+                unknown.push_back(std::move(risk));
             if (unknown.empty())
                 continue;
             QStringList commands;

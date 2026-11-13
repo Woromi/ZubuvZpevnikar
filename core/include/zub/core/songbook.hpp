@@ -130,6 +130,14 @@ std::vector<std::string> referencedFiles(std::string_view songText);
 // built from wherever TEXINPUTS finds it and cannot be checked.
 std::optional<std::string> resolveScoreReference(std::string_view target);
 
+// What building the song would run through LilyPond that the scan flags (lilypondRisks of every
+// score it references, read from disk, found like findScoreFile): "Artist/X.ly: #(system", and
+// "\lilypondfile{name}" for a reference that is not an in-tree score (resolveScoreReference
+// fails) and so cannot be checked. A score that does not exist adds nothing.
+std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,
+                                    const std::filesystem::path& songPath,
+                                    std::string_view songText);
+
 // True when `songPath` is inside <repoRoot>/songs/tinwhistle.
 bool inTinwhistleTree(const std::filesystem::path& repoRoot, const std::filesystem::path& songPath);
 

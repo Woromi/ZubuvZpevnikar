@@ -705,3 +705,31 @@ TEST_CASE("findScoreFile and inTinwhistleTree", "[songbook]") {
           root / "songs/chords/Ayreon/NotASong.ly");
     CHECK(findScoreFile(root, song, "Nope/Nope.ly").empty());
 }
+
+TEST_CASE("scoreRisks", "[songbook]") {
+    using zub::songbook::scoreRisks;
+    namespace fs = std::filesystem;
+    const auto root = fs::temp_directory_path() / "zub-scorerisks-test";
+    fs::remove_all(root);
+    fs::create_directories(root / "songs/chords/A");
+    fs::create_directories(root / "songs/tinwhistle/A");
+    const auto write = [](const fs::path& file, std::string_view text) {
+        std::ofstream(file) << text;
+    };
+    write(root / "songs/chords/A/Good.ly", "{ c4 }\n");
+    write(root / "songs/chords/A/Evil.ly", "x = #(system \"touch P\")\n");
+    write(root / "songs/tinwhistle/A/Tin.ly", "x = #(system \"touch Q\")\n");
+    const auto chordsSong = root / "songs/chords/A/S.tex";
+    const auto tinSong = root / "songs/tinwhistle/A/S.tex";
+
+    CHECK(scoreRisks(root, chordsSong, "\\lilypondfile{A/Good.ly}\n").empty());
+    CHECK(scoreRisks(root, chordsSong, "\\lilypondfile{A/Missing.ly}\n").empty());
+    CHECK(scoreRisks(root, chordsSong, "\\lilypondfile{A/Evil}\n") ==
+          std::vector<std::string>{"A/Evil.ly: #(system"});
+    CHECK(scoreRisks(root, chordsSong, "\\narrowlilypondfile{ A/Tin.ly }\n") ==
+          std::vector<std::string>{"A/Tin.ly: #(system"});
+    CHECK(scoreRisks(root, tinSong, "\\lilypondfile{A/Good.ly}\n").empty());
+    CHECK(scoreRisks(root, chordsSong, "\\lilypondfile{../Evil.ly}\n") ==
+          std::vector<std::string>{"\\lilypondfile{../Evil.ly}"});
+    fs::remove_all(root);
+}

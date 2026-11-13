@@ -5,6 +5,7 @@
 
 #include <QTimer>
 #include <zub/core/safety.hpp>
+#include <zub/core/songbook.hpp>
 #include <zub/core/songtidy.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -87,6 +88,16 @@ void SongbookScan::next() {
             // Measuring builds the song: never one with commands outside the song format.
             if (!zub::safety::unknownConstructs(content_).empty()) {
                 finding_.errors << tr("not measured: commands outside the song format");
+                ++current_;
+                if (current_ >= steps_.size() || steps_[current_].song != step.song)
+                    endSong(step.song);
+                continue;
+            }
+            // ... and neither one whose scores run code in LilyPond.
+            if (const auto risks =
+                    zub::songbook::scoreRisks(options_.songbookRoot, song.path, content_);
+                !risks.empty()) {
+                finding_.errors << tr("not measured: %1").arg(toQString(risks.front()));
                 ++current_;
                 if (current_ >= steps_.size() || steps_[current_].song != step.song)
                     endSong(step.song);

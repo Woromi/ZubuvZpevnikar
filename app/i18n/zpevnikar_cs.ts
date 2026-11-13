@@ -1639,6 +1639,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>neměřeno: příkazy mimo formát písní</translation>
     </message>
     <message>
+        <source>not measured: %1</source>
+        <translation>neměřeno: %1</translation>
+    </message>
+    <message>
         <source>Measuring: %1</source>
         <translation>Měření: %1</translation>
     </message>

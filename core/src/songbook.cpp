@@ -6,6 +6,7 @@
 #include <set>
 #include <system_error>
 #include <zub/core/json.hpp>
+#include <zub/core/safety.hpp>
 #include <zub/core/latex.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/songbook.hpp>
@@ -670,6 +671,30 @@ std::filesystem::path findScoreFile(const std::filesystem::path& repoRoot,
             return candidate;
     }
     return {};
+}
+
+std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,
+                                    const std::filesystem::path& songPath,
+                                    std::string_view songText) {
+    std::vector<std::string> risks;
+    for (const std::string& reference : referencedFiles(songText)) {
+        const auto name = resolveScoreReference(reference);
+        if (!name) {
+            risks.push_back("\\lilypondfile{" + reference + "}");
+            continue;
+        }
+        const auto file = findScoreFile(repoRoot, songPath, *name);
+        if (file.empty())
+            continue;
+        const auto text = readTextFile(file);
+        if (!text) {
+            risks.push_back(*name + ": cannot read the file");
+            continue;
+        }
+        for (const std::string& risk : safety::lilypondRisks(*text))
+            risks.push_back(*name + ": " + risk);
+    }
+    return risks;
 }
 
 std::vector<std::string> referencedFiles(std::string_view songText) {
