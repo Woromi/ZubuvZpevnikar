@@ -12,15 +12,14 @@
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QScrollArea>
+#include <QEvent>
 #include <QSvgRenderer>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <algorithm>
 
-// The SVG on a white sheet, as wide as the view (but at most twice its own size, so a short score
-// is not blown up), with the height that keeps its proportions. The sheet is white like the
-// printed page whatever the colour scheme: LilyPond draws white patches behind tablature fret
-// numbers (so the staff line does not cross them), which show as squares on a dark background.
+// The SVG, as wide as the view (but at most twice its own size, so a short score is not blown
+// up), with the height that keeps its proportions.
 class SvgCanvas : public QWidget {
 public:
     explicit SvgCanvas(QWidget* parent = nullptr) : QWidget(parent), renderer_(this) {
@@ -33,12 +32,14 @@ public:
         QSvgRenderer probe;
         if (!probe.load(svg) || !probe.isValid() || probe.defaultSize().isEmpty())
             return false;
-        renderer_.load(svg);
+        svg_ = svg;
+        renderer_.load(recolored(svg_));
         updateGeometry();
         update();
         return true;
     }
     void clear() {
+        svg_.clear();
         renderer_.load(QByteArray());
         updateGeometry();
         update();
@@ -50,30 +51,51 @@ public:
         if (!hasImage())
             return 0;
         const QSize size = renderer_.defaultSize();
-        return shownWidth(width) * size.height() / size.width() + 2 * margin;
+        return shownWidth(width) * size.height() / size.width();
     }
-    QSize sizeHint() const override {
-        return hasImage() ? renderer_.defaultSize() + QSize(2 * margin, 2 * margin) : QSize(0, 0);
-    }
+    QSize sizeHint() const override { return hasImage() ? renderer_.defaultSize() : QSize(0, 0); }
 
 protected:
+    void changeEvent(QEvent* event) override {
+        // A new colour scheme: the score follows it.
+        if (event->type() == QEvent::PaletteChange && !svg_.isEmpty()) {
+            renderer_.load(recolored(svg_));
+            update();
+        }
+        QWidget::changeEvent(event);
+    }
+
     void paintEvent(QPaintEvent*) override {
         if (!hasImage())
             return;
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         const int width = shownWidth(this->width());
-        const int height = heightForWidth(this->width());
-        painter.fillRect(QRect(0, 0, width + 2 * margin, height), Qt::white);
-        renderer_.render(&painter, QRectF(margin, margin, width, height - 2 * margin));
+        renderer_.render(&painter, QRectF(0, 0, width, heightForWidth(this->width())));
     }
 
 private:
-    static constexpr int margin = 12; // white paper around the score
     int shownWidth(int available) const {
-        return std::max(1, std::min(available - 2 * margin, renderer_.defaultSize().width() * 2));
+        return std::max(1, std::min(available, renderer_.defaultSize().width() * 2));
     }
 
+    // The score in the colours of the pane: LilyPond draws everything in currentColor (black by
+    // default) except the white patches it puts behind tablature fret numbers so the staff line
+    // does not cross them. Those get the background colour and currentColor the text colour, so
+    // a dark colour scheme shows a light score without white squares.
+    QByteArray recolored(const QByteArray& svg) const {
+        const QByteArray ink = palette().color(QPalette::WindowText).name().toLatin1();
+        const QByteArray paper = palette().color(QPalette::Window).name().toLatin1();
+        QByteArray out = svg;
+        for (const char* white : {"color=\"rgb(100.0000%, 100.0000%, 100.0000%)\"",
+                                  "color=\"#ffffff\"", "color=\"white\""})
+            out.replace(white, "color=\"" + paper + "\"");
+        if (const auto root = out.indexOf("<svg"); root >= 0)
+            out.insert(root + 4, " color=\"" + ink + "\"");
+        return out;
+    }
+
+    QByteArray svg_; // as LilyPond wrote it
     QSvgRenderer renderer_;
 };
 
