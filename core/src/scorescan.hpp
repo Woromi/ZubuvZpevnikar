@@ -140,6 +140,9 @@ struct Event {
     // more ( ) ~): the end of the whole token for a selection. Equals `end` for rests.
     std::size_t postEnd = 0;
     bool rest = false; // r, R or s
+    // The whole value of a variable (`emChord = <e\\6 g\\3>4`): music, but of the definition, not
+    // of a place in the score. Region actions leave it alone.
+    bool definition = false;
     bool chord = false;
     std::size_t closeAt = 0; // chord: the `>`
     // Single note only:
@@ -305,12 +308,147 @@ struct Scanner {
         if (c == '#') { // #t #f #\a #(vector)
             if (i + 1 < s.size() && s[i + 1] == '(')
                 return skipDatum(i + 1);
-            i += (i + 1 < s.size() && s[i + 1] == '\\') ? 3 : 1;
+            i += (i + 1 < s.size() && s[i + 1] == '\\') ? std::size_t{3} : std::size_t{1};
             i = std::min(i, s.size());
         }
         while (i < s.size() && !isSpace(s[i]) && s[i] != '(' && s[i] != ')' && s[i] != '"' &&
                s[i] != ';' && s[i] != '{' && s[i] != '}')
             ++i;
+        return i;
+    }
+
+    // Is the text right before `i` `name =`?
+    bool assignmentBefore(std::size_t i) const {
+        while (i > 0 && isSpace(s[i - 1]))
+            --i;
+        if (i == 0 || s[i - 1] != '=')
+            return false;
+        --i;
+        while (i > 0 && isSpace(s[i - 1]))
+            --i;
+        return i > 0 && isWordChar(s[i - 1]);
+    }
+
+    void add(Event e) {
+        e.definition = assignmentBefore(e.begin);
+        events.push_back(std::move(e));
+    }
+
+    std::size_t skipSpaces(std::size_t i) const {
+        while (i < s.size() && isSpace(s[i]))
+            ++i;
+        return i;
+    }
+
+    // The `{ ... }` at `i`: its end (after the matching `}`). Strings, comments and Scheme inside
+    // do not count.
+    std::size_t skipBraced(std::size_t i) const {
+        int depth = 0;
+        while (i < s.size()) {
+            const char c = s[i];
+            if (c == '%') {
+                i = skipComment(i);
+            } else if (c == '"') {
+                i = skipString(i);
+            } else if (c == '#' || c == '$') {
+                i = skipScheme(i);
+            } else if (c == '\\') {
+                i = std::min(i + 2, s.size());
+            } else {
+                ++i;
+                if (c == '{')
+                    ++depth;
+                else if (c == '}' && --depth <= 0)
+                    break;
+            }
+        }
+        return std::min(i, s.size());
+    }
+
+    // `{ ... }` when it follows (after spaces) at `i`, else `i`.
+    std::size_t skipBracedArgument(std::size_t i) const {
+        const std::size_t j = skipSpaces(i);
+        return j < s.size() && s[j] == '{' ? skipBraced(j) : i;
+    }
+
+    // The argument(s) of `\markup` at `i`: `{ ... }`, a string, a word, Scheme, or commands with
+    // such arguments (`\bold "x"`, `\override #'(a . b) { x }`).
+    std::size_t skipMarkupArgument(std::size_t i, int depth = 0) const {
+        const std::size_t j = skipSpaces(i);
+        if (j >= s.size())
+            return i;
+        const char c = s[j];
+        if (c == '{')
+            return skipBraced(j);
+        if (c == '"')
+            return skipString(j);
+        if (c == '#' || c == '$')
+            return skipScheme(j);
+        if (c == '\\' && j + 1 < s.size() && isLetter(s[j + 1]) && depth < 3) {
+            std::size_t k = j + 1;
+            while (k < s.size() && (isLetter(s[k]) || s[k] == '-'))
+                ++k;
+            // A command takes arguments; a few at most.
+            for (int n = 0; n < 3; ++n) {
+                const std::size_t next = skipSpaces(k);
+                if (next >= s.size() || !(s[next] == '{' || s[next] == '"' || s[next] == '#' ||
+                                          s[next] == '$' || s[next] == '\\'))
+                    break;
+                // Only the first argument may be another command (`\bold \italic "x"`); later
+                // ones are music commands that follow the markup.
+                if (s[next] == '\\' &&
+                    (n > 0 || next + 1 >= s.size() || !isLetter(s[next + 1])))
+                    break;
+                k = skipMarkupArgument(next, depth + 1);
+            }
+            return k;
+        }
+        if (isLetter(c) || isDigit(c)) { // a bare word
+            std::size_t k = j;
+            while (k < s.size() && !isSpace(s[k]) && s[k] != '{' && s[k] != '}' && s[k] != '<' &&
+                   s[k] != '>')
+                ++k;
+            return k;
+        }
+        return i;
+    }
+
+    // What a command skips after its name (at `i`): content that looks like notes but is chord
+    // names, lyrics, text.
+    std::size_t skipCommandArguments(std::string_view command, std::size_t i) const {
+        if (command == "chordmode" || command == "chords" || command == "lyricmode" ||
+            command == "lyrics" || command == "addlyrics" || command == "with")
+            return skipBracedArgument(i);
+        if (command == "lyricsto") {
+            std::size_t j = skipSpaces(i);
+            if (j < s.size() && s[j] == '"') {
+                j = skipString(j);
+            } else if (j < s.size() && (isLetter(s[j]) || s[j] == '\\')) {
+                ++j;
+                while (j < s.size() && (isWordChar(s[j]) || s[j] == '-'))
+                    ++j;
+            } else {
+                return i;
+            }
+            return skipBracedArgument(j);
+        }
+        if (command == "markup" || command == "markuplist")
+            return skipMarkupArgument(i);
+        if (command == "mark") {
+            const std::size_t j = skipSpaces(i);
+            if (j < s.size() && s[j] == '"')
+                return skipString(j);
+            if (j < s.size() && (s[j] == '#' || s[j] == '$'))
+                return skipScheme(j);
+            if (j < s.size() && isDigit(s[j])) {
+                std::size_t k = j;
+                while (k < s.size() && isDigit(s[k]))
+                    ++k;
+                return k;
+            }
+            if (s.substr(j, 8) == "\\default")
+                return j + 8;
+        }
         return i;
     }
 
@@ -401,7 +539,7 @@ struct Scanner {
             e.closeAt = s.size();
             e.end = s.size();
             e.postEnd = s.size();
-            events.push_back(std::move(e));
+            add(std::move(e));
             return;
         }
         e.closeAt = j;
@@ -409,7 +547,7 @@ struct Scanner {
         k = skipDuration(k, e.durBegin, e.durEnd);
         e.end = skipPost(k);
         e.postEnd = trail(e.end);
-        events.push_back(std::move(e));
+        add(std::move(e));
     }
 
     void run() {
@@ -428,7 +566,9 @@ struct Scanner {
                     const std::size_t nameBegin = i;
                     while (i < s.size() && isLetter(s[i]))
                         ++i;
-                    i = skipPitchArguments(i, s.substr(nameBegin, i - nameBegin));
+                    const std::string_view name = s.substr(nameBegin, i - nameBegin);
+                    i = skipPitchArguments(i, name);
+                    i = skipCommandArguments(name, i);
                 } else if (i < s.size()) {
                     ++i;
                 }
@@ -466,7 +606,7 @@ struct Scanner {
                     }
                     e.end = skipPost(k);
                     e.postEnd = trail(e.end);
-                    events.push_back(std::move(e));
+                    add(std::move(e));
                     i = std::max(i + 1, events.back().end);
                 } else if (word == "r" || word == "s" || word == "R") {
                     Event e;
@@ -475,7 +615,7 @@ struct Scanner {
                     std::size_t k = skipDuration(wordEnd, e.durBegin, e.durEnd);
                     e.end = k;
                     e.postEnd = k;
-                    events.push_back(std::move(e));
+                    add(std::move(e));
                     i = std::max(i + 1, k);
                 } else {
                     i = wordEnd;

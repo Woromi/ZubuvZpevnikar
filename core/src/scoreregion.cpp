@@ -148,7 +148,7 @@ std::optional<Range> expandToEvents(std::string_view text, Range range) {
         const bool overlaps = range.begin == range.end
                                   ? e.begin <= range.begin && range.begin < e.postEnd
                                   : e.begin < range.end && range.begin < e.postEnd;
-        if (!overlaps)
+        if (!overlaps || e.definition)
             continue;
         if (!out)
             out = Range{e.begin, e.postEnd};
@@ -165,7 +165,7 @@ std::optional<Result> apply(Action action, std::string_view text, Range range) {
     std::vector<Event> inside;
     std::vector<const Event*> notes;
     for (Event& e : sd::scan(text, sd::Names::Any)) {
-        if (e.begin >= region->begin && e.postEnd <= region->end)
+        if (e.begin >= region->begin && e.postEnd <= region->end && !e.definition)
             inside.push_back(std::move(e));
     }
     for (const Event& e : inside) {

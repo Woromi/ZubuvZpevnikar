@@ -276,3 +276,52 @@ TEST_CASE("scoreregion ignores Scheme after # and $", "[scoreregion]") {
     REQUIRE(only);
     CHECK(t4.substr(only->begin, only->end - only->begin) == "c4");
 }
+
+namespace {
+
+// A made-up score: chord names, a mark, a variable chord, lyrics and the tab voice.
+const std::string madeUpScore =
+    "emChord = <e,\\6 b,\\5 e\\4>4\n"
+    "chordNames = \\chordmode { e1:m a2 b }\n"
+    "words = \\lyricmode { la4 la8 be2 }\n"
+    "\\score {\n"
+    "  <<\n"
+    "    \\new ChordNames \\chordNames\n"
+    "    \\new TabStaff \\with { stringTunings = #banjo-open-g-tuning } {\n"
+    "      \\mark \\default\n"
+    "      \\markup { \\bold a b c }\n"
+    "      \\emChord g'8\\3 a\\2 <b\\3 d'\\2>4\n"
+    "    }\n"
+    "    \\new Lyrics \\lyricsto \"x\" { a b c d e }\n"
+    "  >>\n"
+    "  \\addlyrics { a4 b c }\n"
+    "}\n";
+
+} // namespace
+
+TEST_CASE("scoreregion actions never touch chord names, lyrics, marks or definitions",
+          "[scoreregion]") {
+    const sr::Range all{0, madeUpScore.size()};
+    const auto touched = [&](Action action) {
+        const auto result = sr::apply(action, madeUpScore, all);
+        REQUIRE(result);
+        return result->text;
+    };
+    // Only the tab voice changed: the lines above and below it stay byte for byte.
+    const std::string head = madeUpScore.substr(0, madeUpScore.find("      \\emChord"));
+    const std::string tail = madeUpScore.substr(madeUpScore.find("    }\n    \\new Lyrics"));
+    for (const Action action : {Action::Tie, Action::Slur, Action::Glissando, Action::StrokeDown,
+                                Action::StrokeUp, Action::DeadNotes, Action::Repeat}) {
+        const std::string text = touched(action);
+        CAPTURE(static_cast<int>(action));
+        CHECK(text.starts_with(head));
+        CHECK(text.ends_with(tail));
+    }
+    CHECK(touched(Action::StrokeDown).find("g'8\\3^\\strokeDown a\\2^\\strokeDown "
+                                           "<b\\3 d'\\2>4^\\strokeDown") != std::string::npos);
+    CHECK(touched(Action::Repeat).find("\\repeat volta 2 { g'8\\3 a\\2 <b\\3 d'\\2>4 }") !=
+          std::string::npos);
+    // Only a variable's definition in the range: nothing to do.
+    const auto defOnly = sr::expandToEvents(madeUpScore, {0, madeUpScore.find('\n')});
+    CHECK_FALSE(defOnly);
+}
