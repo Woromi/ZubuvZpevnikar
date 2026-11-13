@@ -28,7 +28,7 @@ Tuning guitar();     // 64 59 55 50 45 40
 Tuning banjoOpenG(); // 62 59 55 50 67, shortString 5
 
 // The tuning the score's TabStaff uses: banjoOpenG() when the text sets `banjo-open-g-tuning`
-// (outside comments), else guitar() (also for the E-flat songs: their tab tuning is standard).
+// (outside `%` comments and `%{ %}` blocks), else guitar() (also for the E-flat songs: their tab tuning is standard).
 Tuning tuningOf(std::string_view scoreText);
 
 // An absolute LilyPond pitch with octave marks: c' is 60, e, is 40. German names (c cis d dis e f
@@ -62,6 +62,10 @@ std::string effectiveDuration(std::string_view text, std::size_t cursor);
 // cursor inside a note or chord (or its articulations) moves behind the whole token. The duration
 // "in force" for an insertion is the one at this point (effectiveDuration of the text up to it).
 std::size_t insertionPoint(std::string_view line, std::size_t cursor);
+
+// Is the cursor inside a `%` comment or a "string" of the line? (A `%{ ... %}` block that spans
+// lines is not detected: the scan sees one line only.) Insertions there would not be notes.
+bool inCommentOrString(std::string_view line, std::size_t cursor);
 
 using Change = songedit::Change;
 

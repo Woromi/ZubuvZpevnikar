@@ -10,7 +10,8 @@
 // positions are UTF-8 byte offsets, the region is a half-open range [begin, end). Tokens are read
 // like zub::fretboard reads them: notes (`g'16\2`), chords (`<d\4 g\3>8`), rests, and what is
 // written against them (`~ ( ) [ ]`, `^\strokeDown`, `-.`). Comments, strings and other commands
-// are skipped.
+// are skipped. Not supported: duration multipliers (`c4*3/2`), which no score of the songbook
+// uses.
 namespace zub::scoreregion {
 
 struct Range {
@@ -31,7 +32,7 @@ std::optional<std::size_t> offsetOf(std::string_view text, int line, int column)
 std::optional<Range> expandToEvents(std::string_view text, Range range);
 
 enum class Action {
-    Tie,        // `~` after each note or chord but the last (not when already tied)
+    Tie,        // `~` after each note or chord that a note or chord follows (not when already tied)
     Slur,       // `(` after the first note or chord, `)` after the last (needs two or more)
     Glissando,  // ` \glissando` after the first note or chord
     Repeat,     // `\repeat volta 2 { ... }` around the region (twice: nested)

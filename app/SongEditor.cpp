@@ -663,6 +663,11 @@ void SongEditor::keepCarriedDuration(const std::string& written, const std::stri
     cursor.insertText(toQString(fix->text));
 }
 
+bool SongEditor::cursorInScoreComment() const {
+    const auto state = lineState(edit_->textCursor());
+    return zub::fretboard::inCommentOrString(state.line, state.cursor);
+}
+
 void SongEditor::insertScoreNote(const std::string& token, const std::string& duration) {
     if (edit_->isReadOnly() || kind_ != Kind::Score)
         return;

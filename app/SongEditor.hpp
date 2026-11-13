@@ -112,6 +112,8 @@ public:
     void addScoreNoteToChord(const std::string& token);
     void insertScoreRest(const std::string& duration);
     void insertScoreBarCheck();
+    // Is the text cursor in a `%` comment or a string of its line (no note can be inserted)?
+    bool cursorInScoreComment() const;
     // The cursor as a byte offset into content(), and the duration in force there.
     std::size_t cursorByteOffset() const;
     std::string effectiveDurationAtCursor() const;

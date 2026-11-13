@@ -831,6 +831,10 @@ Použijte vestavěný.</translation>
         <translation>Na A4 se notová ukázka zúží na 80 % šířky, aby nezasahovala do údajů o písni vpravo (diagramy akordů, ladění, tempo). Na A5 má i tak plnou šířku (\narrowlilypondfile).</translation>
     </message>
     <message>
+        <source>The cursor is in a comment.</source>
+        <translation>Kurzor je v komentáři.</translation>
+    </message>
+    <message>
         <source>%1 cannot be opened: %2</source>
         <translation>%1 nelze otevřít: %2</translation>
     </message>

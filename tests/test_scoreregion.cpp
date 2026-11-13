@@ -80,7 +80,9 @@ TEST_CASE("scoreregion tie", "[scoreregion]") {
           "[a4\\3~ a4\\3~ a4\\3]");
     // Chords, rests (skipped), existing ties (skipped), post-events and articulations.
     CHECK(run(Action::Tie, "<e\\4 g\\3>4 r4 <e\\4 g\\3>2~ <e\\4 g\\3>2", "<", "2~ <e\\4 g\\3>2") ==
-          "[<e\\4 g\\3>4~ r4 <e\\4 g\\3>2~ <e\\4 g\\3>2]");
+          "[<e\\4 g\\3>4 r4 <e\\4 g\\3>2~ <e\\4 g\\3>2]");
+    CHECK(run(Action::Tie, "a4\\3 r a\\3 a\\3 r a\\3", "a4", "a\\3 r a\\3") ==
+          "[a4\\3 r a\\3~ a\\3 r a\\3]");
     CHECK(run(Action::Tie, "g4\\3( g\\3) g\\3", "g4", "g\\3) g\\3") == "[g4\\3(~ g\\3)~ g\\3]");
     CHECK(run(Action::Tie, "g4\\3^\\strokeUp g\\3", "g4", "g\\3") == "[g4\\3^\\strokeUp~ g\\3]");
     // A tie written with a space before it counts.

@@ -23,6 +23,33 @@ std::size_t insertionPoint(std::string_view line, std::size_t cursor) {
     return cursor;
 }
 
+bool inCommentOrString(std::string_view line, std::size_t cursor) {
+    const Scanner scanner{line, Names::Any, {}};
+    std::size_t i = 0;
+    while (i < line.size() && i < cursor) {
+        const char c = line[i];
+        if (c == '%') {
+            const std::size_t end = scanner.skipComment(i);
+            const bool block = i + 1 < line.size() && line[i + 1] == '{';
+            if (cursor > i && (cursor < end || (cursor == end && (!block || end == line.size()))))
+                return true;
+            i = end;
+        } else if (c == '"') {
+            const std::size_t end = scanner.skipString(i);
+            if (cursor < end)
+                return true;
+            i = end;
+        } else if (c == '#' || c == '$') {
+            i = scanner.skipScheme(i);
+        } else if (c == '\\') {
+            i += 2;
+        } else {
+            ++i;
+        }
+    }
+    return false;
+}
+
 namespace {
 
 std::string durationText(std::string_view text, const Event& e) {
@@ -69,18 +96,20 @@ Tuning banjoOpenG() {
 }
 
 Tuning tuningOf(std::string_view scoreText) {
-    std::size_t pos = 0;
-    while (pos <= scoreText.size()) {
-        auto end = scoreText.find('\n', pos);
-        if (end == std::string_view::npos)
-            end = scoreText.size();
-        std::string_view line = scoreText.substr(pos, end - pos);
-        if (const auto comment = line.find('%'); comment != std::string_view::npos)
-            line = line.substr(0, comment);
-        if (line.find("banjo-open-g-tuning") != std::string_view::npos)
-            return banjoOpenG();
-        pos = end + 1;
+    // The text without `%` comments and `%{ ... %}` blocks.
+    const Scanner scanner{scoreText, Names::Any, {}};
+    std::string code;
+    std::size_t i = 0;
+    while (i < scoreText.size()) {
+        if (scoreText[i] == '%') {
+            i = scanner.skipComment(i);
+            code += ' ';
+        } else {
+            code += scoreText[i++];
+        }
     }
+    if (code.find("banjo-open-g-tuning") != std::string::npos)
+        return banjoOpenG();
     return guitar();
 }
 
@@ -215,10 +244,12 @@ Change addToChord(std::string_view line, std::size_t cursor, std::string_view to
         text += line.substr(target->closeAt);
         return {std::move(text), after};
     }
-    // A single note: <pitch\N token>duration post-events
-    text.assign(line.substr(0, target->begin));
+    // A single note: <pitch\N token>duration post-events. Its prefix function (`\deadNote`) and
+    // `!` / `?` stay with its pitch.
+    text.assign(line.substr(0, target->prefixBegin));
     text += '<';
-    text += line.substr(target->begin, target->pitchEnd - target->begin);
+    text += line.substr(target->prefixBegin, target->pitchEnd - target->prefixBegin);
+    text += line.substr(target->pitchEnd, target->durBegin - target->pitchEnd);
     text += line.substr(target->stringBegin, target->stringEnd - target->stringBegin);
     text += ' ';
     text += token;

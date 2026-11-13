@@ -496,7 +496,8 @@ void MainWindow::createCentralWidget() {
     });
     // A click on a note of the rendered score: its text in the score editor.
     connect(scorePreview_, &ScorePreviewPane::noteActivated, this, [this](int line, int column) {
-        if (SongEditor* editor = currentEditor(); editor && !onSongTab())
+        // The links of a stale preview (older text, failed build, typing) point to other places.
+        if (SongEditor* editor = currentEditor(); editor && !onSongTab() && scoreLinksFresh_)
             editor->goToLineColumn(line, column);
     });
     connect(tabs_, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
@@ -1944,12 +1945,20 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     connect(inputBar, &ScoreInputBar::restRequested, this, [this] {
         if (SongEditor* current = currentEditor(); current && !onSongTab()) {
             const auto& tab = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)];
+            if (current->cursorInScoreComment()) {
+                statusBar()->showMessage(tr("The cursor is in a comment."), 5000);
+                return;
+            }
             current->insertScoreRest(toStdString(tab.inputBar->duration()));
             current->textEdit()->setFocus();
         }
     });
     connect(inputBar, &ScoreInputBar::barCheckRequested, this, [this] {
         if (SongEditor* current = currentEditor(); current && !onSongTab()) {
+            if (current->cursorInScoreComment()) {
+                statusBar()->showMessage(tr("The cursor is in a comment."), 5000);
+                return;
+            }
             current->insertScoreBarCheck();
             current->textEdit()->setFocus();
         }
@@ -2204,6 +2213,10 @@ void MainWindow::fretboardClicked(int string, int fret, Qt::KeyboardModifiers mo
     const std::string token = zub::fretboard::noteToken(tab.fretboard->midiAt(string, fret), string,
                                                         tab.fretboard->german(),
                                                         tab.fretboard->flats());
+    if (editor->cursorInScoreComment()) {
+        statusBar()->showMessage(tr("The cursor is in a comment."), 5000);
+        return;
+    }
     if (modifiers.testFlag(Qt::ControlModifier))
         editor->addScoreNoteToChord(token);
     else

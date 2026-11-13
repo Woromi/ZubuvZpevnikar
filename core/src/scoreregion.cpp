@@ -211,8 +211,13 @@ std::optional<Result> apply(Action action, std::string_view text, Range range, R
     case Action::Tie:
         if (notes.size() < 2)
             return std::nullopt;
-        for (std::size_t i = 0; i + 1 < notes.size(); ++i) {
-            const Event& e = *notes[i];
+        // `~` after a note whose next event (in the region) is a note: never before a rest, and
+        // never on the last one.
+        for (std::size_t i = 0; i + 1 < inside.size(); ++i) {
+            const Event& e = inside[i];
+            const Event& following = inside[i + 1];
+            if (e.rest || unclosed(text, e) || following.rest || unclosed(text, following))
+                continue;
             const std::size_t next = skipSpaces(text, e.postEnd);
             const bool tied = tailOf(text, e).find('~') != std::string_view::npos ||
                               (next < text.size() && text[next] == '~');

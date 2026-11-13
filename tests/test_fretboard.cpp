@@ -388,3 +388,33 @@ TEST_CASE("fretboard knows chord repetition q", "[fretboard]") {
     // Inserting after q4 with a cursor inside it goes behind it.
     CHECK(fb::insertionPoint("q4^\\strokeUp c", 1) == 12);
 }
+
+TEST_CASE("fretboard addToChord keeps prefix functions and ! ? on their pitch", "[fretboard]") {
+    CHECK(fb::addToChord("\\deadNote c4\\3", 14, "f\\4").text == "<\\deadNote c\\3 f\\4>4");
+    CHECK(fb::addToChord("a \\deadNote c4\\3^\\strokeUp r", 24, "f\\4").text ==
+          "a <\\deadNote c\\3 f\\4>4^\\strokeUp r");
+    CHECK(fb::addToChord("c!4\\3", 5, "f\\4").text == "<c!\\3 f\\4>4");
+    CHECK(fb::addToChord("c?\\3(", 5, "f\\4").text == "<c?\\3 f\\4>(");
+}
+
+TEST_CASE("fretboard inCommentOrString", "[fretboard]") {
+    const std::string line = "c4 % note d4 \"x y\" e4";
+    CHECK_FALSE(fb::inCommentOrString(line, 2));
+    CHECK_FALSE(fb::inCommentOrString(line, 3));   // before the `%`
+    CHECK(fb::inCommentOrString(line, 5));
+    CHECK(fb::inCommentOrString(line, line.size())); // the end of a comment line
+    const std::string str = "a4^\"x y\" b4";
+    CHECK_FALSE(fb::inCommentOrString(str, 3));
+    CHECK(fb::inCommentOrString(str, 6));
+    CHECK_FALSE(fb::inCommentOrString(str, 9)); // after the closing quote
+    CHECK_FALSE(fb::inCommentOrString("#'(a \"%\") c4 ", 12));
+    CHECK(fb::inCommentOrString("c4 %{ x %} d4", 6));
+    CHECK_FALSE(fb::inCommentOrString("c4 %{ x %} d4", 11));
+}
+
+TEST_CASE("fretboard tuningOf skips block comments", "[fretboard]") {
+    CHECK(fb::tuningOf("%{ stringTunings = #banjo-open-g-tuning %}\nc4").open.size() == 6);
+    CHECK(fb::tuningOf("%{\n#banjo-open-g-tuning\n%}\nc4").open.size() == 6);
+    CHECK(fb::tuningOf("% #banjo-open-g-tuning\nc4").open.size() == 6);
+    CHECK(fb::tuningOf("%{ x %} stringTunings = #banjo-open-g-tuning").open.size() == 5);
+}
