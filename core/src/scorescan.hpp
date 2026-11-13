@@ -257,6 +257,63 @@ struct Scanner {
         return i;
     }
 
+    // Scheme after `#` or `$` at `i` (LilyPond's embedded Scheme): `##t`, `#'sym`, `#'(a b)`,
+    // `#(...)` (balanced, strings and `;` comments aware), `#"text"`, an identifier such as
+    // `#banjo-open-g-tuning`, a number `#-6`, `#{ ... #}`. Returns the end; none of it is music.
+    std::size_t skipScheme(std::size_t i) const {
+        ++i;
+        if (i < s.size() && s[i] == '{') {
+            const auto close = s.find("#}", i + 1);
+            return close == std::string_view::npos ? s.size() : close + 2;
+        }
+        return skipDatum(i);
+    }
+
+    std::size_t skipDatum(std::size_t i) const {
+        if (i >= s.size())
+            return i;
+        const char c = s[i];
+        if (c == '\'' || c == '`' || c == ',')
+            return skipDatum(i + 1);
+        if (c == '"')
+            return skipString(i);
+        if (c == '(') {
+            int depth = 0;
+            while (i < s.size()) {
+                const char d = s[i];
+                if (d == '"') {
+                    i = skipString(i);
+                    continue;
+                }
+                if (d == ';') {
+                    const auto nl = s.find('\n', i);
+                    i = nl == std::string_view::npos ? s.size() : nl;
+                    continue;
+                }
+                if (d == '#' && i + 1 < s.size() && s[i + 1] == '\\') { // a character: #\(
+                    i += 3;
+                    continue;
+                }
+                ++i;
+                if (d == '(')
+                    ++depth;
+                else if (d == ')' && --depth == 0)
+                    break;
+            }
+            return std::min(i, s.size());
+        }
+        if (c == '#') { // #t #f #\a #(vector)
+            if (i + 1 < s.size() && s[i + 1] == '(')
+                return skipDatum(i + 1);
+            i += (i + 1 < s.size() && s[i + 1] == '\\') ? 3 : 1;
+            i = std::min(i, s.size());
+        }
+        while (i < s.size() && !isSpace(s[i]) && s[i] != '(' && s[i] != ')' && s[i] != '"' &&
+               s[i] != ';' && s[i] != '{' && s[i] != '}')
+            ++i;
+        return i;
+    }
+
     std::size_t skipComment(std::size_t i) const {
         if (i + 1 < s.size() && s[i + 1] == '{') {
             const auto close = s.find("%}", i + 2);
@@ -302,6 +359,10 @@ struct Scanner {
             }
             if (c == '"') {
                 j = skipString(j);
+                continue;
+            }
+            if (c == '#' || c == '$') {
+                j = skipScheme(j);
                 continue;
             }
             if (c == '\\') {
@@ -359,6 +420,8 @@ struct Scanner {
                 i = skipComment(i);
             } else if (c == '"') {
                 i = skipString(i);
+            } else if (c == '#' || c == '$') {
+                i = skipScheme(i);
             } else if (c == '\\') {
                 ++i;
                 if (i < s.size() && isLetter(s[i])) {

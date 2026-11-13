@@ -336,3 +336,13 @@ TEST_CASE("every note of every real score has a valid position", "[.integration]
     CHECK(scores > 0);
     CHECK(cursors > 0);
 }
+
+TEST_CASE("carriedDurationFix does not read Scheme as notes", "[fretboard]") {
+    namespace fb = zub::fretboard;
+    const std::string text = "#banjo-open-g-tuning ##f #'(a b) d4 e";
+    CHECK_FALSE(fb::carriedDurationFix(text, 0, "8"));
+    const std::string t2 = "#banjo-open-g4-tuning e";
+    const auto fix = fb::carriedDurationFix(t2, 0, "8");
+    REQUIRE(fix);
+    CHECK(fix->offset == t2.size());
+}

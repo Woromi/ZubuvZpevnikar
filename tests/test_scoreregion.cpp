@@ -255,3 +255,24 @@ TEST_CASE("scoreregion survives malformed input and UTF-8", "[scoreregion]") {
     REQUIRE(at);
     CHECK(text.substr(*at, 2) == "a4");
 }
+
+TEST_CASE("scoreregion ignores Scheme after # and $", "[scoreregion]") {
+    // Made-up text: identifiers, quoted lists, strings and booleans that contain note names.
+    const std::string text =
+        "#banjo-open-g-tuning ##f #'(c d e) #(list \"a\" 'b) #\"g\" #-6 $e c4 d4 f4";
+    CHECK(run(Action::StrokeDown, text, "c4", "f4") ==
+          "#banjo-open-g-tuning ##f #'(c d e) #(list \"a\" 'b) #\"g\" #-6 $e "
+          "[c4^\\strokeDown d4^\\strokeDown f4^\\strokeDown]");
+    // A region that starts at a `##f`: the repeat wraps the notes, not the Scheme.
+    const std::string t2 = "x ##f c4 d4";
+    CHECK(shown(sr::apply(Action::Repeat, t2, {0, t2.size()})) ==
+          "x ##f [\\repeat volta 2 { c4 d4 }]");
+    // Nothing but Scheme: no token at all.
+    const std::string t3 = "#banjo-open-g-tuning #'(a b c)";
+    CHECK_FALSE(sr::expandToEvents(t3, {0, t3.size()}));
+    // Balanced parentheses with a string holding `)` and a `;` comment.
+    const std::string t4 = "#(foo \")\" ; a )\n b) c4";
+    const auto only = sr::expandToEvents(t4, {0, t4.size()});
+    REQUIRE(only);
+    CHECK(t4.substr(only->begin, only->end - only->begin) == "c4");
+}
