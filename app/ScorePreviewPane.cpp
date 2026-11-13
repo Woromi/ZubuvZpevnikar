@@ -51,9 +51,11 @@ public:
         if (!hasImage())
             return 0;
         const QSize size = renderer_.defaultSize();
-        return shownWidth(width) * size.height() / size.width();
+        return shownWidth(width) * size.height() / size.width() + 2 * margin;
     }
-    QSize sizeHint() const override { return hasImage() ? renderer_.defaultSize() : QSize(0, 0); }
+    QSize sizeHint() const override {
+        return hasImage() ? renderer_.defaultSize() + QSize(2 * margin, 2 * margin) : QSize(0, 0);
+    }
 
 protected:
     void changeEvent(QEvent* event) override {
@@ -71,12 +73,14 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         const int width = shownWidth(this->width());
-        renderer_.render(&painter, QRectF(0, 0, width, heightForWidth(this->width())));
+        renderer_.render(&painter, QRectF(margin, margin, width,
+                                          heightForWidth(this->width()) - 2 * margin));
     }
 
 private:
+    static constexpr int margin = 12; // space around the score
     int shownWidth(int available) const {
-        return std::max(1, std::min(available, renderer_.defaultSize().width() * 2));
+        return std::max(1, std::min(available - 2 * margin, renderer_.defaultSize().width() * 2));
     }
 
     // The score in the colours of the pane: LilyPond draws everything in currentColor (black by
