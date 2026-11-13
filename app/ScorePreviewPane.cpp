@@ -27,6 +27,7 @@
 #include <cmath>
 #include <functional>
 #include <optional>
+#include <map>
 #include <set>
 #include <utility>
 #include <vector>
@@ -43,6 +44,11 @@ struct NoteLink {
 // A horizontal staff line of the score, in SVG units: from x1 to x2 at height y.
 struct StaffLine {
     double x1, x2, y;
+};
+
+// A staff of the score (its lines grouped), in SVG units: its top and bottom line and its extent.
+struct Staff {
+    double top, bottom, x1, x2;
 };
 
 struct ParsedScore {
@@ -176,7 +182,10 @@ public:
     // The links of the loaded SVG (set after load()). None is selectable until setSelectable().
     void setLinks(ParsedScore parsed) {
         links_ = std::move(parsed.links);
-        staffLines_ = std::move(parsed.staffLines);
+        staves_ = groupStaves(parsed.staffLines);
+        linkStaff_.clear();
+        for (const NoteLink& link : links_)
+            linkStaff_.push_back(staffIndexOf(link.point));
         highlighted_.clear();
         selectable_.clear();
         caret_.reset();
@@ -186,8 +195,8 @@ public:
     void setSelectable(const std::vector<std::pair<int, int>>& positions) {
         selectable_ = std::set<std::pair<int, int>>(positions.begin(), positions.end());
     }
-    // A click on a note (shift: extend the selection to it) and a drag over notes (from the note
-    // pressed on to the one nearest the mouse).
+    // A click on the score (shift: extend the selection) and a drag over it, like in a text: the
+    // note is the one at the mouse (pickAt).
     std::function<void(const NoteLink& link, bool extend)> onNoteClicked;
     std::function<void(const NoteLink& anchor, const NoteLink& current)> onNotesDragged;
     std::function<void(const QPoint& globalPosition)> onContextMenu;
@@ -226,18 +235,40 @@ public:
         return {margin + (svgPoint.x() - box.x()) / box.width() * width,
                 margin + (svgPoint.y() - box.y()) / box.height() * height};
     }
-    const NoteLink* linkAt(const QPoint& position) const {
-        const NoteLink* best = nullptr;
-        double bestDistance = hitRadius * hitRadius;
-        for (const NoteLink& link : links_) {
-            if (!selectable_.contains({link.line, link.column}))
+    // The note a click at `position` means, like a click in a text: on the staff nearest to the
+    // mouse (one under or beside it horizontally first), the selectable note nearest in x. Without
+    // staff lines, the nearest selectable note. Null when nothing is selectable.
+    const NoteLink* pickAt(const QPoint& position) const {
+        const QPointF at = toSvg(QPointF(position));
+        std::vector<bool> hasNotes(staves_.size(), false);
+        for (std::size_t i = 0; i < links_.size(); ++i) {
+            if (linkStaff_[i] >= 0 && isSelectable(links_[i]))
+                hasNotes[static_cast<std::size_t>(linkStaff_[i])] = true;
+        }
+        int staff = -1;
+        double bestDistance = 0;
+        for (std::size_t i = 0; i < staves_.size(); ++i) {
+            if (!hasNotes[i])
                 continue;
-            const QPointF at = toWidget(link.point);
-            const double dx = at.x() - position.x(), dy = at.y() - position.y();
-            if (dx * dx + dy * dy <= bestDistance) {
-                bestDistance = dx * dx + dy * dy;
-                best = &link;
+            const Staff& s = staves_[i];
+            const double dx = at.x() < s.x1 ? s.x1 - at.x() : at.x() > s.x2 ? at.x() - s.x2 : 0;
+            const double dy = at.y() < s.top    ? s.top - at.y()
+                              : at.y() > s.bottom ? at.y() - s.bottom
+                                                  : 0;
+            const double distance = 10 * dx + dy; // a staff beside the mouse loses to one above it
+            if (staff < 0 || distance < bestDistance) {
+                staff = static_cast<int>(i);
+                bestDistance = distance;
             }
+        }
+        if (staff < 0)
+            return nearestLink(position);
+        const NoteLink* best = nullptr;
+        for (std::size_t i = 0; i < links_.size(); ++i) {
+            if (linkStaff_[i] != staff || !isSelectable(links_[i]))
+                continue;
+            if (!best || std::abs(links_[i].point.x() - at.x()) < std::abs(best->point.x() - at.x()))
+                best = &links_[i];
         }
         return best;
     }
@@ -246,7 +277,7 @@ public:
         const NoteLink* best = nullptr;
         double bestDistance = 0;
         for (const NoteLink& link : links_) {
-            if (!selectable_.contains({link.line, link.column}))
+            if (!isSelectable(link))
                 continue;
             const QPointF at = toWidget(link.point);
             const double dx = at.x() - position.x(), dy = at.y() - position.y();
@@ -277,7 +308,8 @@ public:
     }
     void clear() {
         links_.clear();
-        staffLines_.clear();
+        staves_.clear();
+        linkStaff_.clear();
         highlighted_.clear();
         selectable_.clear();
         caret_.reset();
@@ -300,23 +332,23 @@ public:
     }
 
 protected:
-    // A press on a note and release without moving far is a click (the text cursor goes to the
-    // note, Shift: the selection extends to it); moving further selects the notes from the one
-    // pressed to the one nearest the mouse, like selecting text.
+    // Like a text: a press and release without moving far is a click (the text cursor goes before
+    // the note at the mouse, Shift: the selection extends to it); moving further selects the
+    // notes from the one pressed to the one at the mouse.
     void mouseMoveEvent(QMouseEvent* event) override {
         const QPoint position = event->position().toPoint();
         if (pressed_ && pressLink_ &&
             (position - pressAt_).manhattanLength() >= QApplication::startDragDistance())
             dragging_ = true;
         if (dragging_) {
-            if (const NoteLink* nearest = nearestLink(position);
+            if (const NoteLink* nearest = pickAt(position);
                 nearest && nearest != dragLink_ && onNotesDragged) {
                 dragLink_ = nearest;
                 onNotesDragged(*pressLink_, *nearest);
             }
             return;
         }
-        setCursor(linkAt(position) ? Qt::PointingHandCursor : Qt::ArrowCursor);
+        setCursor(selectable_.empty() ? Qt::ArrowCursor : Qt::IBeamCursor);
     }
     void mousePressEvent(QMouseEvent* event) override {
         if (event->button() != Qt::LeftButton)
@@ -325,7 +357,7 @@ protected:
         dragging_ = false;
         dragLink_ = nullptr;
         pressAt_ = event->position().toPoint();
-        pressLink_ = linkAt(pressAt_);
+        pressLink_ = pickAt(pressAt_);
         pressExtend_ = event->modifiers().testFlag(Qt::ShiftModifier);
     }
     void mouseReleaseEvent(QMouseEvent* event) override {
@@ -365,18 +397,11 @@ protected:
         fill.setAlpha(80);
         painter.setPen(Qt::NoPen);
         painter.setBrush(fill);
-        for (const NoteLink& link : links_) {
-            if (!highlighted_.contains({link.line, link.column}))
-                continue;
-            const QPointF at = toWidget(link.point);
-            painter.drawRoundedRect(QRectF(at.x() - highlightSize / 2, at.y() - highlightSize / 2,
-                                           highlightSize, highlightSize),
-                                    4, 4);
-        }
+        paintSelection(painter);
         if (caret_) {
             if (const NoteLink* link = findLink(caret_->first, caret_->second)) {
                 const QPointF at = toWidget(link->point);
-                const auto [top, bottom] = staffSpan(link->point);
+                const auto [top, bottom] = staffSpan(*link);
                 painter.setPen(QPen(edge, 2, Qt::SolidLine, Qt::FlatCap));
                 const double x = at.x() - highlightSize / 2;
                 painter.drawLine(QPointF(x, top), QPointF(x, bottom));
@@ -386,42 +411,129 @@ protected:
 
 private:
     static constexpr int margin = 12;       // space around the score
-    static constexpr double hitRadius = 14; // pixels: how near to a note a click counts
     static constexpr double highlightSize = 20; // pixels: the box around a selected note
 
-    // The widget heights of the top and the bottom staff line of the staff that the note at
-    // `svgPoint` is on (a little beyond); without staff lines in the SVG, a span around the note.
-    std::pair<double, double> staffSpan(const QPointF& svgPoint) const {
-        constexpr double reach = 3.5, gap = 2.5; // SVG units: how far a staff is, between its lines
-        std::vector<double> ys;
-        for (const StaffLine& line : staffLines_) {
-            if (line.x1 - 0.5 <= svgPoint.x() && svgPoint.x() <= line.x2 + 0.5 &&
-                std::abs(line.y - svgPoint.y()) <= 12)
-                ys.push_back(line.y);
-        }
-        std::ranges::sort(ys);
-        // The group of lines (no gap above `gap`) that the note is on or nearest to.
-        double top = 0, bottom = 0, best = 1e9;
-        for (std::size_t i = 0; i < ys.size();) {
-            std::size_t j = i + 1;
-            while (j < ys.size() && ys[j] - ys[j - 1] <= gap)
-                ++j;
-            const double distance = svgPoint.y() < ys[i]       ? ys[i] - svgPoint.y()
-                                    : svgPoint.y() > ys[j - 1] ? svgPoint.y() - ys[j - 1]
-                                                               : 0;
-            if (distance < best) {
-                best = distance;
-                top = ys[i];
-                bottom = ys[j - 1];
+    bool isSelectable(const NoteLink& link) const {
+        return selectable_.contains({link.line, link.column});
+    }
+    int staffOf(const NoteLink& link) const {
+        return linkStaff_[static_cast<std::size_t>(&link - links_.data())];
+    }
+    QPointF toSvg(const QPointF& widgetPoint) const {
+        const QRectF box = renderer_.viewBoxF();
+        if (!hasImage() || box.isEmpty())
+            return {};
+        const int width = shownWidth(this->width());
+        const int height = heightForWidth(this->width()) - 2 * margin;
+        return {box.x() + (widgetPoint.x() - margin) / width * box.width(),
+                box.y() + (widgetPoint.y() - margin) / height * box.height()};
+    }
+
+    // The staves: staff lines that overlap horizontally, each no further than `gap` below the
+    // previous one.
+    static std::vector<Staff> groupStaves(std::vector<StaffLine> lines) {
+        constexpr double gap = 2.5; // SVG units (a staff space is 1.5)
+        std::ranges::sort(lines, {}, &StaffLine::y);
+        std::vector<Staff> staves;
+        for (const StaffLine& line : lines) {
+            const auto staff = std::ranges::find_if(staves, [&line](const Staff& s) {
+                return line.y - s.bottom <= gap && line.x1 < s.x2 && s.x1 < line.x2;
+            });
+            if (staff == staves.end()) {
+                staves.push_back({line.y, line.y, line.x1, line.x2});
+            } else {
+                staff->bottom = std::max(staff->bottom, line.y);
+                staff->x1 = std::min(staff->x1, line.x1);
+                staff->x2 = std::max(staff->x2, line.x2);
             }
-            i = j;
         }
-        if (best > reach) {
-            const double y = toWidget(svgPoint).y();
-            return {y - highlightSize * 1.5, y + highlightSize * 1.5};
+        return staves;
+    }
+    // The staff a note drawn at `svgPoint` is on: the nearest one under it horizontally, no
+    // further than a few ledger lines away; -1 for none (chord names, lyrics, no staff lines).
+    int staffIndexOf(const QPointF& svgPoint) const {
+        constexpr double reach = 3.5; // SVG units
+        int best = -1;
+        double bestDistance = reach;
+        for (std::size_t i = 0; i < staves_.size(); ++i) {
+            const Staff& s = staves_[i];
+            if (svgPoint.x() < s.x1 - 0.5 || svgPoint.x() > s.x2 + 0.5)
+                continue;
+            const double distance = svgPoint.y() < s.top      ? s.top - svgPoint.y()
+                                    : svgPoint.y() > s.bottom ? svgPoint.y() - s.bottom
+                                                              : 0;
+            if (distance <= bestDistance) {
+                bestDistance = distance;
+                best = static_cast<int>(i);
+            }
         }
-        return {toWidget(QPointF(svgPoint.x(), top)).y() - 4,
-                toWidget(QPointF(svgPoint.x(), bottom)).y() + 4};
+        return best;
+    }
+    // The widget heights of the staff (a little beyond its top and bottom line).
+    std::pair<double, double> staffSpan(const Staff& staff) const {
+        return {toWidget(QPointF(staff.x1, staff.top)).y() - 4,
+                toWidget(QPointF(staff.x1, staff.bottom)).y() + 4};
+    }
+    // The widget heights of the staff the note is on; without one, a span around the note.
+    std::pair<double, double> staffSpan(const NoteLink& link) const {
+        if (const int staff = staffOf(link); staff >= 0)
+            return staffSpan(staves_[static_cast<std::size_t>(staff)]);
+        const double y = toWidget(link.point).y();
+        return {y - highlightSize * 1.5, y + highlightSize * 1.5};
+    }
+
+    // The selection like selected text: on each staff one band from its first to its last
+    // selected note, over the whole staff height; a staff that the selection goes on from or to
+    // another staff gets the band to its start or end. Notes off any staff get a box each.
+    void paintSelection(QPainter& painter) const {
+        using Position = std::pair<int, int>; // {line, column}: the text order
+        std::optional<Position> first, last;
+        std::map<int, std::vector<const NoteLink*>> perStaff;
+        for (const NoteLink& link : links_) {
+            const Position position{link.line, link.column};
+            if (!highlighted_.contains(position))
+                continue;
+            first = first ? std::min(*first, position) : position;
+            last = last ? std::max(*last, position) : position;
+            perStaff[staffOf(link)].push_back(&link);
+        }
+        for (const auto& [staff, notes] : perStaff) {
+            if (staff < 0) {
+                for (const NoteLink* link : notes) {
+                    const QPointF at = toWidget(link->point);
+                    painter.drawRoundedRect(QRectF(at.x() - highlightSize / 2,
+                                                   at.y() - highlightSize / 2, highlightSize,
+                                                   highlightSize),
+                                            4, 4);
+                }
+                continue;
+            }
+            const Staff& s = staves_[static_cast<std::size_t>(staff)];
+            double left = 0, right = 0;
+            Position staffFirst{}, staffLast{};
+            bool any = false;
+            for (const NoteLink* link : notes) {
+                const double x = toWidget(link->point).x();
+                const Position position{link->line, link->column};
+                if (!any) {
+                    left = right = x;
+                    staffFirst = staffLast = position;
+                    any = true;
+                }
+                left = std::min(left, x);
+                right = std::max(right, x);
+                staffFirst = std::min(staffFirst, position);
+                staffLast = std::max(staffLast, position);
+            }
+            left -= highlightSize / 2;
+            right += highlightSize / 2;
+            if (staffFirst > *first)
+                left = toWidget(QPointF(s.x1, s.top)).x();
+            if (staffLast < *last)
+                right = toWidget(QPointF(s.x2, s.top)).x();
+            const auto [top, bottom] = staffSpan(s);
+            painter.drawRoundedRect(QRectF(QPointF(left, top), QPointF(right, bottom)), 3, 3);
+        }
     }
     int shownWidth(int available) const {
         return std::max(1, std::min(available - 2 * margin, renderer_.defaultSize().width() * 2));
@@ -446,12 +558,13 @@ private:
     std::vector<NoteLink> links_;
     std::set<std::pair<int, int>> highlighted_; // {line, column} of the links to highlight
     std::set<std::pair<int, int>> selectable_;  // {line, column} of the links that are notes
-    std::vector<StaffLine> staffLines_;
+    std::vector<Staff> staves_;
+    std::vector<int> linkStaff_; // for each link, the index of its staff in staves_ (-1: none)
     std::optional<std::pair<int, int>> caret_;  // the link the score cursor is before
     bool pressed_ = false;                      // the left button is down on the score
     bool dragging_ = false;                     // ... and has moved far enough: a selection
     bool pressExtend_ = false;                  // Shift was down at the press
-    const NoteLink* pressLink_ = nullptr;       // the note pressed on (none: empty space)
+    const NoteLink* pressLink_ = nullptr;       // the note pressed at (none: nothing selectable)
     const NoteLink* dragLink_ = nullptr;        // the note last reported while dragging
     QPoint pressAt_;
     QByteArray svg_; // as LilyPond wrote it
