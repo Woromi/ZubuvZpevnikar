@@ -346,3 +346,19 @@ TEST_CASE("carriedDurationFix does not read Scheme as notes", "[fretboard]") {
     REQUIRE(fix);
     CHECK(fix->offset == t2.size());
 }
+
+TEST_CASE("fretboard edits treat articulations as part of the note", "[fretboard]") {
+    // Inserting inside `g4\3^\strokeDown` goes behind the whole token: the stroke stays.
+    const std::string line = "g4\\3^\\strokeDown d4";
+    const auto inserted = fb::insertNote(line, 4, "a\\2", {});
+    CHECK(inserted.text == "g4\\3^\\strokeDown a\\2 d4");
+    const auto inChord = fb::insertNote("<e\\4 g\\3>4^\\strokeUp", 9, "a\\2", {});
+    CHECK(inChord.text == "<e\\4 g\\3>4^\\strokeUp a\\2");
+    // A cursor right after a chord with an articulation adds to the chord.
+    const std::string chord = "<e\\4 g\\3>4^\\strokeDown";
+    CHECK(fb::addToChord(chord, chord.size(), "b\\2").text == "<e\\4 g\\3 b\\2>4^\\strokeDown");
+    CHECK(fb::addToChord("g4\\3^\\strokeDown", 16, "e\\2").text == "<g\\3 e\\2>4^\\strokeDown");
+    // The position under the cursor in the articulation.
+    const auto guitar = fb::guitar();
+    CHECK(fb::positionsAt("g4\\3^\\strokeDown", 10, guitar, true) == Positions{{3, 0}});
+}

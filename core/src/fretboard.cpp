@@ -26,8 +26,8 @@ Change insertToken(std::string_view line, std::size_t cursor, std::string_view t
            (static_cast<unsigned char>(line[cursor]) & 0xC0) == 0x80)
         --cursor;
     for (const Event& e : scan(line, Names::Any)) {
-        if (e.begin < cursor && cursor < e.end) {
-            cursor = e.end;
+        if (e.begin < cursor && cursor < e.postEnd) {
+            cursor = e.postEnd;
             break;
         }
     }
@@ -126,7 +126,7 @@ std::vector<Position> positionsAt(std::string_view text, std::size_t cursor, con
     const auto events = scan(text, german ? Names::German : Names::English);
     const Event* found = nullptr;
     for (const Event& e : events) {
-        if (e.begin <= cursor && cursor <= e.end && !e.midi.empty())
+        if (e.begin <= cursor && cursor <= e.postEnd && !e.midi.empty())
             found = &e;
     }
     std::vector<Position> out;
@@ -192,9 +192,9 @@ Change addToChord(std::string_view line, std::size_t cursor, std::string_view to
     for (const Event& e : events) {
         if (e.begin >= cursor)
             break;
-        const bool inside = cursor <= e.end;
+        const bool inside = cursor <= e.postEnd;
         const bool justAfter =
-            e.end < cursor && std::ranges::all_of(line.substr(e.end, cursor - e.end),
+            e.postEnd < cursor && std::ranges::all_of(line.substr(e.postEnd, cursor - e.postEnd),
                                                   [](char c) { return isSpace(c); });
         if ((e.chord || e.stringBegin != e.stringEnd) && (inside || justAfter))
             target = &e;
