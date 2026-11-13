@@ -1399,9 +1399,11 @@ void MainWindow::requestPreview(bool userAsked) {
 
     std::string content = editor->content();
     // A reference to a score that exists nowhere would fail the build with a LaTeX error.
-    for (const std::string& name : zub::songbook::referencedFiles(content)) {
-        if (!validScoreName(name) || !scorePath(name).empty())
+    for (const std::string& reference : zub::songbook::referencedFiles(content)) {
+        const auto resolved = zub::songbook::resolveScoreReference(reference);
+        if (!resolved || !scorePath(*resolved).empty())
             continue;
+        const std::string& name = *resolved;
         const int tab = scoreTabIndex(name);
         if (tab > 0 && scoreTabs_[static_cast<std::size_t>(tab - 1)].editor)
             continue;
@@ -1458,9 +1460,17 @@ std::vector<MainWindow::RiskSource> MainWindow::songBuildRisks(SongEditor* edito
                                                                const std::string& content) const {
     std::vector<RiskSource> sources;
     sources.push_back({editor->path(), {}, zub::safety::unknownConstructs(content)});
-    for (const std::string& name : zub::songbook::referencedFiles(content)) {
-        if (!validScoreName(name))
+    for (const std::string& reference : zub::songbook::referencedFiles(content)) {
+        const auto resolved = zub::songbook::resolveScoreReference(reference);
+        if (!resolved) {
+            // Built from wherever TEXINPUTS finds it, so it cannot be checked: needs confirmation.
+            sources.push_back({std::filesystem::path(editor->path().native() + "\\lilypondfile{" +
+                                                     reference + "}"),
+                               {},
+                               {"\\lilypondfile{" + reference + "}"}});
             continue;
+        }
+        const std::string& name = *resolved;
         // What the editor holds, and the file on disk (the converter's measuring builds that).
         std::vector<std::string> texts;
         std::filesystem::path key = scorePath(name);

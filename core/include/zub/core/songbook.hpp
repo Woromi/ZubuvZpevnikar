@@ -121,7 +121,14 @@ converter::Command sortCommand(const std::filesystem::path& texlua,
 
 // The targets of \lilypondfile / \narrowlilypondfile in a song (comments ignored), in order,
 // without duplicates.
+// Names are trimmed, as lyluatex does.
 std::vector<std::string> referencedFiles(std::string_view songText);
+
+// The in-tree score a \lilypondfile target builds: trimmed, ".ly" appended when the last path
+// component has no extension (as lyluatex does). nullopt when that is not a relative path to a
+// .ly file without "..", backslashes or characters LaTeX treats specially: such a reference is
+// built from wherever TEXINPUTS finds it and cannot be checked.
+std::optional<std::string> resolveScoreReference(std::string_view target);
 
 struct FileCopy {
     std::filesystem::path from;

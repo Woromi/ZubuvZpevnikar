@@ -630,6 +630,31 @@ converter::Command sortCommand(const std::filesystem::path& texlua,
     return command;
 }
 
+namespace {
+
+std::string trimScoreTarget(std::string_view target) {
+    constexpr std::string_view blanks = " \t\r\n";
+    const auto first = target.find_first_not_of(blanks);
+    if (first == std::string_view::npos)
+        return {};
+    return std::string(target.substr(first, target.find_last_not_of(blanks) - first + 1));
+}
+
+} // namespace
+
+std::optional<std::string> resolveScoreReference(std::string_view target) {
+    std::string name = trimScoreTarget(target);
+    // lyluatex adds ".ly" to a name without an extension
+    const auto slash = name.rfind('/');
+    const auto lastPart = slash == std::string::npos ? name : name.substr(slash + 1);
+    if (!lastPart.empty() && lastPart.find('.') == std::string::npos)
+        name += ".ly";
+    if (invalidInputName(name) || !name.ends_with(".ly") || name.size() == 3 ||
+        name[name.size() - 4] == '/')
+        return std::nullopt;
+    return name;
+}
+
 std::vector<std::string> referencedFiles(std::string_view songText) {
     const std::string text = latex::stripComments(songText);
     constexpr std::string_view name = "lilypondfile";
@@ -660,7 +685,7 @@ std::vector<std::string> referencedFiles(std::string_view songText) {
         const auto closeBrace = text.find('}', i);
         if (closeBrace == std::string::npos)
             continue;
-        std::string target = text.substr(i + 1, closeBrace - i - 1);
+        std::string target = trimScoreTarget(text.substr(i + 1, closeBrace - i - 1));
         if (!target.empty() && std::ranges::find(files, target) == files.end())
             files.push_back(std::move(target));
     }

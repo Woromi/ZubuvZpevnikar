@@ -446,6 +446,25 @@ TEST_CASE("referencedFiles", "[songbook]") {
                           "\\lilypondfilex{no} \\lilypondfile no") ==
           std::vector<std::string>{"X/a.ly", "X/b.ly"});
     CHECK(referencedFiles("no files").empty());
+    CHECK(referencedFiles("\\lilypondfile{ A/X.ly }") == std::vector<std::string>{"A/X.ly"});
+}
+
+TEST_CASE("resolveScoreReference", "[songbook]") {
+    using zub::songbook::resolveScoreReference;
+    CHECK(resolveScoreReference("Artist/X.ly") == "Artist/X.ly");
+    CHECK(resolveScoreReference("  Artist/X.ly \t") == "Artist/X.ly");
+    CHECK(resolveScoreReference("Artist/Evil") == "Artist/Evil.ly");
+    CHECK(resolveScoreReference("Evil") == "Evil.ly");
+    CHECK_FALSE(resolveScoreReference(""));
+    CHECK_FALSE(resolveScoreReference("   "));
+    CHECK_FALSE(resolveScoreReference("/etc/evil.ly"));
+    CHECK_FALSE(resolveScoreReference("../Evil.ly"));
+    CHECK_FALSE(resolveScoreReference("A/../../Evil"));
+    CHECK_FALSE(resolveScoreReference("A\\Evil.ly"));
+    CHECK_FALSE(resolveScoreReference("A/Evil.txt"));
+    CHECK_FALSE(resolveScoreReference("A/.ly"));
+    CHECK_FALSE(resolveScoreReference("A/"));
+    CHECK_FALSE(resolveScoreReference("A/E~vil.ly"));
 }
 
 TEST_CASE("planFolderExport", "[songbook]") {
