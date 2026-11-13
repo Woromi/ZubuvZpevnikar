@@ -374,3 +374,17 @@ TEST_CASE("fretboard insertionPoint is where the insertion lands", "[fretboard]"
     CHECK(fb::effectiveDuration(text, 1) == "4");
     CHECK(fb::effectiveDuration(text, fb::insertionPoint(text, 1)) == "8");
 }
+
+TEST_CASE("fretboard knows chord repetition q", "[fretboard]") {
+    const std::string text = "<e\\4 g\\3>2 q d4";
+    const auto fix = fb::carriedDurationFix(text, 0, "8");
+    CHECK_FALSE(fix); // the chord has its duration
+    const std::string t2 = "q d4";
+    const auto fix2 = fb::carriedDurationFix(t2, 0, "2.");
+    REQUIRE(fix2);
+    CHECK(fix2->offset == 1);
+    CHECK(fix2->text == "2.");
+    CHECK(fb::effectiveDuration("q8 c", 4) == "8");
+    // Inserting after q4 with a cursor inside it goes behind it.
+    CHECK(fb::insertionPoint("q4^\\strokeUp c", 1) == 12);
+}

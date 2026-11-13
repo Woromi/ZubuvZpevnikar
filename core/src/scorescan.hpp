@@ -684,6 +684,16 @@ struct Scanner {
                     e.postEnd = trail(e.end);
                     add(std::move(e));
                     i = std::max(i + 1, events.back().end);
+                } else if (word == "q") {
+                    // Chord repetition: a chord without pitches of its own.
+                    Event e;
+                    e.begin = i;
+                    e.pitchEnd = wordEnd;
+                    const std::size_t k = skipDuration(wordEnd, e.durBegin, e.durEnd);
+                    e.end = skipPost(k);
+                    e.postEnd = trail(e.end);
+                    add(std::move(e));
+                    i = std::max(i + 1, events.back().end);
                 } else if (word == "r" || word == "s" || word == "R") {
                     Event e;
                     e.begin = i;

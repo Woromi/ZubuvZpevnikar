@@ -363,3 +363,15 @@ TEST_CASE("scoreregion Repeat refuses a region that crosses a block", "[scorereg
     CHECK_FALSE(sr::apply(Action::Tie, "{ }", {0, 3}, &why));
     CHECK(why == sr::Refusal::NothingToApply);
 }
+
+TEST_CASE("scoreregion treats q (chord repetition) as a chord", "[scoreregion]") {
+    const std::string text = "<e\\4 g\\3>2 q q4 d4";
+    CHECK(run(Action::StrokeDown, text, "q", "q4") ==
+          "<e\\4 g\\3>2 [q^\\strokeDown q4^\\strokeDown] d4");
+    CHECK(run(Action::Tie, text, "<", "q4") == "[<e\\4 g\\3>2~ q~ q4] d4");
+    CHECK(run(Action::Slur, text, "q", "q4") == "<e\\4 g\\3>2 [q( q4)] d4");
+    // No pitch to kill.
+    CHECK_FALSE(sr::apply(Action::DeadNotes, text, between(text, "q", "q4")));
+    // Words that merely contain a q are none.
+    CHECK_FALSE(sr::expandToEvents("seq qa", {0, 6}));
+}
