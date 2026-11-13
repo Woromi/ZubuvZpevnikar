@@ -16,10 +16,15 @@ namespace zub::fretboard {
 // (`\N`) is `open[N - 1]`.
 struct Tuning {
     std::vector<int> open;
+    // A short string (the banjo's 5th) that only exists from fret shortStringStartFret on, 1-based;
+    // 0 for none. Frets stay relative to its own nut: `g'\5` is fret 0, drawn at fret 5.
+    int shortString = 0;
 };
 
+inline constexpr int shortStringStartFret = 5;
+
 Tuning guitar();     // 64 59 55 50 45 40
-Tuning banjoOpenG(); // 62 59 55 50 67 (the 5th string is the short one: it starts at fret 5)
+Tuning banjoOpenG(); // 62 59 55 50 67, shortString 5
 
 // The tuning the score's TabStaff uses: banjoOpenG() when the text sets `banjo-open-g-tuning`
 // (outside comments), else guitar() (also for the E-flat songs: their tab tuning is standard).

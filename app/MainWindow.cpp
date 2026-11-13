@@ -3,11 +3,13 @@
 #include "ConverterRunner.hpp"
 #include "ConverterVersion.hpp"
 #include "DiffView.hpp"
+#include "FretboardWidget.hpp"
 #include "ImportDialog.hpp"
 #include "LabelFilterBox.hpp"
 #include "LabelsDialog.hpp"
 #include "PreviewPane.hpp"
 #include "PreviewRunner.hpp"
+#include "ScoreInputBar.hpp"
 #include "ScorePreviewPane.hpp"
 #include "ScoreRunner.hpp"
 #include "ShrinkDialog.hpp"
@@ -77,6 +79,7 @@
 #include <zub/core/linediff.hpp>
 #include <zub/core/preview.hpp>
 #include <zub/core/safety.hpp>
+#include <zub/core/fretboard.hpp>
 #include <zub/core/score.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/songbook.hpp>
@@ -95,6 +98,7 @@ const auto previewClassKey = QStringLiteral("preview/class");
 const auto converterKey = QStringLiteral("converter/path");
 const auto geometryKey = QStringLiteral("window/geometry");
 const auto languageKey = QStringLiteral("ui/language");
+const auto fretboardKey = QStringLiteral("score/fretboard");
 const auto songSplitterKey = QStringLiteral("window/songSplitter");
 
 } // namespace
@@ -403,6 +407,25 @@ void MainWindow::createCentralWidget() {
     scorePreviewTimer_->setSingleShot(true);
     scorePreviewTimer_->setInterval(600);
     connect(scorePreviewTimer_, &QTimer::timeout, this, [this] { requestScorePreview(); });
+    // The fretboard follows the score's cursor and text a moment after they stop moving.
+    fretboardTimer_ = new QTimer(this);
+    fretboardTimer_->setSingleShot(true);
+    fretboardTimer_->setInterval(80);
+    connect(fretboardTimer_, &QTimer::timeout, this, &MainWindow::updateFretboard);
+    fretboardAction_ = new QAction(tr("Fretboard"), this);
+    fretboardAction_->setCheckable(true);
+    fretboardAction_->setChecked(QSettings().value(fretboardKey, true).toBool());
+    fretboardAction_->setToolTip(
+        tr("Show the fretboard: click a fret to write the note, Ctrl+click to add it to the "
+           "chord"));
+    connect(fretboardAction_, &QAction::toggled, this, [this](bool shown) {
+        QSettings().setValue(fretboardKey, shown);
+        for (const ScoreTab& tab : scoreTabs_) {
+            if (tab.inputPanel)
+                tab.inputPanel->setVisible(shown);
+        }
+        updateFretboard();
+    });
     scoreRunner_ = new ScoreRunner(this);
     connect(scoreRunner_, &ScoreRunner::started, scorePreview_, &ScorePreviewPane::showBuilding);
     connect(scoreRunner_, &ScoreRunner::finished, this, &MainWindow::showScoreResult);
@@ -644,6 +667,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
         favouriteTimer_->start();
         scoreSyncTimer_->start(); // a \lilypondfile may have been typed
         updateScoreWidthBars();
+        fretboardTimer_->start(); // lang or key may have changed
     });
     connect(edit, &QPlainTextEdit::redoAvailable, this, [this] { updateEditState(); });
     connect(edit, &QPlainTextEdit::copyAvailable, this, [this] { updateEditState(); });
@@ -1828,15 +1852,47 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     connect(fullButton, &QRadioButton::clicked, this, [this, name] { setScoreWidth(name, false); });
     connect(narrowButton, &QRadioButton::clicked, this,
             [this, name] { setScoreWidth(name, true); });
-    auto* fretboard = new QWidget(splitter); // step 2: the fretboard goes here
-    fretboard->setObjectName(QStringLiteral("fretboardPlaceholder"));
-    fretboard->hide();
-    splitter->addWidget(fretboard);
+    // Under the editor: the input panel {input bar, fretboard}.
+    auto* inputPanel = new QWidget(splitter);
+    inputPanel->setObjectName(QStringLiteral("scoreInputPanel"));
+    auto* panelLayout = new QVBoxLayout(inputPanel);
+    panelLayout->setContentsMargins(0, 0, 0, 0);
+    panelLayout->setSpacing(0);
+    auto* inputBar = new ScoreInputBar(inputPanel);
+    inputBar->setObjectName(QStringLiteral("scoreInputBar"));
+    auto* fretboard = new FretboardWidget(inputPanel);
+    fretboard->setObjectName(QStringLiteral("scoreFretboard"));
+    panelLayout->addWidget(inputBar);
+    panelLayout->addWidget(fretboard);
+    inputPanel->setVisible(fretboardAction_->isChecked());
+    splitter->addWidget(inputPanel);
+    // The toggle for the panel sits in the width bar (the tab's tool row).
+    auto* fretboardButton = new QToolButton(widthBar);
+    fretboardButton->setObjectName(QStringLiteral("scoreFretboardToggle"));
+    fretboardButton->setDefaultAction(fretboardAction_);
+    fretboardButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    widthLayout->addWidget(fretboardButton);
+    connect(fretboard, &FretboardWidget::clicked, this, [this](int string, int fret, Qt::KeyboardModifiers mods) {
+        fretboardClicked(string, fret, mods);
+    });
+    connect(inputBar, &ScoreInputBar::restRequested, this, [this] {
+        if (SongEditor* current = currentEditor(); current && !onSongTab()) {
+            const auto& tab = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)];
+            current->insertScoreRest(toStdString(tab.inputBar->duration()));
+            current->textEdit()->setFocus();
+        }
+    });
+    connect(inputBar, &ScoreInputBar::barCheckRequested, this, [this] {
+        if (SongEditor* current = currentEditor(); current && !onSongTab()) {
+            current->insertScoreBarCheck();
+            current->textEdit()->setFocus();
+        }
+    });
     page->addWidget(splitter);
 
     const QString fileName = toQString(std::filesystem::path(pathOfName(name)).filename());
     const int index = tabs_->addTab(page, fileName);
-    scoreTabs_.push_back({name, page, nullptr});
+    scoreTabs_.push_back({name, page, nullptr, inputBar, fretboard, inputPanel});
     connect(create, &QPushButton::clicked, this, [this, name] { createMissingScore(name); });
 
     if (!editor) {
@@ -1890,6 +1946,8 @@ void MainWindow::attachScoreEditor(int tabIndex, SongEditor* editor) {
     editor->setWindowTitle(toQString(editor->path().filename()));
     splitter->insertWidget(1, editor); // under the width bar
     splitter->setStretchFactor(1, 1);
+    splitter->setStretchFactor(2, 0); // the input panel keeps its height
+    splitter->setCollapsible(2, false);
     page->setCurrentWidget(splitter);
     tab.editor = editor;
     tabs_->setTabText(tabIndex, toQString(editor->path().filename()) +
@@ -1912,8 +1970,14 @@ void MainWindow::attachScoreEditor(int tabIndex, SongEditor* editor) {
     QPlainTextEdit* edit = editor->textEdit();
     connect(edit, &QPlainTextEdit::textChanged, this, [this, editor] {
         pdfStale_ = true;
-        if (currentEditor() == editor)
+        if (currentEditor() == editor) {
             scorePreviewTimer_->start();
+            fretboardTimer_->start();
+        }
+    });
+    connect(edit, &QPlainTextEdit::cursorPositionChanged, this, [this, editor] {
+        if (currentEditor() == editor)
+            fretboardTimer_->start();
     });
     connect(edit, &QPlainTextEdit::undoAvailable, this, [this] { updateEditState(); });
     connect(edit, &QPlainTextEdit::redoAvailable, this, [this] { updateEditState(); });
@@ -2028,8 +2092,48 @@ void MainWindow::onTabChanged() {
         requestScorePreview();
     }
     updateSongActions();
+    updateFretboard();
     if (SongEditor* editor = currentEditor())
         editor->textEdit()->setFocus();
+}
+
+void MainWindow::updateFretboard() {
+    fretboardTimer_->stop();
+    if (onSongTab() || !editor_)
+        return;
+    const auto index = static_cast<std::size_t>(tabs_->currentIndex() - 1);
+    if (index >= scoreTabs_.size())
+        return;
+    const ScoreTab& tab = scoreTabs_[index];
+    if (!tab.editor || !tab.fretboard)
+        return;
+    // The score's own text decides the tuning; the song's lang and key the note names.
+    const std::string text = tab.editor->content();
+    const auto meta = zub::parseSong(editor_->content());
+    const bool german = meta && zub::score::germanNames(meta->value("lang"));
+    const bool flats = meta && zub::fretboard::prefersFlats(meta->value("key"));
+    const auto tuning = zub::fretboard::tuningOf(text);
+    tab.fretboard->setTuning(tuning);
+    tab.fretboard->setNaming(german, flats);
+    tab.fretboard->setMarked(
+        zub::fretboard::positionsAt(text, tab.editor->cursorByteOffset(), tuning, german));
+    tab.inputBar->setDuration(toQString(tab.editor->effectiveDurationAtCursor()));
+}
+
+void MainWindow::fretboardClicked(int string, int fret, Qt::KeyboardModifiers modifiers) {
+    SongEditor* editor = currentEditor();
+    if (!editor || onSongTab())
+        return;
+    const ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)];
+    const std::string token = zub::fretboard::noteToken(tab.fretboard->midiAt(string, fret), string,
+                                                        tab.fretboard->german(),
+                                                        tab.fretboard->flats());
+    if (modifiers.testFlag(Qt::ControlModifier))
+        editor->addScoreNoteToChord(token);
+    else
+        editor->insertScoreNote(token, toStdString(tab.inputBar->duration()));
+    editor->textEdit()->setFocus();
+    updateFretboard(); // now: the next click must see the new cursor and text
 }
 
 void MainWindow::requestScorePreview(bool userAsked) {

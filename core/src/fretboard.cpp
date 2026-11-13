@@ -408,7 +408,7 @@ Tuning guitar() {
     return {{64, 59, 55, 50, 45, 40}};
 }
 Tuning banjoOpenG() {
-    return {{62, 59, 55, 50, 67}};
+    return {{62, 59, 55, 50, 67}, 5};
 }
 
 Tuning tuningOf(std::string_view scoreText) {

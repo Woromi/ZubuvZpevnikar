@@ -51,6 +51,13 @@ Použijte vestavěný.</translation>
     </message>
 </context>
 <context>
+    <name>FretboardWidget</name>
+    <message>
+        <source>%1: click inserts the note, Ctrl+click adds it to the chord before the cursor.</source>
+        <translation>%1: klik vloží notu, Ctrl+klik ji přidá k akordu před kurzorem.</translation>
+    </message>
+</context>
+<context>
     <name>ImportDialog</name>
     <message>
         <source>Import Song</source>
@@ -668,6 +675,14 @@ Použijte vestavěný.</translation>
         <translation>Písně označené ★</translation>
     </message>
     <message>
+        <source>Fretboard</source>
+        <translation>Hmatník</translation>
+    </message>
+    <message>
+        <source>Show the fretboard: click a fret to write the note, Ctrl+click to add it to the chord</source>
+        <translation>Zobrazí hmatník: klik na pražec zapíše notu, Ctrl+klik ji přidá k akordu</translation>
+    </message>
+    <message>
         <source>Favourite: add or remove the label &quot;fav&quot; (one undo step; save to keep it)</source>
         <translation>Oblíbená: přidá nebo odebere štítek „fav“ (jeden krok zpět; uložením se zachová)</translation>
     </message>
@@ -1167,6 +1182,41 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>Songbook (no section)</source>
         <translation>Zpěvník (bez sekce)</translation>
+    </message>
+</context>
+<context>
+    <name>ScoreInputBar</name>
+    <message>
+        <source>Length:</source>
+        <translation>Délka:</translation>
+    </message>
+    <message>
+        <source>Note length 1/%1</source>
+        <translation>Délka noty 1/%1</translation>
+    </message>
+    <message>
+        <source>Dot</source>
+        <translation>Tečka</translation>
+    </message>
+    <message>
+        <source>Dotted note: one and a half times as long</source>
+        <translation>Nota s tečkou: o polovinu delší</translation>
+    </message>
+    <message>
+        <source>Rest</source>
+        <translation>Pauza</translation>
+    </message>
+    <message>
+        <source>Insert a rest of the chosen length</source>
+        <translation>Vloží pauzu zvolené délky</translation>
+    </message>
+    <message>
+        <source>Bar line</source>
+        <translation>Taktová čára</translation>
+    </message>
+    <message>
+        <source>Insert a bar check (|)</source>
+        <translation>Vloží taktovou čáru (|)</translation>
     </message>
 </context>
 <context>

@@ -26,6 +26,7 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <utility>
+#include <zub/core/fretboard.hpp>
 #include <zub/core/textfile.hpp>
 
 SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Repository& repository,
@@ -592,6 +593,57 @@ void applyChange(QPlainTextEdit* edit, const LineState& state,
 }
 
 } // namespace
+
+std::size_t SongEditor::cursorByteOffset() const {
+    const QString text = edit_->toPlainText();
+    return byteOffset(text, edit_->textCursor().position());
+}
+
+std::string SongEditor::effectiveDurationAtCursor() const {
+    return zub::fretboard::effectiveDuration(edit_->toPlainText().toUtf8().toStdString(),
+                                             cursorByteOffset());
+}
+
+namespace {
+
+// `duration` unless it is the one in force (then nothing needs to be written).
+std::string durationToWrite(const std::string& duration, const std::string& effective) {
+    return duration == effective ? std::string() : duration;
+}
+
+} // namespace
+
+void SongEditor::insertScoreNote(const std::string& token, const std::string& duration) {
+    if (edit_->isReadOnly() || kind_ != Kind::Score)
+        return;
+    const auto state = lineState(edit_->textCursor());
+    applyChange(edit_, state,
+                zub::fretboard::insertNote(state.line, state.cursor, token,
+                                           durationToWrite(duration, effectiveDurationAtCursor())));
+}
+
+void SongEditor::addScoreNoteToChord(const std::string& token) {
+    if (edit_->isReadOnly() || kind_ != Kind::Score)
+        return;
+    const auto state = lineState(edit_->textCursor());
+    applyChange(edit_, state, zub::fretboard::addToChord(state.line, state.cursor, token));
+}
+
+void SongEditor::insertScoreRest(const std::string& duration) {
+    if (edit_->isReadOnly() || kind_ != Kind::Score)
+        return;
+    const auto state = lineState(edit_->textCursor());
+    applyChange(edit_, state,
+                zub::fretboard::insertRest(state.line, state.cursor,
+                                           durationToWrite(duration, effectiveDurationAtCursor())));
+}
+
+void SongEditor::insertScoreBarCheck() {
+    if (edit_->isReadOnly() || kind_ != Kind::Score)
+        return;
+    const auto state = lineState(edit_->textCursor());
+    applyChange(edit_, state, zub::fretboard::insertBarCheck(state.line, state.cursor));
+}
 
 void SongEditor::insertChord() {
     if (edit_->isReadOnly() || kind_ != Kind::Song)

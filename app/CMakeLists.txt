@@ -12,6 +12,10 @@ qt_add_executable(zpevnikar
     PreviewPane.cpp
     PreviewRunner.hpp
     PreviewRunner.cpp
+    FretboardWidget.hpp
+    FretboardWidget.cpp
+    ScoreInputBar.hpp
+    ScoreInputBar.cpp
     ScorePreviewPane.hpp
     ScorePreviewPane.cpp
     ScoreRunner.hpp

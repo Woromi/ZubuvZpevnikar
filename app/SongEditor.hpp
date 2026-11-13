@@ -96,6 +96,18 @@ public:
     // (+1), keeping the selection on the moved lines; false at the top or bottom.
     bool moveLines(int direction);
 
+    // Score editing from the fretboard (Kind::Score), each one undo step on the cursor's line,
+    // nothing in a read-only editor. `duration` is what the note should have ("4", "8."); it is
+    // written only when it differs from effectiveDuration() (empty: keep the effective one).
+    void insertScoreNote(const std::string& token, const std::string& duration);
+    // Adds the token (`pitch\N`) to the chord or note before the cursor.
+    void addScoreNoteToChord(const std::string& token);
+    void insertScoreRest(const std::string& duration);
+    void insertScoreBarCheck();
+    // The cursor as a byte offset into content(), and the duration in force there.
+    std::size_t cursorByteOffset() const;
+    std::string effectiveDurationAtCursor() const;
+
 signals:
     void modificationChanged(bool modified);
     // After a successful save(); `content` is the UTF-8 that was written.

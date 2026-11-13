@@ -94,6 +94,8 @@ TEST_CASE("fretboard noteToken and flats", "[fretboard]") {
 TEST_CASE("fretboard tunings", "[fretboard]") {
     CHECK(fb::guitar().open == std::vector<int>{64, 59, 55, 50, 45, 40});
     CHECK(fb::banjoOpenG().open == std::vector<int>{62, 59, 55, 50, 67});
+    CHECK(fb::banjoOpenG().shortString == 5);
+    CHECK(fb::guitar().shortString == 0);
     CHECK(fb::tuningOf("music = { e\\1 }\n").open.size() == 6);
     CHECK(fb::tuningOf("\\new TabStaff \\with {\n  stringTunings = #banjo-open-g-tuning\n}\n")
               .open.size() == 5);

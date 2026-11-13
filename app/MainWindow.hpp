@@ -34,9 +34,11 @@ class QToolBar;
 class QTableView;
 class QWidget;
 class DiffView;
+class FretboardWidget;
 class LabelFilterBox;
 class PreviewPane;
 class PreviewRunner;
+class ScoreInputBar;
 class ScorePreviewPane;
 class ScoreRunner;
 struct ScoreResult;
@@ -105,6 +107,8 @@ private:
     void removeScoreReference(const std::string& name);
     void replaceSongText(const std::string& after); // one undo step in the song editor
     void updateScoreWidthBars();
+    void updateFretboard(); // the current score tab's input panel
+    void fretboardClicked(int string, int fret, Qt::KeyboardModifiers modifiers);
     void setScoreWidth(const std::string& name, bool narrow); // the song and all its score tabs; false if the user cancelled
     void createSongToolBar();
     void updateSongActions();
@@ -227,8 +231,13 @@ private:
         std::string name;            // "Artist/X.ly", as in \lilypondfile{}
         QWidget* page = nullptr;     // the tab's widget
         QPointer<SongEditor> editor; // null while the score is missing
+        ScoreInputBar* inputBar = nullptr;
+        FretboardWidget* fretboard = nullptr;
+        QWidget* inputPanel = nullptr; // {input bar, fretboard}; shown with fretboardAction_
     };
     std::vector<ScoreTab> scoreTabs_;        // in tab order, from index 1
+    QTimer* fretboardTimer_ = nullptr;       // cursor or text moved: refresh the fretboard
+    QAction* fretboardAction_ = nullptr;     // "Fretboard": shows the input panels
     QTimer* scoreSyncTimer_ = nullptr;       // song text changed: look for new \lilypondfile
     QTimer* scorePreviewTimer_ = nullptr;    // score text changed: rebuild the score preview
     std::set<std::string> dismissedScores_;  // closed by the user while still referenced
