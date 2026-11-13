@@ -427,3 +427,26 @@ TEST_CASE("scoreregion Slur refuses to nest", "[scoreregion]") {
     const std::string phrasing = "c4\\( d4^\"(x\" e4 f4\\)";
     CHECK(run(Action::Slur, phrasing, "d4", "e4") == "c4\\( [d4^\"(x\"( e4)] f4\\)");
 }
+
+TEST_CASE("scoreregion musicEvents lists only the music, in text order", "[scoreregion]") {
+    const auto events = sr::musicEvents(madeUpScore);
+    std::vector<std::string> found;
+    for (const sr::Range& r : events)
+        found.push_back(madeUpScore.substr(r.begin, r.end - r.begin));
+    // The chord names, lyrics, marks, the variable's value: none of them.
+    const std::vector<std::string> want = {"g'8\\3", "a\\2",
+                                           "<b\\3 d'\\2>4"};
+    CHECK(found == want);
+    // Prefix functions belong to their event; `q` and rests are events.
+    const std::string text = "\\deadNote c4 q8 r2 \\grace d16 e";
+    const auto more = sr::musicEvents(text);
+    REQUIRE(more.size() == 5);
+    CHECK(text.substr(more[0].begin, more[0].end - more[0].begin) == "\\deadNote c4");
+    CHECK(text.substr(more[3].begin, more[3].end - more[3].begin) == "\\grace d16");
+    // eventAt: inside, at the begin, in the gap between events.
+    CHECK(sr::eventAt(more, 3) == 0);
+    CHECK(sr::eventAt(more, more[1].begin) == 1);
+    CHECK_FALSE(sr::eventAt(more, more[0].end));
+    CHECK(sr::eventAt(more, more[4].end - 1) == 4);
+    CHECK_FALSE(sr::eventAt(more, text.size()));
+}

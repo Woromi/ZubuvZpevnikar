@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // Edits of a REGION of a LilyPond score: the notes the user marked (by a rectangle in the
 // rendered score or by a selection in the editor). The text is the whole score (multi-line), the
@@ -30,6 +31,15 @@ std::optional<std::size_t> offsetOf(std::string_view text, int line, int column)
 // articulations written right against it. A range whose begin equals its end is a point. Nothing
 // when the range touches no note, chord or rest.
 std::optional<Range> expandToEvents(std::string_view text, Range range);
+
+// The music events of a score in text order: notes, chords, `q` and rests, each from its first
+// prefix function (see expandToEvents) to the end of its articulations. Chord names, lyrics, marks,
+// markup, Scheme and the value of a variable definition (`emChord = <e\6 g\3>4`) are none. These are
+// the units of a selection in the rendered score: it runs over whole events, in this order.
+std::vector<Range> musicEvents(std::string_view text);
+
+// The index of the event with `begin <= offset < end`; nothing between events.
+std::optional<std::size_t> eventAt(const std::vector<Range>& events, std::size_t offset);
 
 enum class Action {
     Tie,        // `~` after each note or chord that a note or chord follows (not when already tied)

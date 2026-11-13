@@ -156,6 +156,23 @@ std::optional<std::size_t> offsetOf(std::string_view text, int line, int column)
     return i;
 }
 
+std::vector<Range> musicEvents(std::string_view text) {
+    std::vector<Range> out;
+    for (const Event& e : sd::scan(text, sd::Names::Any)) {
+        if (!e.definition)
+            out.push_back({e.prefixBegin, e.postEnd});
+    }
+    return out;
+}
+
+std::optional<std::size_t> eventAt(const std::vector<Range>& events, std::size_t offset) {
+    // The first event that ends after the offset; it contains it when it has begun.
+    const auto it = std::ranges::upper_bound(events, offset, {}, &Range::end);
+    if (it == events.end() || it->begin > offset)
+        return std::nullopt;
+    return static_cast<std::size_t>(it - events.begin());
+}
+
 std::optional<Range> expandToEvents(std::string_view text, Range range) {
     if (range.end < range.begin)
         std::swap(range.begin, range.end);
