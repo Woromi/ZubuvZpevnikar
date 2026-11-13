@@ -462,6 +462,21 @@ void SongEditor::goToLine(int line) {
     edit_->setFocus();
 }
 
+void SongEditor::goToLineColumn(int line, int column) {
+    const QTextBlock block = edit_->document()->findBlockByNumber(std::max(0, line - 1));
+    if (!block.isValid())
+        return;
+    const QString text = block.text();
+    int position = 0;
+    for (int i = 0; i < column && position < text.size(); ++i)
+        position += text.at(position).isHighSurrogate() && position + 1 < text.size() ? 2 : 1;
+    QTextCursor cursor(block);
+    cursor.setPosition(block.position() + position);
+    edit_->setTextCursor(cursor);
+    edit_->centerCursor();
+    edit_->setFocus();
+}
+
 void SongEditor::setCursorByteOffset(std::size_t byteOffset) {
     QString text = edit_->document()->toRawText();
     text.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));

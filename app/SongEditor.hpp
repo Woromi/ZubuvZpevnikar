@@ -72,6 +72,9 @@ public:
     void replaceContent(const std::string& bytes);
     // Moves the cursor to the start of the 1-based `line`, centres it and focuses the editor.
     void goToLine(int line);
+    // Moves the cursor to the 1-based `line` and the 0-based `column` (code points, as LilyPond
+    // counts them; past the end of the line: its end), centres it and focuses the editor.
+    void goToLineColumn(int line, int column);
     // Puts the cursor at `byteOffset` of the editor text (UTF-8, LF line ends) and focuses it.
     void setCursorByteOffset(std::size_t byteOffset);
     QPlainTextEdit* textEdit() const { return edit_; }

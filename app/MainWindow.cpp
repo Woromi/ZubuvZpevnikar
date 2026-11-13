@@ -435,6 +435,11 @@ void MainWindow::createCentralWidget() {
         if (SongEditor* editor = currentEditor(); editor && !onSongTab())
             editor->goToLine(line);
     });
+    // A click on a note of the rendered score: its text in the score editor.
+    connect(scorePreview_, &ScorePreviewPane::noteActivated, this, [this](int line, int column) {
+        if (SongEditor* editor = currentEditor(); editor && !onSongTab())
+            editor->goToLineColumn(line, column);
+    });
     connect(tabs_, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
     connect(tabs_, &QTabWidget::tabCloseRequested, this, &MainWindow::closeScoreTab);
 

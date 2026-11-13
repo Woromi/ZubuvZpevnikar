@@ -4,19 +4,123 @@
 #include "convert.hpp"
 
 #include <QDialog>
+#include <QEvent>
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLabel>
 #include <QListWidget>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPlainTextEdit>
+#include <QRegularExpression>
 #include <QScrollArea>
-#include <QEvent>
 #include <QSvgRenderer>
 #include <QToolButton>
+#include <QUrl>
 #include <QVBoxLayout>
+#include <QXmlStreamReader>
 #include <algorithm>
+#include <functional>
+#include <utility>
+#include <vector>
+
+// LilyPond's point-and-click: `<a xlink:href="textedit:///path/score.ly:LINE:COL:COL2">` wraps the
+// glyphs of a note, chord name ...; LINE is 1-based, COL the 0-based column of its text in code
+// points. `point` is where the link is drawn, in SVG units.
+struct NoteLink {
+    int line;
+    int column;
+    QPointF point;
+};
+
+namespace {
+
+// "textedit:///path/file.ly:13:66:67" -> path, line, column; false for anything else.
+bool parseTextEdit(const QString& href, QString& path, int& line, int& column) {
+    const QString prefix = QStringLiteral("textedit://");
+    if (!href.startsWith(prefix))
+        return false;
+    const QStringList parts = href.mid(prefix.size()).split(QLatin1Char(':'));
+    if (parts.size() < 4)
+        return false;
+    bool lineOk = false, columnOk = false;
+    line = parts[parts.size() - 3].toInt(&lineOk);
+    column = parts[parts.size() - 2].toInt(&columnOk);
+    if (!lineOk || !columnOk || line < 1 || column < 0)
+        return false;
+    path =
+        QUrl::fromPercentEncoding(parts.mid(0, parts.size() - 3).join(QLatin1Char(':')).toUtf8());
+    return true;
+}
+
+// The links of an engraved score that point into `scorePath` (links into the songbook's .ily
+// files or LilyPond's own would jump to the wrong place). A link is drawn where its first
+// transform="translate(x, y)" puts it; for a fret number that is the corner of the white patch
+// behind it, so the patch's centre is used when that is the first thing in the link.
+std::vector<NoteLink> parseLinks(const QByteArray& svg, const QString& scorePath) {
+    static const QRegularExpression translate(
+        QStringLiteral(R"(translate\(\s*([-+0-9.eE]+)[\s,]+([-+0-9.eE]+)\s*\))"));
+    std::vector<NoteLink> links;
+    QXmlStreamReader xml(svg);
+    const QString xlink = QStringLiteral("http://www.w3.org/1999/xlink");
+    int depth = 0;       // inside a link: its nesting level
+    bool inLink = false; // a link to the score that has no point yet
+    int line = 0, column = 0;
+    enum class State { None, Translated } state = State::None;
+    QPointF origin;
+    const auto finish = [&](QPointF point) {
+        links.push_back({line, column, point});
+        inLink = false;
+        state = State::None;
+    };
+    while (!xml.atEnd()) {
+        const auto token = xml.readNext();
+        if (token == QXmlStreamReader::StartElement) {
+            if (depth == 0 && xml.name() == QLatin1String("a")) {
+                QString path;
+                const QString href =
+                    xml.attributes().value(xlink, QLatin1String("href")).toString();
+                if (parseTextEdit(href, path, line, column) && path == scorePath) {
+                    inLink = true;
+                    state = State::None;
+                    depth = 1;
+                    continue;
+                }
+                depth = 1; // another link: skip its content
+                continue;
+            }
+            if (depth > 0)
+                ++depth;
+            if (!inLink)
+                continue;
+            if (state == State::None && xml.name() == QLatin1String("g")) {
+                const auto match = translate.match(xml.attributes().value("transform").toString());
+                if (match.hasMatch()) {
+                    origin = {match.captured(1).toDouble(), match.captured(2).toDouble()};
+                    state = State::Translated;
+                }
+            } else if (state == State::Translated) {
+                QPointF point = origin;
+                if (xml.name() == QLatin1String("rect")) {
+                    const auto a = xml.attributes();
+                    point += QPointF(a.value("x").toDouble() + a.value("width").toDouble() / 2,
+                                     a.value("y").toDouble() + a.value("height").toDouble() / 2);
+                }
+                finish(point);
+            }
+        } else if (token == QXmlStreamReader::EndElement && depth > 0) {
+            if (--depth == 0 && inLink) {
+                // A link without any transform: nothing to point at.
+                inLink = false;
+                state = State::None;
+            }
+        }
+    }
+    return links;
+}
+
+} // namespace
 
 // The SVG, as wide as the view (but at most twice its own size, so a short score is not blown
 // up), with the height that keeps its proportions.
@@ -26,6 +130,42 @@ public:
         QSizePolicy policy(QSizePolicy::Preferred, QSizePolicy::Preferred);
         policy.setHeightForWidth(true);
         setSizePolicy(policy);
+        setMouseTracking(true);
+    }
+
+    // The links of the loaded SVG (set after load()) and what a click on a note does.
+    void setLinks(std::vector<NoteLink> links) { links_ = std::move(links); }
+    std::function<void(int line, int column)> onNoteClicked;
+
+    // The widget position of a link's point, null when it is not drawn.
+    QPointF toWidget(const QPointF& svgPoint) const {
+        const QRectF box = renderer_.viewBoxF();
+        if (!hasImage() || box.isEmpty())
+            return {};
+        const int width = shownWidth(this->width());
+        const int height = heightForWidth(this->width()) - 2 * margin;
+        return {margin + (svgPoint.x() - box.x()) / box.width() * width,
+                margin + (svgPoint.y() - box.y()) / box.height() * height};
+    }
+    const NoteLink* linkAt(const QPoint& position) const {
+        const NoteLink* best = nullptr;
+        double bestDistance = hitRadius * hitRadius;
+        for (const NoteLink& link : links_) {
+            const QPointF at = toWidget(link.point);
+            const double dx = at.x() - position.x(), dy = at.y() - position.y();
+            if (dx * dx + dy * dy <= bestDistance) {
+                bestDistance = dx * dx + dy * dy;
+                best = &link;
+            }
+        }
+        return best;
+    }
+    const NoteLink* findLink(int line, int column) const {
+        for (const NoteLink& link : links_) {
+            if (link.line == line && link.column == column)
+                return &link;
+        }
+        return nullptr;
     }
 
     bool load(const QByteArray& svg) {
@@ -39,6 +179,7 @@ public:
         return true;
     }
     void clear() {
+        links_.clear();
         svg_.clear();
         renderer_.load(QByteArray());
         updateGeometry();
@@ -58,6 +199,16 @@ public:
     }
 
 protected:
+    void mouseMoveEvent(QMouseEvent* event) override {
+        setCursor(linkAt(event->position().toPoint()) ? Qt::PointingHandCursor : Qt::ArrowCursor);
+    }
+    void mousePressEvent(QMouseEvent* event) override {
+        if (event->button() == Qt::LeftButton && onNoteClicked) {
+            if (const NoteLink* link = linkAt(event->position().toPoint()))
+                onNoteClicked(link->line, link->column);
+        }
+    }
+
     void changeEvent(QEvent* event) override {
         // A new colour scheme: the score follows it.
         if (event->type() == QEvent::PaletteChange && !svg_.isEmpty()) {
@@ -73,12 +224,13 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         const int width = shownWidth(this->width());
-        renderer_.render(&painter, QRectF(margin, margin, width,
-                                          heightForWidth(this->width()) - 2 * margin));
+        renderer_.render(&painter,
+                         QRectF(margin, margin, width, heightForWidth(this->width()) - 2 * margin));
     }
 
 private:
-    static constexpr int margin = 12; // space around the score
+    static constexpr int margin = 12;       // space around the score
+    static constexpr double hitRadius = 14; // pixels: how near to a note a click counts
     int shownWidth(int available) const {
         return std::max(1, std::min(available - 2 * margin, renderer_.defaultSize().width() * 2));
     }
@@ -99,6 +251,7 @@ private:
         return out;
     }
 
+    std::vector<NoteLink> links_;
     QByteArray svg_; // as LilyPond wrote it
     QSvgRenderer renderer_;
 };
@@ -141,6 +294,7 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     layout->addWidget(scroll_, 1);
     layout->addWidget(errors_);
 
+    canvas_->onNoteClicked = [this](int line, int column) { emit noteActivated(line, column); };
     connect(rebuild_, &QToolButton::clicked, this, &ScorePreviewPane::rebuildRequested);
     connect(logButton_, &QToolButton::clicked, this, [this] { showLog(); });
     connect(errors_, &QListWidget::itemActivated, this, [this](QListWidgetItem* item) {
@@ -167,6 +321,8 @@ void ScorePreviewPane::showResult(const ScoreResult& result) {
         success = false;
         message = tr("The build produced an image that cannot be displayed.");
     }
+    if (success)
+        canvas_->setLinks(parseLinks(result.svg, toQString(result.scoreCopy)));
     if (success) {
         status_->setStyleSheet({});
         status_->setText(
@@ -200,6 +356,15 @@ void ScorePreviewPane::showResult(const ScoreResult& result) {
     if (errors_->count() == 0)
         new QListWidgetItem(message, errors_);
     errors_->show();
+}
+
+QPoint ScorePreviewPane::noteViewPosition(int line, int column) const {
+    const NoteLink* link = canvas_->findLink(line, column);
+    return link ? canvas_->toWidget(link->point).toPoint() : QPoint();
+}
+
+QWidget* ScorePreviewPane::scoreView() const {
+    return canvas_;
 }
 
 void ScorePreviewPane::showBlocked(const QString& message) {

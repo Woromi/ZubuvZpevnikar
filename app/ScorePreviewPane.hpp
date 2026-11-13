@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QPoint>
 #include <QString>
 #include <QWidget>
 
@@ -24,10 +25,19 @@ public:
     void showBlocked(const QString& message);
     void clear(); // no score: empty view, no status, no errors
 
+    // Where the note that LilyPond linked to `line` (1-based) and `column` (0-based) is drawn, in
+    // widget coordinates of the score view; a null point when the score has no such link. For
+    // tests.
+    QPoint noteViewPosition(int line, int column) const;
+    QWidget* scoreView() const; // the widget that shows the score (clicks on it jump to notes)
+
 signals:
     void rebuildRequested();
     // An error located in the score was double-clicked (1-based line and column).
     void errorActivated(int line, int column);
+    // A note of the rendered score was clicked: the position of its text in the score (1-based
+    // line, 0-based column in code points).
+    void noteActivated(int line, int column);
 
 private:
     void showLog();
