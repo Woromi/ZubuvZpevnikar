@@ -362,3 +362,15 @@ TEST_CASE("fretboard edits treat articulations as part of the note", "[fretboard
     const auto guitar = fb::guitar();
     CHECK(fb::positionsAt("g4\\3^\\strokeDown", 10, guitar, true) == Positions{{3, 0}});
 }
+
+TEST_CASE("fretboard insertionPoint is where the insertion lands", "[fretboard]") {
+    CHECK(fb::insertionPoint("c8 d", 1) == 2); // inside `c8`: behind it
+    CHECK(fb::insertionPoint("c8 d", 0) == 0);
+    CHECK(fb::insertionPoint("c8 d", 3) == 3);
+    CHECK(fb::insertionPoint("<e\\4 g\\3>4^\\strokeDown r", 5) == 22);
+    CHECK(fb::insertionPoint("c8 d", 99) == 4);
+    // The duration in force there is the one of the note the cursor is in.
+    const std::string text = "c8 d";
+    CHECK(fb::effectiveDuration(text, 1) == "4");
+    CHECK(fb::effectiveDuration(text, fb::insertionPoint(text, 1)) == "8");
+}

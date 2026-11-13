@@ -632,8 +632,12 @@ std::size_t SongEditor::cursorByteOffset() const {
     return utf16ToByteOffset(edit_->document()->toRawText(), edit_->textCursor().position());
 }
 
+// The duration in force where an inserted token lands: a cursor inside a note goes behind it.
 std::string SongEditor::effectiveDurationAtCursor() const {
-    return zub::fretboard::effectiveDuration(editorText(), cursorByteOffset());
+    const auto state = lineState(edit_->textCursor());
+    const std::size_t lineStart = cursorByteOffset() - state.cursor;
+    return zub::fretboard::effectiveDuration(
+        editorText(), lineStart + zub::fretboard::insertionPoint(state.line, state.cursor));
 }
 
 namespace {

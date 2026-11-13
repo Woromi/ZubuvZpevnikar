@@ -10,6 +10,19 @@ namespace zub::fretboard {
 
 using namespace scan_detail;
 
+std::size_t insertionPoint(std::string_view line, std::size_t cursor) {
+    cursor = std::min(cursor, line.size());
+    // Positions in the middle of a UTF-8 sequence move left first.
+    while (cursor > 0 && cursor < line.size() &&
+           (static_cast<unsigned char>(line[cursor]) & 0xC0) == 0x80)
+        --cursor;
+    for (const Event& e : scan(line, Names::Any)) {
+        if (e.begin < cursor && cursor < e.postEnd)
+            return std::min(e.postEnd, line.size());
+    }
+    return cursor;
+}
+
 namespace {
 
 std::string durationText(std::string_view text, const Event& e) {
@@ -19,19 +32,7 @@ std::string durationText(std::string_view text, const Event& e) {
 // Spaces so that a token inserted at `at` touches nothing; returns the new line and the cursor
 // after the token.
 Change insertToken(std::string_view line, std::size_t cursor, std::string_view token) {
-    cursor = std::min(cursor, line.size());
-    // A cursor inside a note or chord goes behind it. Positions in the middle of a UTF-8
-    // sequence move left first.
-    while (cursor > 0 && cursor < line.size() &&
-           (static_cast<unsigned char>(line[cursor]) & 0xC0) == 0x80)
-        --cursor;
-    for (const Event& e : scan(line, Names::Any)) {
-        if (e.begin < cursor && cursor < e.postEnd) {
-            cursor = e.postEnd;
-            break;
-        }
-    }
-    cursor = std::min(cursor, line.size());
+    cursor = insertionPoint(line, cursor);
     std::string text(line.substr(0, cursor));
     const bool spaceBefore = cursor > 0 && !isSpace(line[cursor - 1]);
     if (spaceBefore)

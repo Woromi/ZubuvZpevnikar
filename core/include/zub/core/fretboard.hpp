@@ -58,6 +58,11 @@ std::vector<Position> positionsAt(std::string_view text, std::size_t cursor, con
 // (\time 3/4, \tuplet 3/2, \partial 8 ...); "4" when there is none.
 std::string effectiveDuration(std::string_view text, std::size_t cursor);
 
+// Where insertNote / insertRest / insertBarCheck really insert on `line` for a cursor there: a
+// cursor inside a note or chord (or its articulations) moves behind the whole token. The duration
+// "in force" for an insertion is the one at this point (effectiveDuration of the text up to it).
+std::size_t insertionPoint(std::string_view line, std::size_t cursor);
+
 using Change = songedit::Change;
 
 struct Insertion {
