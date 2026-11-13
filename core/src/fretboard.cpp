@@ -494,9 +494,39 @@ std::string effectiveDuration(std::string_view text, std::size_t cursor) {
     return last;
 }
 
+std::optional<Insertion> carriedDurationFix(std::string_view text, std::size_t from,
+                                            std::string_view effective) {
+    if (effective.empty())
+        return std::nullopt;
+    for (const Event& e : scan(text, Names::Any)) {
+        if (e.begin < from)
+            continue;
+        const bool unclosed = e.chord && e.closeAt >= text.size();
+        if (e.durBegin != e.durEnd || unclosed)
+            return std::nullopt;
+        return Insertion{e.durBegin, std::string(effective)};
+    }
+    return std::nullopt;
+}
+
+namespace {
+
+// A new `duration` changes what the next note, chord or rest inherits when it writes none of its
+// own: it gets `effective` (the duration in force before the insertion) so it keeps its length.
+Change keepFollowingDuration(Change change, std::string_view duration, std::string_view effective) {
+    if (duration.empty() || duration == effective)
+        return change;
+    if (const auto fix = carriedDurationFix(change.text, change.cursor, effective))
+        change.text.insert(fix->offset, fix->text);
+    return change;
+}
+
+} // namespace
+
 Change insertNote(std::string_view line, std::size_t cursor, std::string_view token,
-                  std::string_view duration) {
-    return insertToken(line, cursor, withDuration(token, duration));
+                  std::string_view duration, std::string_view effective) {
+    return keepFollowingDuration(insertToken(line, cursor, withDuration(token, duration)), duration,
+                                 effective);
 }
 
 Change addToChord(std::string_view line, std::size_t cursor, std::string_view token) {
@@ -543,8 +573,10 @@ Change addToChord(std::string_view line, std::size_t cursor, std::string_view to
     return {std::move(text), after};
 }
 
-Change insertRest(std::string_view line, std::size_t cursor, std::string_view duration) {
-    return insertToken(line, cursor, std::string("r") + std::string(duration));
+Change insertRest(std::string_view line, std::size_t cursor, std::string_view duration,
+                  std::string_view effective) {
+    return keepFollowingDuration(insertToken(line, cursor, std::string("r") + std::string(duration)),
+                                 duration, effective);
 }
 
 Change insertBarCheck(std::string_view line, std::size_t cursor) {

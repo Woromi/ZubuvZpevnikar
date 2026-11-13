@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -59,12 +60,27 @@ std::string effectiveDuration(std::string_view text, std::size_t cursor);
 
 using Change = songedit::Change;
 
+struct Insertion {
+    std::size_t offset;
+    std::string text;
+};
+
+// The first note, chord or rest at or after `from` that writes no duration of its own gets
+// `effective` explicitly: where to insert it, nothing when that event has a duration or there is
+// none (or `effective` is empty). For the caller that inserted a note with another duration across
+// lines: insertNote only sees its own line.
+std::optional<Insertion> carriedDurationFix(std::string_view text, std::size_t from,
+                                            std::string_view effective);
+
 // Inserts `token` (a note `fis'\1` or a chord `<...>`) at the cursor with spaces so that tokens
 // never touch, the cursor after it. A cursor inside a note or chord moves to its end first.
 // `duration` is written after the pitch (after `>` for a chord) when it is not empty: the caller
-// passes it only when it differs from effectiveDuration().
+// passes it only when it differs from effectiveDuration(). `effective` is that duration (the one in
+// force before the insertion, from the whole text): when a new `duration` is written and the next
+// note, chord or rest on the line writes none of its own, it gets `effective` so that its length
+// does not change. (A following event on a later line is out of reach: see carriedDurationFix.)
 Change insertNote(std::string_view line, std::size_t cursor, std::string_view token,
-                  std::string_view duration);
+                  std::string_view duration, std::string_view effective = {});
 
 // A chord just before the cursor (or the cursor inside it) gets `token` (`pitch\N`, no duration)
 // before its `>`. A single note with a string becomes `<note token>` keeping its duration and what
@@ -73,7 +89,8 @@ Change insertNote(std::string_view line, std::size_t cursor, std::string_view to
 Change addToChord(std::string_view line, std::size_t cursor, std::string_view token);
 
 // `r` and `duration` (see insertNote), and a bar check ` |`.
-Change insertRest(std::string_view line, std::size_t cursor, std::string_view duration);
+Change insertRest(std::string_view line, std::size_t cursor, std::string_view duration,
+                  std::string_view effective = {});
 Change insertBarCheck(std::string_view line, std::size_t cursor);
 
 } // namespace zub::fretboard

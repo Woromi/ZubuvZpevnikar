@@ -196,6 +196,50 @@ TEST_CASE("fretboard insertNote spacing and duration", "[fretboard]") {
     CHECK(insert("% \xc4\x9b |", "e\\4", "") == "% \xc4\x9b e\\4|");
 }
 
+TEST_CASE("fretboard insertNote and insertRest keep the length of what follows", "[fretboard]") {
+    const auto insert = [](const std::string& marked, const std::string& token,
+                           const std::string& duration, const std::string& effective) {
+        return shown(fb::insertNote(without(marked), at(marked), token, duration, effective));
+    };
+    const auto rest = [](const std::string& marked, const std::string& duration,
+                         const std::string& effective) {
+        return shown(fb::insertRest(without(marked), at(marked), duration, effective));
+    };
+    // The next note has no duration: it carried the old one, now written.
+    CHECK(insert("e\\2 |g\\3", "a\\3", "8", "4") == "e\\2 a8\\3| g4\\3");
+    CHECK(insert("|g\\3 h\\2", "a\\3", "16", "8.") == "a16\\3| g8.\\3 h\\2");
+    CHECK(insert("e\\2 |<g\\3 h\\2>", "a\\3", "8", "4") == "e\\2 a8\\3| <g\\3 h\\2>4");
+    CHECK(insert("e\\2 |<g\\3 h\\2>(", "<a\\3 c\\2>", "8", "2") == "e\\2 <a\\3 c\\2>8| <g\\3 h\\2>2(");
+    CHECK(insert("|r", "a\\3", "8", "4") == "a8\\3| r4");
+    CHECK(insert("|fis'\\1", "a\\3", "8", "4") == "a8\\3| fis'4\\1");
+    CHECK(insert("|g'\\2", "a\\3", "8", "4") == "a8\\3| g'4\\2");
+    // Only the very next one, and only without a duration of its own.
+    CHECK(insert("|g\\3 h\\2", "a\\3", "8", "4") == "a8\\3| g4\\3 h\\2");
+    CHECK(insert("|g2\\3 h\\2", "a\\3", "8", "4") == "a8\\3| g2\\3 h\\2");
+    CHECK(insert("|<g\\3>8 h\\2", "a\\3", "16", "4") == "a16\\3| <g\\3>8 h\\2");
+    // Nothing to fix: no duration written, the same one, nothing after, unknown effective.
+    CHECK(insert("|g\\3", "a\\3", "", "4") == "a\\3| g\\3");
+    CHECK(insert("|g\\3", "a\\3", "4", "4") == "a4\\3| g\\3");
+    CHECK(insert("e\\2 |", "a\\3", "8", "4") == "e\\2 a8\\3|");
+    CHECK(insert("|g\\3", "a\\3", "8", "") == "a8\\3| g\\3");
+    // An unclosed chord has no place for a duration.
+    CHECK(insert("|<g\\3 h\\2", "a\\3", "8", "4") == "a8\\3| <g\\3 h\\2");
+    // Rests: the same.
+    CHECK(rest("e\\1 |g\\2", "8", "4") == "e\\1 r8| g4\\2");
+    CHECK(rest("e\\1 |r", "8.", "2") == "e\\1 r8.| r2");
+    CHECK(rest("e\\1 |g\\2", "", "4") == "e\\1 r| g\\2");
+    // An event on a later line is out of insertNote's reach, but carriedDurationFix finds it.
+    const std::string text = "e8\\1 g\\2\n  % c\n  h\\3 a4\\2";
+    const auto fix = fb::carriedDurationFix(text, 8, "8");
+    REQUIRE(fix);
+    CHECK(fix->offset == text.find("h\\3") + 1);
+    CHECK(fix->text == "8");
+    CHECK_FALSE(fb::carriedDurationFix(text, text.find("h\\3"), ""));
+    CHECK_FALSE(fb::carriedDurationFix(text, text.find("a4"), "8"));
+    CHECK_FALSE(fb::carriedDurationFix(text, text.size(), "8"));
+    CHECK_FALSE(fb::carriedDurationFix("e8\\1 g8\\2", 4, "8"));
+}
+
 TEST_CASE("fretboard addToChord", "[fretboard]") {
     const auto add = [](const std::string& marked, const std::string& token) {
         return shown(fb::addToChord(without(marked), at(marked), token));

@@ -497,6 +497,14 @@ std::size_t byteOffset(const QString& text, int utf16Pos) {
     return static_cast<std::size_t>(text.left(utf16Pos).toUtf8().size());
 }
 
+// A position in a whole document's raw text -> byte offset in its UTF-8 (U+2029 is one byte, as
+// the line feed it stands for).
+std::size_t utf16ToByteOffset(const QString& raw, int utf16Pos) {
+    QString head = raw.left(utf16Pos);
+    head.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+    return static_cast<std::size_t>(head.toUtf8().size());
+}
+
 int utf16Position(const std::string& utf8, std::size_t byteOffset) {
     return static_cast<int>(
         QString::fromUtf8(utf8.data(), static_cast<qsizetype>(byteOffset)).size());
@@ -609,14 +617,19 @@ void applyChange(QPlainTextEdit* edit, const LineState& state,
 
 } // namespace
 
+std::string SongEditor::editorText() const {
+    // Raw text: toPlainText() would turn non-breaking spaces into plain ones (other byte count).
+    QString text = edit_->document()->toRawText();
+    text.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+    return text.toUtf8().toStdString();
+}
+
 std::size_t SongEditor::cursorByteOffset() const {
-    const QString text = edit_->toPlainText();
-    return byteOffset(text, edit_->textCursor().position());
+    return utf16ToByteOffset(edit_->document()->toRawText(), edit_->textCursor().position());
 }
 
 std::string SongEditor::effectiveDurationAtCursor() const {
-    return zub::fretboard::effectiveDuration(edit_->toPlainText().toUtf8().toStdString(),
-                                             cursorByteOffset());
+    return zub::fretboard::effectiveDuration(editorText(), cursorByteOffset());
 }
 
 namespace {
@@ -628,13 +641,32 @@ std::string durationToWrite(const std::string& duration, const std::string& effe
 
 } // namespace
 
+// The note or rest that follows the inserted token on a LATER line has no duration of its own
+// either when it carried the old one; the line edit cannot see it. Part of the same undo step.
+void SongEditor::keepCarriedDuration(const std::string& written, const std::string& effective) {
+    if (written.empty() || written == effective)
+        return;
+    const std::string text = editorText();
+    const auto fix = zub::fretboard::carriedDurationFix(text, cursorByteOffset(), effective);
+    if (!fix)
+        return;
+    QTextCursor cursor(edit_->document());
+    cursor.setPosition(utf16Position(text, fix->offset));
+    cursor.insertText(toQString(fix->text));
+}
+
 void SongEditor::insertScoreNote(const std::string& token, const std::string& duration) {
     if (edit_->isReadOnly() || kind_ != Kind::Score)
         return;
     const auto state = lineState(edit_->textCursor());
+    const std::string effective = effectiveDurationAtCursor();
+    const std::string written = durationToWrite(duration, effective);
+    QTextCursor outer(edit_->document());
+    outer.beginEditBlock();
     applyChange(edit_, state,
-                zub::fretboard::insertNote(state.line, state.cursor, token,
-                                           durationToWrite(duration, effectiveDurationAtCursor())));
+                zub::fretboard::insertNote(state.line, state.cursor, token, written, effective));
+    keepCarriedDuration(written, effective);
+    outer.endEditBlock();
 }
 
 void SongEditor::addScoreNoteToChord(const std::string& token) {
@@ -648,9 +680,14 @@ void SongEditor::insertScoreRest(const std::string& duration) {
     if (edit_->isReadOnly() || kind_ != Kind::Score)
         return;
     const auto state = lineState(edit_->textCursor());
+    const std::string effective = effectiveDurationAtCursor();
+    const std::string written = durationToWrite(duration, effective);
+    QTextCursor outer(edit_->document());
+    outer.beginEditBlock();
     applyChange(edit_, state,
-                zub::fretboard::insertRest(state.line, state.cursor,
-                                           durationToWrite(duration, effectiveDurationAtCursor())));
+                zub::fretboard::insertRest(state.line, state.cursor, written, effective));
+    keepCarriedDuration(written, effective);
+    outer.endEditBlock();
 }
 
 void SongEditor::insertScoreBarCheck() {

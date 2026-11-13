@@ -121,6 +121,8 @@ signals:
 private:
     void onFileChanged();
     std::string currentContent() const; // editor text -> file bytes
+    std::string editorText() const;     // the document as UTF-8 with LF line ends
+    void keepCarriedDuration(const std::string& written, const std::string& effective);
     void setContent(const std::string& bytes);
     void watch();
     void onDirectoryChanged();
