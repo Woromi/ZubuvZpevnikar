@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <zub/core/latex.hpp>
 
 namespace zub::safety {
@@ -200,6 +201,47 @@ bool plainNumbersToClose(std::string_view text, std::size_t from) {
     return false;
 }
 
+// Quoted Scheme data "#'(": read with Scheme's lexical rules up to the matching ")". '%' is an
+// ordinary symbol there, ';' starts a comment, a string may hide parentheses. Returns the index
+// after the closing parenthesis. Block comments and datum comments are reported, not followed.
+std::size_t skipQuotedList(std::string_view text, std::size_t open,
+                           const std::function<void(std::string)>& report) {
+    int depth = 0;
+    auto i = open;
+    while (i < text.size()) {
+        const char c = text[i];
+        if (c == '(') {
+            ++depth;
+            ++i;
+        } else if (c == ')') {
+            ++i;
+            if (--depth == 0)
+                return i;
+        } else if (c == '"') {
+            ++i;
+            while (i < text.size() && text[i] != '"')
+                i += text[i] == '\\' ? 2U : 1U;
+            ++i;
+        } else if (c == ';') {
+            const auto eol = text.find('\n', i);
+            i = eol == std::string_view::npos ? text.size() : eol + 1;
+        } else if (c == '#' && i + 1 < text.size()) {
+            const char n = text[i + 1];
+            if (n == '|' || n == ';' || n == '!') {
+                report(std::string("#") + n);
+                i += 2;
+            } else if (n == '\\') {
+                i += 3; // a character such as #\( or #\"
+            } else {
+                ++i;
+            }
+        } else {
+            ++i;
+        }
+    }
+    return text.size();
+}
+
 constexpr std::array kTrustedIncludes =
     std::to_array<std::string_view>({"zubuvzpevnik.ily", "tinwhistle.ily"});
 
@@ -260,16 +302,28 @@ std::vector<std::string> lilypondRisks(std::string_view ly) {
             const char next = i + 1 < ly.size() ? ly[i + 1] : '\0';
             if (next == '(') {
                 scheme(i, i + 1);
+                i += 1;
+            } else if (next == '\'' && i + 2 < ly.size() && ly[i + 2] == '(') {
+                i = skipQuotedList(ly, i + 2, report);
+            } else if (next == '#') {
+                i += 2; // "##t": the second '#' is not a sigil
+            } else if (next == '\'' || next == '"' || next == '+' || next == '-' ||
+                       next == '{' || next == '}' || next == '\\' || isDigit(next) ||
+                       (c == '#' && isIdentStart(next))) {
+                i += 1;
             } else if (c == '$' && isIdentStart(next)) {
                 std::size_t end = i + 1;
                 while (end < ly.size() && (isIdentStart(ly[end]) || isDigit(ly[end]) ||
                                            ly[end] == '-' || ly[end] == '_' || ly[end] == ':'))
                     ++end;
                 report(std::string(ly.substr(i, end - i)));
-            } else if (c == '#' && (next == '.' || next == ',' || next == '`')) {
-                report(std::string("#") + next);
+                i = end;
+            } else {
+                // whitespace, '@', ';', '!', '|', '.', ',', '`', the end: Scheme the scanner
+                // cannot follow, or a sigil that LilyPond reads differently from what it looks like
+                report(std::string(1, c) + (next == '\0' || isSpace(next) ? ' ' : next));
+                i += 1;
             }
-            i += c == '#' && next == '#' ? 2 : 1; // "##t": the second '#' is not a sigil
         } else {
             ++i;
         }

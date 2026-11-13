@@ -84,6 +84,25 @@ TEST_CASE("lilypond scores: code is reported", "[safety][lilypond]") {
     CHECK(scanLy("\\include#(system \"x\")") == Constructs{"\\include \"\"", "#(system"});
 }
 
+TEST_CASE("lilypond scores: Scheme that hides code from a naive scanner", "[safety][lilypond]") {
+    // '%' in quoted data is a symbol, not a comment
+    CHECK_FALSE(scanLy("x = #'(%)  #(system \"touch P\")").empty());
+    // a ';' comment hides a '"'
+    CHECK_FALSE(scanLy("x = #'(a ; \"\n)\n#(system \"touch P\") % \"").empty());
+    // whitespace after the sigil, splicing
+    CHECK_FALSE(scanLy("# (system \"touch P\")").empty());
+    CHECK_FALSE(scanLy("$ (system \"touch P\")").empty());
+    CHECK_FALSE(scanLy("#\n(system \"touch P\")").empty());
+    CHECK_FALSE(scanLy("#@(system \"touch P\")").empty());
+    CHECK_FALSE(scanLy("$@(system \"touch P\")").empty());
+    CHECK_FALSE(scanLy("#;(foo) #(system \"touch P\")").empty());
+    CHECK_FALSE(scanLy("#!foo!# #(system \"touch P\")").empty());
+    CHECK_FALSE(scanLy("#|foo|# #(system \"touch P\")").empty());
+    CHECK_FALSE(scanLy("x = #'(a #| b |# c)").empty());
+    // quoted data is otherwise data
+    CHECK(scanLy("x = #'(a (b . \"c)\") ; )\n #\\( d) y = #3").empty());
+}
+
 TEST_CASE("lilypond scores: data is fine", "[safety][lilypond]") {
     CHECK(scanLy("\\include \"zubuvzpevnik.ily\"\n\\include \"tinwhistle.ily\"").empty());
     CHECK(scanLy("\\set X = #(ly:make-moment 1 4) \\partial #(ly:make-moment 3 8)").empty());
@@ -93,7 +112,7 @@ TEST_CASE("lilypond scores: data is fine", "[safety][lilypond]") {
     CHECK(scanLy("{ c4 d % #(system \"x\")\n e }").empty());
     CHECK(scanLy("%{ #(system \"x\") %} c4").empty());
     CHECK(scanLy("\\markup \"#(system $x \\\" #(system)\" c4").empty());
-    CHECK(scanLy("\\score { c4 } 5 $ 3").empty());
+    CHECK(scanLy("\\score { c4 } 5 $3").empty());
 }
 
 TEST_CASE("every real score passes the lilypond check", "[.integration][safety][lilypond]") {
