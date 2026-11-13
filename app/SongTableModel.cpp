@@ -28,6 +28,9 @@ SongTableModel::Row SongTableModel::makeRow(zub::SongEntry entry) {
     row.artist = toQString(zub::latex::toDisplayText(entry.meta.value("by")));
     row.language = toQString(entry.meta.value("lang"));
     row.key = toQString(zub::latex::toDisplayText(entry.meta.value("key")));
+    row.tempo = toQString(zub::latex::toDisplayText(entry.meta.value("tem")));
+    row.meter = toQString(zub::latex::toDisplayText(entry.meta.value("met")));
+    row.capo = toQString(zub::latex::toDisplayText(entry.meta.value("cap")));
     QStringList todos;
     for (const auto& note : entry.todos)
         todos << toQString(note);
@@ -126,6 +129,12 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
             return row.language;
         case Key:
             return row.key;
+        case Tempo:
+            return row.tempo;
+        case Meter:
+            return row.meter;
+        case Capo:
+            return row.capo;
         case Todo:
             return row.todo;
         case Changes:
@@ -141,6 +150,16 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
         return row.toolTip;
     case HasTodoRole:
         return !row.entry.todos.empty();
+    case SortRole:
+        // Tempo and capo as numbers (90 before 120); a song without one sorts first.
+        if (index.column() == Tempo || index.column() == Capo) {
+            const QString& text = index.column() == Tempo ? row.tempo : row.capo;
+            qsizetype digits = 0;
+            while (digits < text.size() && text[digits].isDigit())
+                ++digits;
+            return digits > 0 ? text.left(digits).toInt() : -1;
+        }
+        return data(index, Qt::DisplayRole);
     case HasChangesRole:
         return !row.changes.isEmpty();
     case LanguageRole:
@@ -166,6 +185,12 @@ QVariant SongTableModel::headerData(int section, Qt::Orientation orientation, in
         return tr("Language");
     case Key:
         return tr("Key");
+    case Tempo:
+        return tr("Tempo");
+    case Meter:
+        return tr("Meter");
+    case Capo:
+        return tr("Capo");
     case Todo:
         return tr("TODO");
     case Changes:

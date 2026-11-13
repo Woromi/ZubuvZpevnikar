@@ -301,7 +301,8 @@ QWidget* SongbooksPage::buildPickerPane() {
     pickerView_->setDragDropMode(QAbstractItemView::DragOnly);
     pickerView_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pickerView_->verticalHeader()->hide();
-    for (const int column : {SongTableModel::Todo, SongTableModel::Changes})
+    for (const int column : {SongTableModel::Tempo, SongTableModel::Meter, SongTableModel::Capo,
+                             SongTableModel::Todo, SongTableModel::Changes})
         pickerView_->setColumnHidden(column, true);
     pickerView_->horizontalHeader()->setSectionResizeMode(SongTableModel::Title,
                                                           QHeaderView::Stretch);

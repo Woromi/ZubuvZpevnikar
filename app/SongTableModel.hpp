@@ -12,13 +12,14 @@ class SongTableModel : public QAbstractTableModel {
     Q_OBJECT
 
 public:
-    enum Column { Title, Artist, Language, Key, Todo, Changes, ColumnCount };
+    enum Column { Title, Artist, Language, Key, Tempo, Meter, Capo, Todo, Changes, ColumnCount };
     enum Role {
         LanguageRole = Qt::UserRole, // raw lang value, e.g. "czech"
         SearchTextRole,              // all columns, case- and accent-folded, for filtering
         InputNameRole,               // "Artist/Title"
         HasTodoRole,                 // bool: the song has TODO comments
         HasChangesRole,              // bool: a songbook scan found possible changes
+        SortRole,                    // what the column sorts by: numbers for Tempo and Capo
     };
 
     explicit SongTableModel(QObject* parent = nullptr);
@@ -52,7 +53,7 @@ public:
 private:
     struct Row {
         zub::SongEntry entry;
-        QString title, artist, language, key, todo, todoToolTip, searchText, toolTip;
+        QString title, artist, language, key, tempo, meter, capo, todo, todoToolTip, searchText, toolTip;
         QString changes, changesToolTip; // from a songbook scan
     };
     static Row makeRow(zub::SongEntry entry);

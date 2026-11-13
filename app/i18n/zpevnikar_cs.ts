@@ -1421,6 +1421,18 @@ Vynecháno (neplatný název písně): %1</translation>
         <translation>Tónina</translation>
     </message>
     <message>
+        <source>Tempo</source>
+        <translation>Tempo</translation>
+    </message>
+    <message>
+        <source>Meter</source>
+        <translation>Takt</translation>
+    </message>
+    <message>
+        <source>Capo</source>
+        <translation>Kapodastr</translation>
+    </message>
+    <message>
         <source>TODO</source>
         <translation>TODO</translation>
     </message>

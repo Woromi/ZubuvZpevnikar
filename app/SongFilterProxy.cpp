@@ -4,6 +4,7 @@
 
 SongFilterProxy::SongFilterProxy(QObject* parent) : QSortFilterProxyModel(parent) {
     setSortLocaleAware(true);
+    setSortRole(SongTableModel::SortRole);
     setSortCaseSensitivity(Qt::CaseInsensitive);
 }
 
