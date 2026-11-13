@@ -10,7 +10,7 @@ jobs:
     name: Core and tests (Ubuntu)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -37,8 +37,8 @@ jobs:
           dnf install -y git gcc-c++ cmake ninja-build \
             qt6-qtbase-devel qt6-qtsvg-devel qt6-qtpdf-devel qt6-qttools-devel \
             qt6-linguist kf6-syntax-highlighting-devel catch-devel \
-            cargo rust
-      - uses: actions/checkout@v4
+            cargo rust openssl-devel pkgconf-pkg-config
+      - uses: actions/checkout@v5
         with:
           submodules: recursive # external/chords_converter
       - name: Configure
