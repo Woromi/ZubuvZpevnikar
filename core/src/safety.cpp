@@ -56,6 +56,7 @@ constexpr std::array kKnown = std::to_array<std::string_view>({
     "flt",
     "foreignlanguage",
     "gtab",
+    "ifchorded", // the songs package: chords shown or not (\ifchorded … \else … \fi)
     "iflargepaper",
     "insertchorus",
     "itshape",
