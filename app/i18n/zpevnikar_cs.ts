@@ -667,6 +667,22 @@ Použijte vestavěný.</translation>
         <translation>Žádné neuložené změny</translation>
     </message>
     <message>
+        <source>e.g. Intro, Solo, Verse</source>
+        <translation>např. Intro, Solo, Verse</translation>
+    </message>
+    <message>
+        <source>The score&apos;s file is the song&apos;s file name followed by the part name. Leave it empty for the song&apos;s only score.</source>
+        <translation>Soubor ukázky se jmenuje jako soubor písně, za kterým následuje název části. Pro jedinou ukázku písně nechte prázdné.</translation>
+    </message>
+    <message>
+        <source>Part name:</source>
+        <translation>Název části:</translation>
+    </message>
+    <message>
+        <source>Use only letters, digits and spaces.</source>
+        <translation>Použijte jen písmena, číslice a mezery.</translation>
+    </message>
+    <message>
         <source>%1: the song header has a problem: %2</source>
         <translation>%1: problém v hlavičce písně: %2</translation>
     </message>
@@ -867,16 +883,16 @@ Použijte vestavěný.</translation>
         <translation>Nová notová ukázka</translation>
     </message>
     <message>
-        <source>File name of the new score (in the folder %1):</source>
-        <translation>Název souboru nové notové ukázky (ve složce %1):</translation>
-    </message>
-    <message>
         <source>&quot;%1&quot; is not a valid name for a score file.</source>
         <translation>„%1“ není platný název souboru notové ukázky.</translation>
     </message>
     <message>
         <source>%1 already exists.</source>
         <translation>%1 už existuje.</translation>
+    </message>
+    <message>
+        <source>File: %1</source>
+        <translation>Soubor: %1</translation>
     </message>
     <message>
         <source>New score %1. Save it with Ctrl+S to create the file.</source>

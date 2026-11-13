@@ -35,6 +35,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFormLayout>
 #include <QHeaderView>
 #include <QIcon>
 #include <QInputDialog>
@@ -2446,31 +2447,55 @@ void MainWindow::newScore() {
         const std::string name = folder + file;
         return scoreTabIndex(name) >= 0 || !scorePath(name).empty();
     };
-    std::string suggestion = stem + ".ly";
-    for (int n = 2; taken(suggestion); ++n)
-        suggestion = stem + std::to_string(n) + ".ly";
+    // The file is <Song><Part>.ly (the songbook's naming): only the part name is asked for.
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("New Score"));
+    auto* part = new QLineEdit;
+    part->setPlaceholderText(tr("e.g. Intro, Solo, Verse"));
+    part->setToolTip(tr("The score's file is the song's file name followed by the part name. "
+                        "Leave it empty for the song's only score."));
+    auto* fileLabel = new QLabel;
+    fileLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    auto* layout = new QFormLayout(&dialog);
+    layout->addRow(tr("Part name:"), part);
+    layout->addRow(fileLabel);
+    layout->addRow(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 
-    bool ok = false;
-    QString entered = QInputDialog::getText(
-        this, tr("New Score"),
-        tr("File name of the new score (in the folder %1):").arg(toQString(folder)),
-        QLineEdit::Normal, toQString(suggestion), &ok);
-    entered = entered.trimmed();
-    if (!ok || entered.isEmpty())
+    std::string file;
+    const auto check = [&] {
+        // Accents go (NFD, then the combining marks dropped): "kytarové intro" -> KytaroveIntro.
+        QString typed = part->text().normalized(QString::NormalizationForm_D);
+        typed.removeIf([](QChar c) { return c.category() == QChar::Mark_NonSpacing; });
+        const auto name = zub::score::partName(toStdString(typed));
+        file.clear();
+        QString message;
+        if (!name) {
+            message = tr("Use only letters, digits and spaces.");
+        } else {
+            file = zub::score::scoreFileName(stem, *name);
+            if (!validScoreName(folder + file))
+                message = tr("\"%1\" is not a valid name for a score file.")
+                              .arg(toQString(folder + file));
+            else if (taken(file))
+                message = tr("%1 already exists.").arg(toQString(folder + file));
+        }
+        const bool ok = message.isEmpty();
+        fileLabel->setText(ok ? tr("File: %1").arg(toQString(folder + file)) : message);
+        buttons->button(QDialogButtonBox::Ok)->setEnabled(ok);
+        if (!ok)
+            file.clear();
+    };
+    connect(part, &QLineEdit::textChanged, &dialog, check);
+    if (taken(zub::score::scoreFileName(stem, "")))
+        part->setText(QStringLiteral("Intro"));
+    check();
+    dialog.resize(std::max(dialog.sizeHint().width(), 420), dialog.sizeHint().height());
+    if (dialog.exec() != QDialog::Accepted || file.empty())
         return;
-    if (!entered.endsWith(QStringLiteral(".ly")))
-        entered += QStringLiteral(".ly");
-    const std::string file = toStdString(entered);
     const std::string name = folder + file;
-    if (file.find('/') != std::string::npos || !validScoreName(name)) {
-        QMessageBox::warning(this, tr("New Score"),
-                             tr("\"%1\" is not a valid name for a score file.").arg(entered));
-        return;
-    }
-    if (taken(file)) {
-        QMessageBox::warning(this, tr("New Score"), tr("%1 already exists.").arg(toQString(name)));
-        return;
-    }
 
     auto* score =
         new SongEditor(newScorePath(name), *repository_, nullptr, SongEditor::Kind::Score);

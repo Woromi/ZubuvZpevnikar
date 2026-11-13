@@ -64,4 +64,14 @@ struct NewScore {
 // A skeleton like the songbook's guitar tablature files.
 NewScore newScore();
 
+// The songbook's naming of scores: <SongFileName><PartName>.ly next to the song, e.g.
+// HeartOfGold.tex -> HeartOfGoldGuitarIntro.ly, or <SongFileName>.ly for a song's only score.
+// partName turns what the user typed into the part name: words (split at spaces, '-' and '_') each
+// start with a capital letter and are joined ("guitar intro" -> "GuitarIntro", "solo 2" ->
+// "Solo2"). Empty input gives "" (the song's only score); nullopt when a word has anything but
+// ASCII letters and digits.
+std::optional<std::string> partName(std::string_view typed);
+// songStem + part + ".ly".
+std::string scoreFileName(std::string_view songStem, std::string_view part);
+
 } // namespace zub::score

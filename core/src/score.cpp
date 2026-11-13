@@ -169,4 +169,30 @@ NewScore newScore() {
     return {before + "<e,\\6 e\\4>1" + after, before.size()};
 }
 
+std::optional<std::string> partName(std::string_view typed) {
+    std::string part;
+    bool wordStart = true;
+    for (const char c : typed) {
+        if (c == ' ' || c == '\t' || c == '-' || c == '_') {
+            wordStart = true;
+            continue;
+        }
+        const bool lower = c >= 'a' && c <= 'z';
+        const bool upper = c >= 'A' && c <= 'Z';
+        const bool digit = c >= '0' && c <= '9';
+        if (!lower && !upper && !digit)
+            return std::nullopt;
+        part += wordStart && lower ? static_cast<char>(c - 'a' + 'A') : c;
+        wordStart = false;
+    }
+    return part;
+}
+
+std::string scoreFileName(std::string_view songStem, std::string_view part) {
+    std::string name(songStem);
+    name += part;
+    name += ".ly";
+    return name;
+}
+
 } // namespace zub::score

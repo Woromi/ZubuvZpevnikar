@@ -142,6 +142,23 @@ TEST_CASE("newScore has the cursor inside the TabStaff", "[score]") {
     CHECK(n.text.find('}', n.text.find("\\tabFullNotation")) > n.cursor);
 }
 
+TEST_CASE("score part names follow the songbook's naming", "[score]") {
+    CHECK(sc::partName("") == "");
+    CHECK(sc::partName("   ") == "");
+    CHECK(sc::partName("Intro") == "Intro");
+    CHECK(sc::partName("intro") == "Intro");
+    CHECK(sc::partName("guitar intro") == "GuitarIntro");
+    CHECK(sc::partName(" solo-2 ") == "Solo2");
+    CHECK(sc::partName("harp_1") == "Harp1");
+    CHECK(sc::partName("GuitarIntro") == "GuitarIntro"); // capitals inside a word stay
+    CHECK(sc::partName("2nd verse") == "2ndVerse");
+    CHECK_FALSE(sc::partName("sólo"));    // the app strips accents first
+    CHECK_FALSE(sc::partName("intro/x")); // no paths
+    CHECK_FALSE(sc::partName("a.ly"));
+    CHECK(sc::scoreFileName("HeartOfGold", "GuitarIntro") == "HeartOfGoldGuitarIntro.ly");
+    CHECK(sc::scoreFileName("Jolene", "") == "Jolene.ly");
+}
+
 // Hidden: needs lilypond and the real ../ZubuvZpevnik checkout.
 // Run with: build/debug/tests/zub_core_tests "[integration]"
 TEST_CASE("every real score and the new-score template render", "[.integration][score]") {
