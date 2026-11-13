@@ -50,6 +50,11 @@ public:
     // Stops watching the file and its directory for good (the tab is going away).
     void stopWatching();
 
+    // Whether the editor would keep `bytes` exactly (no BOM, valid UTF-8, one kind of line
+    // ending, no Unicode line separators). A file that does not is opened read-only and must not
+    // be rewritten behind the editor's back either.
+    static bool roundTrips(const std::string& bytes);
+
     Kind kind() const { return kind_; }
     const std::filesystem::path& path() const { return path_; }
     bool isModified() const;

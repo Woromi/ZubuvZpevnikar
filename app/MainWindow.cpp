@@ -4,6 +4,8 @@
 #include "ConverterVersion.hpp"
 #include "DiffView.hpp"
 #include "ImportDialog.hpp"
+#include "LabelFilterBox.hpp"
+#include "LabelsDialog.hpp"
 #include "PreviewPane.hpp"
 #include "PreviewRunner.hpp"
 #include "ScorePreviewPane.hpp"
@@ -81,6 +83,7 @@
 #include <zub/core/songedit.hpp>
 #include <zub/core/songimport.hpp>
 #include <zub/core/songsuggest.hpp>
+#include <zub/core/songtags.hpp>
 #include <zub/core/songtidy.hpp>
 #include <zub/core/songtodo.hpp>
 #include <zub/core/textfile.hpp>
@@ -264,6 +267,15 @@ void MainWindow::createCentralWidget() {
             [this] { proxy_->setLanguage(language_->currentData().toString()); });
     filters->addWidget(language_);
 
+    auto* favouritesOnly = new QCheckBox(tr("Only favourites"), filters);
+    favouritesOnly->setToolTip(tr("Songs marked with ★"));
+    connect(favouritesOnly, &QCheckBox::toggled, proxy_, &SongFilterProxy::setFavouritesOnly);
+    filters->addWidget(favouritesOnly);
+
+    labelFilter_ = new LabelFilterBox(model_, filters);
+    connect(labelFilter_, &LabelFilterBox::labelChanged, proxy_, &SongFilterProxy::setLabel);
+    filters->addWidget(labelFilter_);
+
     auto* todoOnly = new QCheckBox(tr("Only songs with TODOs"), filters);
     todoOnly->setToolTip(tr("Songs with a TODO comment, e.g. imported songs not checked yet"));
     connect(todoOnly, &QCheckBox::toggled, proxy_, &SongFilterProxy::setTodoOnly);
@@ -303,6 +315,17 @@ void MainWindow::createCentralWidget() {
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Todo, QHeaderView::Stretch);
     table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Changes, QHeaderView::Stretch);
     table_->setColumnHidden(SongTableModel::Changes, true); // until a songbook scan
+    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Favourite,
+                                                     QHeaderView::ResizeToContents);
+    // Click the ★ to toggle the favourite; right-click for the labels.
+    connect(table_, &QAbstractItemView::clicked, this, [this](const QModelIndex& index) {
+        if (index.column() != SongTableModel::Favourite)
+            return;
+        if (const auto* song = model_->song(proxy_->mapToSource(index).row()))
+            toggleFavourite(song->path);
+    });
+    table_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(table_, &QWidget::customContextMenuRequested, this, &MainWindow::showTableMenu);
     connect(table_, &QAbstractItemView::activated, this, &MainWindow::openSong);
 
     listLayout->addWidget(filters);
@@ -618,6 +641,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
     connect(edit, &QPlainTextEdit::textChanged, this, [this] {
         refreshChanges();
         updateMarkChecked();
+        favouriteTimer_->start();
         scoreSyncTimer_->start(); // a \lilypondfile may have been typed
         updateScoreWidthBars();
     });
@@ -920,6 +944,29 @@ void MainWindow::createSongToolBar() {
     });
     songToolBar_->addAction(markCheckedAction_);
 
+    favouriteAction_ = new QAction(QStringLiteral("★"), this);
+    favouriteAction_->setCheckable(true);
+    favouriteAction_->setToolTip(tr("Favourite: add or remove the label \"fav\" "
+                                    "(one undo step; save to keep it)"));
+    // triggered, not toggled: syncing the check with the text must not write to the text.
+    connect(favouriteAction_, &QAction::triggered, this, [this] {
+        if (editor_)
+            toggleFavourite(editor_->path());
+    });
+    songToolBar_->addAction(favouriteAction_);
+    favouriteTimer_ = new QTimer(this);
+    favouriteTimer_->setSingleShot(true);
+    favouriteTimer_->setInterval(300);
+    connect(favouriteTimer_, &QTimer::timeout, this, &MainWindow::updateLabelActions);
+
+    labelsAction_ = new QAction(QIcon::fromTheme(QStringLiteral("tag")), tr("Labels…"), this);
+    labelsAction_->setToolTip(tr("Edit the song's labels (one undo step; save to keep them)"));
+    connect(labelsAction_, &QAction::triggered, this, [this] {
+        if (editor_)
+            editLabels({editor_->path()});
+    });
+    songToolBar_->addAction(labelsAction_);
+
     changesAction_ =
         new QAction(QIcon::fromTheme(QStringLiteral("document-compare")), tr("Changes"), this);
     changesAction_->setCheckable(true);
@@ -1104,8 +1151,8 @@ void MainWindow::updateSongActions() {
         changesAction_->setChecked(false);
     updateEditState();
     if (!open) {
-        for (QAction* action :
-             {tidyAction_, makeSmallerAction_, joinLinesAction_, checkAction_, markCheckedAction_})
+        for (QAction* action : {tidyAction_, makeSmallerAction_, joinLinesAction_, checkAction_,
+                                markCheckedAction_, favouriteAction_, labelsAction_})
             action->setEnabled(false);
         for (QAction* action : editActions_)
             action->setEnabled(false);
@@ -1128,6 +1175,144 @@ void MainWindow::updateSongActions() {
         action->setEnabled(converterFree && !songbookRoot_.empty());
     checkAction_->setEnabled(converterFree); // check needs no songbook
     updateMarkChecked();
+    updateLabelActions();
+}
+
+void MainWindow::updateLabelActions() {
+    const bool editable = editor_ && onSongTab() && !editor_->textEdit()->isReadOnly() &&
+                          !changesAction_->isChecked();
+    favouriteAction_->setEnabled(editable);
+    labelsAction_->setEnabled(editable);
+    bool favourite = false;
+    if (editor_) {
+        if (const auto meta = zub::parseSong(editor_->content()))
+            favourite = zub::tags::isFavourite(zub::tags::parse(meta->value("tags")));
+    }
+    favouriteAction_->setChecked(favourite);
+}
+
+QString MainWindow::writeSongTags(
+    const std::filesystem::path& path,
+    const std::function<std::vector<std::string>(const std::vector<std::string>&)>& change) {
+    const QString name = toQString(path.filename());
+    const bool open = editor_ && editor_->path() == path;
+    if (open && editor_->textEdit()->isReadOnly())
+        return tr("%1: the song is open read-only.").arg(name);
+    std::string content;
+    if (open) {
+        content = editor_->content();
+    } else if (auto bytes = zub::readTextFile(path)) {
+        content = std::move(*bytes);
+        if (!SongEditor::roundTrips(content))
+            return tr("%1: the file can't be rewritten safely (byte-order mark, invalid UTF-8, "
+                      "mixed line endings or Unicode line separators).")
+                .arg(name);
+    } else {
+        return toQString(bytes.error());
+    }
+    const auto meta = zub::parseSong(content);
+    if (!meta)
+        return tr("%1: the song header has a problem: %2").arg(name, toQString(meta.error()));
+    const auto current = zub::tags::parse(meta->value("tags"));
+    const auto wanted = change(current);
+    if (wanted == current)
+        return {};
+    for (const std::string& tag : wanted) {
+        if (zub::tags::invalidTag(tag))
+            return tr("%1: \"%2\" cannot be a label.").arg(name, toQString(tag));
+    }
+    const std::string updated = zub::tags::setTags(content, wanted);
+    if (open) {
+        editor_->replaceContent(updated);
+        updateLabelActions();
+        return {};
+    }
+    if (auto written = zub::writeTextFileAtomic(path, updated); !written)
+        return toQString(written.error());
+    if (auto newMeta = zub::parseSong(updated))
+        model_->updateSong(path, std::move(*newMeta), zub::todo::notes(updated));
+    return {};
+}
+
+void MainWindow::changeSongTags(
+    const std::vector<std::filesystem::path>& paths,
+    const std::function<std::vector<std::string>(const std::vector<std::string>&)>& change) {
+    QStringList failures;
+    bool anyOpen = false;
+    for (const auto& path : paths) {
+        const QString error = writeSongTags(path, change);
+        if (!error.isEmpty())
+            failures << error;
+        anyOpen = anyOpen || (editor_ && editor_->path() == path);
+    }
+    if (!failures.isEmpty()) {
+        QMessageBox::warning(this, tr("Labels"),
+                             tr("These songs could not be changed:") + QStringLiteral("\n\n") +
+                                 failures.join(QLatin1Char('\n')));
+    } else if (anyOpen) {
+        statusBar()->showMessage(tr("Labels changed. Save to keep them."), 8000);
+    }
+}
+
+void MainWindow::toggleFavourite(const std::filesystem::path& path) {
+    changeSongTags({path}, [](const std::vector<std::string>& tags) {
+        auto result = tags;
+        const std::string fav{zub::tags::kFavourite};
+        if (const auto it = std::ranges::find(result, fav); it != result.end())
+            result.erase(it);
+        else
+            result.insert(result.begin(), fav);
+        return result;
+    });
+    updateLabelActions(); // a failed toggle must not leave the ★ flipped
+}
+
+void MainWindow::editLabels(const std::vector<std::filesystem::path>& paths) {
+    std::vector<std::vector<std::string>> songs;
+    QStringList known = model_->labels();
+    for (const auto& path : paths) {
+        std::optional<zub::SongMetadata> meta;
+        if (editor_ && editor_->path() == path) {
+            if (auto parsed = zub::parseSong(editor_->content()))
+                meta = std::move(*parsed);
+        } else if (const int row = model_->rowOf(path); row >= 0) {
+            meta = model_->song(row)->meta;
+        }
+        songs.push_back(meta ? zub::tags::parse(meta->value("tags")) : std::vector<std::string>{});
+        for (const std::string& tag : songs.back()) {
+            const QString label = toQString(tag);
+            if (tag != zub::tags::kFavourite && !known.contains(label))
+                known << label;
+        }
+    }
+    if (songs.empty())
+        return;
+    LabelsDialog dialog(known, songs, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    changeSongTags(paths,
+                   [&dialog](const std::vector<std::string>& tags) { return dialog.apply(tags); });
+}
+
+std::vector<std::filesystem::path> MainWindow::selectedSongPaths() const {
+    std::vector<std::filesystem::path> paths;
+    for (const QModelIndex& index : table_->selectionModel()->selectedRows()) {
+        if (const auto* song = model_->song(proxy_->mapToSource(index).row()))
+            paths.push_back(song->path);
+    }
+    return paths;
+}
+
+void MainWindow::showTableMenu(const QPoint& position) {
+    const QModelIndex index = table_->indexAt(position);
+    if (!index.isValid())
+        return;
+    if (!table_->selectionModel()->isRowSelected(index.row(), {}))
+        table_->selectRow(index.row());
+    QMenu menu(this);
+    QAction* labels = menu.addAction(tr("Labels…"));
+    if (menu.exec(table_->viewport()->mapToGlobal(position)) == labels)
+        editLabels(selectedSongPaths());
 }
 
 void MainWindow::updateMarkChecked() {

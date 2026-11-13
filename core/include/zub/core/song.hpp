@@ -12,7 +12,8 @@ namespace zub {
 // Everything is kept as raw TeX; use latex::toDisplayText() to show it.
 struct SongMetadata {
     std::string title;
-    std::map<std::string, std::string, std::less<>> keys; // by, lang, key, tun, tem, met, pap, ...
+    // by, lang, key, tun, tem, met, pap, tags, ...
+    std::map<std::string, std::string, std::less<>> keys;
 
     // Raw value of `key`, or "" if the song does not set it.
     std::string value(std::string_view key) const;

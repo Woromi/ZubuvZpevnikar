@@ -240,6 +240,18 @@ QString toEditorText(const std::string& bytes, bool crlf) {
 
 } // namespace
 
+bool SongEditor::roundTrips(const std::string& bytes) {
+    const bool crlf = usesCrlf(bytes);
+    QTextDocument document;
+    document.setPlainText(toEditorText(bytes, crlf));
+    QString text = document.toRawText();
+    text.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+    text.replace(QChar::LineSeparator, QLatin1Char('\n'));
+    if (crlf)
+        text.replace(QLatin1Char('\n'), QStringLiteral("\r\n"));
+    return toStdString(text) == bytes;
+}
+
 void SongEditor::replaceContent(const std::string& bytes) {
     if (lossy_) {
         return;

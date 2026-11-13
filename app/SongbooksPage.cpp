@@ -1,5 +1,6 @@
 #include "SongbooksPage.hpp"
 
+#include "LabelFilterBox.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongPickerModel.hpp"
 #include "SongTableModel.hpp"
@@ -8,16 +9,16 @@
 #include "SongbookTree.hpp"
 #include "convert.hpp"
 
-#include <QAction>
 #include <QAbstractItemView>
+#include <QAction>
 #include <QApplication>
-#include <QCursor>
 #include <QBrush>
 #include <QCheckBox>
+#include <QComboBox>
+#include <QCursor>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QComboBox>
 #include <QFont>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -284,6 +285,11 @@ QWidget* SongbooksPage::buildPickerPane() {
     onlyInSection_ = new QCheckBox(tr("Only songs in this section"), pickerPane_);
     filters->addWidget(search_, 1);
     filters->addWidget(language_);
+    favouritesOnly_ = new QCheckBox(tr("Only favourites"), pickerPane_);
+    favouritesOnly_->setToolTip(tr("Songs marked with ★"));
+    labelFilter_ = new LabelFilterBox(model_, pickerPane_);
+    filters->addWidget(favouritesOnly_);
+    filters->addWidget(labelFilter_);
     layout->addLayout(filters);
     layout->addWidget(onlyInSection_);
 
@@ -302,7 +308,7 @@ QWidget* SongbooksPage::buildPickerPane() {
     pickerView_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pickerView_->verticalHeader()->hide();
     for (const int column : {SongTableModel::Tempo, SongTableModel::Meter, SongTableModel::Capo,
-                             SongTableModel::Todo, SongTableModel::Changes})
+                             SongTableModel::Labels, SongTableModel::Todo, SongTableModel::Changes})
         pickerView_->setColumnHidden(column, true);
     pickerView_->horizontalHeader()->setSectionResizeMode(SongTableModel::Title,
                                                           QHeaderView::Stretch);
@@ -321,6 +327,9 @@ QWidget* SongbooksPage::buildPickerPane() {
     connect(search_, &QLineEdit::textChanged, pickerFilter_, &SongFilterProxy::setSearchText);
     connect(language_, &QComboBox::currentIndexChanged, this,
             [this] { pickerFilter_->setLanguage(language_->currentData().toString()); });
+    connect(favouritesOnly_, &QCheckBox::toggled, pickerFilter_,
+            &SongFilterProxy::setFavouritesOnly);
+    connect(labelFilter_, &LabelFilterBox::labelChanged, pickerFilter_, &SongFilterProxy::setLabel);
     connect(onlyInSection_, &QCheckBox::toggled, this, [this] { updatePicker(); });
     connect(pickerView_, &QTableView::clicked, this, &SongbooksPage::onPickerClicked);
     connect(addPicked_, &QPushButton::clicked, this, &SongbooksPage::addPicked);

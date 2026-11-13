@@ -1,17 +1,18 @@
 #pragma once
 
-#include <QMainWindow>
 #include <QByteArray>
+#include <QMainWindow>
 #include <QPointer>
 #include <QString>
+#include <expected>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
 #include <vector>
 #include <zub/core/songedit.hpp>
-#include <expected>
 #include <zub/core/songsuggest.hpp>
 #include <zub/core/songtidy.hpp>
 
@@ -24,6 +25,7 @@ class QListWidgetItem;
 class QLockFile;
 class QLineEdit;
 class QModelIndex;
+class QPoint;
 class QSplitter;
 class QStackedWidget;
 class QTabWidget;
@@ -32,6 +34,7 @@ class QToolBar;
 class QTableView;
 class QWidget;
 class DiffView;
+class LabelFilterBox;
 class PreviewPane;
 class PreviewRunner;
 class ScorePreviewPane;
@@ -134,6 +137,22 @@ private:
     void onTabChanged();
     void requestScorePreview(bool userAsked = false);
     void showScoreResult(const ScoreResult& result);
+    // Labels (the `tags` header option; "fav" = favourite). `change` maps a song's current tags to
+    // its new ones. An open song gets the new header in its editor (one undo step, unsaved); any
+    // other song is rewritten on disk, if it round-trips, and its table row updated. Returns an
+    // error text, empty on success.
+    QString writeSongTags(
+        const std::filesystem::path& path,
+        const std::function<std::vector<std::string>(const std::vector<std::string>&)>& change);
+    // Applies `change` to every song, then lists the failures in a message box.
+    void changeSongTags(
+        const std::vector<std::filesystem::path>& paths,
+        const std::function<std::vector<std::string>(const std::vector<std::string>&)>& change);
+    void toggleFavourite(const std::filesystem::path& path);
+    void editLabels(const std::vector<std::filesystem::path>& paths);
+    std::vector<std::filesystem::path> selectedSongPaths() const; // in the song table
+    void showTableMenu(const QPoint& position);
+    void updateLabelActions(); // enabled state and ★ check of the song toolbar's actions
     void updateMarkChecked(); // enabled while the editor text has the "not checked yet" line
     // Songs → Scan Songbook…: runs tidy/check/shrink on many songs and marks the ones with
     // possible changes in the list (this session only); changes nothing.
@@ -233,6 +252,9 @@ private:
     QAction* tidyAction_ = nullptr;
     QAction* makeSmallerAction_ = nullptr;
     QAction* checkAction_ = nullptr;
+    QAction* labelsAction_ = nullptr;      // Labels… of the open song
+    QAction* favouriteAction_ = nullptr;   // ★ checkable: the open song is a favourite
+    QTimer* favouriteTimer_ = nullptr;     // syncs the ★ with the editor text after typing
     QAction* markCheckedAction_ = nullptr; // removes the import's "not checked yet" TODO line
     SongbookScan* scan_ = nullptr;         // while a songbook scan runs
     int scanFound_ = 0;                    // songs it marked so far
@@ -262,6 +284,7 @@ private:
     std::map<std::filesystem::path, std::set<std::string>> approvedConstructs_;
     QLineEdit* search_ = nullptr;
     QComboBox* language_ = nullptr;
+    LabelFilterBox* labelFilter_ = nullptr;
     QLabel* countLabel_ = nullptr;
     QLabel* issuesLabel_ = nullptr;
 

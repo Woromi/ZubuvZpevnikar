@@ -194,6 +194,40 @@ Použijte vestavěný.</translation>
     </message>
 </context>
 <context>
+    <name>LabelFilterBox</name>
+    <message>
+        <source>Show only songs with this label</source>
+        <translation>Jen písně s tímto štítkem</translation>
+    </message>
+    <message>
+        <source>All labels</source>
+        <translation>Všechny štítky</translation>
+    </message>
+</context>
+<context>
+    <name>LabelsDialog</name>
+    <message>
+        <source>Labels</source>
+        <translation>Štítky</translation>
+    </message>
+    <message>
+        <source>★ Favourite</source>
+        <translation>★ Oblíbená</translation>
+    </message>
+    <message>
+        <source>No labels yet.</source>
+        <translation>Zatím žádné štítky.</translation>
+    </message>
+    <message>
+        <source>New labels (separated by commas):</source>
+        <translation>Nové štítky (oddělené čárkami):</translation>
+    </message>
+    <message>
+        <source>&quot;%1&quot; cannot be a label: it must not contain { } \ % # or a line break.</source>
+        <translation>„%1“ nemůže být štítek: nesmí obsahovat { } \ % # ani zalomení řádku.</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
         <source>&amp;File</source>
@@ -624,6 +658,50 @@ Použijte vestavěný.</translation>
     <message>
         <source>%1: the song header has a problem: %2</source>
         <translation>%1: problém v hlavičce písně: %2</translation>
+    </message>
+    <message>
+        <source>Only favourites</source>
+        <translation>Jen oblíbené</translation>
+    </message>
+    <message>
+        <source>Songs marked with ★</source>
+        <translation>Písně označené ★</translation>
+    </message>
+    <message>
+        <source>Favourite: add or remove the label &quot;fav&quot; (one undo step; save to keep it)</source>
+        <translation>Oblíbená: přidá nebo odebere štítek „fav“ (jeden krok zpět; uložením se zachová)</translation>
+    </message>
+    <message>
+        <source>Labels…</source>
+        <translation>Štítky…</translation>
+    </message>
+    <message>
+        <source>Edit the song&apos;s labels (one undo step; save to keep them)</source>
+        <translation>Upravit štítky písně (jeden krok zpět; uložením se zachovají)</translation>
+    </message>
+    <message>
+        <source>%1: the song is open read-only.</source>
+        <translation>%1: píseň je otevřená jen pro čtení.</translation>
+    </message>
+    <message>
+        <source>%1: the file can&apos;t be rewritten safely (byte-order mark, invalid UTF-8, mixed line endings or Unicode line separators).</source>
+        <translation>%1: soubor nelze bezpečně přepsat (BOM, neplatné UTF-8, smíšené konce řádků nebo unicodové oddělovače řádků).</translation>
+    </message>
+    <message>
+        <source>%1: &quot;%2&quot; cannot be a label.</source>
+        <translation>%1: „%2“ nemůže být štítek.</translation>
+    </message>
+    <message>
+        <source>Labels</source>
+        <translation>Štítky</translation>
+    </message>
+    <message>
+        <source>These songs could not be changed:</source>
+        <translation>Tyto písně se nepodařilo změnit:</translation>
+    </message>
+    <message>
+        <source>Labels changed. Save to keep them.</source>
+        <translation>Štítky změněny. Uložením je zachováte.</translation>
     </message>
     <message>
         <source>The score %1 does not exist: create it, or remove its \lilypondfile line from the song.</source>
@@ -1405,6 +1483,10 @@ Vynecháno (neplatný název písně): %1</translation>
 <context>
     <name>SongTableModel</name>
     <message>
+        <source>Favourite</source>
+        <translation>Oblíbená</translation>
+    </message>
+    <message>
         <source>Title</source>
         <translation>Název</translation>
     </message>
@@ -1431,6 +1513,10 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>Capo</source>
         <translation>Kapodastr</translation>
+    </message>
+    <message>
+        <source>Labels</source>
+        <translation>Štítky</translation>
     </message>
     <message>
         <source>TODO</source>
@@ -1918,6 +2004,14 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Only songs in this section</source>
         <translation>Jen písně v této sekci</translation>
+    </message>
+    <message>
+        <source>Only favourites</source>
+        <translation>Jen oblíbené</translation>
+    </message>
+    <message>
+        <source>Songs marked with ★</source>
+        <translation>Písně označené ★</translation>
     </message>
     <message>
         <source>Export PDF…</source>

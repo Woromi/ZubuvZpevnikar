@@ -12,7 +12,20 @@ class SongTableModel : public QAbstractTableModel {
     Q_OBJECT
 
 public:
-    enum Column { Title, Artist, Language, Key, Tempo, Meter, Capo, Todo, Changes, ColumnCount };
+    enum Column {
+        Title,
+        Favourite, // ★ for a favourite
+        Artist,
+        Language,
+        Key,
+        Tempo,
+        Meter,
+        Capo,
+        Labels, // the tags except "fav"
+        Todo,
+        Changes,
+        ColumnCount
+    };
     enum Role {
         LanguageRole = Qt::UserRole, // raw lang value, e.g. "czech"
         SearchTextRole,              // all columns, case- and accent-folded, for filtering
@@ -20,6 +33,8 @@ public:
         HasTodoRole,                 // bool: the song has TODO comments
         HasChangesRole,              // bool: a songbook scan found possible changes
         SortRole,                    // what the column sorts by: numbers for Tempo and Capo
+        FavouriteRole,               // bool: the song's tags include "fav"
+        LabelsRole,                  // QStringList: the tags except "fav"
     };
 
     explicit SongTableModel(QObject* parent = nullptr);
@@ -37,6 +52,8 @@ public:
     void setScanResult(const std::filesystem::path& path, const QString& summary,
                        const QString& details);
     void clearScanResults();
+    // Every label (tag except "fav") of any song, sorted for the current locale.
+    QStringList labels() const;
     // Adds a song (e.g. a newly imported one after its first save).
     void addSong(zub::SongEntry song);
 
@@ -53,7 +70,10 @@ public:
 private:
     struct Row {
         zub::SongEntry entry;
-        QString title, artist, language, key, tempo, meter, capo, todo, todoToolTip, searchText, toolTip;
+        QString title, artist, language, key, tempo, meter, capo, todo, todoToolTip, searchText,
+            toolTip, labelsText;
+        QStringList labels;
+        bool favourite = false;
         QString changes, changesToolTip; // from a songbook scan
     };
     static Row makeRow(zub::SongEntry entry);

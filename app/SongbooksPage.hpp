@@ -24,6 +24,7 @@ class QTableView;
 class SongbookExporter;
 class SongbookSorter;
 class SongbookTree;
+class LabelFilterBox;
 class SongFilterProxy;
 class SongPickerModel;
 class SongTableModel;
@@ -168,6 +169,8 @@ private:
     QPushButton* removePicked_ = nullptr;
     QLineEdit* search_ = nullptr;
     QComboBox* language_ = nullptr;
+    QCheckBox* favouritesOnly_ = nullptr;
+    LabelFilterBox* labelFilter_ = nullptr;
     QCheckBox* onlyInSection_ = nullptr;
     SongFilterProxy* pickerFilter_ = nullptr;
     SongPickerModel* picker_ = nullptr;

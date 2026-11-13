@@ -35,6 +35,10 @@ qt_add_executable(zpevnikar
     SongbooksPage.cpp
     SongPickerModel.hpp
     SongPickerModel.cpp
+    LabelFilterBox.hpp
+    LabelFilterBox.cpp
+    LabelsDialog.hpp
+    LabelsDialog.cpp
     DiffView.hpp
     DiffView.cpp
     CodeTextEdit.hpp
