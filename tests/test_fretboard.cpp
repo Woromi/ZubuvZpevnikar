@@ -294,7 +294,8 @@ TEST_CASE("every note of every real score has a valid position", "[.integration]
     }
 
     // A few real scores write a note below its string's open pitch (a leftover guitar chord in a
-    // banjo score, a typo): those are tolerated up to 3 % of the positions; the rest must be a
+    // banjo score, a typo): those are tolerated up to 4 % of the positions (counted per cursor position, and a note's
+    // position now counts in its articulations too: DivokejBill/Rozarka.ly is 3.2 %); the rest must be a
     // playable fret.
     int scores = 0;
     int cursors = 0;
@@ -332,7 +333,7 @@ TEST_CASE("every note of every real score has a valid position", "[.integration]
         }
     }
     CAPTURE(cursors, unplayable);
-    CHECK(unplayable * 100 < cursors * 3);
+    CHECK(unplayable * 100 < cursors * 4);
     CHECK(scores > 0);
     CHECK(cursors > 0);
 }
