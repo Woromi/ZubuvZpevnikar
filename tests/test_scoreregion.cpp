@@ -1,5 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
+#include <algorithm>
+#include <filesystem>
+#include <iostream>
+#include <map>
 #include <string>
+#include <zub/core/textfile.hpp>
 using namespace std::string_literals;
 #include <zub/core/scoreregion.hpp>
 
@@ -449,4 +454,108 @@ TEST_CASE("scoreregion musicEvents lists only the music, in text order", "[score
     CHECK_FALSE(sr::eventAt(more, more[0].end));
     CHECK(sr::eventAt(more, more[4].end - 1) == 4);
     CHECK_FALSE(sr::eventAt(more, text.size()));
+}
+
+// Run with: build/debug/tests/zub_core_tests "[integration]"
+// Reads every real score (read-only, in memory) and applies every action to every music event and
+// to a few contiguous ranges: the text outside the region stays byte for byte, the braces stay
+// balanced (Repeat adds one pair), what lies between the events of the region survives, and
+// applying again changes nothing (Repeat nests, Dead Notes toggles back).
+TEST_CASE("every action on the real scores keeps the rest of the text", "[.integration][scoreregion]") {
+    namespace fs = std::filesystem;
+    const fs::path songs = fs::path(ZUB_REAL_SONGBOOK_DIR) / "songs";
+    if (!fs::is_directory(songs))
+        SKIP("no songbook checkout at " << songs);
+    const auto count = [](const std::string& s, char c) { return std::ranges::count(s, c); };
+    const std::vector<std::pair<const char*, Action>> actions = {
+        {"Tie", Action::Tie},           {"Slur", Action::Slur},
+        {"Glissando", Action::Glissando}, {"Repeat", Action::Repeat},
+        {"StrokeDown", Action::StrokeDown}, {"StrokeUp", Action::StrokeUp},
+        {"DeadNotes", Action::DeadNotes}};
+    std::size_t files = 0, events = 0, applications = 0;
+    std::map<std::string, std::size_t> applied, refused, nothing;
+    for (const auto& entry : fs::recursive_directory_iterator(songs)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".ly")
+            continue;
+        const auto content = zub::readTextFile(entry.path());
+        REQUIRE(content);
+        const std::string& text = *content;
+        const auto all = sr::musicEvents(text);
+        ++files;
+        events += all.size();
+        if (all.empty())
+            continue;
+        // The ranges: every event alone, and a few windows of events.
+        std::vector<sr::Range> ranges;
+        for (const sr::Range& e : all)
+            ranges.push_back(e);
+        const std::size_t n = all.size();
+        for (const std::size_t width : {std::size_t{2}, std::size_t{5}, std::size_t{12}, n}) {
+            for (const std::size_t start : {std::size_t{0}, n / 3, n / 2, n > width ? n - width : 0}) {
+                const std::size_t last = std::min(n, start + width) - 1;
+                if (start <= last)
+                    ranges.push_back({all[start].begin, all[last].end});
+            }
+        }
+        for (const sr::Range& range : ranges) {
+            const auto region = sr::expandToEvents(text, range);
+            REQUIRE(region);
+            // The gaps between the events of the region.
+            std::vector<std::string> gaps;
+            for (std::size_t i = 0; i + 1 < all.size(); ++i) {
+                if (all[i].begin >= region->begin && all[i + 1].end <= region->end &&
+                    all[i].end < all[i + 1].begin)
+                    gaps.push_back(text.substr(all[i].end, all[i + 1].begin - all[i].end));
+            }
+            for (const auto& [name, action] : actions) {
+                INFO(entry.path().string() << " " << name << " [" << range.begin << "," << range.end << ")");
+                sr::Refusal why = sr::Refusal::NothingToApply;
+                const auto result = sr::apply(action, text, range, &why);
+                ++applications;
+                if (!result) {
+                    ++(why == sr::Refusal::NothingToApply ? nothing : refused)[name];
+                    continue;
+                }
+                ++applied[name];
+                const std::string& out = result->text;
+                // Outside the region: untouched.
+                REQUIRE(out.starts_with(text.substr(0, region->begin)));
+                REQUIRE(out.ends_with(text.substr(region->end)));
+                // Braces: balanced as before; Repeat adds exactly one pair.
+                const long pair = action == Action::Repeat ? 1 : 0;
+                REQUIRE(count(out, '{') == count(text, '{') + pair);
+                REQUIRE(count(out, '}') == count(text, '}') + pair);
+                // What lies between the events of the region (commands, bar lines, chord names
+                // inside a long range) is still there, in order.
+                std::size_t at = region->begin;
+                for (const std::string& gap : gaps) {
+                    const auto found = out.find(gap, at);
+                    REQUIRE(found != std::string::npos);
+                    at = found + gap.size();
+                }
+                // Again: nothing changes (Dead Notes toggles back to the original).
+                const auto again = sr::apply(action, out, result->selection);
+                if (action == Action::Repeat)
+                    continue;
+                if (action == Action::DeadNotes) {
+                    REQUIRE(again);
+                    // A toggle: braces and the text outside the (moved) region stay.
+                    REQUIRE(count(again->text, '{') == count(text, '{'));
+                    REQUIRE(count(again->text, '}') == count(text, '}'));
+                    REQUIRE(again->text.starts_with(text.substr(0, region->begin)));
+                    REQUIRE(again->text.ends_with(text.substr(region->end)));
+                    continue;
+                }
+                REQUIRE(again);
+                REQUIRE(again->text == out);
+            }
+        }
+    }
+    CHECK(files > 0);
+    std::cerr << "scores: " << files << ", music events: " << events
+              << ", applications: " << applications << "\n";
+    for (const auto& [name, action] : actions) {
+        std::cerr << "  " << name << ": applied " << applied[name] << ", refused " << refused[name]
+                  << ", nothing to apply " << nothing[name] << "\n";
+    }
 }
