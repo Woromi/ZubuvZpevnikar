@@ -55,6 +55,7 @@ struct Result {
 enum class Refusal {
     NothingToApply,
     CrossesBlock, // Repeat: the `{ }` of the region are not balanced
+    SlurPresent,  // Slur: a slur is open across the region's start, or the region has slur marks
 };
 // `why` (when given) tells the reason of an empty result.
 std::optional<Result> apply(Action action, std::string_view text, Range range,

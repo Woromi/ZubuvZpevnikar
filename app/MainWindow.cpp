@@ -468,6 +468,10 @@ void MainWindow::createCentralWidget() {
                 if (SongEditor* editor = currentEditor(); editor && !onSongTab()) {
                     zub::scoreregion::Refusal why = zub::scoreregion::Refusal::NothingToApply;
                     editor->applyRegionAction(a, &why);
+                    if (why == zub::scoreregion::Refusal::SlurPresent)
+                        statusBar()->showMessage(
+                            tr("A slur is already open here or the selection has slur marks."),
+                            6000);
                     if (why == zub::scoreregion::Refusal::CrossesBlock)
                         statusBar()->showMessage(
                             tr("The selection crosses a { } block: select notes within one "

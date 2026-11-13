@@ -212,7 +212,7 @@ struct Scanner {
         return i;
     }
 
-    // One articulation at `k` (`^\\strokeDown`, `-.`, `_"x"`, `^\\markup { x }`, `-\\bendAfter #+4`,
+    // One articulation at `k` (`^\strokeDown`, `-.`, `_"x"`, `^\markup { x }`, `-\bendAfter #+4`,
     // `-\\tweak color #red ^"x"`); its end, or `k` when it is none.
     std::size_t articulation(std::size_t k) const {
         if (k >= s.size() || (s[k] != '^' && s[k] != '_' && s[k] != '-'))
@@ -255,7 +255,7 @@ struct Scanner {
     }
 
     // Post-events and articulations written after a note or chord from `i` on: right against it
-    // or after spaces (`<...>2. ^\\strokeDown`). Arguments (`^\\markup { x }`, `-\\bendAfter #+4`)
+    // or after spaces (`<...>2. ^\strokeDown`). Arguments (`^\markup { x }`, `-\bendAfter #+4`)
     // are part of the articulation.
     std::size_t trail(std::size_t i) const {
         std::size_t end = i;
@@ -764,6 +764,32 @@ inline bool bracesBalanced(std::string_view text) {
         }
     }
     return depth == 0;
+}
+
+// Where the innermost `{ }` block around `pos` starts (after its `{`); 0 outside any block.
+inline std::size_t enclosingBlockStart(std::string_view text, std::size_t pos) {
+    const Scanner scanner{text, Names::Any, {}};
+    std::vector<std::size_t> open;
+    std::size_t i = 0;
+    while (i < pos && i < text.size()) {
+        const char c = text[i];
+        if (c == '%') {
+            i = scanner.skipComment(i);
+        } else if (c == '"') {
+            i = scanner.skipString(i);
+        } else if (c == '#' || c == '$') {
+            i = scanner.skipScheme(i);
+        } else if (c == '\\') {
+            i = std::min(i + 2, text.size());
+        } else {
+            ++i;
+            if (c == '{')
+                open.push_back(i);
+            else if (c == '}' && !open.empty())
+                open.pop_back();
+        }
+    }
+    return open.empty() ? 0 : open.back();
 }
 
 inline std::vector<Event> scan(std::string_view text, Names names) {

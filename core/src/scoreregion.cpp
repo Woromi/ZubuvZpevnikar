@@ -93,6 +93,23 @@ Result finish(std::string_view text, std::vector<Edit> edits, Range range) {
     return {applyEdits(text, edits), selection};
 }
 
+// The `(` and `)` in the tail of `e` (not those in strings): opening - closing, and how many.
+int slurBalance(std::string_view text, const Event& e, int& marks) {
+    const std::string_view tail = tailOf(text, e);
+    int balance = 0;
+    for (std::size_t i = 0; i < tail.size(); ++i) {
+        if (tail[i] == '"') {
+            for (++i; i < tail.size() && tail[i] != '"'; ++i)
+                if (tail[i] == '\\')
+                    ++i;
+        } else if (tail[i] == '(' || tail[i] == ')') {
+            balance += tail[i] == '(' ? 1 : -1;
+            ++marks;
+        }
+    }
+    return balance;
+}
+
 // `^\strokeDown` / `^\strokeUp` in the tail of `e`: the edits that leave exactly `wanted`.
 void strokeEdits(std::string_view text, const Event& e, std::string_view wanted,
                  std::vector<Edit>& edits) {
@@ -171,9 +188,18 @@ std::optional<Result> apply(Action action, std::string_view text, Range range, R
         return std::nullopt;
     std::vector<Event> inside;
     std::vector<const Event*> notes;
+    // The slurs left open before the region, from the start of its block.
+    int openSlurs = 0;
+    const std::size_t blockStart = sd::enclosingBlockStart(text, region->begin);
     for (Event& e : sd::scan(text, sd::Names::Any)) {
-        if (e.begin >= region->begin && e.postEnd <= region->end && !e.definition)
+        if (e.definition)
+            continue;
+        if (e.begin >= region->begin && e.postEnd <= region->end) {
             inside.push_back(std::move(e));
+        } else if (e.begin >= blockStart && e.postEnd <= region->begin && !e.rest) {
+            int marks = 0;
+            openSlurs += slurBalance(text, e, marks);
+        }
     }
     for (const Event& e : inside) {
         if (!e.rest && !unclosed(text, e))
@@ -199,10 +225,17 @@ std::optional<Result> apply(Action action, std::string_view text, Range range, R
             return std::nullopt;
         const Event& first = *notes.front();
         const Event& last = *notes.back();
-        if (tailOf(text, first).find('(') == std::string_view::npos)
+        int marks = 0;
+        for (const Event* e : notes)
+            slurBalance(text, *e, marks);
+        const bool done = marks == 2 && tailOf(text, first).find('(') != std::string_view::npos &&
+                          tailOf(text, last).find(')') != std::string_view::npos;
+        if (!done && (marks > 0 || openSlurs > 0))
+            return refuse(Refusal::SlurPresent);
+        if (!done) {
             edits.push_back({first.postEnd, 0, "("});
-        if (tailOf(text, last).find(')') == std::string_view::npos)
             edits.push_back({last.postEnd, 0, ")"});
+        }
         break;
     }
     case Action::Glissando: {

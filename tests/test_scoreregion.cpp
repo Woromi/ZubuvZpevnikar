@@ -403,3 +403,25 @@ TEST_CASE("scoreregion articulations with spaces and arguments are part of the n
     CHECK(run(Action::Repeat, "c4^\\markup \\bold \"x\" \\time 3/4 d4", "c4", "c4") ==
           "[\\repeat volta 2 { c4^\\markup \\bold \"x\" }] \\time 3/4 d4");
 }
+
+TEST_CASE("scoreregion Slur refuses to nest", "[scoreregion]") {
+    sr::Refusal why = sr::Refusal::NothingToApply;
+    // A slur is open across the start of the region.
+    const std::string open = "{ c4( d4 e4) f4 }";
+    CHECK_FALSE(sr::apply(Action::Slur, open, between(open, "d4", "e4"), &why));
+    CHECK(why == sr::Refusal::SlurPresent);
+    // The region has slur marks of its own.
+    const std::string inner = "{ c4 d4( e4) f4 }";
+    CHECK_FALSE(sr::apply(Action::Slur, inner, between(inner, "c4", "f4"), &why));
+    CHECK(why == sr::Refusal::SlurPresent);
+    // A slur that closed before the region does not matter; the same slur is a no-op.
+    const std::string closed = "{ c4( d4) e4 f4 g4( a4) }";
+    CHECK(run(Action::Slur, closed, "e4", "f4") == "{ c4( d4) [e4( f4)] g4( a4) }");
+    const std::string done = "{ c4 d4( e4) }";
+    CHECK(run(Action::Slur, done, "d4", "e4") == "{ c4 [d4( e4)] }");
+    // A slur of another block does not count; the strings and phrasing slurs neither.
+    const std::string other = "{ a4( b4 } { c4 d4 }";
+    CHECK(sr::apply(Action::Slur, other, between(other, "c4", "d4")));
+    const std::string phrasing = "c4\\( d4^\"(x\" e4 f4\\)";
+    CHECK(run(Action::Slur, phrasing, "d4", "e4") == "c4\\( [d4^\"(x\"( e4)] f4\\)");
+}

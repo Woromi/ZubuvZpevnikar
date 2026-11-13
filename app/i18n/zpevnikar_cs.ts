@@ -739,6 +739,10 @@ Použijte vestavěný.</translation>
         <translation>Mrtvé (dušené) tóny: \deadNote před každou označenou notou; podruhé je odebere</translation>
     </message>
     <message>
+        <source>A slur is already open here or the selection has slur marks.</source>
+        <translation>Oblouček je tu už otevřený nebo výběr už obsahuje obloučky.</translation>
+    </message>
+    <message>
         <source>The selection crosses a { } block: select notes within one block.</source>
         <translation>Výběr přesahuje blok { }: vyberte noty v jednom bloku.</translation>
     </message>
