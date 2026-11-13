@@ -42,6 +42,8 @@ int CodeTextEdit::areaWidth() const {
 
 void CodeTextEdit::updateAreaWidth() {
     setViewportMargins(areaWidth(), 0, 0, 0);
+    const QRect cr = contentsRect();
+    area_->setGeometry(QRect(cr.left(), cr.top(), areaWidth(), cr.height()));
 }
 
 void CodeTextEdit::updateArea(const QRect& rect, int dy) {
@@ -63,8 +65,10 @@ void CodeTextEdit::keyPressEvent(QKeyEvent* event) {
     // The new line starts with the current line's leading spaces and tabs (only up to the cursor,
     // when the cursor stands inside them), as one undo step with the line break.
     QTextCursor cursor = textCursor();
-    const QString line = cursor.block().text();
-    const int column = cursor.selectionStart() - cursor.block().position();
+    // A selection made downwards starts on an earlier line than the cursor stands on.
+    const QTextBlock startBlock = document()->findBlock(cursor.selectionStart());
+    const QString line = startBlock.text();
+    const int column = cursor.selectionStart() - startBlock.position();
     int indent = 0;
     while (indent < line.size() && indent < column &&
            (line[indent] == QLatin1Char(' ') || line[indent] == QLatin1Char('\t')))
