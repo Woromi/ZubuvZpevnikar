@@ -1781,14 +1781,20 @@ void MainWindow::dropScoreTab(int tabIndex) {
 void MainWindow::closeScoreTab(int tabIndex) {
     if (tabIndex < 1 || tabIndex > static_cast<int>(scoreTabs_.size()))
         return;
-    const ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(tabIndex - 1)];
-    if (tab.editor && !confirmCloseScore(tab.name, tab.editor))
+    // The question runs a nested event loop: tabs may be added or dropped meanwhile (syncing with
+    // the song's references, a reload from disk), so keep the name, not the tab or its index.
+    const std::string name = scoreTabs_[static_cast<std::size_t>(tabIndex - 1)].name;
+    const QPointer<SongEditor> score = scoreTabs_[static_cast<std::size_t>(tabIndex - 1)].editor;
+    if (score && !confirmCloseScore(name, score))
         return;
+    tabIndex = scoreTabIndex(name);
+    if (tabIndex < 1)
+        return; // gone while the question was open
     // Still in the song: it stays closed until the reference goes and comes back.
     if (editor_) {
         const auto references = zub::songbook::referencedFiles(editor_->content());
-        if (std::ranges::find(references, tab.name) != references.end())
-            dismissedScores_.insert(tab.name);
+        if (std::ranges::find(references, name) != references.end())
+            dismissedScores_.insert(name);
     }
     dropScoreTab(tabIndex);
     requestPreview(); // an unsaved score that was discarded must not stay in the PDF
