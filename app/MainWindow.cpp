@@ -286,6 +286,9 @@ void MainWindow::createCentralWidget() {
     connect(songbooksAction_, &QAction::triggered, this, &MainWindow::showSongbooks);
     filters->addAction(songbooksAction_);
     filters->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    // Breathing room: the widgets sat edge to edge.
+    filters->layout()->setSpacing(8);
+    filters->setContentsMargins(6, 4, 6, 4);
 
     table_ = new QTableView(listPage_);
     table_->setModel(proxy_);
