@@ -655,6 +655,23 @@ std::optional<std::string> resolveScoreReference(std::string_view target) {
     return name;
 }
 
+bool inTinwhistleTree(const std::filesystem::path& repoRoot, const std::filesystem::path& songPath) {
+    return songPath.native().starts_with((repoRoot / "songs/tinwhistle" / "").native());
+}
+
+std::filesystem::path findScoreFile(const std::filesystem::path& repoRoot,
+                                    const std::filesystem::path& songPath, std::string_view name) {
+    const bool tinwhistle = inTinwhistleTree(repoRoot, songPath);
+    std::error_code ec;
+    for (const char* dir : tinwhistle ? std::array{"songs/tinwhistle", "songs/chords"}
+                                      : std::array{"songs/chords", "songs/tinwhistle"}) {
+        std::filesystem::path candidate = repoRoot / dir / fromUtf8(name);
+        if (std::filesystem::is_regular_file(candidate, ec))
+            return candidate;
+    }
+    return {};
+}
+
 std::vector<std::string> referencedFiles(std::string_view songText) {
     const std::string text = latex::stripComments(songText);
     constexpr std::string_view name = "lilypondfile";
@@ -794,22 +811,14 @@ std::expected<FolderExport, std::string> planFolderExport(const Songbook& book,
         const auto content = readTextFile(song.path);
         if (!content)
             continue;
-        std::error_code ec;
         for (const auto& ref : referencedFiles(*content)) {
             if (invalidInputName(ref))
                 continue;
-            // \lilypondfile{Artist/X.ly} is found on TEXINPUTS (songs/chords, songs/tinwhistle),
-            // not next to the song; the song's own tree comes first.
-            const bool tinwhistle =
-                song.path.native().starts_with((repoRoot / "songs/tinwhistle").native());
-            for (const char* dir : tinwhistle ? std::array{"songs/tinwhistle", "songs/chords"}
-                                              : std::array{"songs/chords", "songs/tinwhistle"}) {
-                const fs::path source = repoRoot / dir / fromUtf8(ref);
-                if (fs::is_regular_file(source, ec)) {
-                    addCopy(source, fs::path("songs") / fromUtf8(ref));
-                    break;
-                }
-            }
+            // \lilypondfile{Artist/X.ly} is found on TEXINPUTS, not next to the song; the
+            // song's own tree comes first.
+            const fs::path source = findScoreFile(repoRoot, song.path, ref);
+            if (!source.empty())
+                addCopy(source, fs::path("songs") / fromUtf8(ref));
         }
     }
 

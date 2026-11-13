@@ -693,3 +693,15 @@ TEST_CASE("mergeIntoOrder", "[songbook]") {
     // a name missing from the index order goes last
     CHECK(mergeIntoOrder({"a"}, {"a"}, {"q"}) == V{"a", "q"});
 }
+
+TEST_CASE("findScoreFile and inTinwhistleTree", "[songbook]") {
+    using namespace zub::songbook;
+    const auto root = dataDir / "songbook";
+    CHECK(inTinwhistleTree(root, root / "songs/tinwhistle/A/B.tex"));
+    CHECK_FALSE(inTinwhistleTree(root, root / "songs/chords/A/B.tex"));
+    CHECK_FALSE(inTinwhistleTree(root, root / "songs/tinwhistleX/B.tex"));
+    const auto song = root / "songs/chords/Ayreon/NotASong.tex";
+    CHECK(findScoreFile(root, song, "Ayreon/NotASong.ly") ==
+          root / "songs/chords/Ayreon/NotASong.ly");
+    CHECK(findScoreFile(root, song, "Nope/Nope.ly").empty());
+}

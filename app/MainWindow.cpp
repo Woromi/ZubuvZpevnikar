@@ -1439,6 +1439,7 @@ void MainWindow::requestPreview(bool userAsked) {
     request.songbookRoot = songbookRoot_;
     request.workDir = previewWorkDir_;
     request.inputName = inputNameOf(editor);
+    request.tinwhistleSong = zub::songbook::inTinwhistleTree(songbookRoot_, editor->path());
     request.songContent = std::move(content);
     request.documentClass = toStdString(preview_->documentClass());
     // Unsaved scores are built as they are in their editors.
@@ -1545,21 +1546,13 @@ bool MainWindow::approveRisks(const std::vector<RiskSource>& sources, bool askUs
 std::filesystem::path MainWindow::scorePath(const std::string& name) const {
     if (songbookRoot_.empty() || !validScoreName(name))
         return {};
-    const bool tinwhistle = editor_ && editor_->path().native().starts_with(
-                                           (songbookRoot_ / "songs/tinwhistle").native());
-    std::error_code ec;
-    for (const char* dir : tinwhistle ? std::array{"songs/tinwhistle", "songs/chords"}
-                                      : std::array{"songs/chords", "songs/tinwhistle"}) {
-        const std::filesystem::path candidate = songbookRoot_ / dir / pathOfName(name);
-        if (std::filesystem::is_regular_file(candidate, ec))
-            return candidate;
-    }
-    return {};
+    return zub::songbook::findScoreFile(songbookRoot_,
+                                        editor_ ? editor_->path() : std::filesystem::path(), name);
 }
 
 std::filesystem::path MainWindow::newScorePath(const std::string& name) const {
-    const bool tinwhistle = editor_ && editor_->path().native().starts_with(
-                                           (songbookRoot_ / "songs/tinwhistle").native());
+    const bool tinwhistle =
+        editor_ && zub::songbook::inTinwhistleTree(songbookRoot_, editor_->path());
     return songbookRoot_ / (tinwhistle ? "songs/tinwhistle" : "songs/chords") / pathOfName(name);
 }
 

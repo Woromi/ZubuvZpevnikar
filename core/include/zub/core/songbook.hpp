@@ -130,6 +130,15 @@ std::vector<std::string> referencedFiles(std::string_view songText);
 // built from wherever TEXINPUTS finds it and cannot be checked.
 std::optional<std::string> resolveScoreReference(std::string_view target);
 
+// True when `songPath` is inside <repoRoot>/songs/tinwhistle.
+bool inTinwhistleTree(const std::filesystem::path& repoRoot, const std::filesystem::path& songPath);
+
+// The score file `name` (a resolved reference) as the build finds it: <repoRoot>/songs/chords,
+// then songs/tinwhistle, except that a tinwhistle song looks in its own tree first (the order of
+// the preview's TEXINPUTS). Empty when there is no such regular file.
+std::filesystem::path findScoreFile(const std::filesystem::path& repoRoot,
+                                    const std::filesystem::path& songPath, std::string_view name);
+
 struct FileCopy {
     std::filesystem::path from;
     std::filesystem::path to; // relative to the export folder

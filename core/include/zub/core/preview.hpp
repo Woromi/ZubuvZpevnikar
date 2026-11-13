@@ -17,6 +17,7 @@ struct Request {
     std::filesystem::path songbookRoot; // the ZubuvZpevnik checkout
     std::filesystem::path workDir;      // reused between builds: keeps LilyPond's tmp-ly cache
     std::string inputName;              // "Artist/Title", as in \input{}
+    bool tinwhistleSong = false;        // the song is in songs/tinwhistle: that tree comes first
     std::string songContent;            // the song text to build (e.g. unsaved editor content)
     std::string documentClass;          // "velkyzpevnik", "malyzpevnik", ...
     // (relative path, content) of score files (.ly) to build instead of the real ones, e.g. the

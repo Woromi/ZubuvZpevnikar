@@ -108,13 +108,28 @@ TEST_CASE("prepare writes the wrapper, the song copy and the command", "[preview
     const auto g = [](const fs::path& p) { return p.generic_string(); };
     const std::string root = g(fixtureRepo);
     const std::string expected = std::string(".") + sep + g(work / "override") + sep + root + sep +
-                                 root + "/zubuvzpevnik" + sep + root + "/songs/chords" + sep;
+                                 root + "/zubuvzpevnik" + sep + root + "/songs/chords" + sep +
+                                 root + "/songs/tinwhistle" + sep;
     REQUIRE(cmd->environment.size() == 4);
     CHECK(cmd->environment[0].first == "TEXINPUTS");
     CHECK(cmd->environment[0].second == expected);
     CHECK(cmd->environment[1] == std::pair<std::string, std::string>{"max_print_line", "1000"});
     CHECK(cmd->environment[2] == std::pair<std::string, std::string>{"error_line", "254"});
     CHECK(cmd->environment[3] == std::pair<std::string, std::string>{"half_error_line", "238"});
+}
+
+TEST_CASE("prepare puts a tinwhistle song's tree first on TEXINPUTS", "[preview]") {
+    TempDir dir;
+    auto request = requestIn(dir);
+    request.tinwhistleSong = true;
+    const auto cmd = zub::preview::prepare(request);
+    REQUIRE(cmd);
+    const auto& texinputs = cmd->environment[0].second;
+    const auto chords = texinputs.find("/songs/chords");
+    const auto tin = texinputs.find("/songs/tinwhistle");
+    REQUIRE(chords != std::string::npos);
+    REQUIRE(tin != std::string::npos);
+    CHECK(tin < chords);
 }
 
 TEST_CASE("prepare writes file overrides next to the song copy", "[preview]") {

@@ -241,8 +241,12 @@ std::expected<Command, std::string> prepare(const Request& request) {
     cmd.songCopy = songCopy;
 
     const std::string root = utf8(request.songbookRoot);
+    // Scores are found in the song's own tree first (see songbook::findScoreFile).
+    const std::string trees[2] = {root + "/songs/chords", root + "/songs/tinwhistle"};
     const std::string texinputs = std::string(".") + kSep + utf8(overrideDir) + kSep + root + kSep +
-                                  root + "/zubuvzpevnik" + kSep + root + "/songs/chords" + kSep;
+                                  root + "/zubuvzpevnik" + kSep +
+                                  trees[request.tinwhistleSong ? 1 : 0] + kSep +
+                                  trees[request.tinwhistleSong ? 0 : 1] + kSep;
     cmd.environment = {{"TEXINPUTS", texinputs},
                        {"max_print_line", "1000"},
                        {"error_line", "254"},
