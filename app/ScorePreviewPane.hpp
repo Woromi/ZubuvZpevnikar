@@ -34,8 +34,15 @@ public:
     QWidget* scoreView() const; // the widget that shows the score (clicks on it jump to notes)
 
     // Where the notes of the score are linked to: x = 0-based column, y = 1-based line (like a
-    // click's noteActivated), every link of the last successful build.
+    // click's noteClicked), every link of the last successful build.
     QList<QPoint> notePositions() const;
+    // The links that are notes of the music (the others are chord names, lyrics ...): only these
+    // can be clicked, dragged over, or carry the caret. A new build clears them.
+    void setSelectableNotes(const QList<QPoint>& positions);
+    // The score cursor, a vertical line before the note at this position (x = column, y = line);
+    // a null point hides it.
+    void setCaretNote(const QPoint& position);
+    bool hasCaret() const; // for tests
     // Draws a translucent box around the notes at these positions (the editor's selection);
     // empty clears them. A new build clears them too: positions refer to its text.
     void setHighlightedNotes(const QList<QPoint>& positions);
@@ -47,12 +54,12 @@ signals:
     void rebuildRequested();
     // An error located in the score was double-clicked (1-based line and column).
     void errorActivated(int line, int column);
-    // A note of the rendered score was clicked: the position of its text in the score (1-based
-    // line, 0-based column in code points).
-    void noteActivated(int line, int column);
-    // A rectangle was dragged over the score: the notes inside it (x = column, y = line); a
-    // rectangle without notes gives an empty list.
-    void regionSelected(const QList<QPoint>& positions);
+    // A note of the rendered score was clicked: its position in the score text (x = 0-based
+    // column in code points, y = 1-based line). `extend`: Shift was held (select up to it).
+    void noteClicked(const QPoint& position, bool extend);
+    // The mouse was dragged from the note `anchor` over the score; `current` is the note nearest
+    // the mouse. Emitted whenever that note changes.
+    void notesDragged(const QPoint& anchor, const QPoint& current);
 
 private:
     void showLog();

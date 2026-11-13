@@ -484,7 +484,8 @@ void MainWindow::createCentralWidget() {
         }
     }
     scorePreview_->setRegionActions(regionActions_);
-    connect(scorePreview_, &ScorePreviewPane::regionSelected, this, &MainWindow::selectScoreRegion);
+    connect(scorePreview_, &ScorePreviewPane::notesDragged, this, &MainWindow::selectScoreNotes);
+    connect(scorePreview_, &ScorePreviewPane::noteClicked, this, &MainWindow::clickScoreNote);
     scoreRunner_ = new ScoreRunner(this);
     connect(scoreRunner_, &ScoreRunner::started, scorePreview_, &ScorePreviewPane::showBuilding);
     connect(scoreRunner_, &ScoreRunner::finished, this, &MainWindow::showScoreResult);
@@ -493,12 +494,6 @@ void MainWindow::createCentralWidget() {
     connect(scorePreview_, &ScorePreviewPane::errorActivated, this, [this](int line, int) {
         if (SongEditor* editor = currentEditor(); editor && !onSongTab())
             editor->goToLine(line);
-    });
-    // A click on a note of the rendered score: its text in the score editor.
-    connect(scorePreview_, &ScorePreviewPane::noteActivated, this, [this](int line, int column) {
-        // The links of a stale preview (older text, failed build, typing) point to other places.
-        if (SongEditor* editor = currentEditor(); editor && !onSongTab() && scoreLinksFresh_)
-            editor->goToLineColumn(line, column);
     });
     connect(tabs_, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
     connect(tabs_, &QTabWidget::tabCloseRequested, this, &MainWindow::closeScoreTab);
@@ -2055,13 +2050,17 @@ void MainWindow::attachScoreEditor(int tabIndex, SongEditor* editor) {
         if (currentEditor() == editor) {
             scoreLinksFresh_ = false; // the note positions of the preview are of an older text
             scorePreview_->setHighlightedNotes({});
+            scorePreview_->setSelectableNotes({});
+            scorePreview_->setCaretNote({});
             scorePreviewTimer_->start();
             fretboardTimer_->start();
         }
     });
     connect(edit, &QPlainTextEdit::cursorPositionChanged, this, [this, editor] {
-        if (currentEditor() == editor)
+        if (currentEditor() == editor) {
             fretboardTimer_->start();
+            highlightTimer_->start(); // the score cursor follows the text cursor
+        }
     });
     connect(edit, &QPlainTextEdit::undoAvailable, this, [this] { updateEditState(); });
     connect(edit, &QPlainTextEdit::redoAvailable, this, [this] { updateEditState(); });
@@ -2168,6 +2167,8 @@ void MainWindow::onTabChanged() {
     previewStack_->setCurrentWidget(song ? static_cast<QWidget*>(preview_) : scorePreview_);
     scorePreviewTimer_->stop();
     scoreLinksFresh_ = false;
+    scorePreview_->setSelectableNotes({});
+    scorePreview_->setCaretNote({});
     if (song) {
         scoreRunner_->cancel();
         if (pdfStale_ && editor_)
@@ -2269,7 +2270,35 @@ void MainWindow::showScoreResult(const ScoreResult& result) {
         return;
     scorePreview_->showResult(result);
     scoreLinksFresh_ = result.success && !scorePreviewTimer_->isActive();
+    indexScoreEvents();
     updateScoreHighlights();
+}
+
+// The music events of the score text the preview was built from, and which links of the preview
+// belong to which event. Only links into music events are selectable: chord names, lyrics, marks
+// and the definition of a variable (every use of it links there) are not.
+void MainWindow::indexScoreEvents() {
+    scoreEvents_.clear();
+    linkEvent_.clear();
+    eventLink_.clear();
+    scoreAnchor_.reset();
+    SongEditor* editor = currentEditor();
+    QList<QPoint> selectable;
+    if (scoreLinksFresh_ && editor && !onSongTab()) {
+        const std::string text = editor->editorText();
+        scoreEvents_ = zub::scoreregion::musicEvents(text);
+        for (const QPoint& position : scorePreview_->notePositions()) {
+            const auto offset = zub::scoreregion::offsetOf(text, position.y(), position.x());
+            const auto event =
+                offset ? zub::scoreregion::eventAt(scoreEvents_, *offset) : std::nullopt;
+            if (!event)
+                continue;
+            linkEvent_[{position.y(), position.x()}] = *event;
+            eventLink_.try_emplace(*event, position);
+            selectable.append(position);
+        }
+    }
+    scorePreview_->setSelectableNotes(selectable);
 }
 
 void MainWindow::updateRegionActions() {
@@ -2280,44 +2309,87 @@ void MainWindow::updateRegionActions() {
         action->setEnabled(enabled);
 }
 
-// The notes of the preview whose text lies inside the editor's selection get a highlight box.
+// The notes of the preview whose events the editor's selection touches get a highlight box; with
+// no selection the score cursor stands before the note the text cursor is in (or before).
 void MainWindow::updateScoreHighlights() {
     highlightTimer_->stop();
     SongEditor* editor = currentEditor();
-    const auto range = editor && !onSongTab() ? editor->selectedByteRange() : std::nullopt;
-    if (!range || !scoreLinksFresh_) {
+    if (!editor || onSongTab() || !scoreLinksFresh_) {
         scorePreview_->setHighlightedNotes({});
+        scorePreview_->setCaretNote({});
         return;
     }
-    const std::string text = editor->editorText();
+    const auto range = editor->selectedByteRange();
     QList<QPoint> inside;
-    for (const QPoint& position : scorePreview_->notePositions()) {
-        const auto offset = zub::scoreregion::offsetOf(text, position.y(), position.x());
-        if (offset && *offset >= range->first && *offset < range->second)
-            inside.append(position);
+    QPoint caret;
+    if (range) {
+        std::vector<bool> touched(scoreEvents_.size());
+        for (std::size_t i = 0; i < scoreEvents_.size(); ++i)
+            touched[i] = scoreEvents_[i].begin < range->second && range->first < scoreEvents_[i].end;
+        for (const auto& [key, event] : linkEvent_) {
+            if (touched[event])
+                inside.append(QPoint(key.second, key.first));
+        }
+    } else {
+        const std::size_t offset = editor->cursorByteOffset();
+        auto event = zub::scoreregion::eventAt(scoreEvents_, offset);
+        if (!event) { // between events: before the next one
+            const auto next = std::ranges::find_if(
+                scoreEvents_, [offset](const auto& e) { return e.begin >= offset; });
+            if (next != scoreEvents_.end())
+                event = static_cast<std::size_t>(next - scoreEvents_.begin());
+        }
+        if (const auto link = event ? eventLink_.find(*event) : eventLink_.end();
+            link != eventLink_.end())
+            caret = link->second;
     }
     scorePreview_->setHighlightedNotes(inside);
+    scorePreview_->setCaretNote(caret);
 }
 
-// The notes in a rectangle dragged over the preview: the editor selects them, from the start of
-// the first to the end of the last (whole notes and chords).
-void MainWindow::selectScoreRegion(const QList<QPoint>& positions) {
+// A click on a note of the rendered score: the text cursor goes there (the score cursor follows),
+// with Shift the selection extends from where it started.
+void MainWindow::clickScoreNote(const QPoint& position, bool extend) {
     SongEditor* editor = currentEditor();
-    if (!editor || onSongTab() || positions.isEmpty() || !scoreLinksFresh_)
+    if (!editor || onSongTab() || !scoreLinksFresh_)
         return;
-    const std::string text = editor->editorText();
-    std::optional<std::size_t> first, last;
-    for (const QPoint& position : positions) {
-        const auto offset = zub::scoreregion::offsetOf(text, position.y(), position.x());
-        if (!offset)
-            continue;
-        first = first ? std::min(*first, *offset) : *offset;
-        last = last ? std::max(*last, *offset) : *offset;
+    const auto found = linkEvent_.find({position.y(), position.x()});
+    if (found == linkEvent_.end())
+        return;
+    if (extend) {
+        std::optional<std::size_t> anchor = scoreAnchor_;
+        if (!anchor)
+            anchor = zub::scoreregion::eventAt(scoreEvents_, editor->cursorByteOffset());
+        if (anchor) {
+            selectScoreEvents(*anchor, found->second);
+            return;
+        }
     }
-    if (!first)
+    scoreAnchor_ = found->second;
+    editor->goToLineColumn(position.y(), position.x());
+    updateScoreHighlights();
+}
+
+// A drag over the preview: the notes from the one pressed on to the one nearest the mouse.
+void MainWindow::selectScoreNotes(const QPoint& anchor, const QPoint& current) {
+    if (!scoreLinksFresh_)
         return;
-    if (const auto region = zub::scoreregion::expandToEvents(text, {*first, *last + 1}))
-        editor->selectByteRange(region->begin, region->end);
+    const auto a = linkEvent_.find({anchor.y(), anchor.x()});
+    const auto b = linkEvent_.find({current.y(), current.x()});
+    if (a != linkEvent_.end() && b != linkEvent_.end())
+        selectScoreEvents(a->second, b->second);
+}
+
+// The editor selects the events `first` to `last` (either order): from the start of the earlier
+// (with its prefix functions) to the end of the later, whole notes and chords, in text order.
+void MainWindow::selectScoreEvents(std::size_t first, std::size_t last) {
+    SongEditor* editor = currentEditor();
+    if (!editor || onSongTab() || first >= scoreEvents_.size() || last >= scoreEvents_.size())
+        return;
+    scoreAnchor_ = first;
+    const auto [low, high] = std::minmax(first, last);
+    editor->selectByteRange(scoreEvents_[low].begin, scoreEvents_[high].end);
+    updateScoreHighlights();
 }
 
 void MainWindow::newScore() {

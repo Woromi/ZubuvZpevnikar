@@ -24,7 +24,9 @@
 #include <QVBoxLayout>
 #include <QXmlStreamReader>
 #include <algorithm>
+#include <cmath>
 #include <functional>
+#include <optional>
 #include <set>
 #include <utility>
 #include <vector>
@@ -38,7 +40,19 @@ struct NoteLink {
     QPointF point;
 };
 
+// A horizontal staff line of the score, in SVG units: from x1 to x2 at height y.
+struct StaffLine {
+    double x1, x2, y;
+};
+
+struct ParsedScore {
+    std::vector<NoteLink> links;
+    std::vector<StaffLine> staffLines;
+};
+
 namespace {
+
+constexpr double minStaffLineLength = 8; // SVG units (a staff space is 1.5)
 
 // "textedit:///path/file.ly:13:66:67" -> path, line, column; false for anything else.
 bool parseTextEdit(const QString& href, QString& path, int& line, int& column) {
@@ -62,11 +76,15 @@ bool parseTextEdit(const QString& href, QString& path, int& line, int& column) {
 // files or LilyPond's own would jump to the wrong place). A link is drawn where its first
 // transform="translate(x, y)" puts it; for a fret number that is the corner of the white patch
 // behind it, so the patch's centre is used when that is the first thing in the link.
-std::vector<NoteLink> parseLinks(const QByteArray& svg, const QString& scorePath) {
+ParsedScore parseLinks(const QByteArray& svg, const QString& scorePath) {
     static const QRegularExpression translate(
         QStringLiteral(R"(translate\(\s*([-+0-9.eE]+)[\s,]+([-+0-9.eE]+)\s*\))"));
-    std::vector<NoteLink> links;
+    ParsedScore parsed;
+    std::vector<NoteLink>& links = parsed.links;
     QXmlStreamReader xml(svg);
+    // The staff lines are `<g transform="translate(x, y)"><line y1="0" y2="0"/></g>` on their own.
+    QPointF lineOrigin;
+    bool haveLineOrigin = false;
     const QString xlink = QStringLiteral("http://www.w3.org/1999/xlink");
     int depth = 0;       // inside a link: its nesting level
     bool inLink = false; // a link to the score that has no point yet
@@ -81,6 +99,24 @@ std::vector<NoteLink> parseLinks(const QByteArray& svg, const QString& scorePath
     while (!xml.atEnd()) {
         const auto token = xml.readNext();
         if (token == QXmlStreamReader::StartElement) {
+            if (depth == 0 && xml.name() == QLatin1String("g")) {
+                const auto match = translate.match(xml.attributes().value("transform").toString());
+                haveLineOrigin = match.hasMatch();
+                if (haveLineOrigin)
+                    lineOrigin = {match.captured(1).toDouble(), match.captured(2).toDouble()};
+                continue;
+            }
+            if (depth == 0 && xml.name() == QLatin1String("line") && haveLineOrigin) {
+                const auto a = xml.attributes();
+                const double y1 = a.value("y1").toDouble(), y2 = a.value("y2").toDouble();
+                const double x1 = lineOrigin.x() + a.value("x1").toDouble();
+                const double x2 = lineOrigin.x() + a.value("x2").toDouble();
+                // Long horizontal lines only: no ledger lines, no bar lines.
+                if (y1 == y2 && x2 - x1 >= minStaffLineLength)
+                    parsed.staffLines.push_back({x1, x2, lineOrigin.y() + y1});
+                haveLineOrigin = false;
+                continue;
+            }
             if (depth == 0 && xml.name() == QLatin1String("a")) {
                 QString path;
                 const QString href =
@@ -121,7 +157,7 @@ std::vector<NoteLink> parseLinks(const QByteArray& svg, const QString& scorePath
             }
         }
     }
-    return links;
+    return parsed;
 }
 
 } // namespace
@@ -137,16 +173,33 @@ public:
         setMouseTracking(true);
     }
 
-    // The links of the loaded SVG (set after load()) and what a click on a note does.
-    void setLinks(std::vector<NoteLink> links) {
-        links_ = std::move(links);
+    // The links of the loaded SVG (set after load()). None is selectable until setSelectable().
+    void setLinks(ParsedScore parsed) {
+        links_ = std::move(parsed.links);
+        staffLines_ = std::move(parsed.staffLines);
         highlighted_.clear();
+        selectable_.clear();
+        caret_.reset();
         update();
     }
-    std::function<void(int line, int column)> onNoteClicked;
-    // A rectangle was dragged over the score: the links inside it (null: none).
-    std::function<void(const std::vector<const NoteLink*>&)> onRegionDragged;
+    // The links that are notes of the music (clicks, drags and the caret only know these).
+    void setSelectable(const std::vector<std::pair<int, int>>& positions) {
+        selectable_ = std::set<std::pair<int, int>>(positions.begin(), positions.end());
+    }
+    // A click on a note (shift: extend the selection to it) and a drag over notes (from the note
+    // pressed on to the one nearest the mouse).
+    std::function<void(const NoteLink& link, bool extend)> onNoteClicked;
+    std::function<void(const NoteLink& anchor, const NoteLink& current)> onNotesDragged;
     std::function<void(const QPoint& globalPosition)> onContextMenu;
+
+    // The score cursor: a vertical line before the note linked at {line, column}; none clears it.
+    void setCaret(std::optional<std::pair<int, int>> position) {
+        if (position == caret_)
+            return;
+        caret_ = position;
+        update();
+    }
+    bool hasCaret() const { return caret_.has_value(); }
 
     // The links that get a highlight box (the notes inside the editor's selection).
     void setHighlighted(const std::vector<std::pair<int, int>>& positions) {
@@ -177,9 +230,27 @@ public:
         const NoteLink* best = nullptr;
         double bestDistance = hitRadius * hitRadius;
         for (const NoteLink& link : links_) {
+            if (!selectable_.contains({link.line, link.column}))
+                continue;
             const QPointF at = toWidget(link.point);
             const double dx = at.x() - position.x(), dy = at.y() - position.y();
             if (dx * dx + dy * dy <= bestDistance) {
+                bestDistance = dx * dx + dy * dy;
+                best = &link;
+            }
+        }
+        return best;
+    }
+    // The selectable note nearest to `position`, however far.
+    const NoteLink* nearestLink(const QPoint& position) const {
+        const NoteLink* best = nullptr;
+        double bestDistance = 0;
+        for (const NoteLink& link : links_) {
+            if (!selectable_.contains({link.line, link.column}))
+                continue;
+            const QPointF at = toWidget(link.point);
+            const double dx = at.x() - position.x(), dy = at.y() - position.y();
+            if (!best || dx * dx + dy * dy < bestDistance) {
                 bestDistance = dx * dx + dy * dy;
                 best = &link;
             }
@@ -206,7 +277,10 @@ public:
     }
     void clear() {
         links_.clear();
+        staffLines_.clear();
         highlighted_.clear();
+        selectable_.clear();
+        caret_.reset();
         svg_.clear();
         renderer_.load(QByteArray());
         updateGeometry();
@@ -226,17 +300,20 @@ public:
     }
 
 protected:
-    // A press and release without moving far is a click (jump to the note); moving further
-    // marks a rectangle (the notes in it get selected).
+    // A press on a note and release without moving far is a click (the text cursor goes to the
+    // note, Shift: the selection extends to it); moving further selects the notes from the one
+    // pressed to the one nearest the mouse, like selecting text.
     void mouseMoveEvent(QMouseEvent* event) override {
         const QPoint position = event->position().toPoint();
-        if (pressed_ &&
+        if (pressed_ && pressLink_ &&
             (position - pressAt_).manhattanLength() >= QApplication::startDragDistance())
             dragging_ = true;
         if (dragging_) {
-            rubber_ = QRect(pressAt_, position).normalized();
-            setCursor(Qt::CrossCursor);
-            update();
+            if (const NoteLink* nearest = nearestLink(position);
+                nearest && nearest != dragLink_ && onNotesDragged) {
+                dragLink_ = nearest;
+                onNotesDragged(*pressLink_, *nearest);
+            }
             return;
         }
         setCursor(linkAt(position) ? Qt::PointingHandCursor : Qt::ArrowCursor);
@@ -246,28 +323,20 @@ protected:
             return;
         pressed_ = true;
         dragging_ = false;
+        dragLink_ = nullptr;
         pressAt_ = event->position().toPoint();
+        pressLink_ = linkAt(pressAt_);
+        pressExtend_ = event->modifiers().testFlag(Qt::ShiftModifier);
     }
     void mouseReleaseEvent(QMouseEvent* event) override {
         if (event->button() != Qt::LeftButton || !pressed_)
             return;
         const bool wasDragging = dragging_;
-        const QRect band = rubber_;
+        const NoteLink* link = pressLink_;
         pressed_ = dragging_ = false;
-        rubber_ = QRect();
-        update();
-        if (wasDragging) {
-            std::vector<const NoteLink*> inside;
-            for (const NoteLink& link : links_) {
-                if (band.contains(toWidget(link.point).toPoint()))
-                    inside.push_back(&link);
-            }
-            if (onRegionDragged)
-                onRegionDragged(inside);
-        } else if (onNoteClicked) {
-            if (const NoteLink* link = linkAt(pressAt_))
-                onNoteClicked(link->line, link->column);
-        }
+        pressLink_ = dragLink_ = nullptr;
+        if (!wasDragging && link && onNoteClicked)
+            onNoteClicked(*link, pressExtend_);
     }
     void contextMenuEvent(QContextMenuEvent* event) override {
         if (onContextMenu)
@@ -304,11 +373,14 @@ protected:
                                            highlightSize, highlightSize),
                                     4, 4);
         }
-        if (!rubber_.isNull()) {
-            fill.setAlpha(50);
-            painter.setBrush(fill);
-            painter.setPen(QPen(edge, 1));
-            painter.drawRect(rubber_);
+        if (caret_) {
+            if (const NoteLink* link = findLink(caret_->first, caret_->second)) {
+                const QPointF at = toWidget(link->point);
+                const auto [top, bottom] = staffSpan(link->point);
+                painter.setPen(QPen(edge, 2, Qt::SolidLine, Qt::FlatCap));
+                const double x = at.x() - highlightSize / 2;
+                painter.drawLine(QPointF(x, top), QPointF(x, bottom));
+            }
         }
     }
 
@@ -316,6 +388,41 @@ private:
     static constexpr int margin = 12;       // space around the score
     static constexpr double hitRadius = 14; // pixels: how near to a note a click counts
     static constexpr double highlightSize = 20; // pixels: the box around a selected note
+
+    // The widget heights of the top and the bottom staff line of the staff that the note at
+    // `svgPoint` is on (a little beyond); without staff lines in the SVG, a span around the note.
+    std::pair<double, double> staffSpan(const QPointF& svgPoint) const {
+        constexpr double reach = 3.5, gap = 2.5; // SVG units: how far a staff is, between its lines
+        std::vector<double> ys;
+        for (const StaffLine& line : staffLines_) {
+            if (line.x1 - 0.5 <= svgPoint.x() && svgPoint.x() <= line.x2 + 0.5 &&
+                std::abs(line.y - svgPoint.y()) <= 12)
+                ys.push_back(line.y);
+        }
+        std::ranges::sort(ys);
+        // The group of lines (no gap above `gap`) that the note is on or nearest to.
+        double top = 0, bottom = 0, best = 1e9;
+        for (std::size_t i = 0; i < ys.size();) {
+            std::size_t j = i + 1;
+            while (j < ys.size() && ys[j] - ys[j - 1] <= gap)
+                ++j;
+            const double distance = svgPoint.y() < ys[i]       ? ys[i] - svgPoint.y()
+                                    : svgPoint.y() > ys[j - 1] ? svgPoint.y() - ys[j - 1]
+                                                               : 0;
+            if (distance < best) {
+                best = distance;
+                top = ys[i];
+                bottom = ys[j - 1];
+            }
+            i = j;
+        }
+        if (best > reach) {
+            const double y = toWidget(svgPoint).y();
+            return {y - highlightSize * 1.5, y + highlightSize * 1.5};
+        }
+        return {toWidget(QPointF(svgPoint.x(), top)).y() - 4,
+                toWidget(QPointF(svgPoint.x(), bottom)).y() + 4};
+    }
     int shownWidth(int available) const {
         return std::max(1, std::min(available - 2 * margin, renderer_.defaultSize().width() * 2));
     }
@@ -338,10 +445,15 @@ private:
 
     std::vector<NoteLink> links_;
     std::set<std::pair<int, int>> highlighted_; // {line, column} of the links to highlight
+    std::set<std::pair<int, int>> selectable_;  // {line, column} of the links that are notes
+    std::vector<StaffLine> staffLines_;
+    std::optional<std::pair<int, int>> caret_;  // the link the score cursor is before
     bool pressed_ = false;                      // the left button is down on the score
-    bool dragging_ = false;                     // ... and has moved far enough: a rubber band
+    bool dragging_ = false;                     // ... and has moved far enough: a selection
+    bool pressExtend_ = false;                  // Shift was down at the press
+    const NoteLink* pressLink_ = nullptr;       // the note pressed on (none: empty space)
+    const NoteLink* dragLink_ = nullptr;        // the note last reported while dragging
     QPoint pressAt_;
-    QRect rubber_;   // the rubber band while dragging
     QByteArray svg_; // as LilyPond wrote it
     QSvgRenderer renderer_;
 };
@@ -384,12 +496,11 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     layout->addWidget(scroll_, 1);
     layout->addWidget(errors_);
 
-    canvas_->onNoteClicked = [this](int line, int column) { emit noteActivated(line, column); };
-    canvas_->onRegionDragged = [this](const std::vector<const NoteLink*>& links) {
-        QList<QPoint> positions;
-        for (const NoteLink* link : links)
-            positions.append(QPoint(link->column, link->line));
-        emit regionSelected(positions);
+    canvas_->onNoteClicked = [this](const NoteLink& link, bool extend) {
+        emit noteClicked(QPoint(link.column, link.line), extend);
+    };
+    canvas_->onNotesDragged = [this](const NoteLink& anchor, const NoteLink& current) {
+        emit notesDragged(QPoint(anchor.column, anchor.line), QPoint(current.column, current.line));
     };
     canvas_->onContextMenu = [this](const QPoint& at) {
         if (regionActions_.isEmpty())
@@ -478,6 +589,24 @@ void ScorePreviewPane::setHighlightedNotes(const QList<QPoint>& positions) {
     for (const QPoint& position : positions)
         list.emplace_back(position.y(), position.x());
     canvas_->setHighlighted(list);
+}
+
+void ScorePreviewPane::setSelectableNotes(const QList<QPoint>& positions) {
+    std::vector<std::pair<int, int>> list;
+    for (const QPoint& position : positions)
+        list.emplace_back(position.y(), position.x());
+    canvas_->setSelectable(list);
+}
+
+void ScorePreviewPane::setCaretNote(const QPoint& position) {
+    if (position.isNull())
+        canvas_->setCaret(std::nullopt);
+    else
+        canvas_->setCaret(std::make_pair(position.y(), position.x()));
+}
+
+bool ScorePreviewPane::hasCaret() const {
+    return canvas_->hasCaret();
 }
 
 int ScorePreviewPane::highlightedNoteCount() const {

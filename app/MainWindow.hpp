@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QMainWindow>
+#include <QPoint>
 #include <QPointer>
 #include <QString>
 #include <expected>
@@ -9,9 +10,11 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
+#include <zub/core/scoreregion.hpp>
 #include <zub/core/songedit.hpp>
 #include <zub/core/songsuggest.hpp>
 #include <zub/core/songtidy.hpp>
@@ -112,7 +115,10 @@ private:
     // score editor; the preview marks the notes of the selection a moment after it changes.
     void updateRegionActions();
     void updateScoreHighlights();
-    void selectScoreRegion(const QList<QPoint>& positions); // from a rectangle in the preview
+    void clickScoreNote(const QPoint& position, bool extend);  // from the preview
+    void selectScoreNotes(const QPoint& anchor, const QPoint& current); // a drag in the preview
+    void selectScoreEvents(std::size_t first, std::size_t last);
+    void indexScoreEvents();
     void fretboardClicked(int string, int fret, Qt::KeyboardModifiers modifiers);
     void setScoreWidth(const std::string& name, bool narrow); // the song and all its score tabs; false if the user cancelled
     void createSongToolBar();
@@ -245,6 +251,12 @@ private:
     QList<QAction*> regionActions_;          // Tie, Slur ...: on the selected notes of a score
     QTimer* highlightTimer_ = nullptr;       // selection moved: mark its notes in the preview
     bool scoreLinksFresh_ = false;           // the preview's note positions match the editor text
+    // Of the text the preview was built from (valid while scoreLinksFresh_): the music events, the
+    // event of each link ({line, column}), a link of each event, the event a selection started at.
+    std::vector<zub::scoreregion::Range> scoreEvents_;
+    std::map<std::pair<int, int>, std::size_t> linkEvent_;
+    std::map<std::size_t, QPoint> eventLink_;
+    std::optional<std::size_t> scoreAnchor_;
     QAction* fretboardAction_ = nullptr;     // "Fretboard": shows the input panels
     QTimer* scoreSyncTimer_ = nullptr;       // song text changed: look for new \lilypondfile
     QTimer* scorePreviewTimer_ = nullptr;    // score text changed: rebuild the score preview
