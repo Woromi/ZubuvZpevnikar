@@ -739,6 +739,10 @@ Použijte vestavěný.</translation>
         <translation>Mrtvé (dušené) tóny: \deadNote před každou označenou notou; podruhé je odebere</translation>
     </message>
     <message>
+        <source>The selection crosses a { } block: select notes within one block.</source>
+        <translation>Výběr přesahuje blok { }: vyberte noty v jednom bloku.</translation>
+    </message>
+    <message>
         <source>Favourite: add or remove the label &quot;fav&quot; (one undo step; save to keep it)</source>
         <translation>Oblíbená: přidá nebo odebere štítek „fav“ (jeden krok zpět; uložením se zachová)</translation>
     </message>

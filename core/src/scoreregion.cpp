@@ -151,14 +151,21 @@ std::optional<Range> expandToEvents(std::string_view text, Range range) {
         if (!overlaps || e.definition)
             continue;
         if (!out)
-            out = Range{e.begin, e.postEnd};
+            out = Range{e.prefixBegin, e.postEnd};
         else
             out->end = std::max(out->end, e.postEnd);
     }
     return out;
 }
 
-std::optional<Result> apply(Action action, std::string_view text, Range range) {
+std::optional<Result> apply(Action action, std::string_view text, Range range, Refusal* why) {
+    const auto refuse = [&](Refusal reason) -> std::optional<Result> {
+        if (why)
+            *why = reason;
+        return std::nullopt;
+    };
+    if (why)
+        *why = Refusal::NothingToApply;
     const auto region = expandToEvents(text, range);
     if (!region)
         return std::nullopt;
@@ -208,6 +215,8 @@ std::optional<Result> apply(Action action, std::string_view text, Range range) {
         break;
     }
     case Action::Repeat: {
+        if (!sd::bracesBalanced(text.substr(region->begin, region->end - region->begin)))
+            return refuse(Refusal::CrossesBlock);
         std::string open = "\\repeat volta 2 { ";
         std::string close = " }";
         if (region->begin > 0 && !sd::isSpace(text[region->begin - 1]))

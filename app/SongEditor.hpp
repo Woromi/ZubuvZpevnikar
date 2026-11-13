@@ -124,8 +124,10 @@ public:
     // Selects [begin, end) of the editor text, shows it and focuses the editor.
     void selectByteRange(std::size_t begin, std::size_t end);
     // Applies a zub::scoreregion action to the selected notes (Kind::Score): ONE undo step, the
-    // result stays selected. False when nothing changed (no selection, read-only, nothing to do).
-    bool applyRegionAction(zub::scoreregion::Action action);
+    // result stays selected. False when nothing changed (no selection, read-only, nothing to do);
+    // `why` (when given) tells why the core refused.
+    bool applyRegionAction(zub::scoreregion::Action action,
+                           zub::scoreregion::Refusal* why = nullptr);
     // Added to the end of the editor's context menu.
     void setRegionMenuActions(const QList<QAction*>& actions);
 

@@ -24,7 +24,8 @@ struct Range {
 std::optional<std::size_t> offsetOf(std::string_view text, int line, int column);
 
 // Whole tokens: from the start of the first note, chord or rest that overlaps `range` (a chord
-// from its `<`) to the end of the last one, including its duration, string, `>`, and the
+// from its `<`, with the music functions written right before it: `\deadNote`, `\grace`,
+// `\tweak x #y`, `\once \override ...`) to the end of the last one, including its duration, string, `>`, and the
 // articulations written right against it. A range whose begin equals its end is a point. Nothing
 // when the range touches no note, chord or rest.
 std::optional<Range> expandToEvents(std::string_view text, Range range);
@@ -49,6 +50,14 @@ struct Result {
 // the range; no note; a slur over one note); when the text is already as the action wants it
 // (already tied, slurred ...), the result has the same text. Applying the same action twice never
 // doubles anything, except Repeat, which nests.
-std::optional<Result> apply(Action action, std::string_view text, Range range);
+//
+// Why `apply` gave nothing, when it is more than "nothing to apply to".
+enum class Refusal {
+    NothingToApply,
+    CrossesBlock, // Repeat: the `{ }` of the region are not balanced
+};
+// `why` (when given) tells the reason of an empty result.
+std::optional<Result> apply(Action action, std::string_view text, Range range,
+                            Refusal* why = nullptr);
 
 } // namespace zub::scoreregion

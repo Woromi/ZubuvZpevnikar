@@ -839,14 +839,15 @@ void SongEditor::selectByteRange(std::size_t begin, std::size_t end) {
     edit_->setFocus();
 }
 
-bool SongEditor::applyRegionAction(zub::scoreregion::Action action) {
+bool SongEditor::applyRegionAction(zub::scoreregion::Action action,
+                                   zub::scoreregion::Refusal* why) {
     if (edit_->isReadOnly() || kind_ != Kind::Score)
         return false;
     const auto range = selectedByteRange();
     if (!range)
         return false;
     const std::string text = editorText();
-    const auto result = zub::scoreregion::apply(action, text, {range->first, range->second});
+    const auto result = zub::scoreregion::apply(action, text, {range->first, range->second}, why);
     if (!result)
         return false;
     const bool changed = result->text != text;

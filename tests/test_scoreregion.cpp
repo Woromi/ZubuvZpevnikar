@@ -192,7 +192,7 @@ TEST_CASE("scoreregion dead notes", "[scoreregion]") {
           "[<\\deadNote g'\\2 \\deadNote h'\\1>8 \\deadNote a\\3]");
     // Some have it: the others get it.
     CHECK(run(Action::DeadNotes, "\\deadNote e16\\4 g\\3", "e16", "g\\3") ==
-          "\\deadNote [e16\\4 \\deadNote g\\3]");
+          "[\\deadNote e16\\4 \\deadNote g\\3]");
     CHECK(run(Action::DeadNotes, "<\\deadNote g'\\2 h'\\1>8", "<", ">8") ==
           "[<\\deadNote g'\\2 \\deadNote h'\\1>8]");
     // All have it: removed.
@@ -324,4 +324,42 @@ TEST_CASE("scoreregion actions never touch chord names, lyrics, marks or definit
     // Only a variable's definition in the range: nothing to do.
     const auto defOnly = sr::expandToEvents(madeUpScore, {0, madeUpScore.find('\n')});
     CHECK_FALSE(defOnly);
+}
+
+TEST_CASE("scoreregion regions take the music functions written before the first note",
+          "[scoreregion]") {
+    CHECK(run(Action::Repeat, "a \\deadNote c4 d4 e4", "c4", "d4") ==
+          "a [\\repeat volta 2 { \\deadNote c4 d4 }] e4");
+    CHECK(run(Action::Repeat, "x \\grace af'16 c4 d4", "af'16", "d4") ==
+          "x [\\repeat volta 2 { \\grace af'16 c4 d4 }]");
+    CHECK(run(Action::Repeat, "\\acciaccatura b8 c4 d4", "b8", "c4") ==
+          "[\\repeat volta 2 { \\acciaccatura b8 c4 }] d4");
+    // The grace note itself is a note; the region that starts after it does not take it.
+    CHECK(run(Action::Repeat, "\\grace b8 c4 d4", "c4", "d4") ==
+          "\\grace b8 [\\repeat volta 2 { c4 d4 }]");
+    CHECK(run(Action::Repeat, "\\tweak color #red \\parenthesize c4 d4", "c4", "c4") ==
+          "[\\repeat volta 2 { \\tweak color #red \\parenthesize c4 }] d4");
+    CHECK(run(Action::Repeat, "\\once \\override NoteHead.color = #red c4 d4", "c4", "c4") ==
+          "[\\repeat volta 2 { \\once \\override NoteHead.color = #red c4 }] d4");
+    // A lasting \override is not part of the note.
+    CHECK(run(Action::Repeat, "\\override NoteHead.color = #red c4 d4", "c4", "c4") ==
+          "\\override NoteHead.color = #red [\\repeat volta 2 { c4 }] d4");
+    // Something else in between ends the prefix.
+    CHECK(run(Action::Repeat, "\\grace { e8 } c4 d4", "c4", "d4") ==
+          "\\grace { e8 } [\\repeat volta 2 { c4 d4 }]");
+}
+
+TEST_CASE("scoreregion Repeat refuses a region that crosses a block", "[scoreregion]") {
+    const std::string text = "\\new Voice { c4 d4 } \\new Voice { e4 f4 }";
+    sr::Refusal why = sr::Refusal::NothingToApply;
+    CHECK_FALSE(sr::apply(Action::Repeat, text, between(text, "d4", "e4"), &why));
+    CHECK(why == sr::Refusal::CrossesBlock);
+    // A block inside the region is fine, as are braces in strings, comments and Scheme.
+    const std::string ok = "c4 \\tuplet 3/2 { d8 e f } g4 \"}\" #'(})";
+    CHECK(sr::apply(Action::Repeat, ok, {0, ok.size()}));
+    const std::string comment = "{ c4 % }\n d4 }";
+    CHECK(sr::apply(Action::Repeat, comment, between(comment, "c4", "d4")));
+    // Nothing to apply to is told apart.
+    CHECK_FALSE(sr::apply(Action::Tie, "{ }", {0, 3}, &why));
+    CHECK(why == sr::Refusal::NothingToApply);
 }

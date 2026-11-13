@@ -143,6 +143,9 @@ struct Event {
     // The whole value of a variable (`emChord = <e\\6 g\\3>4`): music, but of the definition, not
     // of a place in the score. Region actions leave it alone.
     bool definition = false;
+    // Where the music functions written right before the event start (`\deadNote`, `\grace`,
+    // `\tweak x #y`, `\once \override ...`): they belong to it. Equals `begin` without any.
+    std::size_t prefixBegin = 0;
     bool chord = false;
     std::size_t closeAt = 0; // chord: the `>`
     // Single note only:
@@ -159,6 +162,10 @@ struct Scanner {
     std::string_view s;
     Names names;
     std::vector<Event> events;
+
+    static constexpr std::size_t npos = std::string_view::npos;
+    std::size_t pending_ = npos; // start of the music functions seen since the last token
+    std::size_t carried_ = npos; // ... as the next event takes them
 
     std::size_t skipDuration(std::size_t i, std::size_t& db, std::size_t& de) const {
         db = de = i;
@@ -331,6 +338,8 @@ struct Scanner {
 
     void add(Event e) {
         e.definition = assignmentBefore(e.begin);
+        e.prefixBegin = carried_ != npos ? carried_ : e.begin;
+        carried_ = npos;
         events.push_back(std::move(e));
     }
 
@@ -452,6 +461,53 @@ struct Scanner {
         return i;
     }
 
+    // A word of an argument (`Slur.color`, `font-size`) at `i` after spaces; the end.
+    std::size_t skipPropertyWord(std::size_t i) const {
+        i = skipSpaces(i);
+        while (i < s.size() && (isWordChar(s[i]) || s[i] == '.' || s[i] == '-'))
+            ++i;
+        return i;
+    }
+
+    // A value after spaces: Scheme or one word.
+    std::size_t skipValue(std::size_t i) const {
+        i = skipSpaces(i);
+        if (i < s.size() && (s[i] == '#' || s[i] == '$'))
+            return skipScheme(i);
+        while (i < s.size() && !isSpace(s[i]))
+            ++i;
+        return i;
+    }
+
+    // The music functions that belong to the note that follows. Returns where the scan goes on, or
+    // npos when `command` is none of them; remembers where the first one started.
+    std::size_t prefixCommand(std::string_view command, std::size_t commandBegin,
+                              std::size_t i) {
+        if (command == "deadNote" || command == "grace" || command == "acciaccatura" ||
+            command == "appoggiatura" || command == "slashedGrace" || command == "parenthesize" ||
+            command == "once") {
+            if (pending_ == npos)
+                pending_ = commandBegin;
+            return i;
+        }
+        if (command == "tweak") {
+            if (pending_ == npos)
+                pending_ = commandBegin;
+            return skipValue(skipPropertyWord(i));
+        }
+        if (command == "override" || command == "set") {
+            // Only `\once \override` belongs to the next note (the others last).
+            i = skipPropertyWord(i);
+            const std::size_t eq = skipSpaces(i);
+            if (eq < s.size() && s[eq] == '=')
+                i = skipValue(eq + 1);
+            return i;
+        }
+        if (command == "revert" || command == "unset")
+            return skipPropertyWord(i);
+        return npos;
+    }
+
     std::size_t skipComment(std::size_t i) const {
         if (i + 1 < s.size() && s[i + 1] == '{') {
             const auto close = s.find("%}", i + 2);
@@ -554,9 +610,29 @@ struct Scanner {
         std::size_t i = 0;
         while (i < s.size()) {
             const char c = s[i];
+            // Spaces and comments keep the music functions that wait for their note.
+            if (isSpace(c)) {
+                ++i;
+                continue;
+            }
             if (c == '%') {
                 i = skipComment(i);
-            } else if (c == '"') {
+                continue;
+            }
+            if (c == '\\' && i + 1 < s.size() && isLetter(s[i + 1])) {
+                std::size_t nameEnd = i + 1;
+                while (nameEnd < s.size() && isLetter(s[nameEnd]))
+                    ++nameEnd;
+                const std::size_t next =
+                    prefixCommand(s.substr(i + 1, nameEnd - i - 1), i, nameEnd);
+                if (next != npos) {
+                    i = next;
+                    continue;
+                }
+            }
+            carried_ = pending_;
+            pending_ = npos;
+            if (c == '"') {
                 i = skipString(i);
             } else if (c == '#' || c == '$') {
                 i = skipScheme(i);
@@ -626,6 +702,32 @@ struct Scanner {
         }
     }
 };
+
+// Are the `{ }` of the text balanced (not counting strings, comments, Scheme)?
+inline bool bracesBalanced(std::string_view text) {
+    const Scanner scanner{text, Names::Any, {}};
+    int depth = 0;
+    std::size_t i = 0;
+    while (i < text.size()) {
+        const char c = text[i];
+        if (c == '%') {
+            i = scanner.skipComment(i);
+        } else if (c == '"') {
+            i = scanner.skipString(i);
+        } else if (c == '#' || c == '$') {
+            i = scanner.skipScheme(i);
+        } else if (c == '\\') {
+            i = std::min(i + 2, text.size());
+        } else {
+            ++i;
+            if (c == '{')
+                ++depth;
+            else if (c == '}' && --depth < 0)
+                return false;
+        }
+    }
+    return depth == 0;
+}
 
 inline std::vector<Event> scan(std::string_view text, Names names) {
     Scanner scanner{text, names, {}};

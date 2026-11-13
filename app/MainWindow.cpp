@@ -466,7 +466,13 @@ void MainWindow::createCentralWidget() {
             action->setEnabled(false);
             connect(action, &QAction::triggered, this, [this, a = entry.action] {
                 if (SongEditor* editor = currentEditor(); editor && !onSongTab()) {
-                    editor->applyRegionAction(a);
+                    zub::scoreregion::Refusal why = zub::scoreregion::Refusal::NothingToApply;
+                    editor->applyRegionAction(a, &why);
+                    if (why == zub::scoreregion::Refusal::CrossesBlock)
+                        statusBar()->showMessage(
+                            tr("The selection crosses a { } block: select notes within one "
+                               "block."),
+                            6000);
                     updateRegionActions();
                 }
             });
