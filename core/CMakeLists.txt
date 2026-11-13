@@ -9,6 +9,7 @@ add_library(zub_core STATIC
     src/library.cpp
     src/preview.cpp
     src/safety.cpp
+    src/scoreregion.cpp
     src/score.cpp
     src/linediff.cpp
     src/songbook.cpp
