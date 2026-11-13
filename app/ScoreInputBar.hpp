@@ -1,9 +1,12 @@
 #pragma once
 
+#include <QList>
 #include <QString>
 #include <QWidget>
 
+class QAction;
 class QButtonGroup;
+class QHBoxLayout;
 class QToolButton;
 
 // The note length for the next note and the buttons for a rest and a bar check, above the
@@ -19,6 +22,9 @@ public:
     QString duration() const { return duration_; }
     // Shows `duration` (the one in force at the cursor) without emitting anything.
     void setDuration(const QString& duration);
+    // A row of buttons for the actions on the selected notes (tie, slur ...); the buttons follow
+    // the actions' enabled state. Owned by the caller.
+    void setRegionActions(const QList<QAction*>& actions);
 
 signals:
     void restRequested();
@@ -30,6 +36,7 @@ private:
 
     QButtonGroup* group_ = nullptr;
     QToolButton* dot_ = nullptr;
+    QHBoxLayout* regionRow_ = nullptr;
     QString duration_ = QStringLiteral("4");
     bool updating_ = false;
 };

@@ -74,13 +74,14 @@
 #include <set>
 #include <system_error>
 #include <utility>
+#include <zub/core/fretboard.hpp>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/linediff.hpp>
 #include <zub/core/preview.hpp>
 #include <zub/core/safety.hpp>
-#include <zub/core/fretboard.hpp>
 #include <zub/core/score.hpp>
+#include <zub/core/scoreregion.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/songbook.hpp>
 #include <zub/core/songedit.hpp>
@@ -426,6 +427,54 @@ void MainWindow::createCentralWidget() {
         }
         updateFretboard();
     });
+    // Actions on the selected notes of a score: one undo step each, the notes stay selected.
+    highlightTimer_ = new QTimer(this);
+    highlightTimer_->setSingleShot(true);
+    highlightTimer_->setInterval(120);
+    connect(highlightTimer_, &QTimer::timeout, this, &MainWindow::updateScoreHighlights);
+    {
+        using zub::scoreregion::Action;
+        struct Entry {
+            const char* name;
+            QString text;
+            QString tip;
+            Action action;
+        };
+        const Entry entries[] = {
+            {"Tie", tr("Tie"), tr("Tie the selected notes: ~ after each one but the last"),
+             Action::Tie},
+            {"Slur", tr("Slur"),
+             tr("Slur over the selected notes: ( after the first, ) after the last"), Action::Slur},
+            {"Glissando", tr("Glissando"), tr("Glissando after the first selected note"),
+             Action::Glissando},
+            {"Repeat", tr("Repeat"), tr("Play the selected notes twice: \\repeat volta 2 { ... }"),
+             Action::Repeat},
+            {"StrokeDown", tr("Stroke Down"),
+             tr("Down stroke over every selected chord and note (replaces an up stroke)"),
+             Action::StrokeDown},
+            {"StrokeUp", tr("Stroke Up"),
+             tr("Up stroke over every selected chord and note (replaces a down stroke)"),
+             Action::StrokeUp},
+            {"DeadNotes", tr("Dead Notes"),
+             tr("Dead (muted) notes: \\deadNote before every selected note; again removes them"),
+             Action::DeadNotes},
+        };
+        for (const Entry& entry : entries) {
+            auto* action = new QAction(entry.text, this);
+            action->setObjectName(QString::fromLatin1(entry.name));
+            action->setToolTip(entry.tip);
+            action->setEnabled(false);
+            connect(action, &QAction::triggered, this, [this, a = entry.action] {
+                if (SongEditor* editor = currentEditor(); editor && !onSongTab()) {
+                    editor->applyRegionAction(a);
+                    updateRegionActions();
+                }
+            });
+            regionActions_.append(action);
+        }
+    }
+    scorePreview_->setRegionActions(regionActions_);
+    connect(scorePreview_, &ScorePreviewPane::regionSelected, this, &MainWindow::selectScoreRegion);
     scoreRunner_ = new ScoreRunner(this);
     connect(scoreRunner_, &ScoreRunner::started, scorePreview_, &ScorePreviewPane::showBuilding);
     connect(scoreRunner_, &ScoreRunner::finished, this, &MainWindow::showScoreResult);
@@ -1169,6 +1218,7 @@ void MainWindow::updateEditState() {
 void MainWindow::updateSongActions() {
     const bool open = editor_ != nullptr;
     updateScoreWidthBars();
+    updateRegionActions();
     SongEditor* current = currentEditor();
     const bool songTab = onSongTab();
     closeSongAction_->setEnabled(open);
@@ -1869,6 +1919,7 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     fretboard->setObjectName(QStringLiteral("scoreFretboard"));
     panelLayout->addWidget(inputBar);
     panelLayout->addWidget(fretboard);
+    inputBar->setRegionActions(regionActions_);
     inputPanel->setVisible(fretboardAction_->isChecked());
     splitter->addWidget(inputPanel);
     // The toggle for the panel sits in the width bar (the tab's tool row).
@@ -1973,9 +2024,18 @@ void MainWindow::attachScoreEditor(int tabIndex, SongEditor* editor) {
         requestPreview();
     });
     QPlainTextEdit* edit = editor->textEdit();
+    editor->setRegionMenuActions(regionActions_);
+    connect(edit, &QPlainTextEdit::selectionChanged, this, [this, editor] {
+        if (currentEditor() == editor) {
+            updateRegionActions();
+            highlightTimer_->start();
+        }
+    });
     connect(edit, &QPlainTextEdit::textChanged, this, [this, editor] {
         pdfStale_ = true;
         if (currentEditor() == editor) {
+            scoreLinksFresh_ = false; // the note positions of the preview are of an older text
+            scorePreview_->setHighlightedNotes({});
             scorePreviewTimer_->start();
             fretboardTimer_->start();
         }
@@ -2088,6 +2148,7 @@ void MainWindow::onTabChanged() {
     const bool song = tabs_->currentIndex() <= 0;
     previewStack_->setCurrentWidget(song ? static_cast<QWidget*>(preview_) : scorePreview_);
     scorePreviewTimer_->stop();
+    scoreLinksFresh_ = false;
     if (song) {
         scoreRunner_->cancel();
         if (pdfStale_ && editor_)
@@ -2184,6 +2245,56 @@ void MainWindow::showScoreResult(const ScoreResult& result) {
     if (scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name != result.inputName)
         return;
     scorePreview_->showResult(result);
+    scoreLinksFresh_ = result.success && !scorePreviewTimer_->isActive();
+    updateScoreHighlights();
+}
+
+void MainWindow::updateRegionActions() {
+    SongEditor* editor = currentEditor();
+    const bool enabled = editor && !onSongTab() && !editor->textEdit()->isReadOnly() &&
+                         editor->selectedByteRange().has_value();
+    for (QAction* action : regionActions_)
+        action->setEnabled(enabled);
+}
+
+// The notes of the preview whose text lies inside the editor's selection get a highlight box.
+void MainWindow::updateScoreHighlights() {
+    highlightTimer_->stop();
+    SongEditor* editor = currentEditor();
+    const auto range = editor && !onSongTab() ? editor->selectedByteRange() : std::nullopt;
+    if (!range || !scoreLinksFresh_) {
+        scorePreview_->setHighlightedNotes({});
+        return;
+    }
+    const std::string text = editor->editorText();
+    QList<QPoint> inside;
+    for (const QPoint& position : scorePreview_->notePositions()) {
+        const auto offset = zub::scoreregion::offsetOf(text, position.y(), position.x());
+        if (offset && *offset >= range->first && *offset < range->second)
+            inside.append(position);
+    }
+    scorePreview_->setHighlightedNotes(inside);
+}
+
+// The notes in a rectangle dragged over the preview: the editor selects them, from the start of
+// the first to the end of the last (whole notes and chords).
+void MainWindow::selectScoreRegion(const QList<QPoint>& positions) {
+    SongEditor* editor = currentEditor();
+    if (!editor || onSongTab() || positions.isEmpty() || !scoreLinksFresh_)
+        return;
+    const std::string text = editor->editorText();
+    std::optional<std::size_t> first, last;
+    for (const QPoint& position : positions) {
+        const auto offset = zub::scoreregion::offsetOf(text, position.y(), position.x());
+        if (!offset)
+            continue;
+        first = first ? std::min(*first, *offset) : *offset;
+        last = last ? std::max(*last, *offset) : *offset;
+    }
+    if (!first)
+        return;
+    if (const auto region = zub::scoreregion::expandToEvents(text, {*first, *last + 1}))
+        editor->selectByteRange(region->begin, region->end);
 }
 
 void MainWindow::newScore() {

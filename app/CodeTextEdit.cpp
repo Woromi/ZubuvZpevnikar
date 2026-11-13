@@ -1,6 +1,8 @@
 #include "CodeTextEdit.hpp"
 
+#include <QContextMenuEvent>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QPainter>
 #include <QTextBlock>
 #include <algorithm>
@@ -53,6 +55,18 @@ void CodeTextEdit::updateArea(const QRect& rect, int dy) {
         area_->update(0, rect.y(), area_->width(), rect.height());
     if (rect.contains(viewport()->rect()))
         updateAreaWidth();
+}
+
+void CodeTextEdit::contextMenuEvent(QContextMenuEvent* event) {
+    if (extraActions_.isEmpty()) {
+        QPlainTextEdit::contextMenuEvent(event);
+        return;
+    }
+    QMenu* menu = createStandardContextMenu(event->pos());
+    menu->addSeparator();
+    menu->addActions(extraActions_);
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    menu->popup(event->globalPos());
 }
 
 void CodeTextEdit::keyPressEvent(QKeyEvent* event) {

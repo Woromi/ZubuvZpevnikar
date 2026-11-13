@@ -1,12 +1,17 @@
 #pragma once
 
+#include <QList>
 #include <QString>
 #include <QWidget>
 #include <expected>
 #include <filesystem>
+#include <optional>
 #include <string>
+#include <utility>
+#include <zub/core/scoreregion.hpp>
 #include <zub/core/songedit.hpp>
 
+class QAction;
 class QFileSystemWatcher;
 class QLabel;
 class QPlainTextEdit;
@@ -111,6 +116,19 @@ public:
     std::size_t cursorByteOffset() const;
     std::string effectiveDurationAtCursor() const;
 
+    // The document as UTF-8 with LF line ends, whatever the file uses (the offsets of the
+    // functions below and of zub::scoreregion refer to it).
+    std::string editorText() const;
+    // The selection as byte offsets into the editor text (UTF-8, LF line ends); none without one.
+    std::optional<std::pair<std::size_t, std::size_t>> selectedByteRange() const;
+    // Selects [begin, end) of the editor text, shows it and focuses the editor.
+    void selectByteRange(std::size_t begin, std::size_t end);
+    // Applies a zub::scoreregion action to the selected notes (Kind::Score): ONE undo step, the
+    // result stays selected. False when nothing changed (no selection, read-only, nothing to do).
+    bool applyRegionAction(zub::scoreregion::Action action);
+    // Added to the end of the editor's context menu.
+    void setRegionMenuActions(const QList<QAction*>& actions);
+
 signals:
     void modificationChanged(bool modified);
     // After a successful save(); `content` is the UTF-8 that was written.
@@ -121,9 +139,9 @@ signals:
 private:
     void onFileChanged();
     std::string currentContent() const; // editor text -> file bytes
-    std::string editorText() const;     // the document as UTF-8 with LF line ends
     void keepCarriedDuration(const std::string& written, const std::string& effective);
     void setContent(const std::string& bytes);
+    void replaceDocumentText(const QString& text); // LF line ends; the differing middle only
     void watch();
     void onDirectoryChanged();
     void updateBanner();

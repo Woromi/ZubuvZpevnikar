@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QAction>
 #include <QColor>
+#include <QList>
 #include <QPlainTextEdit>
 
 // A QPlainTextEdit with a line-number area on the left (Qt's "Code Editor" example). The
@@ -12,12 +14,16 @@ class CodeTextEdit : public QPlainTextEdit {
 public:
     explicit CodeTextEdit(QWidget* parent = nullptr);
 
+    // Actions added to the end of the context menu (after the standard entries); owned elsewhere.
+    void setExtraMenuActions(const QList<QAction*>& actions) { extraActions_ = actions; }
+
     void setLineNumberColors(const QColor& background, const QColor& number,
                              const QColor& currentNumber);
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
     friend class LineNumberArea;
@@ -26,6 +32,7 @@ private:
     void updateArea(const QRect& rect, int dy);
     void paintArea(QPaintEvent* event);
 
+    QList<QAction*> extraActions_;
     QWidget* area_ = nullptr;
     QColor background_;
     QColor number_;

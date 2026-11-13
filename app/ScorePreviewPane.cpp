@@ -3,6 +3,8 @@
 #include "ScoreRunner.hpp"
 #include "convert.hpp"
 
+#include <QApplication>
+#include <QContextMenuEvent>
 #include <QDialog>
 #include <QEvent>
 #include <QFontDatabase>
@@ -10,6 +12,7 @@
 #include <QIcon>
 #include <QLabel>
 #include <QListWidget>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPlainTextEdit>
@@ -22,6 +25,7 @@
 #include <QXmlStreamReader>
 #include <algorithm>
 #include <functional>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -134,8 +138,30 @@ public:
     }
 
     // The links of the loaded SVG (set after load()) and what a click on a note does.
-    void setLinks(std::vector<NoteLink> links) { links_ = std::move(links); }
+    void setLinks(std::vector<NoteLink> links) {
+        links_ = std::move(links);
+        highlighted_.clear();
+        update();
+    }
     std::function<void(int line, int column)> onNoteClicked;
+    // A rectangle was dragged over the score: the links inside it (null: none).
+    std::function<void(const std::vector<const NoteLink*>&)> onRegionDragged;
+    std::function<void(const QPoint& globalPosition)> onContextMenu;
+
+    // The links that get a highlight box (the notes inside the editor's selection).
+    void setHighlighted(const std::vector<std::pair<int, int>>& positions) {
+        const std::set<std::pair<int, int>> next(positions.begin(), positions.end());
+        if (next == highlighted_)
+            return;
+        highlighted_ = next;
+        update();
+    }
+    const std::vector<NoteLink>& links() const { return links_; }
+    int highlightedCount() const {
+        return static_cast<int>(std::ranges::count_if(links_, [this](const NoteLink& link) {
+            return highlighted_.contains({link.line, link.column});
+        }));
+    }
 
     // The widget position of a link's point, null when it is not drawn.
     QPointF toWidget(const QPointF& svgPoint) const {
@@ -180,6 +206,7 @@ public:
     }
     void clear() {
         links_.clear();
+        highlighted_.clear();
         svg_.clear();
         renderer_.load(QByteArray());
         updateGeometry();
@@ -199,14 +226,52 @@ public:
     }
 
 protected:
+    // A press and release without moving far is a click (jump to the note); moving further
+    // marks a rectangle (the notes in it get selected).
     void mouseMoveEvent(QMouseEvent* event) override {
-        setCursor(linkAt(event->position().toPoint()) ? Qt::PointingHandCursor : Qt::ArrowCursor);
+        const QPoint position = event->position().toPoint();
+        if (pressed_ &&
+            (position - pressAt_).manhattanLength() >= QApplication::startDragDistance())
+            dragging_ = true;
+        if (dragging_) {
+            rubber_ = QRect(pressAt_, position).normalized();
+            setCursor(Qt::CrossCursor);
+            update();
+            return;
+        }
+        setCursor(linkAt(position) ? Qt::PointingHandCursor : Qt::ArrowCursor);
     }
     void mousePressEvent(QMouseEvent* event) override {
-        if (event->button() == Qt::LeftButton && onNoteClicked) {
-            if (const NoteLink* link = linkAt(event->position().toPoint()))
+        if (event->button() != Qt::LeftButton)
+            return;
+        pressed_ = true;
+        dragging_ = false;
+        pressAt_ = event->position().toPoint();
+    }
+    void mouseReleaseEvent(QMouseEvent* event) override {
+        if (event->button() != Qt::LeftButton || !pressed_)
+            return;
+        const bool wasDragging = dragging_;
+        const QRect band = rubber_;
+        pressed_ = dragging_ = false;
+        rubber_ = QRect();
+        update();
+        if (wasDragging) {
+            std::vector<const NoteLink*> inside;
+            for (const NoteLink& link : links_) {
+                if (band.contains(toWidget(link.point).toPoint()))
+                    inside.push_back(&link);
+            }
+            if (onRegionDragged)
+                onRegionDragged(inside);
+        } else if (onNoteClicked) {
+            if (const NoteLink* link = linkAt(pressAt_))
                 onNoteClicked(link->line, link->column);
         }
+    }
+    void contextMenuEvent(QContextMenuEvent* event) override {
+        if (onContextMenu)
+            onContextMenu(event->globalPos());
     }
 
     void changeEvent(QEvent* event) override {
@@ -226,11 +291,31 @@ protected:
         const int width = shownWidth(this->width());
         renderer_.render(&painter,
                          QRectF(margin, margin, width, heightForWidth(this->width()) - 2 * margin));
+        QColor fill = palette().color(QPalette::Highlight);
+        QColor edge = fill;
+        fill.setAlpha(80);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(fill);
+        for (const NoteLink& link : links_) {
+            if (!highlighted_.contains({link.line, link.column}))
+                continue;
+            const QPointF at = toWidget(link.point);
+            painter.drawRoundedRect(QRectF(at.x() - highlightSize / 2, at.y() - highlightSize / 2,
+                                           highlightSize, highlightSize),
+                                    4, 4);
+        }
+        if (!rubber_.isNull()) {
+            fill.setAlpha(50);
+            painter.setBrush(fill);
+            painter.setPen(QPen(edge, 1));
+            painter.drawRect(rubber_);
+        }
     }
 
 private:
     static constexpr int margin = 12;       // space around the score
     static constexpr double hitRadius = 14; // pixels: how near to a note a click counts
+    static constexpr double highlightSize = 20; // pixels: the box around a selected note
     int shownWidth(int available) const {
         return std::max(1, std::min(available - 2 * margin, renderer_.defaultSize().width() * 2));
     }
@@ -252,6 +337,11 @@ private:
     }
 
     std::vector<NoteLink> links_;
+    std::set<std::pair<int, int>> highlighted_; // {line, column} of the links to highlight
+    bool pressed_ = false;                      // the left button is down on the score
+    bool dragging_ = false;                     // ... and has moved far enough: a rubber band
+    QPoint pressAt_;
+    QRect rubber_;   // the rubber band while dragging
     QByteArray svg_; // as LilyPond wrote it
     QSvgRenderer renderer_;
 };
@@ -295,6 +385,19 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     layout->addWidget(errors_);
 
     canvas_->onNoteClicked = [this](int line, int column) { emit noteActivated(line, column); };
+    canvas_->onRegionDragged = [this](const std::vector<const NoteLink*>& links) {
+        QList<QPoint> positions;
+        for (const NoteLink* link : links)
+            positions.append(QPoint(link->column, link->line));
+        emit regionSelected(positions);
+    };
+    canvas_->onContextMenu = [this](const QPoint& at) {
+        if (regionActions_.isEmpty())
+            return;
+        QMenu menu(this);
+        menu.addActions(regionActions_);
+        menu.exec(at);
+    };
     connect(rebuild_, &QToolButton::clicked, this, &ScorePreviewPane::rebuildRequested);
     connect(logButton_, &QToolButton::clicked, this, [this] { showLog(); });
     connect(errors_, &QListWidget::itemActivated, this, [this](QListWidgetItem* item) {
@@ -361,6 +464,28 @@ void ScorePreviewPane::showResult(const ScoreResult& result) {
 QPoint ScorePreviewPane::noteViewPosition(int line, int column) const {
     const NoteLink* link = canvas_->findLink(line, column);
     return link ? canvas_->toWidget(link->point).toPoint() : QPoint();
+}
+
+QList<QPoint> ScorePreviewPane::notePositions() const {
+    QList<QPoint> positions;
+    for (const NoteLink& link : canvas_->links())
+        positions.append(QPoint(link.column, link.line));
+    return positions;
+}
+
+void ScorePreviewPane::setHighlightedNotes(const QList<QPoint>& positions) {
+    std::vector<std::pair<int, int>> list;
+    for (const QPoint& position : positions)
+        list.emplace_back(position.y(), position.x());
+    canvas_->setHighlighted(list);
+}
+
+int ScorePreviewPane::highlightedNoteCount() const {
+    return canvas_->highlightedCount();
+}
+
+void ScorePreviewPane::setRegionActions(const QList<QAction*>& actions) {
+    regionActions_ = actions;
 }
 
 QWidget* ScorePreviewPane::scoreView() const {

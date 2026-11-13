@@ -683,6 +683,62 @@ Použijte vestavěný.</translation>
         <translation>Zobrazí hmatník: klik na pražec zapíše notu, Ctrl+klik ji přidá k akordu</translation>
     </message>
     <message>
+        <source>Tie</source>
+        <translation>Ligatura</translation>
+    </message>
+    <message>
+        <source>Tie the selected notes: ~ after each one but the last</source>
+        <translation>Ligatura mezi označenými notami: ~ za každou kromě poslední</translation>
+    </message>
+    <message>
+        <source>Slur</source>
+        <translation>Legato oblouček</translation>
+    </message>
+    <message>
+        <source>Slur over the selected notes: ( after the first, ) after the last</source>
+        <translation>Legato oblouček přes označené noty: ( za první, ) za poslední</translation>
+    </message>
+    <message>
+        <source>Glissando</source>
+        <translation>Glissando</translation>
+    </message>
+    <message>
+        <source>Glissando after the first selected note</source>
+        <translation>Glissando za první označenou notou</translation>
+    </message>
+    <message>
+        <source>Repeat</source>
+        <translation>Repetice</translation>
+    </message>
+    <message>
+        <source>Play the selected notes twice: \repeat volta 2 { ... }</source>
+        <translation>Zahrát označené noty dvakrát: \repeat volta 2 { ... }</translation>
+    </message>
+    <message>
+        <source>Stroke Down</source>
+        <translation>Úder dolů</translation>
+    </message>
+    <message>
+        <source>Down stroke over every selected chord and note (replaces an up stroke)</source>
+        <translation>Úder dolů nad každým označeným akordem a notou (nahradí úder nahoru)</translation>
+    </message>
+    <message>
+        <source>Stroke Up</source>
+        <translation>Úder nahoru</translation>
+    </message>
+    <message>
+        <source>Up stroke over every selected chord and note (replaces a down stroke)</source>
+        <translation>Úder nahoru nad každým označeným akordem a notou (nahradí úder dolů)</translation>
+    </message>
+    <message>
+        <source>Dead Notes</source>
+        <translation>Mrtvé tóny</translation>
+    </message>
+    <message>
+        <source>Dead (muted) notes: \deadNote before every selected note; again removes them</source>
+        <translation>Mrtvé (dušené) tóny: \deadNote před každou označenou notou; podruhé je odebere</translation>
+    </message>
+    <message>
         <source>Favourite: add or remove the label &quot;fav&quot; (one undo step; save to keep it)</source>
         <translation>Oblíbená: přidá nebo odebere štítek „fav“ (jeden krok zpět; uložením se zachová)</translation>
     </message>
@@ -1217,6 +1273,10 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>Insert a bar check (|)</source>
         <translation>Vloží taktovou čáru (|)</translation>
+    </message>
+    <message>
+        <source>Selection:</source>
+        <translation>Výběr:</translation>
     </message>
 </context>
 <context>

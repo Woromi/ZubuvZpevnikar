@@ -1,15 +1,24 @@
 #include "ScoreInputBar.hpp"
 
+#include <QAction>
 #include <QButtonGroup>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QToolButton>
+#include <QVBoxLayout>
 
 ScoreInputBar::ScoreInputBar(QWidget* parent)
     : QWidget(parent), group_(new QButtonGroup(this)), dot_(new QToolButton) {
     group_->setExclusive(true);
-    auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(4, 2, 4, 2);
+    auto* outer = new QVBoxLayout(this);
+    outer->setContentsMargins(4, 2, 4, 2);
+    outer->setSpacing(2);
+    auto* layout = new QHBoxLayout;
+    layout->setContentsMargins(0, 0, 0, 0);
+    outer->addLayout(layout);
+    regionRow_ = new QHBoxLayout;
+    regionRow_->setContentsMargins(0, 0, 0, 0);
+    outer->addLayout(regionRow_);
     layout->addWidget(new QLabel(tr("Length:")));
     for (const int length : {1, 2, 4, 8, 16}) {
         auto* button = new QToolButton;
@@ -78,4 +87,23 @@ void ScoreInputBar::showDuration() {
         button->setChecked(true);
     dot_->setChecked(dotted);
     updating_ = false;
+}
+
+void ScoreInputBar::setRegionActions(const QList<QAction*>& actions) {
+    while (QLayoutItem* item = regionRow_->takeAt(0)) {
+        delete item->widget();
+        delete item;
+    }
+    if (actions.isEmpty())
+        return;
+    regionRow_->addWidget(new QLabel(tr("Selection:")));
+    for (QAction* action : actions) {
+        auto* button = new QToolButton;
+        button->setObjectName(QStringLiteral("scoreRegion") + action->objectName());
+        button->setDefaultAction(action);
+        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        button->setAutoRaise(true);
+        regionRow_->addWidget(button);
+    }
+    regionRow_->addStretch();
 }

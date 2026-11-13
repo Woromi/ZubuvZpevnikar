@@ -108,6 +108,11 @@ private:
     void replaceSongText(const std::string& after); // one undo step in the song editor
     void updateScoreWidthBars();
     void updateFretboard(); // the current score tab's input panel
+    // Actions on the selected notes of a score (tie, slur ...): enabled with a selection in the
+    // score editor; the preview marks the notes of the selection a moment after it changes.
+    void updateRegionActions();
+    void updateScoreHighlights();
+    void selectScoreRegion(const QList<QPoint>& positions); // from a rectangle in the preview
     void fretboardClicked(int string, int fret, Qt::KeyboardModifiers modifiers);
     void setScoreWidth(const std::string& name, bool narrow); // the song and all its score tabs; false if the user cancelled
     void createSongToolBar();
@@ -237,6 +242,9 @@ private:
     };
     std::vector<ScoreTab> scoreTabs_;        // in tab order, from index 1
     QTimer* fretboardTimer_ = nullptr;       // cursor or text moved: refresh the fretboard
+    QList<QAction*> regionActions_;          // Tie, Slur ...: on the selected notes of a score
+    QTimer* highlightTimer_ = nullptr;       // selection moved: mark its notes in the preview
+    bool scoreLinksFresh_ = false;           // the preview's note positions match the editor text
     QAction* fretboardAction_ = nullptr;     // "Fretboard": shows the input panels
     QTimer* scoreSyncTimer_ = nullptr;       // song text changed: look for new \lilypondfile
     QTimer* scorePreviewTimer_ = nullptr;    // score text changed: rebuild the score preview

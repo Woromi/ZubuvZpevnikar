@@ -17,8 +17,8 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QScrollBar>
-#include <QTextBlock>
 #include <QStringList>
+#include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTimer>
@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <utility>
 #include <zub/core/fretboard.hpp>
+#include <zub/core/scoreregion.hpp>
 #include <zub/core/textfile.hpp>
 
 SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Repository& repository,
@@ -257,7 +258,10 @@ void SongEditor::replaceContent(const std::string& bytes) {
     if (lossy_) {
         return;
     }
-    const QString text = toEditorText(bytes, crlf_);
+    replaceDocumentText(toEditorText(bytes, crlf_));
+}
+
+void SongEditor::replaceDocumentText(const QString& text) {
     QTextDocument* document = edit_->document();
     // The raw text has one U+2029 per line break, one character each like the document positions.
     const QString oldText = document->toRawText();
@@ -812,4 +816,46 @@ void SongEditor::insertPart(zub::songedit::Part part) {
 
 bool SongEditor::hasSongHeader() const {
     return !edit_->document()->find(QStringLiteral("\\beginsong")).isNull();
+}
+
+std::optional<std::pair<std::size_t, std::size_t>> SongEditor::selectedByteRange() const {
+    const QTextCursor cursor = edit_->textCursor();
+    if (!cursor.hasSelection())
+        return std::nullopt;
+    const QString raw = edit_->document()->toRawText();
+    return std::pair{utf16ToByteOffset(raw, cursor.selectionStart()),
+                     utf16ToByteOffset(raw, cursor.selectionEnd())};
+}
+
+void SongEditor::selectByteRange(std::size_t begin, std::size_t end) {
+    const std::string text = editorText();
+    begin = std::min(begin, text.size());
+    end = std::min(end, text.size());
+    QTextCursor cursor(edit_->document());
+    cursor.setPosition(utf16Position(text, begin));
+    cursor.setPosition(utf16Position(text, end), QTextCursor::KeepAnchor);
+    edit_->setTextCursor(cursor);
+    edit_->ensureCursorVisible();
+    edit_->setFocus();
+}
+
+bool SongEditor::applyRegionAction(zub::scoreregion::Action action) {
+    if (edit_->isReadOnly() || kind_ != Kind::Score)
+        return false;
+    const auto range = selectedByteRange();
+    if (!range)
+        return false;
+    const std::string text = editorText();
+    const auto result = zub::scoreregion::apply(action, text, {range->first, range->second});
+    if (!result)
+        return false;
+    const bool changed = result->text != text;
+    if (changed)
+        replaceDocumentText(toQString(result->text));
+    selectByteRange(result->selection.begin, result->selection.end);
+    return changed;
+}
+
+void SongEditor::setRegionMenuActions(const QList<QAction*>& actions) {
+    static_cast<CodeTextEdit*>(edit_)->setExtraMenuActions(actions);
 }
