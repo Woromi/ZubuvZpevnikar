@@ -212,39 +212,66 @@ struct Scanner {
         return i;
     }
 
-    // Post-events and articulations written directly after a note or chord from `i` on.
+    // One articulation at `k` (`^\\strokeDown`, `-.`, `_"x"`, `^\\markup { x }`, `-\\bendAfter #+4`,
+    // `-\\tweak color #red ^"x"`); its end, or `k` when it is none.
+    std::size_t articulation(std::size_t k) const {
+        if (k >= s.size() || (s[k] != '^' && s[k] != '_' && s[k] != '-'))
+            return k;
+        std::size_t j = k + 1;
+        if (j >= s.size())
+            return k;
+        if (s[j] == '\\') {
+            ++j;
+            if (j >= s.size() || !isLetter(s[j]))
+                return k;
+            const std::size_t wordBegin = j;
+            while (j < s.size() && isLetter(s[j]))
+                ++j;
+            const std::string_view word = s.substr(wordBegin, j - wordBegin);
+            if (word == "markup" || word == "markuplist") {
+                j = skipMarkupArgument(j);
+            } else if (word == "tweak") {
+                // `\tweak property value` and then the articulation it changes.
+                j = skipValue(skipPropertyWord(j));
+                const std::size_t next = articulation(skipSpaces(j));
+                return next == skipSpaces(j) ? j : next;
+            } else {
+                const std::size_t arg = skipSpaces(j);
+                if (arg < s.size() && (s[arg] == '#' || s[arg] == '$'))
+                    j = skipScheme(arg);
+            }
+        } else if (s[j] == '"') {
+            j = skipString(j);
+        } else if (isDigit(s[j])) {
+            while (j < s.size() && isDigit(s[j]))
+                ++j;
+        } else if (s[j] == '.' || s[j] == '>' || s[j] == '!' || s[j] == '+' || s[j] == '-' ||
+                   s[j] == '^' || s[j] == '_') {
+            ++j;
+        } else {
+            return k;
+        }
+        return j;
+    }
+
+    // Post-events and articulations written after a note or chord from `i` on: right against it
+    // or after spaces (`<...>2. ^\\strokeDown`). Arguments (`^\\markup { x }`, `-\\bendAfter #+4`)
+    // are part of the articulation.
     std::size_t trail(std::size_t i) const {
-        while (i < s.size()) {
-            const char c = s[i];
+        std::size_t end = i;
+        while (end < s.size()) {
+            const char c = s[end];
             if (c == '(' || c == ')' || c == '~' || c == '[' || c == ']') {
-                ++i;
+                ++end;
                 continue;
             }
-            if (c != '^' && c != '_' && c != '-')
+            const std::size_t k = skipSpaces(end);
+            const std::size_t next = articulation(k);
+            if (next == k)
                 break;
-            std::size_t j = i + 1;
-            if (j >= s.size())
-                break;
-            if (s[j] == '\\') {
-                ++j;
-                if (j >= s.size() || !isLetter(s[j]))
-                    break;
-                while (j < s.size() && isLetter(s[j]))
-                    ++j;
-            } else if (s[j] == '"') {
-                j = skipString(j);
-            } else if (isDigit(s[j])) {
-                while (j < s.size() && isDigit(s[j]))
-                    ++j;
-            } else if (s[j] == '.' || s[j] == '>' || s[j] == '!' || s[j] == '+' || s[j] == '-' ||
-                       s[j] == '^' || s[j] == '_') {
-                ++j;
-            } else {
-                break;
-            }
-            i = j;
+            end = next;
         }
-        return i;
+        return end;
     }
 
     // The pitch arguments of `\key`, `\relative`, `\transpose`, `\transposition` are no notes.

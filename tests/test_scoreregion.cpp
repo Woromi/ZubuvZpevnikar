@@ -375,3 +375,31 @@ TEST_CASE("scoreregion treats q (chord repetition) as a chord", "[scoreregion]")
     // Words that merely contain a q are none.
     CHECK_FALSE(sr::expandToEvents("seq qa", {0, 6}));
 }
+
+TEST_CASE("scoreregion articulations with spaces and arguments are part of the note",
+          "[scoreregion]") {
+    // Stroke Down, then Stroke Up on a spaced stroke: one stroke at the end.
+    const std::string text = "<e\\4 g\\3>2. ^\\strokeDown a4";
+    const auto down = sr::apply(Action::StrokeDown, text, {0, 14});
+    REQUIRE(down);
+    CHECK(down->text == text);
+    const auto up = sr::apply(Action::StrokeUp, text, {0, 14});
+    REQUIRE(up);
+    CHECK(up->text == "<e\\4 g\\3>2. ^\\strokeUp a4");
+    const auto back = sr::apply(Action::StrokeDown, up->text, up->selection);
+    REQUIRE(back);
+    CHECK(back->text == text);
+    // A markup keeps its argument; the repeat does not split it.
+    CHECK(run(Action::Repeat, "c4^\\markup { \\bold x } d4 e4", "c4", "d4") ==
+          "[\\repeat volta 2 { c4^\\markup { \\bold x } d4 }] e4");
+    CHECK(run(Action::Repeat, "c4^\\markup \"x\" d4", "c4", "c4") ==
+          "[\\repeat volta 2 { c4^\\markup \"x\" }] d4");
+    // An articulation with a Scheme argument; a tweak before one.
+    CHECK(run(Action::Repeat, "<c\\3>4-\\bendAfter #+4 d4", "<", "bendAfter #+4") ==
+          "[\\repeat volta 2 { <c\\3>4-\\bendAfter #+4 }] d4");
+    CHECK(run(Action::Repeat, "c4-\\tweak color #red ^\"x\" d4", "c4", "c4") ==
+          "[\\repeat volta 2 { c4-\\tweak color #red ^\"x\" }] d4");
+    // `\markup` followed by a music command: that stays outside.
+    CHECK(run(Action::Repeat, "c4^\\markup \\bold \"x\" \\time 3/4 d4", "c4", "c4") ==
+          "[\\repeat volta 2 { c4^\\markup \\bold \"x\" }] \\time 3/4 d4");
+}
