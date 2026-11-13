@@ -254,6 +254,13 @@ TEST_CASE("insertMultivoice", "[songedit]") {
     CHECK(inChord.cursor == 5 + 13);
     const auto selInChord = insertMultivoice(line, 4, 2, 4);
     CHECK(selInChord.text == "\\[Am]{\\multivoice{}{}}ab");
+
+    // a selection with unbalanced braces would break the command: it is ignored
+    const auto unbalanced = insertMultivoice("{\\role{Petr} Ah", 9, 7, 15); // "Petr} Ah"
+    CHECK(unbalanced.text == "{\\role{Pe{\\multivoice{}{}}tr} Ah");
+    CHECK(unbalanced.cursor == 9 + 13);
+    const auto balanced = insertMultivoice("a {b} c", 0, 2, 5); // "{b}"
+    CHECK(balanced.text == "a {\\multivoice{{b}}{}} c");
 }
 
 TEST_CASE("insertRole", "[songedit]") {

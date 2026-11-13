@@ -210,6 +210,11 @@ Change insertMultivoice(std::string_view line, std::size_t cursor, std::size_t s
     cursor = std::min(cursor, line.size());
     selEnd = std::min(selEnd, line.size());
     constexpr std::string_view head = "{\\multivoice{";
+    if (selStart < selEnd) {
+        const std::string wrapped = "{" + std::string(line.substr(selStart, selEnd - selStart)) + "}";
+        if (latex::findMatching(wrapped, 0) != wrapped.size() - 1)
+            selStart = selEnd = cursor; // unbalanced braces would break the command: no selection
+    }
     const bool selected = selStart < selEnd && !chordContaining(line, selStart) &&
                           !chordContaining(line, selEnd);
     if (selected) {
