@@ -417,8 +417,9 @@ void MainWindow::createCentralWidget() {
     fretboardAction_->setCheckable(true);
     fretboardAction_->setChecked(QSettings().value(fretboardKey, true).toBool());
     fretboardAction_->setToolTip(
-        tr("Show the fretboard: click a fret to write the note, Ctrl+click to add it to the "
-           "chord"));
+        tr("Show the fretboard: click frets to stage notes (one per string), Insert "
+           "(Ctrl+Return) writes them as a note or chord, Escape clears; double-click a fret "
+           "inserts at once"));
     connect(fretboardAction_, &QAction::toggled, this, [this](bool shown) {
         QSettings().setValue(fretboardKey, shown);
         for (const ScoreTab& tab : scoreTabs_) {
@@ -1934,9 +1935,34 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     fretboardButton->setDefaultAction(fretboardAction_);
     fretboardButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
     widthLayout->addWidget(fretboardButton);
-    connect(fretboard, &FretboardWidget::clicked, this, [this](int string, int fret, Qt::KeyboardModifiers mods) {
-        fretboardClicked(string, fret, mods);
-    });
+    // Insert and Clear work anywhere on the tab while something is staged.
+    auto* insertAction = new QAction(tr("Insert Staged Notes"), page);
+    insertAction->setObjectName(QStringLiteral("scoreInsertStaged"));
+    insertAction->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Return),
+                                QKeySequence(Qt::CTRL | Qt::Key_Enter)});
+    insertAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+    insertAction->setEnabled(false);
+    auto* clearAction = new QAction(tr("Clear Staged Notes"), page);
+    clearAction->setObjectName(QStringLiteral("scoreClearStaged"));
+    clearAction->setShortcut(QKeySequence(Qt::Key_Escape));
+    clearAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+    clearAction->setEnabled(false);
+    page->addAction(insertAction);
+    page->addAction(clearAction);
+    connect(insertAction, &QAction::triggered, this, [this, fretboard] { insertStagedNotes(fretboard); });
+    connect(clearAction, &QAction::triggered, fretboard, &FretboardWidget::clearStaged);
+    connect(fretboard, &FretboardWidget::insertRequested, this,
+            [this, fretboard] { insertStagedNotes(fretboard); });
+    connect(inputBar, &ScoreInputBar::insertRequested, this,
+            [this, fretboard] { insertStagedNotes(fretboard); });
+    connect(inputBar, &ScoreInputBar::clearRequested, fretboard, &FretboardWidget::clearStaged);
+    connect(fretboard, &FretboardWidget::stagedChanged, this,
+            [fretboard, inputBar, insertAction, clearAction] {
+                const int count = static_cast<int>(fretboard->staged().size());
+                inputBar->setStagedCount(count);
+                insertAction->setEnabled(count > 0);
+                clearAction->setEnabled(count > 0);
+            });
     connect(inputBar, &ScoreInputBar::restRequested, this, [this] {
         if (SongEditor* current = currentEditor(); current && !onSongTab()) {
             const auto& tab = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)];
@@ -2020,6 +2046,7 @@ void MainWindow::attachScoreEditor(int tabIndex, SongEditor* editor) {
     splitter->setCollapsible(2, false);
     page->setCurrentWidget(splitter);
     tab.editor = editor;
+    tab.fretboard->clearStaged(); // another file's score
     tabs_->setTabText(tabIndex, toQString(editor->path().filename()) +
                                     (editor->isModified() ? QStringLiteral("*") : QString()));
 
@@ -2206,24 +2233,36 @@ void MainWindow::updateFretboard() {
     tab.inputBar->setDuration(toQString(tab.editor->effectiveDurationAtCursor()));
 }
 
-void MainWindow::fretboardClicked(int string, int fret, Qt::KeyboardModifiers modifiers) {
+void MainWindow::insertStagedNotes(FretboardWidget* fretboard) {
     SongEditor* editor = currentEditor();
-    if (!editor || onSongTab())
+    if (!editor || onSongTab() || fretboard->staged().empty())
         return;
     const ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)];
-    const std::string token = zub::fretboard::noteToken(tab.fretboard->midiAt(string, fret), string,
-                                                        tab.fretboard->german(),
-                                                        tab.fretboard->flats());
+    if (tab.fretboard != fretboard)
+        return;
     if (editor->cursorInScoreComment()) {
         statusBar()->showMessage(tr("The cursor is in a comment."), 5000);
         return;
     }
-    if (modifiers.testFlag(Qt::ControlModifier))
-        editor->addScoreNoteToChord(token);
-    else
-        editor->insertScoreNote(token, toStdString(tab.inputBar->duration()));
+    // From the lowest string (the highest number) to string 1, like the real scores.
+    auto positions = fretboard->staged();
+    std::ranges::sort(positions, std::greater<>{}, &zub::fretboard::Position::string);
+    std::vector<std::string> tokens;
+    for (const auto& position : positions)
+        tokens.push_back(zub::fretboard::noteToken(fretboard->midiAt(position.string, position.fret),
+                                                   position.string, fretboard->german(),
+                                                   fretboard->flats()));
+    std::string token = tokens.front();
+    if (tokens.size() > 1) {
+        token = "<";
+        for (std::size_t i = 0; i < tokens.size(); ++i)
+            token += (i ? " " : "") + tokens[i];
+        token += ">";
+    }
+    editor->insertScoreNote(token, toStdString(tab.inputBar->duration()));
+    fretboard->clearStaged();
     editor->textEdit()->setFocus();
-    updateFretboard(); // now: the next click must see the new cursor and text
+    updateFretboard(); // now: the next input must see the new cursor and text
 }
 
 void MainWindow::requestScorePreview(bool userAsked) {

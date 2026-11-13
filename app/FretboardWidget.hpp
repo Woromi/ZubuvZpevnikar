@@ -7,7 +7,8 @@
 
 // A fretboard for writing tablature: the strings of the score's tuning (string 1 on top), the nut,
 // frets 0..fretCount, the markers at 3, 5, 7, 9 and 12. The positions of the note at the score's
-// cursor are filled dots; the fret under the mouse is highlighted. A short string (the banjo's 5th)
+// cursor are hollow rings in the text colour; the fret under the mouse is highlighted. Clicks stage
+// positions (at most one per string, drawn as filled dots in the Highlight colour on top). A short string (the banjo's 5th)
 // is drawn from its own first fret. Colours come from the palette, so it follows light and dark.
 class FretboardWidget : public QWidget {
     Q_OBJECT
@@ -26,6 +27,13 @@ public:
     void setMarked(const std::vector<zub::fretboard::Position>& marked);
     const std::vector<zub::fretboard::Position>& marked() const { return marked_; }
 
+    // Staged positions: a click toggles one (a click on another fret of a string that has one moves
+    // it). Cleared when the tuning changes. Sorted by string.
+    const std::vector<zub::fretboard::Position>& staged() const { return staged_; }
+    void toggleStaged(int string, int fret);
+    void stage(int string, int fret); // the string's staged position is this one
+    void clearStaged();
+
     // The pitch of a position (MIDI) and the position under a widget point (string 0 for none):
     // fret relative to the string's own nut.
     int midiAt(int string, int fret) const;
@@ -37,13 +45,15 @@ public:
     QSize minimumSizeHint() const override;
 
 signals:
-    // A fret was clicked (Ctrl: add to the chord).
-    void clicked(int string, int fret, Qt::KeyboardModifiers modifiers);
+    void stagedChanged();
+    // A fret was double-clicked: it is staged, insert everything staged.
+    void insertRequested();
 
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
     void leaveEvent(QEvent* event) override;
     bool event(QEvent* event) override;
 
@@ -65,5 +75,6 @@ private:
     bool flats_ = false;
     int fretCount_ = 15;
     std::vector<zub::fretboard::Position> marked_;
+    std::vector<zub::fretboard::Position> staged_;
     zub::fretboard::Position hover_{0, 0};
 };

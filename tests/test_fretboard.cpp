@@ -419,3 +419,13 @@ TEST_CASE("fretboard tuningOf skips block comments", "[fretboard]") {
     CHECK(fb::tuningOf("% #banjo-open-g-tuning\nc4").open.size() == 6);
     CHECK(fb::tuningOf("%{ x %} stringTunings = #banjo-open-g-tuning").open.size() == 5);
 }
+
+TEST_CASE("fretboard insertNote writes a chord token with the duration after >", "[fretboard]") {
+    const auto plain = fb::insertNote("a\\3 b\\2", 4, "<e,\\6 h,\\5 e\\4>", {});
+    CHECK(plain.text == "a\\3 <e,\\6 h,\\5 e\\4> b\\2");
+    CHECK(plain.cursor == std::string("a\\3 <e,\\6 h,\\5 e\\4>").size());
+    const auto timed = fb::insertNote("", 0, "<e,\\6 h,\\5 e\\4>", "8.");
+    CHECK(timed.text == "<e,\\6 h,\\5 e\\4>8.");
+    const auto after = fb::insertNote("<e\\4 g\\3>4", 3, "<a\\2 c\\1>", "4");
+    CHECK(after.text == "<e\\4 g\\3>4 <a\\2 c\\1>4");
+}

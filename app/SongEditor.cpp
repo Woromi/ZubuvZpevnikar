@@ -682,13 +682,6 @@ void SongEditor::insertScoreNote(const std::string& token, const std::string& du
     outer.endEditBlock();
 }
 
-void SongEditor::addScoreNoteToChord(const std::string& token) {
-    if (edit_->isReadOnly() || kind_ != Kind::Score)
-        return;
-    const auto state = lineState(edit_->textCursor());
-    applyChange(edit_, state, zub::fretboard::addToChord(state.line, state.cursor, token));
-}
-
 void SongEditor::insertScoreRest(const std::string& duration) {
     if (edit_->isReadOnly() || kind_ != Kind::Score)
         return;

@@ -30,6 +30,7 @@ void FretboardWidget::setTuning(const zub::fretboard::Tuning& tuning) {
         return;
     tuning_ = tuning;
     hover_ = {0, 0};
+    clearStaged();
     updateGeometry();
     update();
 }
@@ -52,6 +53,46 @@ void FretboardWidget::setMarked(const std::vector<zub::fretboard::Position>& mar
         return;
     marked_ = marked;
     update();
+}
+
+void FretboardWidget::toggleStaged(int string, int fret) {
+    if (string < 1 || string > stringCount() || fret < 0)
+        return;
+    const auto it = std::ranges::find(staged_, string, &zub::fretboard::Position::string);
+    if (it == staged_.end()) {
+        stage(string, fret);
+        return;
+    }
+    if (it->fret == fret)
+        staged_.erase(it);
+    else
+        it->fret = fret;
+    update();
+    emit stagedChanged();
+}
+
+void FretboardWidget::stage(int string, int fret) {
+    if (string < 1 || string > stringCount() || fret < 0)
+        return;
+    const auto it = std::ranges::find(staged_, string, &zub::fretboard::Position::string);
+    if (it != staged_.end()) {
+        if (it->fret == fret)
+            return;
+        it->fret = fret;
+    } else {
+        staged_.push_back({string, fret});
+        std::ranges::sort(staged_, {}, &zub::fretboard::Position::string);
+    }
+    update();
+    emit stagedChanged();
+}
+
+void FretboardWidget::clearStaged() {
+    if (staged_.empty())
+        return;
+    staged_.clear();
+    update();
+    emit stagedChanged();
 }
 
 int FretboardWidget::midiAt(int string, int fret) const {
@@ -200,21 +241,32 @@ void FretboardWidget::paintEvent(QPaintEvent*) {
         p.drawRoundedRect(QRectF(c.x() - 9, c.y() - 8, 18, 16), 4, 4);
     }
 
-    // The marked positions: filled dots with the fret number.
-    for (const auto& m : marked_) {
-        if (m.string < 1 || m.string > stringCount() || m.fret < 0)
-            continue;
-        const int physical = physicalFret(m.string, m.fret);
-        if (physical > fretCount_)
-            continue;
-        const QPointF c = cellCenter(m.string, m.fret);
-        p.setPen(QPen(paper, 1.5));
-        p.setBrush(accent);
-        p.drawEllipse(c, 8.0, 8.0);
-        p.setPen(palette().color(QPalette::HighlightedText));
-        p.setFont(small);
-        p.drawText(QRectF(c.x() - 8, c.y() - 8, 16, 16), Qt::AlignCenter, QString::number(m.fret));
-    }
+    // The note at the cursor: hollow rings with the fret number, then the staged positions: filled
+    // dots on top.
+    const auto drawPositions = [&](const std::vector<zub::fretboard::Position>& positions,
+                                   bool filled) {
+        for (const auto& m : positions) {
+            if (m.string < 1 || m.string > stringCount() || m.fret < 0)
+                continue;
+            if (physicalFret(m.string, m.fret) > fretCount_)
+                continue;
+            const QPointF c = cellCenter(m.string, m.fret);
+            if (filled) {
+                p.setPen(QPen(paper, 1.5));
+                p.setBrush(accent);
+            } else {
+                p.setPen(QPen(ink, 2));
+                p.setBrush(Qt::NoBrush);
+            }
+            p.drawEllipse(c, 8.0, 8.0);
+            p.setPen(filled ? palette().color(QPalette::HighlightedText) : ink);
+            p.setFont(small);
+            p.drawText(QRectF(c.x() - 8, c.y() - 8, 16, 16), Qt::AlignCenter,
+                       QString::number(m.fret));
+        }
+    };
+    drawPositions(marked_, false);
+    drawPositions(staged_, true);
 }
 
 void FretboardWidget::mouseMoveEvent(QMouseEvent* event) {
@@ -235,7 +287,17 @@ void FretboardWidget::mousePressEvent(QMouseEvent* event) {
         return;
     const auto position = positionAt(event->position().toPoint());
     if (position.string > 0)
-        emit clicked(position.string, position.fret, event->modifiers());
+        toggleStaged(position.string, position.fret);
+}
+
+void FretboardWidget::mouseDoubleClickEvent(QMouseEvent* event) {
+    if (event->button() != Qt::LeftButton)
+        return;
+    const auto position = positionAt(event->position().toPoint());
+    if (position.string <= 0)
+        return;
+    stage(position.string, position.fret);
+    emit insertRequested();
 }
 
 bool FretboardWidget::event(QEvent* event) {
@@ -246,8 +308,8 @@ bool FretboardWidget::event(QEvent* event) {
             const QString name = toQString(
                 zub::fretboard::pitchName(midiAt(position.string, position.fret), german_, flats_));
             QToolTip::showText(help->globalPos(),
-                               tr("%1: click inserts the note, Ctrl+click adds it to the chord "
-                                  "before the cursor.")
+                               tr("%1: click stages the note (one per string), double-click inserts "
+                                  "everything staged. Insert: Ctrl+Return, Clear: Escape.")
                                    .arg(name),
                                this);
         } else {

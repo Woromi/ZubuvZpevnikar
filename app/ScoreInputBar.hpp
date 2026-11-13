@@ -24,11 +24,15 @@ public:
     void setDuration(const QString& duration);
     // A row of buttons for the actions on the selected notes (tie, slur ...); the buttons follow
     // the actions' enabled state. Owned by the caller.
+    // The number of staged fretboard positions: Insert and Clear are enabled while it is not 0.
+    void setStagedCount(int count);
     void setRegionActions(const QList<QAction*>& actions);
 
 signals:
     void restRequested();
     void barCheckRequested();
+    void insertRequested();
+    void clearRequested();
 
 private:
     void onPicked();
@@ -36,6 +40,8 @@ private:
 
     QButtonGroup* group_ = nullptr;
     QToolButton* dot_ = nullptr;
+    QToolButton* insert_ = nullptr;
+    QToolButton* clear_ = nullptr;
     QHBoxLayout* regionRow_ = nullptr;
     QString duration_ = QStringLiteral("4");
     bool updating_ = false;

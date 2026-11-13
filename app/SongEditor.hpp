@@ -108,8 +108,6 @@ public:
     // nothing in a read-only editor. `duration` is what the note should have ("4", "8."); it is
     // written only when it differs from effectiveDuration() (empty: keep the effective one).
     void insertScoreNote(const std::string& token, const std::string& duration);
-    // Adds the token (`pitch\N`) to the chord or note before the cursor.
-    void addScoreNoteToChord(const std::string& token);
     void insertScoreRest(const std::string& duration);
     void insertScoreBarCheck();
     // Is the text cursor in a `%` comment or a string of its line (no note can be inserted)?

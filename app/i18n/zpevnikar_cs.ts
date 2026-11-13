@@ -53,8 +53,8 @@ Použijte vestavěný.</translation>
 <context>
     <name>FretboardWidget</name>
     <message>
-        <source>%1: click inserts the note, Ctrl+click adds it to the chord before the cursor.</source>
-        <translation>%1: klik vloží notu, Ctrl+klik ji přidá k akordu před kurzorem.</translation>
+        <source>%1: click stages the note (one per string), double-click inserts everything staged. Insert: Ctrl+Return, Clear: Escape.</source>
+        <translation>%1: klik připraví notu (jednu na strunu), dvojklik vloží vše připravené. Vložit: Ctrl+Return, Vymazat: Escape.</translation>
     </message>
 </context>
 <context>
@@ -407,6 +407,10 @@ Použijte vestavěný.</translation>
         <translation>Píseň</translation>
     </message>
     <message>
+        <source>Show the fretboard: click frets to stage notes (one per string), Insert (Ctrl+Return) writes them as a note or chord, Escape clears; double-click a fret inserts at once</source>
+        <translation>Zobrazí hmatník: kliky na pražce připraví noty (jednu na strunu), Vložit (Ctrl+Return) je zapíše jako notu nebo akord, Escape je zruší; dvojklik na pražec vloží hned</translation>
+    </message>
+    <message>
         <source>Cannot save score</source>
         <translation>Nelze uložit notovou ukázku</translation>
     </message>
@@ -679,10 +683,6 @@ Použijte vestavěný.</translation>
         <translation>Hmatník</translation>
     </message>
     <message>
-        <source>Show the fretboard: click a fret to write the note, Ctrl+click to add it to the chord</source>
-        <translation>Zobrazí hmatník: klik na pražec zapíše notu, Ctrl+klik ji přidá k akordu</translation>
-    </message>
-    <message>
         <source>Tie</source>
         <translation>Ligatura</translation>
     </message>
@@ -829,6 +829,14 @@ Použijte vestavěný.</translation>
     <message>
         <source>On A4 the score is narrowed to 80 % of the width, so that it does not run into the song&apos;s details on the right (chord diagrams, tuning, tempo). On A5 it is full width anyway (\narrowlilypondfile).</source>
         <translation>Na A4 se notová ukázka zúží na 80 % šířky, aby nezasahovala do údajů o písni vpravo (diagramy akordů, ladění, tempo). Na A5 má i tak plnou šířku (\narrowlilypondfile).</translation>
+    </message>
+    <message>
+        <source>Insert Staged Notes</source>
+        <translation>Vložit připravené noty</translation>
+    </message>
+    <message>
+        <source>Clear Staged Notes</source>
+        <translation>Vymazat připravené noty</translation>
     </message>
     <message>
         <source>The cursor is in a comment.</source>
@@ -1285,6 +1293,22 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>Insert a bar check (|)</source>
         <translation>Vloží taktovou čáru (|)</translation>
+    </message>
+    <message>
+        <source>Insert</source>
+        <translation>Vložit</translation>
+    </message>
+    <message>
+        <source>Insert the staged fretboard notes at the cursor, as a note or a chord (Ctrl+Return). Double-clicking a fret stages it and inserts at once.</source>
+        <translation>Vloží připravené noty z hmatníku na místo kurzoru jako notu nebo akord (Ctrl+Return). Dvojklik na pražec ho připraví a vloží hned.</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>Vymazat</translation>
+    </message>
+    <message>
+        <source>Remove the staged fretboard notes (Escape)</source>
+        <translation>Zruší připravené noty z hmatníku (Escape)</translation>
     </message>
     <message>
         <source>Selection:</source>

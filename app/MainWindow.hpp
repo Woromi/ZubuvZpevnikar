@@ -119,7 +119,7 @@ private:
     void selectScoreNotes(const QPoint& anchor, const QPoint& current); // a drag in the preview
     void selectScoreEvents(std::size_t first, std::size_t last);
     void indexScoreEvents();
-    void fretboardClicked(int string, int fret, Qt::KeyboardModifiers modifiers);
+    void insertStagedNotes(FretboardWidget* fretboard); // the staged positions as a note or chord
     void setScoreWidth(const std::string& name, bool narrow); // the song and all its score tabs; false if the user cancelled
     void createSongToolBar();
     void updateSongActions();

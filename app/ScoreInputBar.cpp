@@ -45,6 +45,20 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
     bar->setObjectName(QStringLiteral("scoreBarCheck"));
     bar->setText(tr("Bar line"));
     bar->setToolTip(tr("Insert a bar check (|)"));
+    insert_ = new QToolButton;
+    insert_->setObjectName(QStringLiteral("scoreInsert"));
+    insert_->setText(tr("Insert"));
+    insert_->setToolTip(tr("Insert the staged fretboard notes at the cursor, as a note or a chord "
+                           "(Ctrl+Return). Double-clicking a fret stages it and inserts at once."));
+    insert_->setEnabled(false);
+    clear_ = new QToolButton;
+    clear_->setObjectName(QStringLiteral("scoreClear"));
+    clear_->setText(tr("Clear"));
+    clear_->setToolTip(tr("Remove the staged fretboard notes (Escape)"));
+    clear_->setEnabled(false);
+    layout->addSpacing(8);
+    layout->addWidget(insert_);
+    layout->addWidget(clear_);
     layout->addSpacing(8);
     layout->addWidget(rest);
     layout->addWidget(bar);
@@ -52,9 +66,16 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
 
     connect(group_, &QButtonGroup::idClicked, this, [this] { onPicked(); });
     connect(dot_, &QToolButton::clicked, this, [this] { onPicked(); });
+    connect(insert_, &QToolButton::clicked, this, &ScoreInputBar::insertRequested);
+    connect(clear_, &QToolButton::clicked, this, &ScoreInputBar::clearRequested);
     connect(rest, &QToolButton::clicked, this, &ScoreInputBar::restRequested);
     connect(bar, &QToolButton::clicked, this, &ScoreInputBar::barCheckRequested);
     showDuration();
+}
+
+void ScoreInputBar::setStagedCount(int count) {
+    insert_->setEnabled(count > 0);
+    clear_->setEnabled(count > 0);
 }
 
 void ScoreInputBar::onPicked() {
