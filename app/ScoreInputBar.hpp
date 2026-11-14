@@ -26,6 +26,8 @@ public:
     // the actions' enabled state. Owned by the caller.
     // The number of staged fretboard positions: Insert and Clear are enabled while it is not 0.
     void setStagedCount(int count);
+    // The Insert button reads "Replace" while the staged notes replace the selected note or chord.
+    void setReplaceMode(bool replace);
     void setRegionActions(const QList<QAction*>& actions);
 
 signals:

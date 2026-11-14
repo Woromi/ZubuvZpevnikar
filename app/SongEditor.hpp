@@ -123,6 +123,11 @@ public:
     std::optional<std::pair<std::size_t, std::size_t>> selectedByteRange() const;
     // Selects [begin, end) of the editor text, shows it and focuses the editor.
     void selectByteRange(std::size_t begin, std::size_t end);
+    // Replaces [begin, end) of the editor text by `text` as ONE undo step (cursor and scroll stay,
+    // nothing else changes), then selects [selectBegin, selectEnd) of the NEW text. False in a
+    // read-only editor (Kind::Score only).
+    bool replaceScoreRange(std::size_t begin, std::size_t end, const std::string& text,
+                           std::size_t selectBegin, std::size_t selectEnd);
     // Applies a zub::scoreregion action to the selected notes (Kind::Score): ONE undo step, the
     // result stays selected. False when nothing changed (no selection, read-only, nothing to do);
     // `why` (when given) tells why the core refused.

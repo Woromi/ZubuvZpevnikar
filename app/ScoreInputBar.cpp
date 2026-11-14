@@ -78,6 +78,20 @@ void ScoreInputBar::setStagedCount(int count) {
     clear_->setEnabled(count > 0);
 }
 
+void ScoreInputBar::setReplaceMode(bool replace) {
+    if (replace) {
+        insert_->setText(tr("Replace"));
+        insert_->setToolTip(tr("Replace the selected note or chord by the staged fretboard notes; "
+                               "its length and articulations stay (Ctrl+Return). Double-clicking "
+                               "a fret stages it and replaces at once."));
+    } else {
+        insert_->setText(tr("Insert"));
+        insert_->setToolTip(
+            tr("Insert the staged fretboard notes at the cursor, as a note or a chord "
+               "(Ctrl+Return). Double-clicking a fret stages it and inserts at once."));
+    }
+}
+
 void ScoreInputBar::onPicked() {
     if (updating_)
         return;

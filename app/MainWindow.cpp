@@ -1991,7 +1991,7 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
 
     const QString fileName = toQString(std::filesystem::path(pathOfName(name)).filename());
     const int index = tabs_->addTab(page, fileName);
-    scoreTabs_.push_back({name, page, nullptr, inputBar, fretboard, inputPanel});
+    scoreTabs_.push_back({name, page, nullptr, inputBar, fretboard, inputPanel, {}});
     connect(create, &QPushButton::clicked, this, [this, name] { createMissingScore(name); });
 
     if (!editor) {
@@ -2213,6 +2213,21 @@ void MainWindow::onTabChanged() {
         editor->textEdit()->setFocus();
 }
 
+std::optional<zub::scoreregion::Range> MainWindow::singleSelectedEvent(SongEditor* editor) const {
+    const auto selection = editor->selectedByteRange();
+    if (!selection)
+        return std::nullopt;
+    std::optional<zub::scoreregion::Range> found;
+    for (const auto& event : zub::scoreregion::musicEvents(editor->editorText())) {
+        if (event.begin < selection->second && selection->first < event.end) {
+            if (found)
+                return std::nullopt;
+            found = event;
+        }
+    }
+    return found;
+}
+
 void MainWindow::updateFretboard() {
     fretboardTimer_->stop();
     if (onSongTab() || !editor_)
@@ -2220,7 +2235,7 @@ void MainWindow::updateFretboard() {
     const auto index = static_cast<std::size_t>(tabs_->currentIndex() - 1);
     if (index >= scoreTabs_.size())
         return;
-    const ScoreTab& tab = scoreTabs_[index];
+    ScoreTab& tab = scoreTabs_[index];
     if (!tab.editor || !tab.fretboard)
         return;
     // The score's own text decides the tuning; the song's lang and key the note names.
@@ -2229,10 +2244,32 @@ void MainWindow::updateFretboard() {
     const bool german = meta && zub::score::germanNames(meta->value("lang"));
     const bool flats = meta && zub::fretboard::prefersFlats(meta->value("key"));
     const auto tuning = zub::fretboard::tuningOf(text);
+    if (tab.fretboard->tuning().open != tuning.open ||
+        tab.fretboard->tuning().shortString != tuning.shortString)
+        tab.replaceTarget.reset(); // a new tuning clears the staging
     tab.fretboard->setTuning(tuning);
     tab.fretboard->setNaming(german, flats);
-    tab.fretboard->setMarked(
-        zub::fretboard::positionsAt(text, tab.editor->cursorByteOffset(), tuning, german));
+    // Like a letter selected in a text: the rings show the one note or chord that is selected, and
+    // its positions are staged so that they can be edited and replaced. A cursor between notes
+    // shows nothing.
+    const auto single = singleSelectedEvent(tab.editor);
+    std::vector<zub::fretboard::Position> positions;
+    if (single)
+        positions = zub::fretboard::positionsOfEvent(tab.editor->editorText(), single->begin,
+                                                     single->end, tuning, german);
+    tab.fretboard->setMarked(positions);
+    if (single && !positions.empty()) {
+        if (tab.replaceTarget != single) {
+            tab.fretboard->clearStaged();
+            for (const auto& position : positions)
+                tab.fretboard->stage(position.string, position.fret);
+            tab.replaceTarget = single;
+        }
+    } else if (tab.replaceTarget) { // moved off the event the staging came from
+        tab.fretboard->clearStaged();
+        tab.replaceTarget.reset();
+    }
+    tab.inputBar->setReplaceMode(tab.replaceTarget.has_value());
     tab.inputBar->setDuration(toQString(tab.editor->effectiveDurationAtCursor()));
 }
 
@@ -2240,10 +2277,12 @@ void MainWindow::insertStagedNotes(FretboardWidget* fretboard) {
     SongEditor* editor = currentEditor();
     if (!editor || onSongTab() || fretboard->staged().empty())
         return;
-    const ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)];
+    ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)];
     if (tab.fretboard != fretboard)
         return;
-    if (editor->cursorInScoreComment()) {
+    const auto target = tab.replaceTarget;
+    const bool replacing = target && singleSelectedEvent(editor) == target;
+    if (!replacing && editor->cursorInScoreComment()) {
         statusBar()->showMessage(tr("The cursor is in a comment."), 5000);
         return;
     }
@@ -2261,6 +2300,24 @@ void MainWindow::insertStagedNotes(FretboardWidget* fretboard) {
         for (std::size_t i = 0; i < tokens.size(); ++i)
             token += (i ? " " : "") + tokens[i];
         token += ">";
+    }
+    if (replacing) {
+        // Only the notes change; the length, ties and articulations of the event stay.
+        const auto replacement = zub::fretboard::replacePitches(editor->editorText(), target->begin,
+                                                                target->end, token);
+        if (!replacement) {
+            statusBar()->showMessage(tr("The selected note cannot be replaced."), 5000);
+            return;
+        }
+        const std::size_t newEnd =
+            target->end + replacement->text.size() - (replacement->end - replacement->begin);
+        if (!editor->replaceScoreRange(replacement->begin, replacement->end, replacement->text,
+                                       target->begin, newEnd))
+            return;
+        tab.replaceTarget = zub::scoreregion::Range{target->begin, newEnd};
+        editor->textEdit()->setFocus();
+        updateFretboard();
+        return;
     }
     editor->insertScoreNote(token, toStdString(tab.inputBar->duration()));
     fretboard->clearStaged();

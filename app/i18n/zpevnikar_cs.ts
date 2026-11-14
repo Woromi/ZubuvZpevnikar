@@ -871,6 +871,10 @@ Použijte vestavěný.</translation>
         <translation>%1 (chybí)</translation>
     </message>
     <message>
+        <source>The selected note cannot be replaced.</source>
+        <translation>Vybranou notu nelze nahradit.</translation>
+    </message>
+    <message>
         <source>Not built automatically: the score uses %1, which scores normally don&apos;t. Building runs it with full access to your files. Check the score, then press Rebuild to build it anyway.</source>
         <translation>Nesestaveno automaticky: notová ukázka používá %1, což notové ukázky běžně nepoužívají. Sestavení to spustí s plným přístupem k vašim souborům. Zkontrolujte notovou ukázku a pak ji tlačítkem Sestavit znovu přesto sestavte.</translation>
     </message>
@@ -1325,6 +1329,14 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>Remove the staged fretboard notes (Escape)</source>
         <translation>Zruší připravené noty z hmatníku (Escape)</translation>
+    </message>
+    <message>
+        <source>Replace</source>
+        <translation>Nahradit</translation>
+    </message>
+    <message>
+        <source>Replace the selected note or chord by the staged fretboard notes; its length and articulations stay (Ctrl+Return). Double-clicking a fret stages it and replaces at once.</source>
+        <translation>Nahradí vybranou notu nebo akord připravenými notami z hmatníku; délka a artikulace zůstanou (Ctrl+Return). Dvojklik na pražec ho připraví a nahradí hned.</translation>
     </message>
     <message>
         <source>Selection:</source>

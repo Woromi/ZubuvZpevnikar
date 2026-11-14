@@ -171,6 +171,78 @@ std::vector<Position> positionsAt(std::string_view text, std::size_t cursor, con
     return out;
 }
 
+namespace {
+
+const Event* eventSpanning(const std::vector<Event>& events, std::size_t begin, std::size_t end) {
+    for (const Event& e : events) {
+        if (e.prefixBegin == begin && e.postEnd == end && !e.definition)
+            return &e;
+    }
+    return nullptr;
+}
+
+} // namespace
+
+std::vector<Position> positionsOfEvent(std::string_view text, std::size_t begin, std::size_t end,
+                                       const Tuning& tuning, bool german) {
+    const auto events = scan(text, german ? Names::German : Names::English);
+    const Event* e = eventSpanning(events, begin, end);
+    std::vector<Position> out;
+    if (!e || e->rest || e->pitches.empty() || e->midi.size() != e->pitches.size())
+        return out;
+    for (std::size_t i = 0; i < e->midi.size(); ++i) {
+        const int string = e->raw[i].string;
+        if (string < 1 || static_cast<std::size_t>(string) > tuning.open.size())
+            return {};
+        out.push_back({string, e->midi[i] - tuning.open[static_cast<std::size_t>(string - 1)]});
+    }
+    return out;
+}
+
+std::optional<Replacement> replacePitches(std::string_view text, std::size_t eventBegin,
+                                          std::size_t eventEnd, std::string_view token) {
+    if (token.empty())
+        return std::nullopt;
+    const bool chordToken = token.front() == '<';
+    std::string_view pitchPart, stringPart;
+    if (chordToken) {
+        if (token.size() < 3 || token.back() != '>')
+            return std::nullopt;
+    } else {
+        const auto slash = token.rfind('\\');
+        if (slash == std::string_view::npos || slash == 0 || slash + 1 >= token.size() ||
+            !std::ranges::all_of(token.substr(slash + 1), isDigit))
+            return std::nullopt;
+        pitchPart = token.substr(0, slash);
+        stringPart = token.substr(slash);
+    }
+    const auto events = scan(text, Names::Any);
+    const Event* e = eventSpanning(events, eventBegin, eventEnd);
+    if (!e)
+        return std::nullopt;
+    const bool single = !e->chord && !e->rest;
+    if (single && e->pitches.empty()) // q
+        return std::nullopt;
+    if (e->chord && e->closeAt >= text.size())
+        return std::nullopt;
+    const std::size_t coreEnd =
+        single ? std::max({e->durEnd, e->stringEnd, e->pitchEnd}) : e->durEnd;
+    const std::string_view duration = text.substr(e->durBegin, e->durEnd - e->durBegin);
+    std::string out;
+    if (chordToken) {
+        out += token;
+        out += duration;
+    } else {
+        out += pitchPart;
+        // `!` and `?` of the old note stay with its pitch.
+        if (single && e->durBegin > e->pitchEnd)
+            out += text.substr(e->pitchEnd, e->durBegin - e->pitchEnd);
+        out += duration;
+        out += stringPart;
+    }
+    return Replacement{e->begin, coreEnd, std::move(out)};
+}
+
 std::string effectiveDuration(std::string_view text, std::size_t cursor) {
     std::string last = "4";
     for (const Event& e : scan(text, Names::Any)) {

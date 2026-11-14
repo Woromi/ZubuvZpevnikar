@@ -54,6 +54,14 @@ struct Position {
 std::vector<Position> positionsAt(std::string_view text, std::size_t cursor, const Tuning& tuning,
                                   bool german);
 
+// The positions of the ONE note or chord that spans exactly [begin, end) of the whole score text
+// (an event of zub::scoreregion::musicEvents: with its prefix functions and articulations). Empty
+// unless every note of it has an explicit `\N` within the tuning (a rest, `q` and a chord with a
+// note without a string give nothing: replacing them would lose notes), or when no single event
+// has exactly that range.
+std::vector<Position> positionsOfEvent(std::string_view text, std::size_t begin, std::size_t end,
+                                       const Tuning& tuning, bool german);
+
 // The last duration written before the cursor ("4", "8."), skipping those of commands
 // (\time 3/4, \tuplet 3/2, \partial 8 ...); "4" when there is none.
 std::string effectiveDuration(std::string_view text, std::size_t cursor);
@@ -68,6 +76,25 @@ std::size_t insertionPoint(std::string_view line, std::size_t cursor);
 bool inCommentOrString(std::string_view line, std::size_t cursor);
 
 using Change = songedit::Change;
+
+// A replacement of [begin, end) of the text by `text`.
+struct Replacement {
+    std::size_t begin;
+    std::size_t end;
+    std::string text;
+};
+
+// Replaces the notes of the event that spans exactly [eventBegin, eventEnd) of the score text (see
+// positionsOfEvent) by `token`: a note `fis'\1` or a chord `<e\4 g\3>` (as insertStagedNotes
+// builds them). Only the note-or-chord part changes; the prefix functions before it, its duration
+// (moved behind the `>` or before the `\N` as the form needs), and the ties, slurs and
+// articulations after it stay. A rest becomes the notes with its duration. Nothing for `q` (a
+// chord repetition: it has no notes of its own), an unclosed chord, an event not found, or a
+// `token` that is neither form. A note inside a replaced chord that has its own prefix
+// (`\deadNote` between `<` and its pitch) loses it. The new event spans [eventBegin, eventEnd +
+// text.size() - (end - begin)).
+std::optional<Replacement> replacePitches(std::string_view text, std::size_t eventBegin,
+                                          std::size_t eventEnd, std::string_view token);
 
 struct Insertion {
     std::size_t offset;

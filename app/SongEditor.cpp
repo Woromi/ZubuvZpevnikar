@@ -841,6 +841,23 @@ void SongEditor::selectByteRange(std::size_t begin, std::size_t end) {
     edit_->setFocus();
 }
 
+bool SongEditor::replaceScoreRange(std::size_t begin, std::size_t end, const std::string& text,
+                                   std::size_t selectBegin, std::size_t selectEnd) {
+    if (edit_->isReadOnly() || kind_ != Kind::Score)
+        return false;
+    const std::string old = editorText();
+    if (begin > end || end > old.size())
+        return false;
+    QTextCursor cursor(edit_->document());
+    cursor.beginEditBlock();
+    cursor.setPosition(utf16Position(old, begin));
+    cursor.setPosition(utf16Position(old, end), QTextCursor::KeepAnchor);
+    cursor.insertText(toQString(text));
+    cursor.endEditBlock();
+    selectByteRange(selectBegin, selectEnd);
+    return true;
+}
+
 bool SongEditor::applyRegionAction(zub::scoreregion::Action action,
                                    zub::scoreregion::Refusal* why) {
     if (edit_->isReadOnly() || kind_ != Kind::Score)

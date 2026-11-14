@@ -429,3 +429,96 @@ TEST_CASE("fretboard insertNote writes a chord token with the duration after >",
     const auto after = fb::insertNote("<e\\4 g\\3>4", 3, "<a\\2 c\\1>", "4");
     CHECK(after.text == "<e\\4 g\\3>4 <a\\2 c\\1>4");
 }
+
+namespace {
+
+// The whole-event range of the first event of `text` that starts at `needle`'s position (with
+// `prefix` before it when given): the end is where `endMark` ends.
+std::optional<fb::Replacement> replaceIn(const std::string& text, const std::string& eventText,
+                                         const std::string& token, std::size_t from = 0) {
+    const auto begin = text.find(eventText, from);
+    REQUIRE(begin != std::string::npos);
+    return fb::replacePitches(text, begin, begin + eventText.size(), token);
+}
+std::string applied(const std::string& text, const fb::Replacement& r) {
+    return text.substr(0, r.begin) + r.text + text.substr(r.end);
+}
+
+} // namespace
+
+TEST_CASE("fretboard replacePitches swaps the pitches and keeps the rest", "[fretboard]") {
+    const std::string note = "{ a4 g'8.\\1~ b }";
+    const auto toChord = replaceIn(note, "g'8.\\1~", "<e\\4 g\\3>");
+    REQUIRE(toChord);
+    CHECK(applied(note, *toChord) == "{ a4 <e\\4 g\\3>8.~ b }");
+
+    const std::string chord = "{ <e\\4 g\\3>4. r }";
+    const auto toNote = replaceIn(chord, "<e\\4 g\\3>4.", "fis'\\1");
+    REQUIRE(toNote);
+    CHECK(applied(chord, *toNote) == "{ fis'4.\\1 r }");
+
+    const auto toOther = replaceIn(chord, "<e\\4 g\\3>4.", "<a\\2 c'\\1>");
+    REQUIRE(toOther);
+    CHECK(applied(chord, *toOther) == "{ <a\\2 c'\\1>4. r }");
+
+    const std::string single = "{ g16\\3( a\\3) }";
+    const auto toSingle = replaceIn(single, "g16\\3(", "e,\\6");
+    REQUIRE(toSingle);
+    CHECK(applied(single, *toSingle) == "{ e,16\\6( a\\3) }");
+}
+
+TEST_CASE("fretboard replacePitches keeps prefixes, articulations and cautionary marks",
+          "[fretboard]") {
+    const std::string dead = "{ \\deadNote g4\\3^\\strokeDown c }";
+    const auto a = replaceIn(dead, "\\deadNote g4\\3^\\strokeDown", "<e\\4 g\\3>");
+    REQUIRE(a);
+    CHECK(applied(dead, *a) == "{ \\deadNote <e\\4 g\\3>4^\\strokeDown c }");
+
+    const std::string markup = "{ <e\\4 g\\3>2-\\markup { x } c }";
+    const auto b = replaceIn(markup, "<e\\4 g\\3>2-\\markup { x }", "g\\3");
+    REQUIRE(b);
+    CHECK(applied(markup, *b) == "{ g2\\3-\\markup { x } c }");
+
+    const std::string caution = "{ g!4\\3 }";
+    const auto c = replaceIn(caution, "g!4\\3", "a\\3");
+    REQUIRE(c);
+    CHECK(applied(caution, *c) == "{ a!4\\3 }");
+}
+
+TEST_CASE("fretboard replacePitches handles German names, rests and refusals", "[fretboard]") {
+    const std::string german = "{ his4\\2 h\\3 }";
+    CHECK(fb::positionsOfEvent(german, 2, 8, fb::guitar(), true).size() == 1);
+    const std::string eng = "{ bf4\\2 }";
+    const auto a = replaceIn(eng, "bf4\\2", "<bf\\2 d'\\1>");
+    REQUIRE(a);
+    CHECK(applied(eng, *a) == "{ <bf\\2 d'\\1>4 }");
+
+    const std::string rest = "{ r8. c }";
+    const auto r = replaceIn(rest, "r8.", "fis'\\1");
+    REQUIRE(r);
+    CHECK(applied(rest, *r) == "{ fis'8.\\1 c }");
+
+    CHECK_FALSE(replaceIn("{ <e\\4 g\\3>4 q4 }", "q4", "g\\3")); // q: no notes of its own
+    CHECK_FALSE(replaceIn("{ g4\\3 }", "g4\\3", "g"));            // no string
+    CHECK_FALSE(replaceIn("{ g4\\3 }", "g4\\3", "<g\\3"));        // unclosed token
+    CHECK_FALSE(replaceIn("{ g4\\3 }", "g4\\3", ""));
+    CHECK_FALSE(fb::replacePitches("{ g4\\3 }", 0, 3, "a\\3"));     // not an event range
+    CHECK_FALSE(replaceIn("{ <e\\4 g\\3 4 }", "<e\\4 g\\3 4 }", "a\\3")); // unclosed chord
+}
+
+TEST_CASE("fretboard positionsOfEvent needs every note to have a string", "[fretboard]") {
+    const auto guitar = fb::guitar();
+    const std::string text = "{ <e\\4 g\\3>4 <e g\\3>4 c'4 r4 g'\\1 }";
+    const auto first = text.find("<e\\4 g\\3>4");
+    CHECK(fb::positionsOfEvent(text, first, first + 10, guitar, false) ==
+          Positions{{4, 2}, {3, 0}});
+    const auto second = text.find("<e g\\3>4");
+    CHECK(fb::positionsOfEvent(text, second, second + 8, guitar, false).empty());
+    const auto plain = text.find("c'4");
+    CHECK(fb::positionsOfEvent(text, plain, plain + 3, guitar, false).empty());
+    const auto rest = text.find("r4");
+    CHECK(fb::positionsOfEvent(text, rest, rest + 2, guitar, false).empty());
+    const auto single = text.find("g'\\1");
+    CHECK(fb::positionsOfEvent(text, single, single + 4, guitar, false) == Positions{{1, 3}});
+    CHECK(fb::positionsOfEvent(text, first, first + 5, guitar, false).empty());
+}

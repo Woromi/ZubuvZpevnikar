@@ -111,6 +111,8 @@ private:
     void replaceSongText(const std::string& after); // one undo step in the song editor
     void updateScoreWidthBars();
     void updateFretboard(); // the current score tab's input panel
+    // The music event the editor's selection touches, when it is exactly one.
+    std::optional<zub::scoreregion::Range> singleSelectedEvent(SongEditor* editor) const;
     // Actions on the selected notes of a score (tie, slur ...): enabled with a selection in the
     // score editor; the preview marks the notes of the selection a moment after it changes.
     void updateRegionActions();
@@ -248,6 +250,9 @@ private:
         ScoreInputBar* inputBar = nullptr;
         FretboardWidget* fretboard = nullptr;
         QWidget* inputPanel = nullptr; // {input bar, fretboard}; shown with fretboardAction_
+        // The event (editor text range) whose positions the fretboard staging was loaded from while
+        // it is the one selected note or chord: Insert replaces it then.
+        std::optional<zub::scoreregion::Range> replaceTarget;
     };
     std::vector<ScoreTab> scoreTabs_;        // in tab order, from index 1
     QTimer* fretboardTimer_ = nullptr;       // cursor or text moved: refresh the fretboard
