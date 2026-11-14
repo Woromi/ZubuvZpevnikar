@@ -42,6 +42,7 @@ ScoreRunner::ScoreRunner(QObject* parent)
         }
         ScoreResult result;
         result.inputName = inputName_;
+        result.amp = amp_;
         result.elapsedMs = clock_.isValid() ? clock_.elapsed() : 0;
         result.message =
             tr("Cannot start lilypond: %1. Is LilyPond installed?").arg(process_->errorString());
@@ -67,16 +68,17 @@ bool ScoreRunner::isRunning() const {
     return process_->state() != QProcess::NotRunning;
 }
 
-void ScoreRunner::request(zub::score::Request request) {
+void ScoreRunner::request(zub::score::Request request, bool amp) {
     if (isRunning()) {
         // The work dir files must not be rewritten while the old build runs; the newest
         // request starts once that process has exited.
         pending_ = std::move(request);
+        pendingAmp_ = amp;
         emit started();
         killTree();
         return;
     }
-    start(std::move(request), true);
+    start(std::move(request), true, amp);
 }
 
 void ScoreRunner::cancel() {
@@ -101,15 +103,17 @@ void ScoreRunner::startPending() {
     pending_.reset();
     cancelled_ = false;
     timedOut_ = false;
-    start(std::move(next), false);
+    start(std::move(next), false, pendingAmp_);
 }
 
-void ScoreRunner::start(zub::score::Request request, bool announce) {
+void ScoreRunner::start(zub::score::Request request, bool announce, bool amp) {
+    amp_ = amp;
     inputName_ = request.inputName;
     auto prepared = zub::score::prepare(request);
     if (!prepared) {
         ScoreResult result;
         result.inputName = inputName_;
+        result.amp = amp_;
         result.message = toQString(prepared.error());
         emit finished(result);
         return;
@@ -154,6 +158,7 @@ void ScoreRunner::onProcessFinished() {
 
     ScoreResult result;
     result.inputName = inputName_;
+    result.amp = amp_;
     result.elapsedMs = clock_.elapsed();
     const zub::score::Command cmd = command_.value_or(zub::score::Command{});
     result.scoreCopy = cmd.scoreCopy;

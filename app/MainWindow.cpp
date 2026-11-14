@@ -532,6 +532,7 @@ void MainWindow::createCentralWidget() {
             [this] { scorePreviewTimer_->start(); });
     // ... and a new instrument is another instrument in the MIDI file.
     connect(scorePreview_, &ScorePreviewPane::instrumentChanged, this, [this] {
+        scoreRunner_->cancel(); // a build under way has the old instrument
         forgetScoreMidi(); // the old MIDI file has the old instrument: no Play until the rebuild
         scorePreviewTimer_->start();
     });
@@ -1321,8 +1322,10 @@ void MainWindow::updateSongActions() {
     for (QAction* action : songEditActions_)
         action->setEnabled(editable && songTab);
     // The song actions work on the song's text.
-    const bool converterFree = songTab && !editor_->textEdit()->isReadOnly() &&
-                               !converterRunner_->isRunning() && !findConverter().empty();
+    // The background re-measure does not block them: starting one cancels it.
+    const bool busy = converterRunner_->isRunning() && runKind_ != RunKind::Measure;
+    const bool converterFree =
+        songTab && !editor_->textEdit()->isReadOnly() && !busy && !findConverter().empty();
     tidyAction_->setEnabled(converterFree);
     for (QAction* action : {makeSmallerAction_, joinLinesAction_})
         action->setEnabled(converterFree && !songbookRoot_.empty());
@@ -2448,17 +2451,17 @@ void MainWindow::requestScorePreview(bool userAsked) {
     zub::score::MidiOptions midi;
     midi.factor = scorePreview_->tempoFactor();
     midi.instrument = zub::score::midiInstrument(request.content);
-    scoreAmp_ = false;
+    bool amp = false;
     if (const auto* chosen = zub::midi::findInstrument(toStdString(scorePreview_->instrumentId()))) {
         midi.instrument = std::string(chosen->name);
-        scoreAmp_ = chosen->amp;
+        amp = chosen->amp;
     }
     if (const auto meta = zub::parseSong(editor_->content())) {
         midi.tempo = zub::score::songTempo(meta->value("tem"));
         midi.transpose = zub::score::songCapo(meta->value("cap")); // sounds as with the capo on
     }
     request.midi = std::move(midi);
-    scoreRunner_->request(std::move(request));
+    scoreRunner_->request(std::move(request), amp);
 }
 
 void MainWindow::updateSoundAvailability() {
@@ -2549,6 +2552,7 @@ void MainWindow::showScoreResult(const ScoreResult& result) {
         return;
     scorePreview_->showResult(result);
     scoreMidi_ = result.midi;
+    scoreAmp_ = result.amp; // of the build the MIDI file belongs to
     updateSoundAvailability();
     scoreLinksFresh_ = result.success && !scorePreviewTimer_->isActive();
     indexScoreEvents();

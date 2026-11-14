@@ -1,7 +1,9 @@
 #pragma once
 
 #include <QByteArray>
+#include <QList>
 #include <QObject>
+#include <QPointer>
 #include <QString>
 #include <QtGlobal>
 #include <expected>
@@ -40,7 +42,8 @@ public:
     // that file. Returns false (and emits nothing) while a run is active. Failures to start are
     // reported through finished(), from the event loop.
     bool start(const CommandFactory& makeCommand, const std::string& content, const QString& stem);
-    // Kills a running converter; no result is emitted.
+    // Stops a running converter; no result is emitted. Does not wait: the process (and its group)
+    // is terminated in the background.
     void cancel();
     bool isRunning() const { return busy_; }
 
@@ -54,6 +57,7 @@ private:
     void release(); // detaches and kills the process, removes the temp dir
 
     QProcess* process_ = nullptr;
+    QList<QPointer<QProcess>> dying_; // cancelled runs whose process is still exiting
     QTimer* watchdog_ = nullptr;
     std::unique_ptr<QTemporaryDir> dir_;
     QByteArray out_;

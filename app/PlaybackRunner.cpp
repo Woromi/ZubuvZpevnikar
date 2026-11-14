@@ -224,14 +224,15 @@ void PlaybackRunner::onProcessFinished() {
     postProcess();
 }
 
-// Cuts the silence the soundfont's long release leaves behind the music and applies the effect, on
+// Applies the effect and cuts the silence the soundfont's long release leaves behind the music (in
+// that order: the effect lifts the quiet tail, a cut before it would end in a click), on
 // a worker thread: both map the whole file, which can be tens of megabytes.
 void PlaybackRunner::postProcess() {
     const fs::path temp = wavTemp_;
     const bool amp = current_.amp;
     auto ok = std::make_shared<std::atomic<bool>>(false);
     worker_ = QThread::create([temp, amp, ok] {
-        ok->store(trimWavFile(temp) && (!amp || ampWavFile(temp)));
+        ok->store((!amp || ampWavFile(temp)) && trimWavFile(temp));
     });
     connect(worker_, &QThread::finished, this, [this, ok] {
         worker_->deleteLater();
@@ -247,7 +248,13 @@ void PlaybackRunner::onPostProcessed(bool ok) {
     if (pending_) {
         auto next = std::move(*pending_);
         pending_.reset();
-        fs::remove(wavTemp_, ec);
+        // The work is done: keep it in the cache (a request for the same MIDI is a hit then).
+        if (ok)
+            fs::rename(wavTemp_, wav_, ec);
+        if (!ok || ec)
+            fs::remove(wavTemp_, ec);
+        else
+            trimCache();
         start(std::move(next));
         return;
     }

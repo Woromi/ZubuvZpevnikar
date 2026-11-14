@@ -11,7 +11,7 @@ namespace zub::audio {
 // The id and version of the amp effect: part of the cache key of an audio file that went through
 // it. Raise ampVersion whenever applyAmp's sound changes, so older cached files are not played.
 inline constexpr std::string_view ampId = "amp";
-inline constexpr int ampVersion = 1;
+inline constexpr int ampVersion = 2; // 2: the effect runs before the silence is trimmed
 
 // Guitar amp distortion, applied in place to the 16-bit PCM WAV file `wav` (the whole file: RIFF
 // header and data). It works on the mixed signal, so notes played together intermodulate: a chord

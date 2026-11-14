@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <fstream>
 #include <system_error>
+#include <zub/core/audio.hpp>
 #include <zub/core/midi.hpp>
 
 #ifdef Q_OS_UNIX
@@ -53,8 +54,9 @@ NoteSounds::NoteSounds(fs::path cacheDir, QObject* parent)
         } else if (!ok) {
             problem = tr("Cannot render the note sound: %1")
                           .arg(QString::fromUtf8(process_->readAll()).trimmed());
-        } else if (!trimWavFile(job.temp) || (job.note.amp && !ampWavFile(job.temp))) {
-            // A note is short: the effect is quick enough for the UI thread.
+        } else if ((job.note.amp && !ampWavFile(job.temp)) || !trimWavFile(job.temp)) {
+            // A note is short: the effect is quick enough for the UI thread. The effect comes first:
+            // it lifts the quiet tail, which a cut before it would leave as a click.
             problem = tr("Cannot trim the rendered note sound.");
         } else {
             fs::rename(job.temp, job.wav, ec);
@@ -96,7 +98,9 @@ void NoteSounds::killTree() {
 }
 
 fs::path NoteSounds::fileOf(int program, int pitch, bool amp) const {
-    return dir_ / (std::to_string(program) + "-" + std::to_string(pitch) + (amp ? "-amp" : "") +
+    return dir_ / (std::to_string(program) + "-" + std::to_string(pitch) + (amp ? "-" + std::string(zub::audio::ampId) +
+                                 std::to_string(zub::audio::ampVersion)
+                          : std::string()) +
                    ".wav");
 }
 

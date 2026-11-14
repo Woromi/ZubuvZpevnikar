@@ -7,6 +7,8 @@
 #include <QProcessEnvironment>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QPointer>
+#include <memory>
 #ifdef Q_OS_UNIX
 #include <signal.h>
 #include <unistd.h>
@@ -15,6 +17,7 @@
 namespace {
 // Measuring (shrink --measure, join) builds the song with lualatex: slow on a cold cache.
 constexpr int watchdogSeconds = 60;
+constexpr int killGraceMs = 500; // between SIGTERM and SIGKILL of a cancelled run
 
 // Stops the converter and what it started (a measuring shrink or join runs python3 checkpaper.py,
 // lualatex and lilypond). On Unix the converter leads its own process group (see start()):
@@ -49,6 +52,11 @@ ConverterRunner::ConverterRunner(QObject* parent) : QObject(parent), watchdog_(n
 
 ConverterRunner::~ConverterRunner() {
     release();
+    // Cancelled runs that are still dying: no process may outlive the app.
+    for (const auto& dying : dying_) {
+        if (dying)
+            killTree(dying); // the QProcess itself is deleted with its parent
+    }
 }
 
 void ConverterRunner::release() {
@@ -64,8 +72,53 @@ void ConverterRunner::release() {
     dir_.reset();
 }
 
+// Cancels without waiting: the result is dropped (generation_), the converter and its process
+// group get SIGTERM now and SIGKILL after a grace period, and the temp dir (its working
+// directory) stays until the process is gone.
 void ConverterRunner::cancel() {
-    release();
+    busy_ = false;
+    ++generation_;
+    watchdog_->stop();
+    QProcess* process = process_;
+    process_ = nullptr;
+    std::shared_ptr<QTemporaryDir> dir(std::move(dir_));
+    if (!process)
+        return;
+    process->disconnect(this);
+    if (process->state() == QProcess::NotRunning) {
+        delete process;
+        return;
+    }
+#ifdef Q_OS_UNIX
+    const qint64 pid = process->processId();
+    if (pid > 0)
+        ::kill(-static_cast<pid_t>(pid), SIGTERM);
+    else
+        process->terminate();
+#else
+    process->terminate();
+#endif
+    dying_.append(process);
+    connect(process, &QProcess::finished, this, [this, process, dir] {
+        dying_.removeOne(process);
+        process->deleteLater();
+    });
+    // A QProcess that fails to start or dies badly: the same cleanup.
+    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart) {
+            dying_.removeOne(process);
+            process->deleteLater();
+        }
+    });
+    QTimer::singleShot(killGraceMs, process, [process] {
+        if (process->state() == QProcess::NotRunning)
+            return;
+#ifdef Q_OS_UNIX
+        if (const qint64 leader = process->processId(); leader > 0)
+            ::kill(-static_cast<pid_t>(leader), SIGKILL);
+#endif
+        process->kill();
+    });
 }
 
 bool ConverterRunner::start(const CommandFactory& makeCommand, const std::string& content,
