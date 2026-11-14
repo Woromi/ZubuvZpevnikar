@@ -436,12 +436,24 @@ void MainWindow::createCentralWidget() {
         }
         updateFretboard();
     });
-    soundAction_ = new QAction(tr("Sound"), this);
+    // An on/off switch: a speaker icon shows whether a fret click sounds.
+    soundAction_ = new QAction(tr("Fretboard Sound"), this);
     soundAction_->setCheckable(true);
     soundAction_->setChecked(QSettings().value(fretboardSoundKey, true).toBool());
     soundAction_->setToolTip(tr("Play the note when a fret is clicked"));
-    connect(soundAction_, &QAction::toggled, this,
-            [](bool on) { QSettings().setValue(fretboardSoundKey, on); });
+    const auto showSoundState = [this](bool on) {
+        const QString icon =
+            on ? QStringLiteral("audio-volume-high") : QStringLiteral("audio-volume-muted");
+        soundAction_->setIcon(QIcon::fromTheme(icon));
+        soundAction_->setStatusTip(on ? tr("Fret clicks play their note.")
+                                      : tr("Fret clicks are silent."));
+    };
+    showSoundState(soundAction_->isChecked());
+    connect(soundAction_, &QAction::toggled, this, [this, showSoundState](bool on) {
+        QSettings().setValue(fretboardSoundKey, on);
+        showSoundState(on);
+        statusBar()->showMessage(soundAction_->statusTip(), 3000);
+    });
     // Actions on the selected notes of a score: one undo step each, the notes stay selected.
     highlightTimer_ = new QTimer(this);
     highlightTimer_->setSingleShot(true);
@@ -1985,7 +1997,9 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     auto* soundButton = new QToolButton(widthBar);
     soundButton->setObjectName(QStringLiteral("scoreSoundToggle"));
     soundButton->setDefaultAction(soundAction_);
-    soundButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    soundButton->setToolButtonStyle(QIcon::hasThemeIcon(QStringLiteral("audio-volume-high"))
+                                        ? Qt::ToolButtonTextBesideIcon
+                                        : Qt::ToolButtonTextOnly);
     widthLayout->addWidget(soundButton);
     connect(fretboard, &FretboardWidget::fretClicked, this,
             [this, fretboard](int string, int fret) { soundFret(fretboard, string, fret); });

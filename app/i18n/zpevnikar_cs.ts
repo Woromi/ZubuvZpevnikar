@@ -411,6 +411,10 @@ Použijte vestavěný.</translation>
         <translation>Zobrazí hmatník: kliky na pražce připraví noty (jednu na strunu), Vložit (Ctrl+Return) je zapíše jako notu nebo akord, Escape je zruší; dvojklik na pražec vloží hned</translation>
     </message>
     <message>
+        <source>Fretboard Sound</source>
+        <translation>Zvuk hmatníku</translation>
+    </message>
+    <message>
         <source>Cannot save score</source>
         <translation>Nelze uložit notovou ukázku</translation>
     </message>
@@ -711,12 +715,16 @@ Použijte vestavěný.</translation>
         <translation>Hmatník</translation>
     </message>
     <message>
-        <source>Sound</source>
-        <translation>Zvuk</translation>
-    </message>
-    <message>
         <source>Play the note when a fret is clicked</source>
         <translation>Po kliknutí na pražec zahrát tón</translation>
+    </message>
+    <message>
+        <source>Fret clicks play their note.</source>
+        <translation>Kliknutí na pražec zahraje tón.</translation>
+    </message>
+    <message>
+        <source>Fret clicks are silent.</source>
+        <translation>Kliknutí na pražec je bez zvuku.</translation>
     </message>
     <message>
         <source>Tie</source>
