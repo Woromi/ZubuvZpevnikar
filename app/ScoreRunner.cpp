@@ -6,6 +6,7 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QTimer>
+#include <system_error>
 
 #ifdef Q_OS_UNIX
 #include <signal.h>
@@ -174,6 +175,9 @@ void ScoreRunner::onProcessFinished() {
             result.svg = file.readAll();
         if (result.svg.isEmpty())
             result.success = false;
+        std::error_code ec;
+        if (result.success && !cmd.midi.empty() && std::filesystem::is_regular_file(cmd.midi, ec))
+            result.midi = cmd.midi;
     }
     if (!result.success) {
         result.svg.clear();

@@ -11,7 +11,11 @@
 #include "PreviewRunner.hpp"
 #include "ScoreInputBar.hpp"
 #include "ScorePreviewPane.hpp"
+#include "NoteSounds.hpp"
+#include "PlaybackRunner.hpp"
+#include "ScorePlayer.hpp"
 #include "ScoreRunner.hpp"
+#include "SoundTools.hpp"
 #include "ShrinkDialog.hpp"
 #include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
@@ -76,6 +80,7 @@
 #include <system_error>
 #include <utility>
 #include <zub/core/fretboard.hpp>
+#include <zub/core/midi.hpp>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/linediff.hpp>
@@ -101,6 +106,7 @@ const auto converterKey = QStringLiteral("converter/path");
 const auto geometryKey = QStringLiteral("window/geometry");
 const auto languageKey = QStringLiteral("ui/language");
 const auto fretboardKey = QStringLiteral("score/fretboard");
+const auto fretboardSoundKey = QStringLiteral("playback/fretboardSound");
 const auto songSplitterKey = QStringLiteral("window/songSplitter");
 
 } // namespace
@@ -152,6 +158,7 @@ MainWindow::~MainWindow() {
     // (and its highlighter) would outlive repository_. Disconnect first: no signal may reach
     // a half-destroyed window.
     scoreRunner_->cancel();
+    playbackRunner_->cancel();
     for (const ScoreTab& tab : scoreTabs_) {
         if (tab.editor) {
             disconnect(tab.editor, nullptr, this, nullptr);
@@ -429,6 +436,12 @@ void MainWindow::createCentralWidget() {
         }
         updateFretboard();
     });
+    soundAction_ = new QAction(tr("Sound"), this);
+    soundAction_->setCheckable(true);
+    soundAction_->setChecked(QSettings().value(fretboardSoundKey, true).toBool());
+    soundAction_->setToolTip(tr("Play the note when a fret is clicked"));
+    connect(soundAction_, &QAction::toggled, this,
+            [](bool on) { QSettings().setValue(fretboardSoundKey, on); });
     // Actions on the selected notes of a score: one undo step each, the notes stay selected.
     highlightTimer_ = new QTimer(this);
     highlightTimer_->setSingleShot(true);
@@ -492,7 +505,36 @@ void MainWindow::createCentralWidget() {
             &MainWindow::doubleClickScoreNote);
     scoreRunner_ = new ScoreRunner(this);
     connect(scoreRunner_, &ScoreRunner::started, scorePreview_, &ScorePreviewPane::showBuilding);
+    connect(scoreRunner_, &ScoreRunner::started, this, [this] {
+        // The build replaces the MIDI file: nothing to play until it is done.
+        playbackRunner_->cancel();
+        scorePlayer_->stop();
+        scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
+        scoreMidi_.clear();
+        updateSoundAvailability();
+    });
+    // A new tempo is a new MIDI file: rebuild the preview like after an edit.
+    connect(scorePreview_, &ScorePreviewPane::tempoChanged, this,
+            [this] { scorePreviewTimer_->start(); });
     connect(scoreRunner_, &ScoreRunner::finished, this, &MainWindow::showScoreResult);
+    playbackRunner_ = new PlaybackRunner(this);
+    scorePlayer_ = new ScorePlayer(this);
+    connect(playbackRunner_, &PlaybackRunner::started, this, [this] {
+        scorePreview_->setPlayState(ScorePreviewPane::PlayState::Preparing);
+        scorePreview_->showPlaybackMessage(tr("Preparing playback…"), false);
+    });
+    connect(playbackRunner_, &PlaybackRunner::finished, this, &MainWindow::showPlaybackResult);
+    connect(scorePlayer_, &ScorePlayer::finished, this, [this] {
+        scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
+        scorePreview_->showPlaybackMessage({}, false);
+    });
+    connect(scorePlayer_, &ScorePlayer::failed, this, [this](const QString& message) {
+        scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
+        scorePreview_->showPlaybackMessage(tr("Cannot play: %1").arg(message), true);
+    });
+    connect(scorePreview_, &ScorePreviewPane::playRequested, this, &MainWindow::playScore);
+    connect(scorePreview_, &ScorePreviewPane::stopRequested, this, &MainWindow::stopPlayback);
+    updateSoundAvailability();
     connect(scorePreview_, &ScorePreviewPane::rebuildRequested, this,
             [this] { requestScorePreview(true); });
     connect(scorePreview_, &ScorePreviewPane::errorActivated, this, [this](int line, int) {
@@ -1651,6 +1693,8 @@ void MainWindow::createPreview() {
         dirName == QStringLiteral("preview")
             ? QStringLiteral("score")
             : QStringLiteral("score-%1").arg(QApplication::applicationPid())));
+    playbackCacheDir_ = toPath(QDir(cache).absoluteFilePath(QStringLiteral("playback")));
+    noteSounds_ = new NoteSounds(toPath(QDir(cache).absoluteFilePath(QStringLiteral("sounds"))), this);
 }
 
 std::string MainWindow::inputNameOf(const SongEditor* editor) const {
@@ -1938,6 +1982,13 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     fretboardButton->setDefaultAction(fretboardAction_);
     fretboardButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
     widthLayout->addWidget(fretboardButton);
+    auto* soundButton = new QToolButton(widthBar);
+    soundButton->setObjectName(QStringLiteral("scoreSoundToggle"));
+    soundButton->setDefaultAction(soundAction_);
+    soundButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    widthLayout->addWidget(soundButton);
+    connect(fretboard, &FretboardWidget::fretClicked, this,
+            [this, fretboard](int string, int fret) { soundFret(fretboard, string, fret); });
     // Insert and Clear work anywhere on the tab while something is staged.
     auto* insertAction = new QAction(tr("Insert Staged Notes"), page);
     insertAction->setObjectName(QStringLiteral("scoreInsertStaged"));
@@ -2166,6 +2217,7 @@ void MainWindow::closeScoreTab(int tabIndex) {
 }
 
 void MainWindow::removeScoreTabs() {
+    stopPlayback();
     scoreSyncTimer_->stop();
     scorePreviewTimer_->stop();
     scoreRunner_->cancel();
@@ -2193,6 +2245,8 @@ void MainWindow::removeScoreTabs() {
 }
 
 void MainWindow::onTabChanged() {
+    stopPlayback(); // another score or the song: the sound belongs to the score that was shown
+    scoreMidi_.clear();
     const bool song = tabs_->currentIndex() <= 0;
     previewStack_->setCurrentWidget(song ? static_cast<QWidget*>(preview_) : scorePreview_);
     scorePreviewTimer_->stop();
@@ -2358,7 +2412,75 @@ void MainWindow::requestScorePreview(bool userAsked) {
     if (const auto meta = zub::parseSong(editor_->content()))
         request.germanNames = zub::score::germanNames(meta->value("lang"));
     request.includeDir = songbookRoot_ / "zubuvzpevnik" / "lilypond";
+    // The build also writes the score's MIDI file, for Play.
+    zub::score::MidiOptions midi;
+    midi.factor = scorePreview_->tempoFactor();
+    midi.instrument = zub::score::midiInstrument(request.content);
+    if (const auto meta = zub::parseSong(editor_->content()))
+        midi.tempo = zub::score::songTempo(meta->value("tem"));
+    request.midi = std::move(midi);
     scoreRunner_->request(std::move(request));
+}
+
+void MainWindow::updateSoundAvailability() {
+    const SoundTools tools = findSoundTools();
+    QString reason = tools.missingHint();
+    if (reason.isEmpty() && scoreMidi_.empty())
+        reason = tr("The score has no MIDI file yet: it is being built, or the build failed.");
+    scorePreview_->setPlaybackAvailable(reason.isEmpty(), reason);
+    if (soundAction_) {
+        soundAction_->setEnabled(tools.available());
+        soundAction_->setToolTip(tools.available() ? tr("Play the note when a fret is clicked")
+                                                   : tools.missingHint());
+    }
+}
+
+void MainWindow::stopPlayback() {
+    playbackRunner_->cancel();
+    scorePlayer_->stop();
+    scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
+    scorePreview_->showPlaybackMessage({}, false);
+}
+
+// Plays the MIDI file of the latest successful preview build: that build was approved (the
+// preview's gate), and playing runs only fluidsynth.
+void MainWindow::playScore() {
+    if (scoreMidi_.empty() || onSongTab())
+        return;
+    const SoundTools tools = findSoundTools();
+    if (!tools.available()) {
+        updateSoundAvailability();
+        return;
+    }
+    PlaybackRequest request;
+    request.midiFile = scoreMidi_;
+    request.fluidsynth = tools.fluidsynth;
+    request.soundfont = tools.soundfont;
+    request.cacheDir = playbackCacheDir_;
+    scorePlayer_->stop();
+    playbackRunner_->request(std::move(request));
+}
+
+void MainWindow::showPlaybackResult(const PlaybackResult& result) {
+    if (onSongTab() || !currentEditor())
+        return;
+    if (!result.success) {
+        scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
+        scorePreview_->showPlaybackMessage(result.message, true);
+        return;
+    }
+    scorePreview_->setPlayState(ScorePreviewPane::PlayState::Playing);
+    scorePreview_->showPlaybackMessage(tr("Playing"), false);
+    scorePlayer_->play(result.wav);
+}
+
+void MainWindow::soundFret(FretboardWidget* fretboard, int string, int fret) {
+    if (!soundAction_->isChecked() || !soundAction_->isEnabled())
+        return;
+    const SoundTools tools = findSoundTools();
+    const bool banjo = fretboard->tuning().shortString != 0;
+    noteSounds_->play(tools, banjo ? zub::midi::programBanjo : zub::midi::programSteelGuitar,
+                      fretboard->midiAt(string, fret));
 }
 
 void MainWindow::showScoreResult(const ScoreResult& result) {
@@ -2368,6 +2490,8 @@ void MainWindow::showScoreResult(const ScoreResult& result) {
     if (scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name != result.inputName)
         return;
     scorePreview_->showResult(result);
+    scoreMidi_ = result.midi;
+    updateSoundAvailability();
     scoreLinksFresh_ = result.success && !scorePreviewTimer_->isActive();
     indexScoreEvents();
     updateScoreHighlights();

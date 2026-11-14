@@ -286,8 +286,12 @@ void FretboardWidget::mousePressEvent(QMouseEvent* event) {
     if (event->button() != Qt::LeftButton)
         return;
     const auto position = positionAt(event->position().toPoint());
-    if (position.string > 0)
-        toggleStaged(position.string, position.fret);
+    if (position.string <= 0)
+        return;
+    toggleStaged(position.string, position.fret);
+    const auto it = std::ranges::find(staged_, position.string, &zub::fretboard::Position::string);
+    if (it != staged_.end() && it->fret == position.fret)
+        emit fretClicked(position.string, position.fret);
 }
 
 void FretboardWidget::mouseDoubleClickEvent(QMouseEvent* event) {

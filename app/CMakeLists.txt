@@ -1,4 +1,4 @@
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Svg Pdf PdfWidgets LinguistTools)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Svg Pdf PdfWidgets Multimedia LinguistTools)
 find_package(KF6SyntaxHighlighting REQUIRED)
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -16,6 +16,14 @@ qt_add_executable(zpevnikar
     FretboardWidget.cpp
     ScoreInputBar.hpp
     ScoreInputBar.cpp
+    NoteSounds.hpp
+    NoteSounds.cpp
+    PlaybackRunner.hpp
+    PlaybackRunner.cpp
+    ScorePlayer.hpp
+    ScorePlayer.cpp
+    SoundTools.hpp
+    SoundTools.cpp
     ScorePreviewPane.hpp
     ScorePreviewPane.cpp
     ScoreRunner.hpp
@@ -55,7 +63,7 @@ qt_add_executable(zpevnikar
     SongTableModel.cpp
     convert.hpp
 )
-target_link_libraries(zpevnikar PRIVATE Zub::core zub_warnings Qt6::Widgets Qt6::Svg Qt6::Pdf Qt6::PdfWidgets KF6::SyntaxHighlighting)
+target_link_libraries(zpevnikar PRIVATE Zub::core zub_warnings Qt6::Widgets Qt6::Svg Qt6::Pdf Qt6::PdfWidgets Qt6::Multimedia KF6::SyntaxHighlighting)
 
 # UI translations (source language English). zpevnikar_cs.ts is the Czech translation,
 # zpevnikar_en.ts only holds the plural forms of the English texts ("%n song(s)"). The .qm files

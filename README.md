@@ -35,7 +35,7 @@ ZubuvZpevnik checkout, and conversions from chords_converter.
 Requirements:
 
 - CMake ≥ 3.25 and a C++23 compiler (developed with GCC 13)
-- Qt ≥ 6.5 with the Widgets and PDF modules
+- Qt ≥ 6.5 with the Widgets, PDF and Multimedia modules
 - KF6 SyntaxHighlighting
 - Catch2 v3 (tests)
 - Rust and cargo, to build the bundled chords_converter (optional)
@@ -43,6 +43,9 @@ Requirements:
 To build songs and songbooks you also need what the songbook needs (see its `docs/building.md`):
 TeX Live with LuaLaTeX and the `songs` and `lyluatex` packages, LilyPond, the Open Sans, Roboto Mono
 and FreeSans fonts, and a Czech locale (`cs_CZ.UTF-8`) for the index order.
+
+Optional: `fluidsynth` and a General MIDI soundfont (e.g. `/usr/share/sounds/sf2/default-GM.sf2`) for
+playing scores and the sound of a clicked fret; without them those buttons are disabled.
 
 ```bash
 git clone --recurse-submodules https://github.com/Woromi/ZubuvZpevnikar.git

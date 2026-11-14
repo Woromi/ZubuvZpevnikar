@@ -41,7 +41,11 @@ class FretboardWidget;
 class LabelFilterBox;
 class PreviewPane;
 class PreviewRunner;
+class NoteSounds;
+class PlaybackRunner;
+struct PlaybackResult;
 class ScoreInputBar;
+class ScorePlayer;
 class ScorePreviewPane;
 class ScoreRunner;
 struct ScoreResult;
@@ -157,6 +161,12 @@ private:
     void onTabChanged();
     void requestScorePreview(bool userAsked = false);
     void showScoreResult(const ScoreResult& result);
+      // it, Qt Multimedia plays it) and the sound of a clicked fret.
+    void playScore();
+    void stopPlayback();
+    void showPlaybackResult(const PlaybackResult& result);
+    void updateSoundAvailability(); // fluidsynth and a soundfont: enables Play and Sound
+    void soundFret(FretboardWidget* fretboard, int string, int fret);
     // Labels (the `tags` header option; "fav" = favourite). `change` maps a song's current tags to
     // its new ones. An open song gets the new header in its editor (one undo step, unsaved); any
     // other song is rewritten on disk, if it round-trips, and its table row updated. Returns an
@@ -273,6 +283,12 @@ private:
     QStackedWidget* previewStack_ = nullptr; // {song PDF preview, score preview}
     ScorePreviewPane* scorePreview_ = nullptr;
     ScoreRunner* scoreRunner_ = nullptr;
+    PlaybackRunner* playbackRunner_ = nullptr;
+    ScorePlayer* scorePlayer_ = nullptr;
+    NoteSounds* noteSounds_ = nullptr;
+    QAction* soundAction_ = nullptr; // "Sound": clicking a fret plays the note
+    std::filesystem::path scoreMidi_;        // the MIDI file of the latest successful build
+    std::filesystem::path playbackCacheDir_; // the rendered WAV files
     std::filesystem::path scoreWorkDir_;
     DiffView* diffView_ = nullptr;
     QWidget* tidyPanel_ = nullptr; // "Tidy changed:" list under the editor area

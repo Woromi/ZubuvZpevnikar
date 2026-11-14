@@ -667,6 +667,10 @@ Použijte vestavěný.</translation>
         <translation>Žádné neuložené změny</translation>
     </message>
     <message>
+        <source>The score has no MIDI file yet: it is being built, or the build failed.</source>
+        <translation>Notová ukázka zatím nemá soubor MIDI: sestavuje se, nebo sestavení selhalo.</translation>
+    </message>
+    <message>
         <source>e.g. Intro, Solo, Verse</source>
         <translation>např. Intro, Solo, Verse</translation>
     </message>
@@ -705,6 +709,14 @@ Použijte vestavěný.</translation>
     <message>
         <source>Fretboard</source>
         <translation>Hmatník</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Zvuk</translation>
+    </message>
+    <message>
+        <source>Play the note when a fret is clicked</source>
+        <translation>Po kliknutí na pražec zahrát tón</translation>
     </message>
     <message>
         <source>Tie</source>
@@ -769,6 +781,14 @@ Použijte vestavěný.</translation>
     <message>
         <source>The selection crosses a { } block: select notes within one block.</source>
         <translation>Výběr přesahuje blok { }: vyberte noty v jednom bloku.</translation>
+    </message>
+    <message>
+        <source>Preparing playback…</source>
+        <translation>Připravuji přehrávání…</translation>
+    </message>
+    <message>
+        <source>Cannot play: %1</source>
+        <translation>Nelze přehrát: %1</translation>
     </message>
     <message>
         <source>Favourite: add or remove the label &quot;fav&quot; (one undo step; save to keep it)</source>
@@ -885,6 +905,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Not built automatically: the score uses %1, which scores normally don&apos;t. Building runs it with full access to your files. Check the score, then press Rebuild to build it anyway.</source>
         <translation>Nesestaveno automaticky: notová ukázka používá %1, což notové ukázky běžně nepoužívají. Sestavení to spustí s plným přístupem k vašim souborům. Zkontrolujte notovou ukázku a pak ji tlačítkem Sestavit znovu přesto sestavte.</translation>
+    </message>
+    <message>
+        <source>Playing</source>
+        <translation>Hraje</translation>
     </message>
     <message>
         <source>The song is not in an artist folder.</source>
@@ -1160,6 +1184,40 @@ Použijte vestavěný.</translation>
     </message>
 </context>
 <context>
+    <name>NoteSounds</name>
+    <message>
+        <source>Cannot render the note sound: %1</source>
+        <translation>Nelze vytvořit zvuk tónu: %1</translation>
+    </message>
+</context>
+<context>
+    <name>PlaybackRunner</name>
+    <message>
+        <source>Cannot read the MIDI file: %1</source>
+        <translation>Nelze přečíst soubor MIDI: %1</translation>
+    </message>
+    <message>
+        <source>Cannot start fluidsynth: %1</source>
+        <translation>Nelze spustit fluidsynth: %1</translation>
+    </message>
+    <message>
+        <source>fluidsynth took longer than %1 s and was stopped.</source>
+        <translation>fluidsynth trval déle než %1 s a byl zastaven.</translation>
+    </message>
+    <message>
+        <source>fluidsynth crashed.</source>
+        <translation>fluidsynth spadl.</translation>
+    </message>
+    <message>
+        <source>fluidsynth failed: %1</source>
+        <translation>fluidsynth selhal: %1</translation>
+    </message>
+    <message>
+        <source>fluidsynth wrote no audio.</source>
+        <translation>fluidsynth nevytvořil žádný zvuk.</translation>
+    </message>
+</context>
+<context>
     <name>PreviewPane</name>
     <message>
         <source>Document class used for the preview</source>
@@ -1362,6 +1420,14 @@ Vynecháno (neplatný název písně): %1</translation>
         <translation>Logy</translation>
     </message>
     <message>
+        <source>Playback speed, as a share of the song&apos;s tempo</source>
+        <translation>Rychlost přehrávání jako podíl tempa písně</translation>
+    </message>
+    <message>
+        <source>%1 %</source>
+        <translation>%1 %</translation>
+    </message>
+    <message>
         <source>Building…</source>
         <translation>Sestavuji…</translation>
     </message>
@@ -1392,6 +1458,22 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>Not built</source>
         <translation>Nesestaveno</translation>
+    </message>
+    <message>
+        <source>Play</source>
+        <translation>Přehrát</translation>
+    </message>
+    <message>
+        <source>Stop</source>
+        <translation>Zastavit</translation>
+    </message>
+    <message>
+        <source>Play the score (Ctrl+Space)</source>
+        <translation>Přehrát notovou ukázku (Ctrl+Mezerník)</translation>
+    </message>
+    <message>
+        <source>Stop playing (Ctrl+Space)</source>
+        <translation>Zastavit přehrávání (Ctrl+Mezerník)</translation>
     </message>
     <message>
         <source>Build log</source>
@@ -2278,6 +2360,17 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
             <numerusform>Odebrat ze zpěvníku sekci %1 a její %n písně?</numerusform>
             <numerusform>Odebrat ze zpěvníku sekci %1 a jejích %n písní?</numerusform>
         </translation>
+    </message>
+</context>
+<context>
+    <name>SoundTools</name>
+    <message>
+        <source>Sound needs FluidSynth: install the fluidsynth package.</source>
+        <translation>Zvuk potřebuje FluidSynth: nainstalujte balíček fluidsynth.</translation>
+    </message>
+    <message>
+        <source>Sound needs a General MIDI soundfont: install a package such as fluid-soundfont-gm, or set playback/soundfont in the settings.</source>
+        <translation>Zvuk potřebuje soundfont General MIDI: nainstalujte balíček, např. fluid-soundfont-gm, nebo nastavte playback/soundfont v nastavení.</translation>
     </message>
 </context>
 </TS>

@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: |
           dnf install -y git gcc-c++ cmake ninja-build \
-            qt6-qtbase-devel qt6-qtsvg-devel qt6-qtpdf-devel qt6-qttools-devel \
+            qt6-qtbase-devel qt6-qtsvg-devel qt6-qtpdf-devel qt6-qtmultimedia-devel qt6-qttools-devel \
             qt6-linguist kf6-syntax-highlighting-devel catch-devel \
             cargo rust openssl-devel pkgconf-pkg-config
       - uses: actions/checkout@v5

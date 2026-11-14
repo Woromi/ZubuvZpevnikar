@@ -4,6 +4,7 @@
 #include "convert.hpp"
 
 #include <QApplication>
+#include <QComboBox>
 #include <QContextMenuEvent>
 #include <QDialog>
 #include <QEvent>
@@ -17,6 +18,7 @@
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QScrollArea>
 #include <QSvgRenderer>
 #include <QToolButton>
@@ -597,7 +599,7 @@ private:
 };
 
 ScorePreviewPane::ScorePreviewPane(QWidget* parent)
-    : QWidget(parent), rebuild_(new QToolButton), logButton_(new QToolButton), status_(new QLabel),
+    : QWidget(parent), rebuild_(new QToolButton), logButton_(new QToolButton), play_(new QToolButton), tempo_(new QComboBox), status_(new QLabel),
       scroll_(new QScrollArea), canvas_(new SvgCanvas), errors_(new QListWidget) {
     rebuild_->setText(tr("Rebuild"));
     if (QIcon::hasThemeIcon(QStringLiteral("view-refresh"))) {
@@ -610,12 +612,25 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     logButton_->setText(tr("Log"));
     logButton_->setEnabled(false);
 
+    play_->setObjectName(QStringLiteral("scorePlay"));
+    play_->setShortcut(QKeySequence(QStringLiteral("Ctrl+Space")));
+    tempo_->setObjectName(QStringLiteral("scoreTempo"));
+    tempo_->setToolTip(tr("Playback speed, as a share of the song's tempo"));
+    for (const int percent : {50, 75, 100, 125})
+        tempo_->addItem(tr("%1 %").arg(percent), percent);
+    tempo_->setCurrentIndex(
+        std::max(0, tempo_->findData(QSettings().value(QStringLiteral("playback/tempoPercent"), 100)
+                                         .toInt())));
+    setPlayState(PlayState::Idle);
+
     status_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     status_->setMinimumWidth(0);
 
     auto* toolbar = new QHBoxLayout;
     toolbar->setContentsMargins(4, 4, 4, 0);
     toolbar->addWidget(rebuild_);
+    toolbar->addWidget(play_);
+    toolbar->addWidget(tempo_);
     toolbar->addWidget(status_, 1);
     toolbar->addWidget(logButton_);
 
@@ -653,6 +668,16 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
         menu.exec(at);
     };
     connect(rebuild_, &QToolButton::clicked, this, &ScorePreviewPane::rebuildRequested);
+    connect(play_, &QToolButton::clicked, this, [this] {
+        if (playState_ == PlayState::Idle)
+            emit playRequested();
+        else
+            emit stopRequested();
+    });
+    connect(tempo_, &QComboBox::currentIndexChanged, this, [this] {
+        QSettings().setValue(QStringLiteral("playback/tempoPercent"), tempo_->currentData());
+        emit tempoChanged();
+    });
     connect(logButton_, &QToolButton::clicked, this, [this] { showLog(); });
     connect(errors_, &QListWidget::itemActivated, this, [this](QListWidgetItem* item) {
         const QVariant position = item->data(Qt::UserRole);
@@ -783,6 +808,46 @@ void ScorePreviewPane::clear() {
     errors_->hide();
     log_.clear();
     logButton_->setEnabled(false);
+}
+
+void ScorePreviewPane::setPlaybackAvailable(bool available, const QString& reason) {
+    playbackAvailable_ = available;
+    unavailableReason_ = reason;
+    setPlayState(playState_);
+}
+
+void ScorePreviewPane::setPlayState(PlayState state) {
+    playState_ = state;
+    const bool idle = state == PlayState::Idle;
+    const QString text = idle ? tr("Play") : tr("Stop");
+    play_->setText(text);
+    const char* icon = idle ? "media-playback-start" : "media-playback-stop";
+    if (QIcon::hasThemeIcon(QString::fromLatin1(icon))) {
+        play_->setIcon(QIcon::fromTheme(QString::fromLatin1(icon)));
+        play_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    } else {
+        play_->setIcon({});
+        play_->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    }
+    play_->setEnabled(playbackAvailable_ || !idle);
+    if (idle && !playbackAvailable_)
+        play_->setToolTip(unavailableReason_);
+    else
+        play_->setToolTip(idle ? tr("Play the score (Ctrl+Space)")
+                               : tr("Stop playing (Ctrl+Space)"));
+}
+
+void ScorePreviewPane::showPlaybackMessage(const QString& message, bool error) {
+    status_->setStyleSheet(error ? QStringLiteral("color: #c0392b;") : QString());
+    status_->setText(message);
+}
+
+double ScorePreviewPane::tempoFactor() const {
+    return tempo_->currentData().toInt() / 100.0;
+}
+
+QWidget* ScorePreviewPane::playButton() const {
+    return play_;
 }
 
 void ScorePreviewPane::showLog() {

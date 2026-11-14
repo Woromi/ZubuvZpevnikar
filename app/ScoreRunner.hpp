@@ -16,6 +16,7 @@ class QTimer;
 struct ScoreResult {
     bool success = false;
     QByteArray svg;                        // the engraved score (success only)
+    std::filesystem::path midi;            // the score's MIDI file; empty if there is none
     std::vector<zub::score::Error> errors; // LilyPond's errors, in log order
     QString message;                       // failures that are not LilyPond errors: lilypond
                                            // missing, prepare() failed, timeout, crash

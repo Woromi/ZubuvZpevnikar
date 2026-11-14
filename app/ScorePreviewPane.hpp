@@ -7,6 +7,7 @@
 
 struct ScoreResult;
 class QAction;
+class QComboBox;
 class QLabel;
 class QListWidget;
 class QScrollArea;
@@ -26,6 +27,15 @@ public:
     // The score is not built (e.g. not approved): `message` is shown in place of the errors.
     void showBlocked(const QString& message);
     void clear(); // no score: empty view, no status, no errors
+
+    // Playback: the Play/Stop button and the tempo. Disabled with `reason` as its tooltip when
+    // sound is not available (no fluidsynth or soundfont).
+    enum class PlayState { Idle, Preparing, Playing };
+    void setPlaybackAvailable(bool available, const QString& reason);
+    void setPlayState(PlayState state);
+    void showPlaybackMessage(const QString& message, bool error); // in the status line
+    double tempoFactor() const; // 0.5 ... 1.25 of the song's tempo
+    QWidget* playButton() const; // for tests
 
     // Where the note that LilyPond linked to `line` (1-based) and `column` (0-based) is drawn, in
     // widget coordinates of the score view; a null point when the score has no such link. For
@@ -52,6 +62,9 @@ public:
 
 signals:
     void rebuildRequested();
+    void tempoChanged(); // the playback speed combo changed: the MIDI file must be built again
+    void playRequested(); // the Play button was pressed while idle
+    void stopRequested(); // ... or Stop while preparing or playing
     // An error located in the score was double-clicked (1-based line and column).
     void errorActivated(int line, int column);
     // A note of the rendered score was clicked: its position in the score text (x = 0-based
@@ -70,6 +83,11 @@ private:
 
     QToolButton* rebuild_ = nullptr;
     QToolButton* logButton_ = nullptr;
+    QToolButton* play_ = nullptr;
+    QComboBox* tempo_ = nullptr;
+    PlayState playState_ = PlayState::Idle;
+    bool playbackAvailable_ = true;
+    QString unavailableReason_;
     QLabel* status_ = nullptr;
     QScrollArea* scroll_ = nullptr;
     SvgCanvas* canvas_ = nullptr;
