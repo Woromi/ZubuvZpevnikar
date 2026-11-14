@@ -46,8 +46,8 @@ public:
 
 signals:
     void stagedChanged();
-    // A fret was clicked and now holds a staged position (not when the click removed it): for the
-    // sound of the note. Not emitted when the staging is loaded from the score.
+    // A fret was clicked (staged or unstaged by it): for the sound of the note. Not emitted when
+    // the staging is loaded from the score.
     void fretClicked(int string, int fret);
     // A fret was double-clicked: it is staged, insert everything staged.
     void insertRequested();

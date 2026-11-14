@@ -289,9 +289,8 @@ void FretboardWidget::mousePressEvent(QMouseEvent* event) {
     if (position.string <= 0)
         return;
     toggleStaged(position.string, position.fret);
-    const auto it = std::ranges::find(staged_, position.string, &zub::fretboard::Position::string);
-    if (it != staged_.end() && it->fret == position.fret)
-        emit fretClicked(position.string, position.fret);
+    // Every click sounds, also one that unstages: the sound answers the click.
+    emit fretClicked(position.string, position.fret);
 }
 
 void FretboardWidget::mouseDoubleClickEvent(QMouseEvent* event) {

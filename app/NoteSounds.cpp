@@ -119,19 +119,31 @@ void NoteSounds::renderNext() {
 void NoteSounds::playFile(const fs::path& wav) {
     const QString path = toQString(wav);
     QSoundEffect*& effect = effects_[path];
+    if (effect && effect->status() == QSoundEffect::Error) {
+        effect->deleteLater(); // a failed load is not retried by QSoundEffect itself
+        effect = nullptr;
+    }
     if (!effect) {
         effect = new QSoundEffect(this);
         effect->setSource(QUrl::fromLocalFile(path));
     }
-    if (effect->status() == QSoundEffect::Loading) {
-        // Plays once it is loaded.
-        connect(effect, &QSoundEffect::loadedChanged, effect,
-                [effect] {
-                    if (effect->isLoaded())
-                        effect->play();
-                },
-                Qt::SingleShotConnection);
+    // Other notes stop: only the newest click sounds.
+    for (auto& [other, sound] : effects_) {
+        if (sound && sound != effect && sound->isPlaying())
+            sound->stop();
+    }
+    if (!effect->isLoaded()) {
+        // Status Null or Loading right after setSource: play once it is loaded (one pending play).
+        disconnect(effect, &QSoundEffect::statusChanged, this, nullptr);
+        connect(effect, &QSoundEffect::statusChanged, this, [effect] {
+            if (effect->status() == QSoundEffect::Ready) {
+                effect->disconnect(effect, &QSoundEffect::statusChanged, nullptr, nullptr);
+                effect->play();
+            }
+        });
         return;
     }
+    // play() on a sound that is still playing does not restart it.
+    effect->stop();
     effect->play();
 }
