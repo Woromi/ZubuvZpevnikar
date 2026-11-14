@@ -252,6 +252,67 @@ std::string scaleTempo(std::string_view music, double factor) {
     return out;
 }
 
+std::string markBends(std::string_view music) {
+    const auto marker = [](const char* name) {
+        return std::string("\\once \\set Staff.midiInstrument = \"") + name + "\" ";
+    };
+    std::vector<std::pair<std::size_t, std::string>> inserts;
+    std::size_t preBendEnd = npos;
+    walk(
+        music, 0,
+        [&](std::size_t begin, std::size_t wordEnd, std::string_view word) {
+            if (word == "preBend") {
+                preBendEnd = wordEnd;
+            } else if (word == "grace") {
+                // Only `\^` between the \preBend and the \grace.
+                bool pre = false;
+                if (preBendEnd != npos && preBendEnd <= begin) {
+                    std::string between;
+                    for (const char c : music.substr(preBendEnd, begin - preBendEnd))
+                        if (!isSpace(c))
+                            between += c;
+                    pre = between.empty() || between == "\\^";
+                }
+                preBendEnd = npos;
+                const std::size_t note = skipSpace(music, wordEnd);
+                if (note >= music.size() || music[note] == '{' || music[note] == '}')
+                    return proceed;
+                std::size_t end = note;
+                while (end < music.size() && !isSpace(music[end]) && music[end] != '}')
+                    ++end;
+                const std::string_view chunk = music.substr(note, end - note);
+                const std::size_t after = skipSpace(music, end);
+                const bool release =
+                    chunk.find("\\^") != npos || music.substr(after).starts_with("\\^");
+                inserts.emplace_back(begin,
+                                     marker(pre ? (release ? "telephone ring" : "helicopter")
+                                                : (release ? "applause" : "gunshot")));
+            } else if (word == "glissando") {
+                std::size_t next = skipSpace(music, wordEnd);
+                if (next < music.size() && music[next] == '|')
+                    next = skipSpace(music, next + 1);
+                // A note or chord follows, not a rest or a skip.
+                if (next < music.size() &&
+                    ((music[next] >= 'a' && music[next] <= 'z' && music[next] != 'r' &&
+                      music[next] != 's') ||
+                     music[next] == '<'))
+                    inserts.emplace_back(next, marker("seashore"));
+            }
+            return proceed;
+        },
+        [](std::size_t, char) { return true; });
+    std::ranges::stable_sort(inserts, {}, &std::pair<std::size_t, std::string>::first);
+    std::string out;
+    std::size_t copied = 0;
+    for (const auto& [at, text] : inserts) {
+        out.append(music.substr(copied, at - copied));
+        out += text;
+        copied = at;
+    }
+    out.append(music.substr(copied));
+    return out;
+}
+
 std::optional<std::string> midiScore(std::string_view text, const MidiOptions& options) {
     const auto music = scoreMusic(text);
     if (!music)
@@ -265,7 +326,7 @@ std::optional<std::string> midiScore(std::string_view text, const MidiOptions& o
     const long beats =
         std::max(1L, std::lround(static_cast<double>(options.tempo) * options.factor));
 
-    std::string played = "\\unfoldRepeats {\n" + scaleTempo(*music, options.factor) + "\n  }";
+    std::string played = "\\unfoldRepeats {\n" + markBends(scaleTempo(*music, options.factor)) + "\n  }";
     if (options.transpose > 0 && options.transpose <= 12)
         // c' up to the capo's pitch, in the note names of the score's language. The names assume
         // the wrapper's \language (zub::score::prepare); no real score sets its own.

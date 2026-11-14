@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -68,6 +69,30 @@ std::string trimSilence(std::string_view wav, int threshold = 64, int keepMs = 3
 // (0-based) for `durationMs`, followed by silence so FluidSynth renders the release. Arguments
 // outside the MIDI ranges are clamped (program, pitch 0-127; duration at least 1).
 std::string noteFile(int program, int pitch, int durationMs);
+
+// ---- Bends and slides ----
+// LilyPond's MIDI has no pitch bends: a bend `a'\^ \grace h'`, a pre-bend `a'\preBend \^ \grace h'`
+// and a slide `d' \glissando g'` are separate notes. The playback score marks the notes that
+// belong together (zub::score::markBends): the bend's grace note and the slide's target get a
+// one-moment program change to one of these programs (General MIDI sound effects no instrument
+// of the playback uses). smoothBends reads them from the MIDI file and turns the notes into one
+// sounding note with pitch bend events.
+inline constexpr int markerBend = 127;           // grace note: the note before it bends up to it
+inline constexpr int markerBendRelease = 126;    // ... and the note after it is the release
+inline constexpr int markerPreBend = 125;        // grace note: the note before it starts bent to it
+inline constexpr int markerPreBendRelease = 124; // ... and the note after it is the release
+inline constexpr int markerSlide = 122;          // the note the previous one slides to
+// Raise when smoothBends changes the sound (part of the WAV cache key).
+inline constexpr int bendVersion = 1;
+
+// Rewrites the Standard MIDI File `midi` (any format, with ticks per quarter): every marked note
+// (see above) is merged into the note before it (the note after a release into that one too),
+// which gets pitch bend events (range +-12 semitones, set with RPN 0 on its channel) that glide
+// to the marked note's pitch; the markers are removed and the bend is reset before the next
+// note of the channel. Pitch bend is per channel, so notes that sound together with a bent one
+// bend too. Unmarked or unpairable notes are left alone; a file without markers comes back
+// unchanged. Error for anything that is no readable SMF (or has SMPTE time).
+std::expected<std::string, std::string> smoothBends(std::string_view midi);
 
 // FNV-1a, 64 bit: a hash that is the same in every build (std::hash is not).
 std::uint64_t fnv1a64(std::string_view data);

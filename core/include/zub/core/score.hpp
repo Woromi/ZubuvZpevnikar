@@ -110,8 +110,15 @@ std::optional<std::string> scoreMusic(std::string_view text);
 // are left alone.
 std::string scaleTempo(std::string_view music, double factor);
 
+// Marks the notes of bends and slides for zub::midi::smoothBends: before every `\grace` (the
+// bend's target; a `\preBend` before it, only `\^` in between, makes it a pre-bend; a `\^` after
+// its note makes the next note its release) and before the note after `\glissando` the text
+// `\once \set Staff.midiInstrument = "<marker>"` is inserted, which LilyPond writes as a program
+// change at that moment. Comments, strings and Scheme are left alone.
+std::string markBends(std::string_view music);
+
 // The score that makes LilyPond write the MIDI file, to append to `text`:
-//   \\score { \\unfoldRepeats { <scoreMusic with scaled tempi> } \\midi { \\tempo 4 = N ... } }
+//   \\score { \\unfoldRepeats { <scoreMusic with scaled tempi, markBends> } \\midi { \\tempo 4 = N ... } }
 // (the chord names make no sound; Staff and TabStaff play `options.instrument`). Only numbers and
 // the instrument name are written into it. Nullopt when `text` has no \\score block.
 std::optional<std::string> midiScore(std::string_view text, const MidiOptions& options);

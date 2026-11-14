@@ -1,3 +1,5 @@
+#include "midi_events.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 #include <cstdlib>
 #include <filesystem>
@@ -266,6 +268,57 @@ TEST_CASE("prepare appends no playback score after text that would change how it
     }
 }
 
+TEST_CASE("markBends marks the targets of bends, pre-bends, releases and slides", "[score][midi]") {
+    const auto set = [](const char* name) {
+        return std::string("\\once \\set Staff.midiInstrument = \"") + name + "\" ";
+    };
+    // A bend; a pre-bend (only \^ between \preBend and \grace); both with a release (\^ after the
+    // grace note); a slide with a bar check before the target.
+    const std::string music =
+        "a'\\2\\^ \\grace h'8\\2 a'\\preBend \\^ \\grace h'\\2 a'16\\^ \\grace h'16\\2\\^ a'\\2 "
+        "a'\\preBend \\^ \\grace h'\\2\\^ a' d'\\3 \\glissando | g'\\2 g'\\glissando <a e'>";
+    const auto marked = sc::markBends(music);
+    CHECK(contains(marked, "\\^ " + set("gunshot") + "\\grace h'8"));
+    CHECK(contains(marked, "\\^ " + set("helicopter") + "\\grace h'\\2 a'16"));
+    CHECK(contains(marked, "\\^ " + set("applause") + "\\grace h'16\\2\\^"));
+    CHECK(contains(marked, "\\^ " + set("telephone ring") + "\\grace h'\\2\\^ a'"));
+    CHECK(contains(marked, "\\glissando | " + set("seashore") + "g'\\2"));
+    CHECK(contains(marked, "\\glissando " + set("seashore") + "<a e'>"));
+    // The music itself is unchanged.
+    std::string without = marked;
+    for (const char* name : {"gunshot", "helicopter", "applause", "telephone ring", "seashore"})
+        for (auto at = without.find(set(name)); at != std::string::npos; at = without.find(set(name)))
+            without.erase(at, set(name).size());
+    CHECK(without == music);
+}
+
+TEST_CASE("markBends leaves comments, strings, Scheme, rests and a plain \\grace shape alone",
+          "[score][midi]") {
+    const std::string music =
+        "% \\grace c' \\glissando c''\n\\markup \"\\grace\" #(display \"\\glissando\") "
+        "c'\\glissando r c' \\glissando s c' \\grace { d'8 } \\grace\n";
+    CHECK(sc::markBends(music) == music);
+    CHECK(sc::markBends("c'4 d'") == "c'4 d'");
+}
+
+TEST_CASE("the playback score marks bends and is still appended", "[score][midi]") {
+    TempDir dir;
+    sc::Request request;
+    request.workDir = dir.path / "work";
+    request.inputName = "Artist/Title.ly";
+    request.content = "\\score { \\new TabStaff { a'4\\2\\^ \\grace h'8\\2 a'4\\2 } }\n";
+    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    request.midi = options();
+    const auto cmd = sc::prepare(request);
+    REQUIRE(cmd);
+    CHECK_FALSE(cmd->midi.empty()); // appendIsNeutral: the markers add no Scheme
+    std::ifstream copy(cmd->scoreCopy);
+    std::stringstream copied;
+    copied << copy.rdbuf();
+    CHECK(contains(copied.str(), "\\once \\set Staff.midiInstrument = \"gunshot\" \\grace"));
+    CHECK(zub::safety::lilypondRisks(copied.str()).empty());
+}
+
 // Hidden: needs lilypond and the real ../ZubuvZpevnik checkout.
 // Run with: build/debug/tests/zub_core_tests "[integration]"
 TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][score][midi]") {
@@ -328,6 +381,35 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
             UNSCOPED_INFO(name << ": " << text.str());
         }
         CHECK(ok);
+        if (ok) {
+            std::ifstream midiIn(cmd->midi, std::ios::binary);
+            std::stringstream midiBytes;
+            midiBytes << midiIn.rdbuf();
+            const auto smoothed = zub::midi::smoothBends(midiBytes.str());
+            if (!smoothed) {
+                UNSCOPED_INFO(name << ": " << smoothed.error());
+            }
+            REQUIRE(smoothed);
+            const auto raw = testmidi::parse(midiBytes.str());
+            const auto after = testmidi::parse(*smoothed);
+            REQUIRE(raw.size() == after.size());
+            for (std::size_t t = 0; t < raw.size(); ++t) {
+                int before = 0;
+                int now = 0;
+                int markers = 0;
+                for (const auto& e : raw[t]) {
+                    before += e.noteOn() ? 1 : 0;
+                    markers += e.status == 0xc0 && e.d1 >= 122 && e.d1 != 123 && e.d1 <= 127 ? 1 : 0;
+                }
+                for (const auto& e : after[t]) {
+                    now += e.noteOn() ? 1 : 0;
+                    CHECK_FALSE((e.status == 0xc0 && e.d1 >= 122 && e.d1 <= 127));
+                }
+                // A marker merges at most two notes (the target and a release) into its note.
+                CHECK(now <= before);
+                CHECK(now >= before - 2 * markers);
+            }
+        }
         ++count;
     }
     CHECK(count > 0);
