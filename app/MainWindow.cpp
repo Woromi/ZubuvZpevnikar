@@ -2430,8 +2430,10 @@ void MainWindow::requestScorePreview(bool userAsked) {
     zub::score::MidiOptions midi;
     midi.factor = scorePreview_->tempoFactor();
     midi.instrument = zub::score::midiInstrument(request.content);
-    if (const auto meta = zub::parseSong(editor_->content()))
+    if (const auto meta = zub::parseSong(editor_->content())) {
         midi.tempo = zub::score::songTempo(meta->value("tem"));
+        midi.transpose = zub::score::songCapo(meta->value("cap")); // sounds as with the capo on
+    }
     request.midi = std::move(midi);
     scoreRunner_->request(std::move(request));
 }
@@ -2493,8 +2495,13 @@ void MainWindow::soundFret(FretboardWidget* fretboard, int string, int fret) {
         return;
     const SoundTools tools = findSoundTools();
     const bool banjo = fretboard->tuning().shortString != 0;
+    // Frets count from the capo, like the tablature: the note sounds as with the capo on.
+    int capo = 0;
+    if (editor_)
+        if (const auto meta = zub::parseSong(editor_->content()))
+            capo = zub::score::songCapo(meta->value("cap"));
     noteSounds_->play(tools, banjo ? zub::midi::programBanjo : zub::midi::programSteelGuitar,
-                      fretboard->midiAt(string, fret));
+                      fretboard->midiAt(string, fret) + capo);
 }
 
 void MainWindow::showScoreResult(const ScoreResult& result) {

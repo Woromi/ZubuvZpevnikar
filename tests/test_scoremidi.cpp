@@ -161,6 +161,32 @@ TEST_CASE("midiScore is a score that unfolds repeats and plays", "[score][midi]"
     CHECK(score->ends_with("\n  }\n}"));
 }
 
+TEST_CASE("midiScore sounds as with the capo on", "[score][midi]") {
+    auto o = options();
+    o.transpose = 4;
+    const auto english = sc::midiScore(jolene, o);
+    REQUIRE(english);
+    CHECK(english->starts_with("\\score {\n  \\transpose c' e' {\n  \\unfoldRepeats {"));
+    o.transpose = 11;
+    o.germanNames = true;
+    CHECK(contains(*sc::midiScore(jolene, o), "\\transpose c' h' {"));
+    o.transpose = 1;
+    o.germanNames = false;
+    CHECK(contains(*sc::midiScore(jolene, o), "\\transpose c' cs' {"));
+    o.transpose = 0;
+    CHECK(sc::midiScore(jolene, o)->starts_with("\\score {\n  \\unfoldRepeats {"));
+}
+
+TEST_CASE("songCapo reads the cap header", "[score][midi]") {
+    CHECK(sc::songCapo("{4}") == 4);
+    CHECK(sc::songCapo(" 2 ") == 2);
+    CHECK(sc::songCapo("{12}") == 12);
+    CHECK(sc::songCapo("") == 0);
+    CHECK(sc::songCapo("{13}") == 0);
+    CHECK(sc::songCapo("{II}") == 0);
+    CHECK(sc::songCapo("{2.5}") == 0);
+}
+
 TEST_CASE("midiScore scales the score's tempi and the factor sets the midi tempo", "[score][midi]") {
     auto o = options();
     o.factor = 0.5;

@@ -127,6 +127,18 @@ std::string scaled(long value, double factor) {
 
 } // namespace
 
+int songCapo(std::string_view cap) {
+    while (!cap.empty() && (isSpace(cap.front()) || cap.front() == '{'))
+        cap.remove_prefix(1);
+    while (!cap.empty() && (isSpace(cap.back()) || cap.back() == '}'))
+        cap.remove_suffix(1);
+    std::size_t i = 0;
+    const auto value = number(cap, i);
+    if (!value || i != cap.size() || *value < 0 || *value > 12)
+        return 0;
+    return static_cast<int>(*value);
+}
+
 int songTempo(std::string_view tem) {
     const auto trim = [](std::string_view s) {
         while (!s.empty() && (isSpace(s.front()) || s.front() == '{'))
@@ -253,8 +265,13 @@ std::optional<std::string> midiScore(std::string_view text, const MidiOptions& o
     const long beats =
         std::max(1L, std::lround(static_cast<double>(options.tempo) * options.factor));
 
-    return "\\score {\n  \\unfoldRepeats {\n" + scaleTempo(*music, options.factor) +
-           "\n  }\n  \\midi {\n    \\tempo 4 = " + std::to_string(beats) +
+    std::string played = "\\unfoldRepeats {\n" + scaleTempo(*music, options.factor) + "\n  }";
+    if (options.transpose > 0 && options.transpose <= 12)
+        // c' up to the capo's pitch, in the note names of the score's language
+        played = "\\transpose " + fretboard::pitchName(60, options.germanNames, false) + " " +
+                 fretboard::pitchName(60 + options.transpose, options.germanNames, false) +
+                 " {\n  " + played + "\n  }";
+    return "\\score {\n  " + played + "\n  \\midi {\n    \\tempo 4 = " + std::to_string(beats) +
            "\n    \\context { \\ChordNames \\remove \"Staff_performer\" }\n"
            "    \\context { \\Staff midiInstrument = \"" + instrument +
            "\" }\n"

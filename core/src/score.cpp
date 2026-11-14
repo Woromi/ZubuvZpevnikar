@@ -56,7 +56,9 @@ std::expected<Command, std::string> prepare(const Request& request) {
     std::string content = request.content;
     bool withMidi = false;
     if (request.midi) {
-        if (const auto played = midiScore(content, *request.midi)) {
+        MidiOptions options = *request.midi;
+        options.germanNames = request.germanNames;
+        if (const auto played = midiScore(content, options)) {
             if (!content.empty() && content.back() != '\n')
                 content += '\n';
             content += *played;

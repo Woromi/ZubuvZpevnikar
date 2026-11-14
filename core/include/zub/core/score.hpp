@@ -19,6 +19,10 @@ struct MidiOptions {
     int tempo = 100;        // quarter notes per minute (the song's `tem`, see songTempo)
     double factor = 1.0;    // playback speed: the tempo is tempo * factor
     std::string instrument; // General MIDI name for Staff and TabStaff, see midiInstrument
+    // Semitones the music sounds higher than written: the song's capo (songCapo), since the
+    // songbook's tablature is written in the capo's fret shapes.
+    int transpose = 0;
+    bool germanNames = false; // set by prepare from Request::germanNames (the \transpose names)
 };
 
 struct Request {
@@ -74,6 +78,10 @@ std::optional<Error> firstError(std::string_view log);
 // The song's `tem` header value ("{120}") as quarter notes per minute; 100 when it is missing,
 // not a plain integer or outside 20 to 400.
 int songTempo(std::string_view tem);
+
+// The song's `cap` header value ("{4}") as semitones; 0 when it is missing, not a plain integer
+// or outside 0 to 12.
+int songCapo(std::string_view cap);
 
 // The General MIDI instrument name to play the score with: "whistle" for a score that includes
 // tinwhistle.ily, "banjo" for one with the banjo tuning (zub::fretboard::tuningOf), else
