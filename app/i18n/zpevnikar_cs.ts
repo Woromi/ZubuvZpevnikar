@@ -683,6 +683,14 @@ Použijte vestavěný.</translation>
         <translation>Použijte jen písmena, číslice a mezery.</translation>
     </message>
     <message>
+        <source>No lines can be joined: the parts of a kind need the same number of lines, and the joined lines must still fit the column on A4 and A5.</source>
+        <translation>Žádné řádky nelze spojit: části jednoho druhu potřebují stejný počet řádků a spojené řádky se musí vejít do sloupce na A4 i A5.</translation>
+    </message>
+    <message>
+        <source>No lines can be joined.</source>
+        <translation>Žádné řádky nelze spojit.</translation>
+    </message>
+    <message>
         <source>%1: the song header has a problem: %2</source>
         <translation>%1: problém v hlavičce písně: %2</translation>
     </message>
@@ -957,10 +965,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>No mistakes found.</source>
         <translation>Žádné chyby nenalezeny.</translation>
-    </message>
-    <message>
-        <source>No lines can be joined: every part of a kind needs an even number of lines, and the joined lines must still fit the column on A4 and A5.</source>
-        <translation>Žádné řádky nelze spojit: každá část daného druhu musí mít sudý počet řádků a spojené řádky se musí vejít do sloupce na A4 i A5.</translation>
     </message>
     <message>
         <source>Pick a change, most readable first (score 0–100: how readable the song stays):</source>
@@ -1462,6 +1466,10 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>some lines without chords</source>
         <translation>některé řádky bez akordů</translation>
+    </message>
+    <message>
+        <source>Not offered:</source>
+        <translation>Nenabídnuto:</translation>
     </message>
     <message>
         <source>(Ctrl+click or Shift+click picks several.)</source>

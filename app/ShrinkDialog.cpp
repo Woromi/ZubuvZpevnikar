@@ -64,6 +64,13 @@ QString ShrinkDialog::summary(const zub::songsuggest::Suggestions& suggestions) 
         parts << measuredText(QStringLiteral("A5"), *suggestions.a5);
     if (!suggestions.note.empty())
         parts << toQString(suggestions.note);
+    if (!suggestions.notJoined.empty()) {
+        // join: the kinds of parts it did not offer, and why (the converter's English text)
+        QStringList reasons;
+        for (const auto& reason : suggestions.notJoined)
+            reasons << QStringLiteral("• ") + toQString(reason);
+        parts << tr("Not offered:") + QStringLiteral("\n") + reasons.join(QStringLiteral("\n"));
+    }
     return parts.join(QStringLiteral("\n"));
 }
 

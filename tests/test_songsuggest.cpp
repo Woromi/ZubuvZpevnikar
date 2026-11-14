@@ -211,6 +211,24 @@ TEST_CASE("join lists joined lines in shrink's shape", "[songsuggest]") {
     CHECK(result->proposals[1].edits.size() == 24);
 }
 
+TEST_CASE("join says which parts it did not offer and why (0.11.0)", "[songsuggest]") {
+    // join-notjoined-input.tex: verses of 3 and 5 lines, choruses of 4.
+    const auto result = ss::interpretProposals(
+        exitCode("join-notjoined"), slurp(converterData / "join-notjoined.json"), "");
+    REQUIRE(result);
+    REQUIRE(result->proposals.size() == 1);
+    REQUIRE(result->notJoined.size() == 1);
+    CHECK(result->notJoined[0].starts_with("verse: the parts have 3 and 5 lines"));
+    // Older output without the key, and a null: nothing listed.
+    const auto older =
+        ss::interpretProposals(exitCode("join"), slurp(converterData / "join.json"), "");
+    REQUIRE(older);
+    CHECK(older->notJoined.empty());
+    CHECK(ss::interpretProposals(0, R"({"not_joined":null,"proposals":[]})", "")->notJoined.empty());
+    CHECK_FALSE(ss::interpretProposals(0, R"({"not_joined":"verse","proposals":[]})", ""));
+    CHECK_FALSE(ss::interpretProposals(0, R"({"not_joined":[1],"proposals":[]})", ""));
+}
+
 TEST_CASE("suggest copes with null fits, null wrap lines and nothing measured", "[songsuggest]") {
     const auto result = ss::interpretProposals(
         0,

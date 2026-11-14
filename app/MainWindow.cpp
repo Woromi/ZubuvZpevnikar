@@ -2747,8 +2747,12 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
             text = tr("No mistakes found.");
             break;
         case SongAction::Join:
-            text = tr("No lines can be joined: every part of a kind needs an even number of "
-                      "lines, and the joined lines must still fit the column on A4 and A5.");
+            // The converter says why (0.11.0, listed in the summary); the rule in general
+            // otherwise.
+            text = suggestions.notJoined.empty()
+                       ? tr("No lines can be joined: the parts of a kind need the same number of "
+                            "lines, and the joined lines must still fit the column on A4 and A5.")
+                       : tr("No lines can be joined.");
             break;
         }
         if (!summary.isEmpty() && action != SongAction::Check)

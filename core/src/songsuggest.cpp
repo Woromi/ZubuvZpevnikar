@@ -162,6 +162,16 @@ std::expected<Suggestions, std::string> interpretProposals(int exitCode, std::st
                 return badOutput(std::string("bad \"measured\".\"") + paper + "\"");
         }
     }
+    if (const json::Value* notJoined = parsed->find("not_joined");
+        notJoined && !notJoined->isNull()) {
+        if (!notJoined->asArray())
+            return badOutput("\"not_joined\" is not a list");
+        for (const json::Value& reason : *notJoined->asArray()) {
+            if (!reason.asString())
+                return badOutput("\"not_joined\" has a non-string entry");
+            result.notJoined.push_back(*reason.asString());
+        }
+    }
     const json::Value* proposals = parsed->find("proposals");
     if (!proposals || !proposals->asArray())
         return badOutput("no \"proposals\" list");

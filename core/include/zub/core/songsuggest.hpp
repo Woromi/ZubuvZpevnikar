@@ -77,6 +77,9 @@ struct Suggestions {
     std::optional<Measured> a4; // only the papers --measure measured
     std::optional<Measured> a5;
     std::vector<Proposal> proposals; // best first
+    // 0.11.0, join: one line per kind of part that is not offered, with the reason
+    // ("verse: the parts have 3 and 5 lines; ..."). Empty for the other commands.
+    std::vector<std::string> notJoined;
     bool operator==(const Suggestions&) const = default;
 };
 
