@@ -372,9 +372,10 @@ bool chosenAmp(std::string_view id) {
 // that one would win), and staves that must not sound get `\remove "Staff_performer"`.
 std::string applyStaffChoices(std::string_view music, const zub::score::MidiOptions& options) {
     using Sounding = zub::score::MidiOptions::Sounding;
-    if (options.staffInstruments.empty() && options.sounding == Sounding::All)
-        return std::string(music);
     const auto staves = findStaves(music);
+    if (staves.empty() || (staves.size() == 1 && options.staffInstruments.empty() &&
+                           options.sounding == Sounding::All))
+        return std::string(music);
     struct Edit {
         std::size_t begin;
         std::size_t end;
@@ -388,7 +389,15 @@ std::string applyStaffChoices(std::string_view music, const zub::score::MidiOpti
         const bool amp = chosenAmp(id);
         const bool muted = (options.sounding == Sounding::AmpOnly && !amp) ||
                            (options.sounding == Sounding::WithoutAmp && amp);
-        const std::string name = muted ? std::string() : chosenName(id);
+        std::string name = muted ? std::string() : chosenName(id);
+        // "Automatic" in a score with several staves: a tab staff that sets nothing plays the
+        // banjo when its own tuning is the banjo's, else the guitar (the whole-score guess says
+        // banjo for all of them as soon as one staff has the banjo tuning).
+        if (name.empty() && !muted && staves.size() >= 2 && staff.type == "TabStaff" &&
+            staff.instrument.empty() && chosenName(id).empty())
+            name = staff.tuning.find("banjo") != std::string::npos
+                       ? std::string(zub::midi::findInstrument("banjo")->name)
+                       : std::string(zub::midi::findInstrument("steel")->name);
         std::string with;
         if (!name.empty())
             with += " midiInstrument = \"" + name + "\"";

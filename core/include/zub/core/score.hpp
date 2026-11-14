@@ -25,7 +25,9 @@ struct MidiOptions {
     int transpose = 0;
     bool germanNames = false; // set by prepare from Request::germanNames (the \transpose names)
     // The instrument of each staff of the score (see staves(), by index) as a zub::midi::Instrument
-    // id; "", "auto" and unknown ids leave the staff as the file (or `instrument`) has it. The
+    // id; "", "auto" and unknown ids leave the staff as the file has it, else `instrument`; in a
+    // score with several staves a tab staff that sets nothing plays the banjo if its own
+    // `stringTunings` is a banjo tuning, else the steel guitar. The
     // "amp" id is the clean electric guitar here: prepare plays the amp staves in a score of their
     // own (Command::ampMidi) so the app can run that one through the amp effect.
     std::vector<std::string> staffInstruments;

@@ -281,12 +281,18 @@ TEST_CASE("the playback score gives each staff its own instrument", "[score][sta
     CHECK(contains(played, "instrumentName = \"Banjo \"")); // the staff's own \with is kept
     CHECK(count(played, "\\remove \"Staff_performer\"") == 1); // only the ChordNames in \midi
 
-    // Without a choice, nothing is added.
+    // Without a choice, a tab staff plays by its own tuning: banjo for the banjo staff, the
+    // guitar for the other (not both banjo, as the whole score's tuning would say).
     options.staffInstruments = {"", "auto"};
-    CHECK_FALSE(contains(withMidiFor(rozarka, options), "acoustic grand"));
+    std::string plain = withMidiFor(rozarka, options);
+    CHECK_FALSE(contains(plain, "acoustic grand"));
+    CHECK(count(plain, "midiInstrument = \"banjo\"") == 1);
+    CHECK(count(plain, "midiInstrument = \"acoustic guitar (steel)\"") == 3); // staff 2, \midi x2
     options.staffInstruments = {};
-    const std::string plain = withMidiFor(rozarka, options);
-    CHECK(count(plain, "midiInstrument") == 3); // the \midi block's two contexts and a comment
+    plain = withMidiFor(rozarka, options);
+    CHECK(count(plain, "midiInstrument = \"banjo\"") == 1);
+    // A file's own instrument stays, and one staff alone is not changed.
+    CHECK(count(withMidiFor(jolene, options), "midiInstrument") == 2);
 
     // A staff without a \with gets one; a file's \set of that staff is changed to the choice.
     options.staffInstruments = {"flute"};
