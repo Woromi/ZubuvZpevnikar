@@ -333,3 +333,32 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
     CHECK(count > 0);
 #endif
 }
+
+TEST_CASE("errors in the appended playback score are dropped", "[score][midi]") {
+    TempDir dir;
+    sc::Request request;
+    request.workDir = dir.path / "work";
+    request.inputName = "Artist/Title.ly";
+    request.content = "\\score { { c'4 } }\n";
+    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+
+    auto cmd = sc::prepare(request);
+    REQUIRE(cmd);
+    CHECK(cmd->generatedFromLine == 0); // nothing appended
+
+    request.midi = options();
+    cmd = sc::prepare(request);
+    REQUIRE(cmd);
+    CHECK(cmd->generatedFromLine == 2);
+
+    const sc::Error own{"bad", cmd->scoreCopy, 1, 3};
+    const sc::Error generated{"bad", cmd->scoreCopy, 5, 3};
+    const sc::Error other{"bad", "/songbook/zubuvzpevnik/lilypond/x.ily", 5, 3};
+    const auto kept = sc::withoutGeneratedErrors({own, generated, other}, *cmd);
+    REQUIRE(kept.size() == 2);
+    CHECK(kept[0].line == 1);
+    CHECK(kept[1].file == other.file);
+
+    sc::Command none;
+    CHECK(sc::withoutGeneratedErrors({generated}, none).size() == 1);
+}

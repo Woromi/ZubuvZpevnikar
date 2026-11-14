@@ -74,6 +74,7 @@ std::expected<Command, std::string> prepare(const Request& request) {
     // The score that makes LilyPond play the music too goes last: line numbers stay valid.
     std::string content = request.content;
     bool withMidi = false;
+    int generatedFromLine = 0;
     if (request.midi) {
         MidiOptions options = *request.midi;
         options.germanNames = request.germanNames;
@@ -83,11 +84,13 @@ std::expected<Command, std::string> prepare(const Request& request) {
             std::string appended = content;
             if (!appended.empty() && appended.back() != '\n')
                 appended += '\n';
+            const int firstGenerated = static_cast<int>(std::ranges::count(appended, '\n')) + 1;
             appended += "\\book {\n\\bookOutputName \"" + std::string(playbackOutputName) +
                         "\"\n" + *played + "\n}\n";
             if (appendIsNeutral(content, appended)) {
                 content = std::move(appended);
                 withMidi = true;
+                generatedFromLine = firstGenerated;
             }
         }
     }
@@ -130,6 +133,7 @@ std::expected<Command, std::string> prepare(const Request& request) {
     if (withMidi)
         cmd.midi = outDir / (std::string(playbackOutputName) + ".midi");
     cmd.scoreCopy = copy;
+    cmd.generatedFromLine = generatedFromLine;
     return cmd;
 }
 
@@ -142,6 +146,16 @@ bool germanNames(std::string_view lang) {
     std::ranges::transform(lower, lower.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lower == "czech" || lower == "slovak";
+}
+
+std::vector<Error> withoutGeneratedErrors(std::vector<Error> found, const Command& command) {
+    if (command.generatedFromLine <= 0)
+        return found;
+    const auto copy = command.scoreCopy.lexically_normal();
+    std::erase_if(found, [&](const Error& error) {
+        return error.line >= command.generatedFromLine && error.file.lexically_normal() == copy;
+    });
+    return found;
 }
 
 std::vector<Error> errors(std::string_view log) {

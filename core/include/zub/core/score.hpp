@@ -52,6 +52,9 @@ struct Command {
     std::filesystem::path midi;      // the MIDI file, written on success; empty when not asked for
                                      // or the score has no \\score block to play
     std::filesystem::path scoreCopy; // the copy of content the build reads
+    // 1-based first line of the score copy that prepare appended (the playback score); 0 when
+    // nothing was appended. LilyPond reports an error of the music again there.
+    int generatedFromLine = 0;
 };
 
 // Writes the score copy (workDir/score/<inputName>) and the wrapper document (workDir/score.ly:
@@ -76,6 +79,11 @@ struct Error {
 // The "file:line:col: error: message" lines of a LilyPond log, in order.
 std::vector<Error> errors(std::string_view log);
 std::optional<Error> firstError(std::string_view log);
+
+// `found` without the errors in the lines prepare appended to the score copy (the playback
+// score): LilyPond reports an error of the copied music a second time there, and the user's text
+// has no such lines. Errors in other files are kept.
+std::vector<Error> withoutGeneratedErrors(std::vector<Error> found, const Command& command);
 
 // ---- Playback: the preview build also writes a MIDI file; zub::midi renders it to audio ----
 

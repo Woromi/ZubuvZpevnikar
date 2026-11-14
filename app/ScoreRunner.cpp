@@ -167,8 +167,20 @@ void ScoreRunner::onProcessFinished() {
         result.message = tr("lilypond crashed.");
     }
 
-    result.success = !timedOut_ && process_->exitStatus() == QProcess::NormalExit &&
-                     process_->exitCode() == 0 && !cmd.svg.empty();
+    const bool cleanExit = !timedOut_ && process_->exitStatus() == QProcess::NormalExit;
+    result.success = cleanExit && process_->exitCode() == 0 && !cmd.svg.empty();
+    std::vector<zub::score::Error> found;
+    if (!result.success) {
+        found = zub::score::errors(output.toStdString());
+        const std::size_t all = found.size();
+        found = zub::score::withoutGeneratedErrors(std::move(found), cmd);
+        // Every error is in the appended playback score: the engraved SVG was still written
+        // (prepare removed the old one), so the score is shown; there is just no MIDI to play.
+        if (cleanExit && all > 0 && found.empty() && !cmd.svg.empty())
+            result.success = true;
+        else
+            result.errors = std::move(found);
+    }
     if (result.success) {
         QFile file(toQString(cmd.svg));
         if (file.open(QIODevice::ReadOnly))
@@ -176,12 +188,12 @@ void ScoreRunner::onProcessFinished() {
         if (result.svg.isEmpty())
             result.success = false;
         std::error_code ec;
-        if (result.success && !cmd.midi.empty() && std::filesystem::is_regular_file(cmd.midi, ec))
+        if (result.success && process_->exitCode() == 0 && !cmd.midi.empty() &&
+            std::filesystem::is_regular_file(cmd.midi, ec))
             result.midi = cmd.midi;
     }
     if (!result.success) {
         result.svg.clear();
-        result.errors = zub::score::errors(output.toStdString());
         if (result.errors.empty() && result.message.isEmpty())
             result.message = tr("The build failed; see the log.");
     }
