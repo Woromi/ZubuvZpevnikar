@@ -6,9 +6,11 @@
 #include <QPlainTextEdit>
 #include <functional>
 
+class QTimer;
+
 // A QPlainTextEdit with a line-number area on the left (Qt's "Code Editor" example). The
 // numbers are the 1-based block numbers, which are the file's lines (the editor does not wrap).
-// Enter keeps the current line's indentation.
+// Enter keeps the current line's indentation. Selecting text marks its other occurrences.
 class CodeTextEdit : public QPlainTextEdit {
     Q_OBJECT
 
@@ -32,12 +34,16 @@ protected:
 
 private:
     friend class LineNumberArea;
+    // Marks the other occurrences of the selected text (one line, case-sensitive) with a lighter
+    // background than the selection; none without a selection.
+    void markOccurrences();
     int areaWidth() const;
     void updateAreaWidth();
     void updateArea(const QRect& rect, int dy);
     void paintArea(QPaintEvent* event);
 
     QList<QAction*> extraActions_;
+    QTimer* occurrenceTimer_ = nullptr;
     std::function<bool(QKeyEvent*)> keyFilter_;
     QWidget* area_ = nullptr;
     QColor background_;

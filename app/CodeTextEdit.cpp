@@ -5,6 +5,8 @@
 #include <QMenu>
 #include <QPainter>
 #include <QTextBlock>
+#include <QTextDocument>
+#include <QTimer>
 #include <algorithm>
 
 class LineNumberArea : public QWidget {
@@ -24,7 +26,38 @@ CodeTextEdit::CodeTextEdit(QWidget* parent)
     connect(this, &QPlainTextEdit::blockCountChanged, this, [this] { updateAreaWidth(); });
     connect(this, &QPlainTextEdit::updateRequest, this, &CodeTextEdit::updateArea);
     connect(this, &QPlainTextEdit::cursorPositionChanged, area_, qOverload<>(&QWidget::update));
+    // Other occurrences of the selected text are marked, like in code editors; after a short
+    // pause, so dragging a selection over a long text stays smooth.
+    occurrenceTimer_ = new QTimer(this);
+    occurrenceTimer_->setSingleShot(true);
+    occurrenceTimer_->setInterval(80);
+    connect(occurrenceTimer_, &QTimer::timeout, this, &CodeTextEdit::markOccurrences);
+    connect(this, &QPlainTextEdit::selectionChanged, occurrenceTimer_,
+            qOverload<>(&QTimer::start));
+    connect(this, &QPlainTextEdit::textChanged, occurrenceTimer_, qOverload<>(&QTimer::start));
     updateAreaWidth();
+}
+
+void CodeTextEdit::markOccurrences() {
+    QList<QTextEdit::ExtraSelection> marks;
+    const QTextCursor selection = textCursor();
+    const QString text = selection.selectedText();
+    // One line (a selection over lines holds U+2029), not only blanks, not huge.
+    if (!text.isEmpty() && text.size() <= 200 && !text.contains(QChar::ParagraphSeparator) &&
+        !text.trimmed().isEmpty()) {
+        QColor background = palette().color(QPalette::Highlight);
+        background.setAlpha(70); // lighter than the selection itself
+        QTextCharFormat format;
+        format.setBackground(background);
+        constexpr int maxMarks = 2000;
+        QTextCursor found = document()->find(text, 0, QTextDocument::FindCaseSensitively);
+        while (!found.isNull() && marks.size() < maxMarks) {
+            if (found.selectionStart() != selection.selectionStart())
+                marks.append({found, format});
+            found = document()->find(text, found, QTextDocument::FindCaseSensitively);
+        }
+    }
+    setExtraSelections(marks);
 }
 
 void CodeTextEdit::setLineNumberColors(const QColor& background, const QColor& number,
