@@ -7,6 +7,7 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <zub/core/songedit.hpp>
 
 // Score-only previews: a song's LilyPond file (.ly) engraved on its own to SVG, much faster than
 // building the song's PDF. core prepares the build and reads its log; the app runs the command
@@ -23,6 +24,14 @@ struct MidiOptions {
     // songbook's tablature is written in the capo's fret shapes.
     int transpose = 0;
     bool germanNames = false; // set by prepare from Request::germanNames (the \transpose names)
+    // The instrument of each staff of the score (see staves(), by index) as a zub::midi::Instrument
+    // id; "", "auto" and unknown ids leave the staff as the file (or `instrument`) has it. The
+    // "amp" id is the clean electric guitar here: prepare plays the amp staves in a score of their
+    // own (Command::ampMidi) so the app can run that one through the amp effect.
+    std::vector<std::string> staffInstruments;
+    // Which staves sound; prepare sets it (a muted staff gets `\remove "Staff_performer"`).
+    enum class Sounding { All, AmpOnly, WithoutAmp };
+    Sounding sounding = Sounding::All;
 };
 
 struct Request {
@@ -40,6 +49,8 @@ struct Request {
 // The base name of the playback MIDI file that prepare's appended score writes (in a \book of its
 // own, so a score with its own \midi, which writes score.midi, does not clash).
 inline constexpr std::string_view playbackOutputName = "zub-playback";
+// ... and of the second book prepare appends when some staves are "amp" and others are not.
+inline constexpr std::string_view playbackAmpOutputName = "zub-playback-amp";
 
 struct Command {
     std::string program; // "lilypond"
@@ -51,6 +62,11 @@ struct Command {
     std::filesystem::path svg;       // the cropped SVG, written on success 
     std::filesystem::path midi;      // the MIDI file, written on success; empty when not asked for
                                      // or the score has no \\score block to play
+    // The MIDI file of the amp staves when other staves sound without the amp (two books were
+    // appended); empty otherwise. Both files have the same length of music: mix their audio.
+    std::filesystem::path ampMidi;
+    // `midi` holds only amp staves (every staff of the score chose "amp"): run its audio through the amp.
+    bool midiIsAmp = false;
     std::filesystem::path scoreCopy; // the copy of content the build reads
     // 1-based first line of the score copy that prepare appended (the playback score); 0 when
     // nothing was appended. LilyPond reports an error of the music again there.
@@ -122,6 +138,48 @@ std::string markBends(std::string_view music);
 // (the chord names make no sound; Staff and TabStaff play `options.instrument`). Only numbers and
 // the instrument name are written into it. Nullopt when `text` has no \\score block.
 std::optional<std::string> midiScore(std::string_view text, const MidiOptions& options);
+
+// ---- Staves: one instrument per staff ----
+
+inline constexpr std::size_t noPosition = static_cast<std::size_t>(-1);
+
+// A `\new Staff` or `\new TabStaff` of the first \score block (other contexts, such as ChordNames,
+// Lyrics or Dynamics, are no staves; RhythmicStaff and DrumStaff are skipped). All offsets are byte
+// offsets into the text given to staves().
+struct Staff {
+    std::string type;       // "Staff" or "TabStaff"
+    std::string name;       // `\new Staff = "name"`; empty without
+    std::string instrument; // the General MIDI name the file sets, empty if none: the first
+                            // `\set Staff.midiInstrument = "..."` directly in the staff's music,
+                            // else `midiInstrument = "..."` in its \with
+    std::string tuning;     // `stringTunings = #...` of the \with without the `#`, e.g.
+                            // "banjo-open-g-tuning"; empty without
+    std::size_t begin = 0;  // the backslash of `\new`
+    std::size_t end = 0;    // after the staff's music
+    std::size_t headEnd = 0;           // after `\new Staff` and its `= "name"`
+    std::size_t withOpen = noPosition; // the `{` and `}` of its \with block
+    std::size_t withClose = noPosition;
+    std::size_t setBegin = noPosition;  // the text inside the quotes of the `\set`
+    std::size_t setEnd = noPosition;
+    std::size_t withBegin = noPosition; // ... and of `midiInstrument = "..."` in the \with
+    std::size_t withEnd = noPosition;
+    std::size_t insertAt = noPosition;  // right after the `{` (or `<<`) that opens the music
+};
+
+// The staves of the first \score block of `text` in the order they are written, outside
+// comments, strings and Scheme (a staff inside another one is part of that one). A staff whose
+// music is a bare variable (`\new Staff \melody`) has no insertAt.
+std::vector<Staff> staves(std::string_view text);
+
+// `text` with the staff's instrument set to the General MIDI name `gmName` for the song file: an
+// existing `\set Staff.midiInstrument` (or the \with's) gets the new name, else the line
+// `\set Staff.midiInstrument = "<name>"` goes right after the `{` that opens the staff's music
+// (own line, indented like the next line, in the file's line ending; or inline when the brace has
+// code behind it). Everything else is byte-exact. The change's cursor is behind the name. Nullopt
+// when there is no such staff, `gmName` is not one of zub::midi::instruments() names, or the
+// staff's music is a bare variable.
+std::optional<songedit::Change> saveStaffInstrument(std::string_view text, std::size_t staffIndex,
+                                                    std::string_view gmName);
 
 struct NewScore {
     std::string text;

@@ -210,3 +210,21 @@ TEST_CASE("the instrument menu names real General MIDI programs", "[midi]") {
         CHECK(mi::findInstrument(a.id) == &a);
     }
 }
+
+TEST_CASE("mixWav sums the samples, clamps, and runs to the longer file", "[audio]") {
+    const auto mixed = zub::audio::mixWav(wavFile({1000, -1000, 30000, -30000, 5}),
+                                          wavFile({2000, 500, 10000, -10000}));
+    REQUIRE(mixed);
+    CHECK(samplesOf(*mixed) == std::vector<std::int16_t>{3000, -500, 32767, -32768, 5});
+    const auto swapped = zub::audio::mixWav(wavFile({7}), wavFile({1, 2, 3}));
+    REQUIRE(swapped);
+    CHECK(samplesOf(*swapped) == std::vector<std::int16_t>{8, 2, 3});
+}
+
+TEST_CASE("mixWav needs two 16-bit WAV files of the same format", "[audio]") {
+    CHECK_FALSE(zub::audio::mixWav(wavFile({1}, 1), wavFile({1, 2}, 2)));
+    CHECK_FALSE(zub::audio::mixWav(wavFile({1}, 1, 44100), wavFile({1}, 1, 48000)));
+    CHECK_FALSE(zub::audio::mixWav(wavFile({1}, 1, 44100, 8), wavFile({1})));
+    const std::string junk = "not a wav file";
+    CHECK_FALSE(zub::audio::mixWav(wavFile({1}), junk));
+}

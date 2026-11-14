@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
+#include <string>
 #include <span>
 #include <string_view>
 
@@ -21,5 +23,11 @@ inline constexpr int ampVersion = 2; // 2: the effect runs before the silence is
 // Returns false and leaves `wav` untouched when it is not a 16-bit PCM WAV file with 1 to 8
 // channels. Needs no memory beyond the file.
 bool applyAmp(std::span<char> wav);
+
+// Mixes two 16-bit PCM WAV files of the same channel count and sample rate (what FluidSynth
+// writes for two MIDI files of one score): a new WAV file as long as the longer one, each sample
+// the sum of both clamped to 16 bits (the shorter file counts as silence behind its end). Nullopt
+// when either is no such file or they differ in channels or rate.
+std::optional<std::string> mixWav(std::span<const char> first, std::span<const char> second);
 
 } // namespace zub::audio

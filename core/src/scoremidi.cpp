@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <tuple>
 
 namespace zub::score {
 
@@ -123,6 +124,295 @@ std::optional<long> number(std::string_view text, std::size_t& i) {
 
 std::string scaled(long value, double factor) {
     return std::to_string(std::max(1L, std::lround(static_cast<double>(value) * factor)));
+}
+
+// ---- Staves ----
+
+constexpr std::size_t none = zub::score::noPosition;
+
+// The index after the `>>` that closes the `<<` at `open` (comments, strings, Scheme and `\>`
+// skipped); npos if there is none.
+std::size_t closingDouble(std::string_view text, std::size_t open) {
+    const Scanner scanner{text, Names::Any, {}};
+    int depth = 0;
+    std::size_t i = open;
+    while (i < text.size()) {
+        const char c = text[i];
+        if (c == '%') {
+            i = scanner.skipComment(i);
+        } else if (c == '"') {
+            i = scanner.skipString(i);
+        } else if (c == '#' || c == '$') {
+            i = scanner.skipScheme(i);
+        } else if (c == '\\') {
+            i += 2;
+        } else if (c == '<' && i + 1 < text.size() && text[i + 1] == '<') {
+            ++depth;
+            i += 2;
+        } else if (c == '>' && i + 1 < text.size() && text[i + 1] == '>') {
+            i += 2;
+            if (--depth == 0)
+                return i;
+        } else {
+            ++i;
+        }
+    }
+    return npos;
+}
+
+// The music a staff holds, starting at `at`: `{ }`, `<< >>`, `\relative c' { }` and the like, or a
+// bare `\variable`. `open`: where the braces open (npos for a variable), `inner`: the text between
+// the braces (empty view without), `end`: after the music.
+struct MusicSpan {
+    std::size_t open = npos;
+    std::size_t openLength = 0;
+    std::size_t end = 0;
+    bool closed = false;
+};
+
+MusicSpan musicAt(std::string_view text, std::size_t at) {
+    MusicSpan span;
+    span.end = at;
+    if (at >= text.size())
+        return span;
+    if (text[at] == '{') {
+        const std::size_t close = closingBrace(text, at);
+        span.open = at;
+        span.openLength = 1;
+        span.closed = close != npos;
+        span.end = span.closed ? close : text.size();
+    } else if (text.substr(at).starts_with("<<")) {
+        const std::size_t close = closingDouble(text, at);
+        span.open = at;
+        span.openLength = 2;
+        span.closed = close != npos;
+        span.end = span.closed ? close : text.size();
+    } else if (text[at] == '\\') {
+        std::size_t end = at + 1;
+        while (end < text.size() && isLetter(text[end]))
+            ++end;
+        const std::string_view word = text.substr(at + 1, end - at - 1);
+        span.end = end;
+        if (word == "relative" || word == "transpose" || word == "fixed" || word == "transposition" ||
+            word == "absolute") {
+            // The arguments are pitches (`c'`, `d ees`): up to the music itself.
+            std::size_t i = end;
+            while (i < text.size() && text[i] != '{' && text[i] != '<' && text[i] != '\\' &&
+                   text[i] != '}' && text[i] != '%' && text[i] != '"' && text[i] != '#' &&
+                   text[i] != '$')
+                ++i;
+            if (i < text.size() && (text[i] == '{' || text[i] == '<' || text[i] == '\\'))
+                return musicAt(text, i);
+        }
+    }
+    return span;
+}
+
+// `midiInstrument = "..."` and `stringTunings = #...` in the text of a \with block.
+void scanWith(std::string_view text, std::size_t from, std::size_t to, zub::score::Staff& staff) {
+    const Scanner scanner{text, Names::Any, {}};
+    std::size_t i = from;
+    while (i < to) {
+        const char c = text[i];
+        if (c == '%') {
+            i = scanner.skipComment(i);
+        } else if (c == '"') {
+            i = scanner.skipString(i);
+        } else if (c == '#' || c == '$') {
+            i = scanner.skipScheme(i);
+        } else if (c == '\\') {
+            ++i;
+            while (i < to && isLetter(text[i]))
+                ++i;
+        } else if (isLetter(c)) {
+            std::size_t end = i;
+            while (end < to && (isLetter(text[end]) || isDigit(text[end]) || text[end] == '-'))
+                ++end;
+            const std::string_view word = text.substr(i, end - i);
+            std::size_t j = skipSpace(text, end);
+            if ((word == "midiInstrument" || word == "stringTunings") && j < to && text[j] == '=') {
+                j = skipSpace(text, j + 1);
+                if (word == "midiInstrument" && j < to && text[j] == '"') {
+                    const std::size_t close = scanner.skipString(j);
+                    if (staff.withBegin == none && close - 1 <= to && close > j + 1 &&
+                        text[close - 1] == '"') {
+                        staff.withBegin = j + 1;
+                        staff.withEnd = close - 1;
+                    }
+                } else if (word == "stringTunings" && j < to && text[j] == '#') {
+                    const std::size_t close = std::min(scanner.skipScheme(j), to);
+                    staff.tuning = std::string(text.substr(j + 1, close - j - 1));
+                }
+            }
+            i = std::max(end, i + 1);
+        } else {
+            ++i;
+        }
+    }
+}
+
+// The first `\set [Context.]midiInstrument = "..."` directly in the music (not in a nested
+// block, not after `\once`): the text inside its quotes, as offsets into `text`.
+void scanLeadingSet(std::string_view text, const MusicSpan& music, zub::score::Staff& staff) {
+    if (music.open == npos || !music.closed)
+        return;
+    const std::size_t from = music.open + music.openLength;
+    const std::size_t to = music.end - music.openLength;
+    const std::string_view inner = text.substr(from, to - from);
+    int depth = 0;
+    std::string_view previous;
+    walk(
+        inner, 0,
+        [&](std::size_t, std::size_t wordEnd, std::string_view word) {
+            const std::string_view before = previous;
+            previous = word;
+            if (depth != 0 || word != "set" || before == "once" || before == "temporary")
+                return proceed;
+            std::size_t k = skipSpace(inner, wordEnd);
+            const std::size_t nameBegin = k;
+            while (k < inner.size() && (isLetter(inner[k]) || inner[k] == '.'))
+                ++k;
+            const std::string_view property = inner.substr(nameBegin, k - nameBegin);
+            if (property != "midiInstrument" && !property.ends_with(".midiInstrument"))
+                return proceed;
+            k = skipSpace(inner, k);
+            if (k >= inner.size() || inner[k] != '=')
+                return proceed;
+            k = skipSpace(inner, k + 1);
+            if (k >= inner.size() || inner[k] != '"')
+                return proceed;
+            const std::size_t close = Scanner{inner, Names::Any, {}}.skipString(k);
+            if (close <= k + 1 || inner[close - 1] != '"')
+                return proceed;
+            staff.setBegin = from + k + 1;
+            staff.setEnd = from + close - 1;
+            return stop;
+        },
+        [&](std::size_t, char c) {
+            depth += c == '{' ? 1 : -1;
+            return true;
+        });
+}
+
+std::vector<zub::score::Staff> findStaves(std::string_view text) {
+    std::vector<zub::score::Staff> found;
+    walk(
+        text, 0,
+        [&](std::size_t begin, std::size_t wordEnd, std::string_view word) {
+            if (word != "new")
+                return proceed;
+            std::size_t typeBegin = skipSpace(text, wordEnd);
+            std::size_t typeEnd = typeBegin;
+            while (typeEnd < text.size() && isLetter(text[typeEnd]))
+                ++typeEnd;
+            const std::string_view type = text.substr(typeBegin, typeEnd - typeBegin);
+            if (type != "Staff" && type != "TabStaff")
+                return proceed;
+            zub::score::Staff staff;
+            staff.type = std::string(type);
+            staff.begin = begin;
+            staff.headEnd = typeEnd;
+            std::size_t i = skipSpace(text, typeEnd);
+            if (i < text.size() && text[i] == '=') {
+                const std::size_t quote = skipSpace(text, i + 1);
+                if (quote < text.size() && text[quote] == '"') {
+                    const std::size_t close = Scanner{text, Names::Any, {}}.skipString(quote);
+                    if (close > quote + 1 && text[close - 1] == '"') {
+                        staff.name = std::string(text.substr(quote + 1, close - quote - 2));
+                        staff.headEnd = close;
+                        i = skipSpace(text, close);
+                    }
+                }
+            }
+            if (text.substr(i).starts_with("\\with") &&
+                (i + 5 >= text.size() || !isLetter(text[i + 5]))) {
+                const std::size_t open = skipSpace(text, i + 5);
+                if (open < text.size() && text[open] == '{') {
+                    const std::size_t close = closingBrace(text, open);
+                    if (close != npos) {
+                        staff.withOpen = open;
+                        staff.withClose = close - 1;
+                        scanWith(text, open + 1, close - 1, staff);
+                        i = skipSpace(text, close);
+                    }
+                }
+            }
+            const MusicSpan music = musicAt(text, i);
+            staff.end = std::max(music.end, wordEnd);
+            if (music.open != npos)
+                staff.insertAt = music.open + music.openLength;
+            scanLeadingSet(text, music, staff);
+            if (staff.setBegin != none)
+                staff.instrument = std::string(text.substr(staff.setBegin, staff.setEnd - staff.setBegin));
+            else if (staff.withBegin != none)
+                staff.instrument =
+                    std::string(text.substr(staff.withBegin, staff.withEnd - staff.withBegin));
+            const std::size_t next = staff.end;
+            found.push_back(std::move(staff));
+            return next;
+        },
+        [](std::size_t, char) { return true; });
+    return found;
+}
+
+// A General MIDI name as the songbook's instruments spell it, without anything that could end the
+// string: "" for an id that sets nothing.
+std::string chosenName(std::string_view id) {
+    const auto* instrument = id == "auto" ? nullptr : zub::midi::findInstrument(id);
+    return instrument ? std::string(instrument->name) : std::string();
+}
+
+bool chosenAmp(std::string_view id) {
+    const auto* instrument = zub::midi::findInstrument(id);
+    return instrument && instrument->amp;
+}
+
+// `music` with every staff set to its choice of `options` (see MidiOptions::staffInstruments):
+// the instrument goes into the staff's \with (a file's `\set` of the staff is changed to it, since
+// that one would win), and staves that must not sound get `\remove "Staff_performer"`.
+std::string applyStaffChoices(std::string_view music, const zub::score::MidiOptions& options) {
+    using Sounding = zub::score::MidiOptions::Sounding;
+    if (options.staffInstruments.empty() && options.sounding == Sounding::All)
+        return std::string(music);
+    const auto staves = findStaves(music);
+    struct Edit {
+        std::size_t begin;
+        std::size_t end;
+        std::string text;
+    };
+    std::vector<Edit> edits;
+    for (std::size_t i = 0; i < staves.size(); ++i) {
+        const auto& staff = staves[i];
+        const std::string_view id =
+            i < options.staffInstruments.size() ? std::string_view(options.staffInstruments[i]) : "";
+        const bool amp = chosenAmp(id);
+        const bool muted = (options.sounding == Sounding::AmpOnly && !amp) ||
+                           (options.sounding == Sounding::WithoutAmp && amp);
+        const std::string name = muted ? std::string() : chosenName(id);
+        std::string with;
+        if (!name.empty())
+            with += " midiInstrument = \"" + name + "\"";
+        if (muted)
+            with += " \\remove \"Staff_performer\"";
+        if (with.empty())
+            continue;
+        if (!name.empty() && staff.setBegin != none)
+            edits.push_back({staff.setBegin, staff.setEnd, name});
+        if (staff.withClose != none)
+            edits.push_back({staff.withClose, staff.withClose, with + " "});
+        else
+            edits.push_back({staff.headEnd, staff.headEnd, " \\with {" + with + " }"});
+    }
+    std::ranges::stable_sort(edits, {}, &Edit::begin);
+    std::string out;
+    std::size_t copied = 0;
+    for (const auto& edit : edits) {
+        out.append(music.substr(copied, edit.begin - copied));
+        out += edit.text;
+        copied = edit.end;
+    }
+    out.append(music.substr(copied));
+    return out;
 }
 
 } // namespace
@@ -313,6 +603,86 @@ std::string markBends(std::string_view music) {
     return out;
 }
 
+std::vector<Staff> staves(std::string_view text) {
+    const auto block = firstScore(text);
+    if (!block)
+        return {};
+    const std::size_t from = block->open + 1;
+    auto found = findStaves(text.substr(from, block->end - 1 - from));
+    const auto shift = [from](std::size_t& offset) {
+        if (offset != none)
+            offset += from;
+    };
+    for (auto& staff : found) {
+        for (std::size_t* offset :
+             {&staff.begin, &staff.end, &staff.headEnd, &staff.withOpen, &staff.withClose,
+              &staff.setBegin, &staff.setEnd, &staff.withBegin, &staff.withEnd, &staff.insertAt})
+            shift(*offset);
+    }
+    return found;
+}
+
+std::optional<songedit::Change> saveStaffInstrument(std::string_view text, std::size_t staffIndex,
+                                                    std::string_view gmName) {
+    if (!midi::findInstrumentByName(gmName))
+        return std::nullopt;
+    const auto all = staves(text);
+    if (staffIndex >= all.size())
+        return std::nullopt;
+    const Staff& staff = all[staffIndex];
+    std::size_t begin = staff.setBegin != none ? staff.setBegin : staff.withBegin;
+    std::size_t end = staff.setBegin != none ? staff.setEnd : staff.withEnd;
+    std::string replacement(gmName);
+    if (begin == none) {
+        if (staff.insertAt == none)
+            return std::nullopt;
+        const std::string line = "\\set Staff.midiInstrument = \"" + std::string(gmName) + "\"";
+        // The brace ends its line: the new line goes behind that line break, indented like the
+        // next line of the music (or two spaces deeper than the brace's line).
+        std::size_t eol = staff.insertAt;
+        while (eol < text.size() && (text[eol] == ' ' || text[eol] == '\t'))
+            ++eol;
+        const bool ownLine = eol < text.size() && (text[eol] == '\n' || text[eol] == '\r');
+        if (!ownLine) {
+            begin = end = staff.insertAt;
+            replacement = " " + line;
+        } else {
+            const std::string_view lineBreak =
+                text.substr(eol).starts_with("\r\n") ? "\r\n" : text[eol] == '\r' ? "\r" : "\n";
+            const std::size_t next = eol + lineBreak.size();
+            std::size_t indentEnd = next;
+            while (indentEnd < text.size() && (text[indentEnd] == ' ' || text[indentEnd] == '\t'))
+                ++indentEnd;
+            std::string indent(text.substr(next, indentEnd - next));
+            const bool blank = indentEnd >= text.size() || text[indentEnd] == '\n' ||
+                               text[indentEnd] == '\r';
+            if (blank || indent.empty()) {
+                std::size_t lineStart = staff.insertAt;
+                while (lineStart > 0 && text[lineStart - 1] != '\n')
+                    --lineStart;
+                std::size_t i = lineStart;
+                while (i < text.size() && (text[i] == ' ' || text[i] == '\t'))
+                    ++i;
+                indent = std::string(text.substr(lineStart, i - lineStart)) + "  ";
+            }
+            begin = end = next;
+            replacement = indent + line + std::string(lineBreak);
+            std::string out(text.substr(0, begin));
+            out += replacement;
+            out.append(text.substr(end));
+            return songedit::Change{std::move(out), begin + indent.size() + line.size() - 1};
+        }
+        std::string out(text.substr(0, begin));
+        out += replacement;
+        out.append(text.substr(end));
+        return songedit::Change{std::move(out), begin + replacement.size() - 1};
+    }
+    std::string out(text.substr(0, begin));
+    out += replacement;
+    out.append(text.substr(end));
+    return songedit::Change{std::move(out), begin + replacement.size()};
+}
+
 std::optional<std::string> midiScore(std::string_view text, const MidiOptions& options) {
     const auto music = scoreMusic(text);
     if (!music)
@@ -326,7 +696,9 @@ std::optional<std::string> midiScore(std::string_view text, const MidiOptions& o
     const long beats =
         std::max(1L, std::lround(static_cast<double>(options.tempo) * options.factor));
 
-    std::string played = "\\unfoldRepeats {\n" + markBends(scaleTempo(*music, options.factor)) + "\n  }";
+    std::string played = "\\unfoldRepeats {\n" +
+                         markBends(applyStaffChoices(scaleTempo(*music, options.factor), options)) +
+                         "\n  }";
     if (options.transpose > 0 && options.transpose <= 12)
         // c' up to the capo's pitch, in the note names of the score's language. The names assume
         // the wrapper's \language (zub::score::prepare); no real score sets its own.

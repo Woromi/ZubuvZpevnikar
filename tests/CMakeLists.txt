@@ -13,6 +13,7 @@ add_executable(zub_core_tests
     test_preview.cpp
     test_safety.cpp
     test_scoremidi.cpp
+    test_scorestaves.cpp
     test_scoreregion.cpp
     test_score.cpp
     test_song.cpp

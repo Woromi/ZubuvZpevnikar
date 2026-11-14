@@ -4,6 +4,7 @@
 #include <cctype>
 #include <charconv>
 #include <system_error>
+#include <zub/core/midi.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
@@ -75,9 +76,21 @@ std::expected<Command, std::string> prepare(const Request& request) {
     std::string content = request.content;
     bool withMidi = false;
     int generatedFromLine = 0;
+    std::filesystem::path ampOutput;
+    bool allAmp = false;
     if (request.midi) {
         MidiOptions options = *request.midi;
         options.germanNames = request.germanNames;
+        // Staves that chose the amp sound in a book of their own (its audio goes through the amp
+        // effect); the other staves are muted there, and the amp staves in the main book.
+        const std::size_t staffCount = staves(content).size();
+        std::size_t ampStaves = 0;
+        for (std::size_t i = 0; i < options.staffInstruments.size() && i < staffCount; ++i)
+            if (const auto* instrument = midi::findInstrument(options.staffInstruments[i]))
+                ampStaves += instrument->amp ? 1 : 0;
+        const bool mixed = ampStaves > 0 && ampStaves < staffCount;
+        allAmp = ampStaves > 0 && ampStaves == staffCount;
+        options.sounding = mixed ? MidiOptions::Sounding::WithoutAmp : MidiOptions::Sounding::All;
         if (const auto played = midiScore(content, options)) {
             // In a book of its own, so its file name is ours even when the score has its own
             // \midi (that one writes score.midi).
@@ -87,10 +100,21 @@ std::expected<Command, std::string> prepare(const Request& request) {
             const int firstGenerated = static_cast<int>(std::ranges::count(appended, '\n')) + 1;
             appended += "\\book {\n\\bookOutputName \"" + std::string(playbackOutputName) +
                         "\"\n" + *played + "\n}\n";
+            if (mixed) {
+                options.sounding = MidiOptions::Sounding::AmpOnly;
+                if (const auto amp = midiScore(content, options)) {
+                    appended += "\\book {\n\\bookOutputName \"" +
+                                std::string(playbackAmpOutputName) + "\"\n" + *amp + "\n}\n";
+                    ampOutput = std::string(playbackAmpOutputName) + ".midi";
+                }
+            }
             if (appendIsNeutral(content, appended)) {
                 content = std::move(appended);
                 withMidi = true;
                 generatedFromLine = firstGenerated;
+            } else {
+                ampOutput.clear();
+                allAmp = false;
             }
         }
     }
@@ -130,8 +154,12 @@ std::expected<Command, std::string> prepare(const Request& request) {
     cmd.workingDirectory = work;
     cmd.environment = {{"LC_ALL", "C"}};
     cmd.svg = outDir / "score.cropped.svg";
-    if (withMidi)
+    if (withMidi) {
         cmd.midi = outDir / (std::string(playbackOutputName) + ".midi");
+        if (!ampOutput.empty())
+            cmd.ampMidi = outDir / ampOutput;
+        cmd.midiIsAmp = allAmp;
+    }
     cmd.scoreCopy = copy;
     cmd.generatedFromLine = generatedFromLine;
     return cmd;

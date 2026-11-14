@@ -95,4 +95,43 @@ bool applyAmp(std::span<char> wav) {
     return true;
 }
 
+std::optional<std::string> mixWav(std::span<const char> first, std::span<const char> second) {
+    Layout a;
+    Layout b;
+    if (!parse(first, a) || !parse(second, b) || a.channels != b.channels || a.rate != b.rate)
+        return std::nullopt;
+    const std::size_t samplesA = a.dataSize / 2;
+    const std::size_t samplesB = b.dataSize / 2;
+    const std::size_t samples = std::max(samplesA, samplesB);
+    const auto put = [](std::string& out, std::size_t value, int bytes) {
+        for (int i = 0; i < bytes; ++i)
+            out.push_back(static_cast<char>((value >> (8 * i)) & 0xff));
+    };
+    std::string out = "RIFF";
+    put(out, 36 + samples * 2, 4);
+    out += "WAVEfmt ";
+    put(out, 16, 4);
+    put(out, 1, 2);
+    put(out, a.channels, 2);
+    put(out, a.rate, 4);
+    put(out, static_cast<std::size_t>(a.rate) * a.channels * 2, 4);
+    put(out, a.channels * 2u, 2);
+    put(out, 16, 2);
+    out += "data";
+    put(out, samples * 2, 4);
+    out.reserve(out.size() + samples * 2);
+    const auto sample = [](std::span<const char> wav, const Layout& layout, std::size_t n,
+                           std::size_t count) {
+        return n < count
+                   ? static_cast<std::int16_t>(le16(wav, layout.dataAt + n * 2))
+                   : std::int16_t{0};
+    };
+    for (std::size_t n = 0; n < samples; ++n) {
+        const int sum = sample(first, a, n, samplesA) + sample(second, b, n, samplesB);
+        const auto clamped = static_cast<std::int16_t>(std::clamp(sum, -32768, 32767));
+        put(out, static_cast<std::uint16_t>(clamped), 2);
+    }
+    return out;
+}
+
 } // namespace zub::audio
