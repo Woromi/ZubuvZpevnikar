@@ -22,6 +22,14 @@ TEST_CASE("known song commands are sorted and plausible", "[safety]") {
     CHECK(std::ranges::binary_search(known, std::string_view("lilypondfile")));
     CHECK(std::ranges::binary_search(known, std::string_view("textquotedbl")));
     CHECK_FALSE(std::ranges::binary_search(known, std::string_view("directlua")));
+    // Every command of the songs package, except the file-opening and name-building ones.
+    for (const std::string_view name : {"prefersharps", "preferflats", "songcolumns", "echo",
+                                        "transposehere", "gtab", "nolyrics", "textnote"})
+        CHECK(std::ranges::binary_search(known, name));
+    for (const std::string_view name :
+         {"csname", "expandafter", "newindex", "newauthorindex", "newscripindex", "showindex",
+          "write", "immediate", "openout", "input", "catcode"})
+        CHECK_FALSE(std::ranges::binary_search(known, name));
 }
 
 TEST_CASE("fixture songs have no unknown constructs", "[safety]") {
