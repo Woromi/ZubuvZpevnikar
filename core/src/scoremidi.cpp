@@ -267,7 +267,8 @@ std::optional<std::string> midiScore(std::string_view text, const MidiOptions& o
 
     std::string played = "\\unfoldRepeats {\n" + scaleTempo(*music, options.factor) + "\n  }";
     if (options.transpose > 0 && options.transpose <= 12)
-        // c' up to the capo's pitch, in the note names of the score's language
+        // c' up to the capo's pitch, in the note names of the score's language. The names assume
+        // the wrapper's \language (zub::score::prepare); no real score sets its own.
         played = "\\transpose " + fretboard::pitchName(60, options.germanNames, false) + " " +
                  fretboard::pitchName(60 + options.transpose, options.germanNames, false) +
                  " {\n  " + played + "\n  }";

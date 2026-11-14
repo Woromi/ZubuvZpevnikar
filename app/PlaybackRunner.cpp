@@ -1,5 +1,6 @@
 #include "PlaybackRunner.hpp"
 
+#include "SoundTools.hpp"
 #include "WavFile.hpp"
 #include "convert.hpp"
 
@@ -104,7 +105,7 @@ void PlaybackRunner::start(PlaybackRequest request) {
         return;
     }
     const QByteArray bytes = midi.readAll();
-    const std::string soundfont = toStdString(toQString(current_.soundfont));
+    const std::string soundfont = soundfontIdentity(current_.soundfont);
     const std::string key = zub::midi::cacheKey(
         {std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())), soundfont});
     fs::create_directories(current_.cacheDir, ec);

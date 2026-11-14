@@ -165,9 +165,11 @@ private:
     void onTabChanged();
     void requestScorePreview(bool userAsked = false);
     void showScoreResult(const ScoreResult& result);
-      // it, Qt Multimedia plays it) and the sound of a clicked fret.
+    // Playback of the score preview (fluidsynth renders the build's MIDI file, Qt Multimedia plays
+    // the WAV) and the sound of a clicked fret.
     void playScore();
     void stopPlayback();
+    void forgetScoreMidi(); // stops Play and drops the MIDI file of the last build
     void showPlaybackResult(const PlaybackResult& result);
     void updateSoundAvailability(); // fluidsynth and a soundfont: enables Play and Sound
     void soundFret(FretboardWidget* fretboard, int string, int fret);

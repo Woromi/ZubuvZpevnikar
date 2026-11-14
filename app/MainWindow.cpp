@@ -2402,6 +2402,7 @@ void MainWindow::requestScorePreview(bool userAsked) {
     if (!editor || onSongTab() || songbookRoot_.empty()) {
         scoreRunner_->cancel();
         scorePreview_->clear();
+        forgetScoreMidi();
         return;
     }
     const std::string name = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name;
@@ -2412,6 +2413,7 @@ void MainWindow::requestScorePreview(bool userAsked) {
     if (!approveRisks({{editor->path(), {}, zub::safety::lilypondRisks(content)}}, userAsked, &list,
                       {}, {}, true)) {
         scoreRunner_->cancel();
+        forgetScoreMidi();
         scorePreview_->showBlocked(
             tr("Not built automatically: the score uses %1, which scores normally don't. "
                "Building runs it with full access to your files. Check the score, then "
@@ -2452,6 +2454,13 @@ void MainWindow::updateSoundAvailability() {
         soundAction_->setToolTip(tools.available() ? tr("Play the note when a fret is clicked")
                                                    : tools.missingHint());
     }
+}
+
+// The MIDI file of an earlier build must not be played when no build of the shown score follows.
+void MainWindow::forgetScoreMidi() {
+    stopPlayback();
+    scoreMidi_.clear();
+    updateSoundAvailability();
 }
 
 void MainWindow::stopPlayback() {

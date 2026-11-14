@@ -102,7 +102,7 @@ void NoteSounds::play(const SoundTools& tools, int program, int pitch) {
     if (!tools.available())
         return;
     tools_ = tools;
-    const std::string sfKey = zub::midi::cacheKey({toStdString(toQString(tools.soundfont))});
+    const std::string sfKey = zub::midi::cacheKey({soundfontIdentity(tools.soundfont)});
     dir_ = baseDir_ / sfKey;
     const Note note{program, pitch};
     wanted_ = note;

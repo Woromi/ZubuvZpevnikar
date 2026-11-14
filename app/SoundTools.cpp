@@ -31,3 +31,11 @@ SoundTools findSoundTools() {
     }
     return tools;
 }
+
+std::string soundfontIdentity(const std::filesystem::path& soundfont) {
+    std::error_code ec;
+    const auto size = std::filesystem::file_size(soundfont, ec);
+    const auto time = std::filesystem::last_write_time(soundfont, ec);
+    return toStdString(toQString(soundfont)) + '\n' + (ec ? std::string() : std::to_string(size)) +
+           '\n' + (ec ? std::string() : std::to_string(time.time_since_epoch().count()));
+}
