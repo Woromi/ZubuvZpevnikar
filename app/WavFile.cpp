@@ -4,6 +4,8 @@
 
 #include <QFile>
 #include <string_view>
+#include <span>
+#include <zub/core/audio.hpp>
 #include <zub/core/midi.hpp>
 
 bool trimWavFile(const std::filesystem::path& wav) {
@@ -31,4 +33,18 @@ bool trimWavFile(const std::filesystem::path& wav) {
     return putLe32(static_cast<qint64>(plan->dataSizeAt), plan->dataSize) &&
            putLe32(4, static_cast<unsigned>(plan->size - 8)) &&
            file.resize(static_cast<qint64>(plan->size)) && file.flush();
+}
+
+bool ampWavFile(const std::filesystem::path& wav) {
+    QFile file(toQString(wav));
+    if (!file.open(QIODevice::ReadWrite))
+        return false;
+    const qint64 size = file.size();
+    uchar* mapped = size > 0 ? file.map(0, size) : nullptr;
+    if (!mapped)
+        return false;
+    const bool done = zub::audio::applyAmp(
+        std::span<char>(reinterpret_cast<char*>(mapped), static_cast<std::size_t>(size)));
+    file.unmap(mapped);
+    return done && file.flush();
 }

@@ -1492,6 +1492,70 @@ Vynecháno (neplatný název písně): %1</translation>
         <translation>%1 %</translation>
     </message>
     <message>
+        <source>The instrument the score is played with</source>
+        <translation>Nástroj, kterým se skladba přehrává</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automaticky</translation>
+    </message>
+    <message>
+        <source>Classical guitar (nylon)</source>
+        <translation>Klasická kytara (nylon)</translation>
+    </message>
+    <message>
+        <source>Acoustic guitar (steel)</source>
+        <translation>Akustická kytara (ocel)</translation>
+    </message>
+    <message>
+        <source>Jazz guitar</source>
+        <translation>Jazzová kytara</translation>
+    </message>
+    <message>
+        <source>Electric guitar (clean)</source>
+        <translation>Elektrická kytara (čistá)</translation>
+    </message>
+    <message>
+        <source>Overdriven guitar</source>
+        <translation>Kytara s overdrivem</translation>
+    </message>
+    <message>
+        <source>Distorted guitar</source>
+        <translation>Zkreslená kytara</translation>
+    </message>
+    <message>
+        <source>Distortion (amp)</source>
+        <translation>Zkreslení (zesilovač)</translation>
+    </message>
+    <message>
+        <source>Banjo</source>
+        <translation>Banjo</translation>
+    </message>
+    <message>
+        <source>Piano</source>
+        <translation>Klavír</translation>
+    </message>
+    <message>
+        <source>Tin whistle</source>
+        <translation>Píšťalka</translation>
+    </message>
+    <message>
+        <source>Flute</source>
+        <translation>Flétna</translation>
+    </message>
+    <message>
+        <source>Bass guitar</source>
+        <translation>Baskytara</translation>
+    </message>
+    <message>
+        <source>The guitar for tablature, the banjo for banjo tuning, the whistle for tin whistle scores</source>
+        <translation>Kytara pro tabulatury, banjo pro ladění banja, píšťalka pro skladby pro píšťalku</translation>
+    </message>
+    <message>
+        <source>The clean electric guitar through a distortion: chords sound rougher than their notes alone</source>
+        <translation>Čistá elektrická kytara přes zkreslení: akordy znějí drsněji než jejich tóny samotné</translation>
+    </message>
+    <message>
         <source>Building…</source>
         <translation>Sestavuji…</translation>
     </message>

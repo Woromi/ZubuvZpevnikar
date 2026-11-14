@@ -36,6 +36,8 @@ public:
     void setPlayState(PlayState state);
     void showPlaybackMessage(const QString& message, bool error); // in the status line
     double tempoFactor() const; // 0.5 ... 1.25 of the song's tempo
+    // The chosen instrument: "auto" (by the score) or a zub::midi::Instrument id.
+    QString instrumentId() const;
     QWidget* playButton() const; // for tests
 
     // Where the note that LilyPond linked to `line` (1-based) and `column` (0-based) is drawn, in
@@ -71,6 +73,7 @@ public:
 signals:
     void rebuildRequested();
     void tempoChanged(); // the playback speed combo changed: the MIDI file must be built again
+    void instrumentChanged(); // ... and so did the instrument combo
     void playRequested(); // the Play button was pressed while idle
     void stopRequested(); // ... or Stop while preparing or playing
     // An error located in the score was double-clicked (1-based line and column).
@@ -96,6 +99,7 @@ private:
     QToolButton* logButton_ = nullptr;
     QToolButton* play_ = nullptr;
     QComboBox* tempo_ = nullptr;
+    QComboBox* instrument_ = nullptr;
     PlayState playState_ = PlayState::Idle;
     bool playbackAvailable_ = true;
     QString unavailableReason_;

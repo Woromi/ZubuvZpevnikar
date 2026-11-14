@@ -6,6 +6,7 @@
 #include <optional>
 
 class QProcess;
+class QThread;
 class QTimer;
 
 struct PlaybackRequest {
@@ -13,6 +14,7 @@ struct PlaybackRequest {
     QString fluidsynth;             // the executable
     std::filesystem::path soundfont;
     std::filesystem::path cacheDir; // the WAV files <key>.wav live here
+    bool amp = false;               // run the rendered audio through zub::audio::applyAmp
 };
 
 struct PlaybackResult {
@@ -23,9 +25,10 @@ struct PlaybackResult {
 };
 
 // Renders a MIDI file to audio, one request at a time: fluidsynth writes <cacheDir>/<key>.wav (the
-// key hashes the MIDI bytes and the soundfont, so an unchanged score is answered from the cache at
+// key hashes the MIDI bytes, the soundfont and the effect with its version, so an unchanged score is answered from the cache at
 // once). Runs with QProcess; a new request kills the running one and only the newest produces a
-// result.
+// result. The audio is trimmed and, for the amp, distorted on a worker thread (it reads the whole
+// file).
 class PlaybackRunner : public QObject {
     Q_OBJECT
 
@@ -46,6 +49,8 @@ private:
     void onProcessFinished();
     void finishWith(PlaybackResult result);
     void killTree();
+    void postProcess();
+    void onPostProcessed(bool ok);
     void trimCache() const;
 
     QProcess* process_ = nullptr;
@@ -58,4 +63,5 @@ private:
     bool timedOut_ = false;
     bool cancelled_ = false;
     bool startFailed_ = false;
+    QThread* worker_ = nullptr; // trimming and the effect of the rendered file
 };

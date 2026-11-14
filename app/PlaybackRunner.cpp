@@ -10,10 +10,16 @@
 #include <QFileInfo>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QThread>
 #include <QTimer>
 #include <algorithm>
+#include <atomic>
+#include <memory>
+#include <string>
 #include <string_view>
 #include <system_error>
+#include <vector>
+#include <zub/core/audio.hpp>
 #include <zub/core/midi.hpp>
 
 #ifdef Q_OS_UNIX
@@ -54,6 +60,11 @@ PlaybackRunner::~PlaybackRunner() {
         killTree();
         process_->waitForFinished(2000);
     }
+    if (worker_) {
+        worker_->disconnect(this);
+        worker_->wait();
+        delete worker_; // no parent: the thread object is ours
+    }
 }
 
 bool PlaybackRunner::isRunning() const {
@@ -61,6 +72,12 @@ bool PlaybackRunner::isRunning() const {
 }
 
 void PlaybackRunner::request(PlaybackRequest request) {
+    if (worker_) {
+        // The temp file is still being processed: start when the worker is done.
+        pending_ = std::move(request);
+        emit started();
+        return;
+    }
     if (process_->state() != QProcess::NotRunning) {
         // The work dir must not be rewritten while the old build runs.
         pending_ = std::move(request);
@@ -73,7 +90,9 @@ void PlaybackRunner::request(PlaybackRequest request) {
 
 void PlaybackRunner::cancel() {
     pending_.reset();
-    if (process_->state() != QProcess::NotRunning) {
+    if (worker_) {
+        cancelled_ = true;
+    } else if (process_->state() != QProcess::NotRunning) {
         cancelled_ = true;
         killTree();
     } else {
@@ -106,8 +125,15 @@ void PlaybackRunner::start(PlaybackRequest request) {
     }
     const QByteArray bytes = midi.readAll();
     const std::string soundfont = soundfontIdentity(current_.soundfont);
-    const std::string key = zub::midi::cacheKey(
-        {std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())), soundfont});
+    // The effect and its version are part of the key: the same MIDI bytes sound different with it.
+    const std::string effect =
+        current_.amp ? std::string(zub::audio::ampId) + std::to_string(zub::audio::ampVersion)
+                     : std::string();
+    std::vector<std::string_view> parts{
+        std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())), soundfont};
+    if (!effect.empty())
+        parts.push_back(effect);
+    const std::string key = zub::midi::cacheKey(parts);
     fs::create_directories(current_.cacheDir, ec);
     wav_ = current_.cacheDir / (key + ".wav");
     wavTemp_ = current_.cacheDir /
@@ -180,9 +206,44 @@ void PlaybackRunner::onProcessFinished() {
         finishWith(failure);
         return;
     }
-    // Cut the silence the soundfont's long release leaves behind the music. A failed trim leaves
-    // the temp file in an unknown state: it never reaches the cache.
-    if (!trimWavFile(wavTemp_)) {
+    postProcess();
+}
+
+// Cuts the silence the soundfont's long release leaves behind the music and applies the effect, on
+// a worker thread: both map the whole file, which can be tens of megabytes.
+void PlaybackRunner::postProcess() {
+    const fs::path temp = wavTemp_;
+    const bool amp = current_.amp;
+    auto ok = std::make_shared<std::atomic<bool>>(false);
+    worker_ = QThread::create([temp, amp, ok] {
+        ok->store(trimWavFile(temp) && (!amp || ampWavFile(temp)));
+    });
+    connect(worker_, &QThread::finished, this, [this, ok] {
+        worker_->deleteLater();
+        worker_ = nullptr;
+        onPostProcessed(ok->load());
+    });
+    worker_->start();
+}
+
+void PlaybackRunner::onPostProcessed(bool ok) {
+    std::error_code ec;
+    PlaybackResult failure;
+    if (pending_) {
+        auto next = std::move(*pending_);
+        pending_.reset();
+        fs::remove(wavTemp_, ec);
+        start(std::move(next));
+        return;
+    }
+    if (cancelled_) {
+        cancelled_ = false;
+        running_ = false;
+        fs::remove(wavTemp_, ec);
+        return;
+    }
+    // A failed trim leaves the temp file in an unknown state: it never reaches the cache.
+    if (!ok) {
         fs::remove(wavTemp_, ec);
         failure.message = tr("Cannot trim the rendered audio.");
         finishWith(failure);

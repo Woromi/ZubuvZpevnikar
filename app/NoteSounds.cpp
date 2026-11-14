@@ -53,7 +53,8 @@ NoteSounds::NoteSounds(fs::path cacheDir, QObject* parent)
         } else if (!ok) {
             problem = tr("Cannot render the note sound: %1")
                           .arg(QString::fromUtf8(process_->readAll()).trimmed());
-        } else if (!trimWavFile(job.temp)) {
+        } else if (!trimWavFile(job.temp) || (job.note.amp && !ampWavFile(job.temp))) {
+            // A note is short: the effect is quick enough for the UI thread.
             problem = tr("Cannot trim the rendered note sound.");
         } else {
             fs::rename(job.temp, job.wav, ec);
@@ -94,19 +95,20 @@ void NoteSounds::killTree() {
     process_->kill();
 }
 
-fs::path NoteSounds::fileOf(int program, int pitch) const {
-    return dir_ / (std::to_string(program) + "-" + std::to_string(pitch) + ".wav");
+fs::path NoteSounds::fileOf(int program, int pitch, bool amp) const {
+    return dir_ / (std::to_string(program) + "-" + std::to_string(pitch) + (amp ? "-amp" : "") +
+                   ".wav");
 }
 
-void NoteSounds::play(const SoundTools& tools, int program, int pitch) {
+void NoteSounds::play(const SoundTools& tools, int program, int pitch, bool amp) {
     if (!tools.available())
         return;
     tools_ = tools;
     const std::string sfKey = zub::midi::cacheKey({soundfontIdentity(tools.soundfont)});
     dir_ = baseDir_ / sfKey;
-    const Note note{program, pitch};
+    const Note note{program, pitch, amp};
     wanted_ = note;
-    const fs::path wav = fileOf(program, pitch);
+    const fs::path wav = fileOf(program, pitch, amp);
     wantedFile_ = wav;
     std::error_code ec;
     if (fs::is_regular_file(wav, ec)) {
@@ -125,7 +127,7 @@ void NoteSounds::renderNext() {
     // Newest request first: that is the one the user waits for.
     const Note note = queue_.back();
     queue_.pop_back();
-    const fs::path wav = fileOf(note.first, note.second);
+    const fs::path wav = fileOf(note.program, note.pitch, note.amp);
     fs::path temp = wav;
     temp += ".tmp";
     rendering_ = Rendering{note, temp, wav};
@@ -136,7 +138,7 @@ void NoteSounds::renderNext() {
     midi.replace_extension(".mid");
     {
         std::ofstream out(midi, std::ios::binary);
-        out << zub::midi::noteFile(note.first, note.second, 1000);
+        out << zub::midi::noteFile(note.program, note.pitch, 1000);
     }
     const auto command = zub::midi::renderCommand(toStdString(tools_.fluidsynth),
                                                   tools_.soundfont, midi, temp);

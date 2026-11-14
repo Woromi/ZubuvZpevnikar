@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <map>
 #include <optional>
-#include <utility>
 #include <vector>
 
 class QProcess;
@@ -16,7 +15,8 @@ class QSoundEffect;
 
 // The short sound of one note (a fret that was clicked): a one-note MIDI file
 // (zub::midi::noteFile) is rendered once by fluidsynth to <cacheDir>/<soundfont key>/<program>-
-// <pitch>.wav, then played with QSoundEffect, which starts at once. A note that is not rendered
+// <pitch>.wav (<program>-<pitch>-amp.wav for the amp: the note goes through zub::audio::applyAmp),
+// then played with QSoundEffect, which starts at once. A note that is not rendered
 // yet plays when it is ready, unless another note was asked for meanwhile.
 class NoteSounds : public QObject {
     Q_OBJECT
@@ -26,15 +26,21 @@ public:
     ~NoteSounds() override;
 
     // `program`: General MIDI program (0-based), `pitch`: MIDI note number.
-    void play(const SoundTools& tools, int program, int pitch);
+    // `amp`: the note is distorted like the score playback's Distortion (amp).
+    void play(const SoundTools& tools, int program, int pitch, bool amp = false);
     // The sound file of a note, for tests; empty before the first play() with these tools.
-    std::filesystem::path fileOf(int program, int pitch) const;
+    std::filesystem::path fileOf(int program, int pitch, bool amp = false) const;
 
 signals:
     void failed(const QString& message);
 
 private:
-    using Note = std::pair<int, int>; // program, pitch
+    struct Note {
+        int program = 0;
+        int pitch = 0;
+        bool amp = false;
+        bool operator==(const Note&) const = default;
+    };
     // The note being rendered with the paths it was started with.
     struct Rendering {
         Note note;

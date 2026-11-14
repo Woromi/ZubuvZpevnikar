@@ -530,6 +530,11 @@ void MainWindow::createCentralWidget() {
     // A new tempo is a new MIDI file: rebuild the preview like after an edit.
     connect(scorePreview_, &ScorePreviewPane::tempoChanged, this,
             [this] { scorePreviewTimer_->start(); });
+    // ... and a new instrument is another instrument in the MIDI file.
+    connect(scorePreview_, &ScorePreviewPane::instrumentChanged, this, [this] {
+        forgetScoreMidi(); // the old MIDI file has the old instrument: no Play until the rebuild
+        scorePreviewTimer_->start();
+    });
     connect(scoreRunner_, &ScoreRunner::finished, this, &MainWindow::showScoreResult);
     playbackRunner_ = new PlaybackRunner(this);
     scorePlayer_ = new ScorePlayer(this);
@@ -2443,6 +2448,11 @@ void MainWindow::requestScorePreview(bool userAsked) {
     zub::score::MidiOptions midi;
     midi.factor = scorePreview_->tempoFactor();
     midi.instrument = zub::score::midiInstrument(request.content);
+    scoreAmp_ = false;
+    if (const auto* chosen = zub::midi::findInstrument(toStdString(scorePreview_->instrumentId()))) {
+        midi.instrument = std::string(chosen->name);
+        scoreAmp_ = chosen->amp;
+    }
     if (const auto meta = zub::parseSong(editor_->content())) {
         midi.tempo = zub::score::songTempo(meta->value("tem"));
         midi.transpose = zub::score::songCapo(meta->value("cap")); // sounds as with the capo on
@@ -2493,6 +2503,7 @@ void MainWindow::playScore() {
     request.fluidsynth = tools.fluidsynth;
     request.soundfont = tools.soundfont;
     request.cacheDir = playbackCacheDir_;
+    request.amp = scoreAmp_;
     scorePlayer_->stop();
     playbackRunner_->request(std::move(request));
 }
@@ -2520,8 +2531,14 @@ void MainWindow::soundFret(FretboardWidget* fretboard, int string, int fret) {
     if (editor_)
         if (const auto meta = zub::parseSong(editor_->content()))
             capo = zub::score::songCapo(meta->value("cap"));
-    noteSounds_->play(tools, banjo ? zub::midi::programBanjo : zub::midi::programSteelGuitar,
-                      fretboard->midiAt(string, fret) + capo);
+    // The chosen instrument; "automatic" is the banjo for a banjo fretboard, else the steel guitar.
+    int program = banjo ? zub::midi::programBanjo : zub::midi::programSteelGuitar;
+    bool amp = false;
+    if (const auto* chosen = zub::midi::findInstrument(toStdString(scorePreview_->instrumentId()))) {
+        program = chosen->program;
+        amp = chosen->amp;
+    }
+    noteSounds_->play(tools, program, fretboard->midiAt(string, fret) + capo, amp);
 }
 
 void MainWindow::showScoreResult(const ScoreResult& result) {

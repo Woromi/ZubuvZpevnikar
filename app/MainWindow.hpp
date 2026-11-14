@@ -303,6 +303,7 @@ private:
     PlaybackRunner* playbackRunner_ = nullptr;
     ScorePlayer* scorePlayer_ = nullptr;
     NoteSounds* noteSounds_ = nullptr;
+    bool scoreAmp_ = false; // the latest preview build's MIDI file is for the amp instrument
     QAction* soundAction_ = nullptr; // "Sound": clicking a fret plays the note
     std::filesystem::path scoreMidi_;        // the MIDI file of the latest successful build
     std::filesystem::path playbackCacheDir_; // the rendered WAV files

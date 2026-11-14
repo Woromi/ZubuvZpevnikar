@@ -671,7 +671,7 @@ private:
 };
 
 ScorePreviewPane::ScorePreviewPane(QWidget* parent)
-    : QWidget(parent), rebuild_(new QToolButton), logButton_(new QToolButton), play_(new QToolButton), tempo_(new QComboBox), status_(new QLabel),
+    : QWidget(parent), rebuild_(new QToolButton), logButton_(new QToolButton), play_(new QToolButton), tempo_(new QComboBox), instrument_(new QComboBox), status_(new QLabel),
       scroll_(new QScrollArea), canvas_(new SvgCanvas), errors_(new QListWidget) {
     rebuild_->setText(tr("Rebuild"));
     if (QIcon::hasThemeIcon(QStringLiteral("view-refresh"))) {
@@ -693,6 +693,39 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     tempo_->setCurrentIndex(
         std::max(0, tempo_->findData(QSettings().value(QStringLiteral("playback/tempoPercent"), 100)
                                          .toInt())));
+    instrument_->setObjectName(QStringLiteral("scoreInstrument"));
+    instrument_->setToolTip(tr("The instrument the score is played with"));
+    const struct {
+        const char* id;
+        QString text;
+    } instruments[] = {
+        {"auto", tr("Automatic")},
+        {"nylon", tr("Classical guitar (nylon)")},
+        {"steel", tr("Acoustic guitar (steel)")},
+        {"jazz", tr("Jazz guitar")},
+        {"clean", tr("Electric guitar (clean)")},
+        {"overdriven", tr("Overdriven guitar")},
+        {"distortion", tr("Distorted guitar")},
+        {"amp", tr("Distortion (amp)")},
+        {"banjo", tr("Banjo")},
+        {"piano", tr("Piano")},
+        {"whistle", tr("Tin whistle")},
+        {"flute", tr("Flute")},
+        {"bass", tr("Bass guitar")},
+    };
+    for (const auto& entry : instruments)
+        instrument_->addItem(entry.text, QString::fromLatin1(entry.id));
+    instrument_->setItemData(instrument_->findData(QStringLiteral("auto")),
+                             tr("The guitar for tablature, the banjo for banjo tuning, the whistle "
+                                "for tin whistle scores"),
+                             Qt::ToolTipRole);
+    instrument_->setItemData(instrument_->findData(QStringLiteral("amp")),
+                             tr("The clean electric guitar through a distortion: chords sound "
+                                "rougher than their notes alone"),
+                             Qt::ToolTipRole);
+    instrument_->setCurrentIndex(std::max(
+        0, instrument_->findData(
+               QSettings().value(QStringLiteral("playback/instrument"), QStringLiteral("auto")))));
     setPlayState(PlayState::Idle);
 
     status_->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -703,6 +736,7 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     toolbar->addWidget(rebuild_);
     toolbar->addWidget(play_);
     toolbar->addWidget(tempo_);
+    toolbar->addWidget(instrument_);
     toolbar->addWidget(status_, 1);
     toolbar->addWidget(logButton_);
 
@@ -752,6 +786,10 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     connect(tempo_, &QComboBox::currentIndexChanged, this, [this] {
         QSettings().setValue(QStringLiteral("playback/tempoPercent"), tempo_->currentData());
         emit tempoChanged();
+    });
+    connect(instrument_, &QComboBox::currentIndexChanged, this, [this] {
+        QSettings().setValue(QStringLiteral("playback/instrument"), instrument_->currentData());
+        emit instrumentChanged();
     });
     connect(logButton_, &QToolButton::clicked, this, [this] { showLog(); });
     connect(errors_, &QListWidget::itemActivated, this, [this](QListWidgetItem* item) {
@@ -930,6 +968,10 @@ void ScorePreviewPane::showPlaybackMessage(const QString& message, bool error) {
 
 double ScorePreviewPane::tempoFactor() const {
     return tempo_->currentData().toInt() / 100.0;
+}
+
+QString ScorePreviewPane::instrumentId() const {
+    return instrument_->currentData().toString();
 }
 
 QWidget* ScorePreviewPane::playButton() const {
