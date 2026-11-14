@@ -83,11 +83,17 @@ std::expected<Command, std::string> prepare(const Request& request) {
         options.germanNames = request.germanNames;
         // Staves that chose the amp sound in a book of their own (its audio goes through the amp
         // effect); the other staves are muted there, and the amp staves in the main book.
-        const std::size_t staffCount = staves(content).size();
+        // Sounding chord names count as one more staff.
+        std::size_t staffCount = staves(content).size();
         std::size_t ampStaves = 0;
         for (std::size_t i = 0; i < options.staffInstruments.size() && i < staffCount; ++i)
             if (const auto* instrument = midi::findInstrument(options.staffInstruments[i]))
                 ampStaves += instrument->amp ? 1 : 0;
+        if (const auto* chords = midi::findInstrument(options.chordInstrument);
+            chords && hasChordNames(content)) {
+            ++staffCount;
+            ampStaves += chords->amp ? 1 : 0;
+        }
         const bool mixed = ampStaves > 0 && ampStaves < staffCount;
         allAmp = ampStaves > 0 && ampStaves == staffCount;
         options.sounding = mixed ? MidiOptions::Sounding::WithoutAmp : MidiOptions::Sounding::All;

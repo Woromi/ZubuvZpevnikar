@@ -612,6 +612,31 @@ std::string markBends(std::string_view music) {
     return out;
 }
 
+bool hasChordNames(std::string_view text) {
+    const auto block = firstScore(text);
+    if (!block)
+        return false;
+    const std::size_t from = block->open + 1;
+    const std::string_view music = text.substr(from, block->end - 1 - from);
+    bool found = false;
+    walk(
+        music, 0,
+        [&](std::size_t, std::size_t wordEnd, std::string_view word) {
+            if (word == "chords") {
+                found = true;
+            } else if (word == "new") {
+                const std::size_t typeBegin = skipSpace(music, wordEnd);
+                std::size_t typeEnd = typeBegin;
+                while (typeEnd < music.size() && isLetter(music[typeEnd]))
+                    ++typeEnd;
+                found = music.substr(typeBegin, typeEnd - typeBegin) == "ChordNames";
+            }
+            return found ? stop : proceed;
+        },
+        [](std::size_t, char) { return true; });
+    return found;
+}
+
 std::vector<Staff> staves(std::string_view text) {
     const auto block = firstScore(text);
     if (!block)
@@ -714,8 +739,17 @@ std::optional<std::string> midiScore(std::string_view text, const MidiOptions& o
         played = "\\transpose " + fretboard::pitchName(60, options.germanNames, false) + " " +
                  fretboard::pitchName(60 + options.transpose, options.germanNames, false) +
                  " {\n  " + played + "\n  }";
+    // The chord names sound only with an instrument of their own, in the book of their group.
+    using Sounding = MidiOptions::Sounding;
+    const auto* chords = midi::findInstrument(options.chordInstrument);
+    if (chords && ((options.sounding == Sounding::AmpOnly && !chords->amp) ||
+                   (options.sounding == Sounding::WithoutAmp && chords->amp)))
+        chords = nullptr;
+    const std::string chordContext =
+        chords ? "midiInstrument = \"" + std::string(chords->name) + "\""
+               : std::string("\\remove \"Staff_performer\"");
     return "\\score {\n  " + played + "\n  \\midi {\n    \\tempo 4 = " + std::to_string(beats) +
-           "\n    \\context { \\ChordNames \\remove \"Staff_performer\" }\n"
+           "\n    \\context { \\ChordNames " + chordContext + " }\n"
            "    \\context { \\Staff midiInstrument = \"" + instrument +
            "\" }\n"
            "    \\context { \\TabStaff midiInstrument = \"" + instrument + "\" }\n  }\n}";

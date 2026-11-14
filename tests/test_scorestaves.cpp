@@ -373,6 +373,79 @@ TEST_CASE("prepare plays amp staves in a book of their own", "[score][staves][mi
     CHECK_FALSE(cmd->midiIsAmp);
 }
 
+TEST_CASE("hasChordNames finds chord names in the first score", "[score][staves]") {
+    CHECK(sc::hasChordNames(rozarka));
+    CHECK(sc::hasChordNames("\\score { << \\chords { c1 } \\new Staff { c1 } >> }"));
+    CHECK_FALSE(sc::hasChordNames("\\score { \\new TabStaff { c1 } }"));
+    CHECK_FALSE(sc::hasChordNames("\\score { % \\new ChordNames { c1 }\n \\new Staff { c1 } }"));
+    CHECK_FALSE(sc::hasChordNames("\\score { \\new Staff { c1^\"\\chords\" } }"));
+    CHECK_FALSE(sc::hasChordNames("\\score { \\new Staff { c1 } }\n\\score { \\chords { c1 } }"));
+    CHECK_FALSE(sc::hasChordNames(""));
+}
+
+TEST_CASE("the chord names are silent unless they have an instrument", "[score][staves][midi]") {
+    sc::MidiOptions options;
+    options.instrument = "acoustic guitar (steel)";
+    const std::string silent = "\\context { \\ChordNames \\remove \"Staff_performer\" }";
+    for (const char* id : {"", "silent", "auto", "nonsense"}) {
+        options.chordInstrument = id;
+        CHECK(contains(withMidiFor(rozarka, options), silent));
+    }
+    options.chordInstrument = "piano";
+    std::string played = withMidiFor(rozarka, options);
+    CHECK(contains(played, "\\context { \\ChordNames midiInstrument = \"acoustic grand\" }"));
+    CHECK_FALSE(contains(played, silent));
+    // In the books of the amp's mix they sound in their own group only.
+    options.chordInstrument = "amp";
+    options.sounding = sc::MidiOptions::Sounding::WithoutAmp;
+    CHECK(contains(withMidiFor(rozarka, options), silent));
+    options.sounding = sc::MidiOptions::Sounding::AmpOnly;
+    CHECK(contains(withMidiFor(rozarka, options),
+                   "\\context { \\ChordNames midiInstrument = \"electric guitar (clean)\" }"));
+    options.chordInstrument = "piano";
+    CHECK(contains(withMidiFor(rozarka, options), silent));
+}
+
+TEST_CASE("prepare counts sounding chord names as a staff of the amp's mix", "[score][staves][midi]") {
+    TempDir dir;
+    sc::Request request;
+    request.workDir = dir.path / "work";
+    request.inputName = "Artist/Title.ly";
+    request.content = rozarka;
+    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    sc::MidiOptions midi;
+    midi.instrument = "acoustic guitar (steel)";
+    midi.staffInstruments = {"amp", "amp"};
+
+    midi.chordInstrument = "piano"; // the staves through the amp, the chords not: two books
+    request.midi = midi;
+    auto cmd = sc::prepare(request);
+    REQUIRE(cmd);
+    CHECK_FALSE(cmd->ampMidi.empty());
+    CHECK_FALSE(cmd->midiIsAmp);
+
+    midi.chordInstrument = "amp"; // everything through the amp
+    request.midi = midi;
+    cmd = sc::prepare(request);
+    REQUIRE(cmd);
+    CHECK(cmd->ampMidi.empty());
+    CHECK(cmd->midiIsAmp);
+
+    midi.chordInstrument = "silent"; // silent chords don't count
+    request.midi = midi;
+    cmd = sc::prepare(request);
+    REQUIRE(cmd);
+    CHECK(cmd->ampMidi.empty());
+    CHECK(cmd->midiIsAmp);
+
+    midi.staffInstruments = {"banjo", "banjo"};
+    midi.chordInstrument = "amp"; // only the chords through the amp
+    request.midi = midi;
+    cmd = sc::prepare(request);
+    REQUIRE(cmd);
+    CHECK_FALSE(cmd->ampMidi.empty());
+}
+
 // Hidden: needs lilypond.
 TEST_CASE("per-staff instruments reach the MIDI file", "[.integration][score][staves][midi]") {
 #ifdef _WIN32
@@ -403,7 +476,8 @@ TEST_CASE("per-staff instruments reach the MIDI file", "[.integration][score][st
         }
         return result;
     };
-    const auto build = [&](const std::string& content, const std::vector<std::string>& choice) {
+    const auto build = [&](const std::string& content, const std::vector<std::string>& choice,
+                           const std::string& chords = "") {
         sc::Request request;
         request.songbookRoot = realRepo;
         request.workDir = dir.path / "work";
@@ -414,6 +488,7 @@ TEST_CASE("per-staff instruments reach the MIDI file", "[.integration][score][st
         sc::MidiOptions midi;
         midi.instrument = "acoustic guitar (steel)";
         midi.staffInstruments = choice;
+        midi.chordInstrument = chords;
         request.midi = midi;
         const auto cmd = sc::prepare(request);
         REQUIRE(cmd);
@@ -456,6 +531,19 @@ TEST_CASE("per-staff instruments reach the MIDI file", "[.integration][score][st
     found = programs(cmd.ampMidi);
     REQUIRE(found.size() == 1);
     CHECK(found[0].contains(27));
+
+    // Chord names with an instrument play as one more track; silent by default.
+    const std::string withChords = std::string("\\include \"zubuvzpevnik.ily\"\n") +
+                                   "\\score {\n<<\n"
+                                   "  \\new ChordNames { \\chordmode { c1 } }\n"
+                                   "  \\new TabStaff { c4 d e f }\n"
+                                   ">>\n}\n";
+    cmd = build(withChords, {"banjo"});
+    CHECK(programs(cmd.midi).size() == 1);
+    cmd = build(withChords, {"banjo"}, "flute");
+    found = programs(cmd.midi);
+    REQUIRE(found.size() == 2);
+    CHECK((found[0].contains(73) || found[1].contains(73)));
 
     // Without a choice the file's own instrument plays.
     cmd = build(content, {});

@@ -31,6 +31,10 @@ struct MidiOptions {
     // "amp" id is the clean electric guitar here: prepare plays the amp staves in a score of their
     // own (Command::ampMidi) so the app can run that one through the amp effect.
     std::vector<std::string> staffInstruments;
+    // The instrument of the chord names (`\new ChordNames`, `\chords`) as a zub::midi::Instrument
+    // id; "", "silent" and unknown ids keep them silent (LilyPond would play them). "amp" plays
+    // them in the amp's book like an amp staff.
+    std::string chordInstrument;
     // Which staves sound; prepare sets it (a muted staff gets `\remove "Staff_performer"`).
     enum class Sounding { All, AmpOnly, WithoutAmp };
     Sounding sounding = Sounding::All;
@@ -137,11 +141,16 @@ std::string markBends(std::string_view music);
 
 // The score that makes LilyPond write the MIDI file, to append to `text`:
 //   \\score { \\unfoldRepeats { <scoreMusic with scaled tempi, markBends> } \\midi { \\tempo 4 = N ... } }
-// (the chord names make no sound; Staff and TabStaff play `options.instrument`). Only numbers and
+// (the chord names make no sound unless `options.chordInstrument` names one; Staff and TabStaff
+// play `options.instrument`). Only numbers and
 // the instrument name are written into it. Nullopt when `text` has no \\score block.
 std::optional<std::string> midiScore(std::string_view text, const MidiOptions& options);
 
 // ---- Staves: one instrument per staff ----
+
+// Does the first \score block have chord names (`\new ChordNames`, `\chords`)? Comments and
+// strings don't count.
+bool hasChordNames(std::string_view text);
 
 inline constexpr std::size_t noPosition = static_cast<std::size_t>(-1);
 
