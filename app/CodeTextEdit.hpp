@@ -23,6 +23,8 @@ public:
     // Sees every key press first; returning true means it was handled (e.g. the song editor's
     // space inside a chord).
     void setKeyFilter(std::function<bool(QKeyEvent*)> filter) { keyFilter_ = std::move(filter); }
+    // What a key press does without the filter (for a filter that wraps it, e.g. in an edit block).
+    void processKey(QKeyEvent* event);
 
     void setLineNumberColors(const QColor& background, const QColor& number,
                              const QColor& currentNumber);

@@ -76,7 +76,9 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
 
     auto* codeEdit = new CodeTextEdit(this);
     edit_ = codeEdit;
-    codeEdit->setKeyFilter([this](QKeyEvent* event) { return typeSpaceOutsideChord(event); });
+    codeEdit->setKeyFilter([this](QKeyEvent* event) {
+        return typeSpaceOutsideChord(event) || editLinkedName(event);
+    });
     layout->addWidget(edit_);
 
     const QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
@@ -113,6 +115,10 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
             &SongEditor::hideSuggestion);
     connect(edit_->document(), &QTextDocument::modificationChanged, this,
             &SongEditor::modificationChanged);
+    if (kind_ == Kind::Song) {
+        connect(edit_, &QPlainTextEdit::cursorPositionChanged, this,
+                &SongEditor::updateEnvironmentLink);
+    }
 }
 
 SongEditor::~SongEditor() = default;
@@ -752,6 +758,69 @@ void SongEditor::insertScoreBarCheck() {
         return;
     const auto state = lineState(edit_->textCursor());
     applyChange(edit_, state, zub::fretboard::insertBarCheck(state.line, state.cursor));
+}
+
+void SongEditor::updateEnvironmentLink() {
+    if (syncingEnvironment_)
+        return;
+    environmentLink_.reset();
+    if (edit_->isReadOnly())
+        return;
+    const std::string text = editorText();
+    const auto link = zub::songedit::environmentLinkAt(text, cursorByteOffset());
+    if (link)
+        environmentLink_ = EnvironmentLink{utf16Position(text, link->nameBegin),
+                                           utf16Position(text, link->nameEnd)};
+}
+
+bool SongEditor::editLinkedName(QKeyEvent* event) {
+    if (kind_ != Kind::Song || !environmentLink_ || edit_->isReadOnly())
+        return false;
+    // Keys that edit at the cursor: typed text, Backspace, Delete. The cursor (and a selection)
+    // must lie in the linked name; Backspace at its start or Delete at its end would leave it.
+    const QTextCursor cursor = edit_->textCursor();
+    const int begin = cursor.selectionStart(), end = cursor.selectionEnd();
+    const auto [nameBegin, nameEnd] = *environmentLink_;
+    if (begin < nameBegin || end > nameEnd)
+        return false;
+    const bool collapsed = begin == end;
+    const auto others = event->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier);
+    const bool backspace = event->key() == Qt::Key_Backspace;
+    const bool del = event->key() == Qt::Key_Delete;
+    if (backspace || del) {
+        if (others != Qt::NoModifier || (collapsed && backspace && begin == nameBegin) ||
+            (collapsed && del && end == nameEnd))
+            return false;
+    } else if (event->text().isEmpty() || !event->text().at(0).isLetter() ||
+               (others != Qt::NoModifier)) {
+        return false; // only letters belong in a name; anything else just types
+    }
+    // The key and the partner's rename as one edit block: one undo step, never half done.
+    QTextCursor block(edit_->document());
+    block.beginEditBlock();
+    static_cast<CodeTextEdit*>(edit_)->processKey(event);
+    syncEnvironmentName();
+    block.endEditBlock();
+    return true;
+}
+
+void SongEditor::syncEnvironmentName() {
+    if (edit_->isReadOnly())
+        return;
+    const std::string text = editorText();
+    const auto link = zub::songedit::environmentLinkAt(text, cursorByteOffset());
+    if (!link)
+        return;
+    const std::string name = text.substr(link->nameBegin, link->nameEnd - link->nameBegin);
+    if (name == text.substr(link->otherBegin, link->otherEnd - link->otherBegin))
+        return;
+    QTextCursor partner(edit_->document());
+    partner.setPosition(utf16Position(text, link->otherBegin));
+    partner.setPosition(utf16Position(text, link->otherEnd), QTextCursor::KeepAnchor);
+    syncingEnvironment_ = true;
+    partner.insertText(QString::fromStdString(name));
+    syncingEnvironment_ = false;
+    updateEnvironmentLink();
 }
 
 bool SongEditor::typeSpaceOutsideChord(QKeyEvent* event) {

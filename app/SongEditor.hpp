@@ -165,6 +165,11 @@ signals:
 private:
     // A space typed inside a chord's name goes after the chord (spaces are no chord characters).
     bool typeSpaceOutsideChord(QKeyEvent* event);
+    // Linked renaming of environments: a key typed in the name of \beginverse (or \endverse)
+    // renames its partner too, in the same undo step (zub::songedit::environmentLinkAt).
+    void updateEnvironmentLink();
+    bool editLinkedName(QKeyEvent* event);
+    void syncEnvironmentName();
 
     void onFileChanged();
     std::string currentContent() const; // editor text -> file bytes
@@ -189,6 +194,11 @@ private:
     QLabel* suggestionLabel_ = nullptr;
     QPushButton* suggestionButton_ = nullptr;
     std::function<void()> suggestionAction_;
+    struct EnvironmentLink {
+        int nameBegin, nameEnd; // document positions of the name at the cursor
+    };
+    std::optional<EnvironmentLink> environmentLink_; // the name at the cursor, if linked
+    bool syncingEnvironment_ = false;                // our own rename of the partner
     bool lossy_ = false; // the file does not round-trip: editor is read-only
     QString lossyReason_;
     bool missing_ = false; // the file vanished from disk
