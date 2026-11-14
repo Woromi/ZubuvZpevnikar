@@ -52,6 +52,11 @@ struct ChordSpan {
 // without one.
 std::optional<ChordSpan> chordAt(std::string_view line, std::size_t cursor);
 
+// Where typing a space at `cursor` should go: a space is no chord character, so with the cursor
+// inside a chord's name (after "\[", up to before "]") the space goes after the chord. The offset
+// after the chord's "]", or nullopt when the cursor is not inside a chord's name.
+std::optional<std::size_t> spaceTarget(std::string_view line, std::size_t cursor);
+
 enum class Step { Letter, Word };
 
 // Moves the chord at the cursor one step left (direction < 0) or right (> 0). Letter: past one

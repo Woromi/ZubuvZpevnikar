@@ -11,6 +11,7 @@
 #include <QFileSystemWatcher>
 #include <QFontDatabase>
 #include <QFontMetricsF>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPlainTextEdit>
@@ -46,6 +47,7 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
 
     auto* codeEdit = new CodeTextEdit(this);
     edit_ = codeEdit;
+    codeEdit->setKeyFilter([this](QKeyEvent* event) { return typeSpaceOutsideChord(event); });
     layout->addWidget(edit_);
 
     const QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
@@ -702,6 +704,22 @@ void SongEditor::insertScoreBarCheck() {
         return;
     const auto state = lineState(edit_->textCursor());
     applyChange(edit_, state, zub::fretboard::insertBarCheck(state.line, state.cursor));
+}
+
+bool SongEditor::typeSpaceOutsideChord(QKeyEvent* event) {
+    const auto others = event->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier);
+    if (kind_ != Kind::Song || event->key() != Qt::Key_Space || others != Qt::NoModifier ||
+        edit_->isReadOnly() || edit_->textCursor().hasSelection())
+        return false;
+    const auto state = lineState(edit_->textCursor());
+    const auto target = zub::songedit::spaceTarget(state.line, state.cursor);
+    if (!target)
+        return false;
+    QTextCursor cursor = edit_->textCursor();
+    cursor.setPosition(state.block.position() + utf16Position(state.line, *target));
+    cursor.insertText(QStringLiteral(" "));
+    edit_->setTextCursor(cursor);
+    return true;
 }
 
 void SongEditor::insertChord() {

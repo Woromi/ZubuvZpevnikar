@@ -4,6 +4,7 @@
 #include <QColor>
 #include <QList>
 #include <QPlainTextEdit>
+#include <functional>
 
 // A QPlainTextEdit with a line-number area on the left (Qt's "Code Editor" example). The
 // numbers are the 1-based block numbers, which are the file's lines (the editor does not wrap).
@@ -16,6 +17,10 @@ public:
 
     // Actions added to the end of the context menu (after the standard entries); owned elsewhere.
     void setExtraMenuActions(const QList<QAction*>& actions) { extraActions_ = actions; }
+
+    // Sees every key press first; returning true means it was handled (e.g. the song editor's
+    // space inside a chord).
+    void setKeyFilter(std::function<bool(QKeyEvent*)> filter) { keyFilter_ = std::move(filter); }
 
     void setLineNumberColors(const QColor& background, const QColor& number,
                              const QColor& currentNumber);
@@ -33,6 +38,7 @@ private:
     void paintArea(QPaintEvent* event);
 
     QList<QAction*> extraActions_;
+    std::function<bool(QKeyEvent*)> keyFilter_;
     QWidget* area_ = nullptr;
     QColor background_;
     QColor number_;

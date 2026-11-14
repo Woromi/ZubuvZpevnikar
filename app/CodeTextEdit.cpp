@@ -70,6 +70,8 @@ void CodeTextEdit::contextMenuEvent(QContextMenuEvent* event) {
 }
 
 void CodeTextEdit::keyPressEvent(QKeyEvent* event) {
+    if (keyFilter_ && keyFilter_(event))
+        return;
     const bool enter = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter;
     const auto others = event->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier);
     if (!enter || others != Qt::NoModifier || isReadOnly()) {

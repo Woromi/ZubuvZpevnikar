@@ -1,5 +1,7 @@
 #pragma once
 
+class QKeyEvent;
+
 #include <QList>
 #include <QString>
 #include <QWidget>
@@ -150,6 +152,9 @@ signals:
     void reloadedFromDisk();
 
 private:
+    // A space typed inside a chord's name goes after the chord (spaces are no chord characters).
+    bool typeSpaceOutsideChord(QKeyEvent* event);
+
     void onFileChanged();
     std::string currentContent() const; // editor text -> file bytes
     void keepCarriedDuration(const std::string& written, const std::string& effective);

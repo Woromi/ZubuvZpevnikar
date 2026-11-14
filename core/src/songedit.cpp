@@ -249,6 +249,13 @@ std::optional<ChordSpan> chordAt(std::string_view line, std::size_t cursor) {
     return std::nullopt;
 }
 
+std::optional<std::size_t> spaceTarget(std::string_view line, std::size_t cursor) {
+    for (const auto& chord : chordsIn(line))
+        if (cursor >= chord.begin + 2 && cursor < chord.end)
+            return chord.end;
+    return std::nullopt;
+}
+
 std::optional<Change> moveChord(std::string_view line, std::size_t cursor, int direction,
                                 Step step) {
     const auto span = chordAt(line, cursor);

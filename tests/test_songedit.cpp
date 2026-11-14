@@ -344,3 +344,17 @@ TEST_CASE("removeElementAt takes the innermost element", "[songedit]") {
     REQUIRE(voice);
     CHECK(voice->text == "a\\[Dm]b");
 }
+
+TEST_CASE("a space typed inside a chord's name goes after the chord", "[songedit]") {
+    using zub::songedit::spaceTarget;
+    const std::string line = "J\u00e1 \\[Am]tu \\[C]";
+    // "J\u00e1 " is 4 bytes; the chord \[Am] spans 4..9
+    CHECK(spaceTarget(line, 6) == 9u); // right after "\[" -> after "]"
+    CHECK(spaceTarget(line, 7) == 9u);
+    CHECK(spaceTarget(line, 8) == 9u); // before "]"
+    CHECK_FALSE(spaceTarget(line, 4)); // before the chord
+    CHECK_FALSE(spaceTarget(line, 5)); // between "\" and "["
+    CHECK_FALSE(spaceTarget(line, 9)); // after the chord
+    CHECK_FALSE(spaceTarget(line, 2));
+    CHECK(spaceTarget(line, line.size() - 1) == line.size()); // before the last "]"
+}
