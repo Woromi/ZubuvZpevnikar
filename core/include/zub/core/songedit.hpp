@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // Small text edits for the song editor (insert a chord, move it along the text, insert a part).
 // All positions are UTF-8 byte offsets within the given text; the line functions work on ONE
@@ -114,5 +115,22 @@ std::optional<bool> scoreIsNarrow(std::string_view text, std::string_view inputN
 // Turns every reference to `inputName` into \narrowlilypondfile (narrow) or \lilypondfile,
 // keeping its [..] argument and file name. Unchanged text when already so.
 std::string setScoreWidth(std::string_view text, std::string_view inputName, bool narrow);
+
+// One edit inside a line: `length` bytes at byte `column` of line `line` become `text`.
+struct LineEdit {
+    std::size_t line;
+    std::size_t column;
+    std::size_t length;
+    std::string text;
+    bool operator==(const LineEdit&) const = default;
+};
+
+// Toggles `%` line comments (songs and LilyPond scores alike) on whole lines, like a code editor's
+// Toggle Comment. When every non-blank line starts with `%` after its indentation (`%{` and `%}`,
+// LilyPond's block comment marks, don't count), the `%` and one space after it are removed from
+// each; otherwise "% " goes into every non-blank line at the smallest indentation among them (blank
+// lines stay as they are; when all are blank, every line gets "% " at its start). Edits are in
+// line order, columns in bytes; the indentation is spaces and tabs.
+std::vector<LineEdit> toggleLineComments(const std::vector<std::string>& lines);
 
 } // namespace zub::songedit

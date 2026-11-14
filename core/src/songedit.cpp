@@ -672,4 +672,45 @@ std::string setScoreWidth(std::string_view text, std::string_view inputName, boo
     return result;
 }
 
+std::vector<LineEdit> toggleLineComments(const std::vector<std::string>& lines) {
+    const auto indentOf = [](const std::string& line) {
+        std::size_t i = 0;
+        while (i < line.size() && (line[i] == ' ' || line[i] == '\t'))
+            ++i;
+        return i;
+    };
+    const auto blank = [&](const std::string& line) { return indentOf(line) == line.size(); };
+    const auto commented = [&](const std::string& line) {
+        const std::size_t i = indentOf(line);
+        return i < line.size() && line[i] == '%' &&
+               !(i + 1 < line.size() && (line[i + 1] == '{' || line[i + 1] == '}'));
+    };
+    bool anyText = false;
+    bool allCommented = true;
+    std::size_t indent = std::string::npos;
+    for (const std::string& line : lines) {
+        if (blank(line))
+            continue;
+        anyText = true;
+        allCommented = allCommented && commented(line);
+        indent = std::min(indent, indentOf(line));
+    }
+    std::vector<LineEdit> edits;
+    for (std::size_t n = 0; n < lines.size(); ++n) {
+        const std::string& line = lines[n];
+        if (!anyText) {
+            edits.push_back({n, 0, 0, "% "});
+        } else if (blank(line)) {
+            continue;
+        } else if (allCommented) {
+            const std::size_t at = indentOf(line);
+            const std::size_t length = at + 1 < line.size() && line[at + 1] == ' ' ? 2 : 1;
+            edits.push_back({n, at, length, ""});
+        } else {
+            edits.push_back({n, indent, 0, "% "});
+        }
+    }
+    return edits;
+}
+
 } // namespace zub::songedit

@@ -410,3 +410,28 @@ TEST_CASE("environmentLinkAt pairs by nesting, so half-typed names still link", 
     // An end without a begin: none.
     CHECK_FALSE(environmentLinkAt(text, text.find("\\endsong") + 5));
 }
+
+TEST_CASE("toggleLineComments comments and uncomments whole lines", "[songedit]") {
+    using zub::songedit::LineEdit;
+    using zub::songedit::toggleLineComments;
+    // Commenting: "% " at the smallest indentation, blank lines left alone.
+    CHECK(toggleLineComments({"    \\[C]la", "", "  lo"}) ==
+          std::vector<LineEdit>{{0, 2, 0, "% "}, {2, 2, 0, "% "}});
+    // Uncommenting: the % and one space, at each line's own indentation.
+    CHECK(toggleLineComments({"  % \\[C]la", "   ", "%lo", "\t%  li"}) ==
+          std::vector<LineEdit>{{0, 2, 2, ""}, {2, 0, 1, ""}, {3, 1, 2, ""}});
+    // Mixed: everything gets commented (again).
+    CHECK(toggleLineComments({"% a", "b"}) ==
+          std::vector<LineEdit>{{0, 0, 0, "% "}, {1, 0, 0, "% "}});
+    // LilyPond's block comment marks are not line comments.
+    CHECK(toggleLineComments({"%{", "c4"}) ==
+          std::vector<LineEdit>{{0, 0, 0, "% "}, {1, 0, 0, "% "}});
+    CHECK(toggleLineComments({"%}"}) == std::vector<LineEdit>{{0, 0, 0, "% "}});
+    // Only blank lines: each gets "% " at its start.
+    CHECK(toggleLineComments({"", "  "}) ==
+          std::vector<LineEdit>{{0, 0, 0, "% "}, {1, 0, 0, "% "}});
+    CHECK(toggleLineComments({}).empty());
+    // A lone "%" uncomments to an empty line; UTF-8 after it is untouched.
+    CHECK(toggleLineComments({"%"}) == std::vector<LineEdit>{{0, 0, 1, ""}});
+    CHECK(toggleLineComments({"% Žluťoučký"}) == std::vector<LineEdit>{{0, 0, 2, ""}});
+}
