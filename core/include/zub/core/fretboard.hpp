@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <zub/core/score.hpp>
 #include <zub/core/songedit.hpp>
 
 // Writing tablature from a fretboard: LilyPond pitches and `\string` numbers as the songbook's
@@ -28,8 +29,26 @@ Tuning guitar();     // 64 59 55 50 45 40
 Tuning banjoOpenG(); // 62 59 55 50 67, shortString 5
 
 // The tuning the score's TabStaff uses: banjoOpenG() when the text sets `banjo-open-g-tuning`
-// (outside `%` comments and `%{ %}` blocks), else guitar() (also for the E-flat songs: their tab tuning is standard).
+// (outside `%` comments and `%{ %}` blocks), else guitar() (also for the E-flat songs: their tab
+// tuning is standard).
 Tuning tuningOf(std::string_view scoreText);
+
+// The tuning of one staff: `stringTunings = #...` of its \with ("banjo-open-g-tuning" is the banjo
+// tuning, "" or "guitar-tuning" the guitar's; any other name gives guitar() and is reported in
+// TuningAt::unknownName by tuningAt). A staff without an own `stringTunings` takes the banjo when
+// a context-wide `banjo-open-g-tuning` (outside every staff) or one inside the staff's own music
+// (`\set TabStaff.stringTunings = ...`) says so, else the guitar.
+struct TuningAt {
+    Tuning tuning;
+    std::size_t staff = score::noPosition; // index into score::staves(text) of the staff used
+    std::string unknownName;               // a named tuning that is neither banjo nor guitar
+};
+
+// The staff `cursor` is in: its tuning. A cursor inside the definition of a variable that staves
+// play (`\new TabStaff \banjoPart`, `banjoPart = { ... }` before \score) takes the tuning of those
+// staves when they all agree. Outside any staff, or when the staves using the variable disagree:
+// tuningOf(text) (staff = noPosition).
+TuningAt tuningAt(std::string_view text, std::size_t cursor);
 
 // An absolute LilyPond pitch with octave marks: c' is 60, e, is 40. German names (c cis d dis e f
 // fis g gis a ais h; with flats des es ges as b) or English (c cs d ds e f fs g gs a as b; with

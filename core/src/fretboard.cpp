@@ -4,6 +4,8 @@
 #include <cctype>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 #include <zub/core/fretboard.hpp>
 
 namespace zub::fretboard {
@@ -111,6 +113,176 @@ Tuning tuningOf(std::string_view scoreText) {
     if (code.find("banjo-open-g-tuning") != std::string::npos)
         return banjoOpenG();
     return guitar();
+}
+
+namespace {
+
+// `text` with the `%` comments blanked (same length).
+std::string blankComments(std::string_view text) {
+    const Scanner scanner{text, Names::Any, {}};
+    std::string code(text);
+    std::size_t i = 0;
+    while (i < text.size()) {
+        if (text[i] == '%') {
+            const std::size_t end = scanner.skipComment(i);
+            for (std::size_t k = i; k < end && k < code.size(); ++k)
+                if (code[k] != '\n')
+                    code[k] = ' ';
+            i = end;
+        } else if (text[i] == '"') {
+            i = scanner.skipString(i);
+        } else {
+            ++i;
+        }
+    }
+    return code;
+}
+
+constexpr std::string_view banjoName = "banjo-open-g-tuning";
+
+// [begin, end) of the music a variable is defined as: `name = { ... }` at the top level (before
+// the \score), including its braces; nullopt when there is none.
+std::optional<std::pair<std::size_t, std::size_t>>
+variableDefinition(std::string_view code, std::string_view name, std::size_t limit) {
+    std::size_t from = 0;
+    while ((from = code.find(name, from)) != std::string_view::npos && from < limit) {
+        const std::size_t after = from + name.size();
+        const bool wordStart =
+            from == 0 ||
+            !(std::isalpha(static_cast<unsigned char>(code[from - 1])) || code[from - 1] == '\\');
+        std::size_t i = after;
+        while (i < code.size() && std::isspace(static_cast<unsigned char>(code[i])))
+            ++i;
+        if (wordStart && i < code.size() && code[i] == '=' &&
+            (i + 1 >= code.size() || code[i + 1] != '=')) {
+            ++i;
+            while (i < code.size() && std::isspace(static_cast<unsigned char>(code[i])))
+                ++i;
+            // Braces and << >> (strings and Scheme skipped), up to the matching close.
+            const Scanner scanner{code, Names::Any, {}};
+            const std::size_t begin = i;
+            int depth = 0;
+            while (i < code.size()) {
+                const char c = code[i];
+                if (c == '"') {
+                    i = scanner.skipString(i);
+                    continue;
+                }
+                if (c == '#' || c == '$') {
+                    i = scanner.skipScheme(i);
+                    continue;
+                }
+                if (c == '\\') {
+                    i += 2;
+                    continue;
+                }
+                if (c == '{') {
+                    ++depth;
+                } else if (c == '<' && i + 1 < code.size() && code[i + 1] == '<') {
+                    ++depth;
+                    ++i;
+                } else if (c == '}') {
+                    --depth;
+                } else if (c == '>' && i + 1 < code.size() && code[i + 1] == '>') {
+                    --depth;
+                    ++i;
+                } else if (depth == 0) {
+                    break; // not a braced definition
+                }
+                ++i;
+                if (depth == 0 && i > begin)
+                    return std::pair{begin, std::min(i, code.size())};
+            }
+            return std::nullopt;
+        }
+        from = after;
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+TuningAt tuningAt(std::string_view text, std::size_t cursor) {
+    TuningAt result{tuningOf(text), score::noPosition, {}};
+    const auto all = score::staves(text);
+    if (all.empty())
+        return result;
+    const std::string code = blankComments(text);
+    const std::size_t scoreBegin = all.front().begin;
+
+    // The staff's variable: music that is a bare `\name` after the head and the \with.
+    const auto variableOf = [&](const score::Staff& staff) -> std::string {
+        std::size_t i = staff.withClose != score::noPosition ? staff.withClose + 1 : staff.headEnd;
+        while (i < staff.end && std::isspace(static_cast<unsigned char>(code[i])))
+            ++i;
+        if (i >= staff.end || code[i] != '\\')
+            return {};
+        std::size_t e = i + 1;
+        while (e < staff.end && std::isalpha(static_cast<unsigned char>(code[e])))
+            ++e;
+        std::size_t rest = e;
+        while (rest < staff.end && std::isspace(static_cast<unsigned char>(code[rest])))
+            ++rest;
+        return rest >= staff.end && e > i + 1 ? code.substr(i + 1, e - i - 1) : std::string();
+    };
+
+    // The text no staff owns: staves and the variables they play blanked.
+    std::string outside = code;
+    const auto blank = [&](std::size_t b, std::size_t e) {
+        for (std::size_t k = b; k < e && k < outside.size(); ++k)
+            outside[k] = ' ';
+    };
+    std::vector<std::string> variables(all.size());
+    std::vector<std::optional<std::pair<std::size_t, std::size_t>>> definitions(all.size());
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        blank(all[i].begin, all[i].end);
+        variables[i] = variableOf(all[i]);
+        if (!variables[i].empty()) {
+            definitions[i] = variableDefinition(code, variables[i], scoreBegin);
+            if (definitions[i])
+                blank(definitions[i]->first, definitions[i]->second);
+        }
+    }
+    const bool global = outside.find(banjoName) != std::string::npos;
+
+    const auto tuningOfStaff = [&](std::size_t i) {
+        const score::Staff& staff = all[i];
+        TuningAt r{guitar(), i, {}};
+        if (!staff.tuning.empty()) {
+            if (staff.tuning == banjoName)
+                r.tuning = banjoOpenG();
+            else if (staff.tuning != "guitar-tuning")
+                r.unknownName = staff.tuning;
+            return r;
+        }
+        bool banjo = global || code.substr(staff.begin, staff.end - staff.begin).find(banjoName) !=
+                                   std::string::npos;
+        if (definitions[i])
+            banjo = banjo || code.substr(definitions[i]->first,
+                                         definitions[i]->second - definitions[i]->first)
+                                     .find(banjoName) != std::string::npos;
+        if (banjo)
+            r.tuning = banjoOpenG();
+        return r;
+    };
+
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        if (cursor >= all[i].begin && cursor <= all[i].end)
+            return tuningOfStaff(i);
+    }
+    // Inside the definition of a variable: the staves that play it must agree.
+    std::optional<TuningAt> agreed;
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        if (!definitions[i] || cursor < definitions[i]->first || cursor > definitions[i]->second)
+            continue;
+        const TuningAt r = tuningOfStaff(i);
+        if (agreed && (agreed->tuning.open != r.tuning.open ||
+                       agreed->tuning.shortString != r.tuning.shortString))
+            return result;
+        if (!agreed)
+            agreed = r;
+    }
+    return agreed ? *agreed : result;
 }
 
 std::string pitchName(int midi, bool german, bool flats) {
@@ -297,7 +469,7 @@ Change addToChord(std::string_view line, std::size_t cursor, std::string_view to
         const bool inside = cursor <= e.postEnd;
         const bool justAfter =
             e.postEnd < cursor && std::ranges::all_of(line.substr(e.postEnd, cursor - e.postEnd),
-                                                  [](char c) { return isSpace(c); });
+                                                      [](char c) { return isSpace(c); });
         if ((e.chord || e.stringBegin != e.stringEnd) && (inside || justAfter))
             target = &e;
     }

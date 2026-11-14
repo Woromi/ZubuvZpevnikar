@@ -209,7 +209,8 @@ TEST_CASE("fretboard insertNote and insertRest keep the length of what follows",
     CHECK(insert("e\\2 |g\\3", "a\\3", "8", "4") == "e\\2 a8\\3| g4\\3");
     CHECK(insert("|g\\3 h\\2", "a\\3", "16", "8.") == "a16\\3| g8.\\3 h\\2");
     CHECK(insert("e\\2 |<g\\3 h\\2>", "a\\3", "8", "4") == "e\\2 a8\\3| <g\\3 h\\2>4");
-    CHECK(insert("e\\2 |<g\\3 h\\2>(", "<a\\3 c\\2>", "8", "2") == "e\\2 <a\\3 c\\2>8| <g\\3 h\\2>2(");
+    CHECK(insert("e\\2 |<g\\3 h\\2>(", "<a\\3 c\\2>", "8", "2") ==
+          "e\\2 <a\\3 c\\2>8| <g\\3 h\\2>2(");
     CHECK(insert("|r", "a\\3", "8", "4") == "a8\\3| r4");
     CHECK(insert("|fis'\\1", "a\\3", "8", "4") == "a8\\3| fis'4\\1");
     CHECK(insert("|g'\\2", "a\\3", "8", "4") == "a8\\3| g'4\\2");
@@ -294,12 +295,14 @@ TEST_CASE("every note of every real score has a valid position", "[.integration]
     }
 
     // A few real scores write a note below its string's open pitch (a leftover guitar chord in a
-    // banjo score, a typo): those are tolerated up to 4 % of the positions (counted per cursor position, and a note's
-    // position now counts in its articulations too: DivokejBill/Rozarka.ly is 3.2 %); the rest must be a
-    // playable fret.
+    // banjo score, a typo): those are tolerated up to 4 % of the positions (counted per cursor
+    // position, and a note's position now counts in its articulations too: DivokejBill/Rozarka.ly
+    // is 3.2 %); the rest must be a playable fret.
     int scores = 0;
     int cursors = 0;
     int unplayable = 0;
+    int unplayableWholeScore = 0; // the same cursors with the old whole-score tuning
+    int staffCount = 0;
     std::set<std::string> reported;
     for (const auto& entry : fs::recursive_directory_iterator(realRepo / "songs")) {
         if (!entry.is_regular_file() || entry.path().extension() != ".ly")
@@ -310,13 +313,32 @@ TEST_CASE("every note of every real score has a valid position", "[.integration]
             fs::relative(entry.path(), entry.path().parent_path().parent_path()).generic_string();
         const auto known = germanOf.find(name);
         const bool german = known != germanOf.end() && known->second;
-        const auto tuning = fb::tuningOf(*content);
+        const auto wholeTuning = fb::tuningOf(*content);
         ++scores;
+        // Every staff is found by a cursor in it, and its tuning is a known one.
+        const auto staves = zub::score::staves(*content);
+        for (std::size_t i = 0; i < staves.size(); ++i) {
+            ++staffCount;
+            const auto found = fb::tuningAt(*content, staves[i].begin + 1);
+            CHECK(found.staff == i);
+            CHECK(found.unknownName.empty());
+        }
         for (std::size_t cursor = 0; cursor <= content->size(); ++cursor) {
+            const auto whole = fb::positionsAt(*content, cursor, wholeTuning, german);
+            if (whole.empty())
+                continue;
+            ++cursors;
+            for (const auto& p : whole) {
+                if (p.fret < 0 || p.fret > 24 ||
+                    static_cast<std::size_t>(p.string) > wholeTuning.open.size()) {
+                    ++unplayableWholeScore;
+                    break;
+                }
+            }
+            const auto tuning = fb::tuningAt(*content, cursor).tuning;
             const auto positions = fb::positionsAt(*content, cursor, tuning, german);
             if (positions.empty())
                 continue;
-            ++cursors;
             for (const auto& p : positions) {
                 CHECK(p.string >= 1);
                 CHECK(static_cast<std::size_t>(p.string) <= tuning.open.size());
@@ -332,7 +354,10 @@ TEST_CASE("every note of every real score has a valid position", "[.integration]
             }
         }
     }
-    CAPTURE(cursors, unplayable);
+    CAPTURE(cursors, unplayable, unplayableWholeScore, staffCount);
+    WARN("unplayable cursors: whole-score tuning "
+                  << unplayableWholeScore << ", per staff " << unplayable << " of " << cursors);
+    CHECK(unplayable <= unplayableWholeScore);
     CHECK(unplayable * 100 < cursors * 4);
     CHECK(scores > 0);
     CHECK(cursors > 0);
@@ -401,7 +426,7 @@ TEST_CASE("fretboard addToChord keeps prefix functions and ! ? on their pitch", 
 TEST_CASE("fretboard inCommentOrString", "[fretboard]") {
     const std::string line = "c4 % note d4 \"x y\" e4";
     CHECK_FALSE(fb::inCommentOrString(line, 2));
-    CHECK_FALSE(fb::inCommentOrString(line, 3));   // before the `%`
+    CHECK_FALSE(fb::inCommentOrString(line, 3)); // before the `%`
     CHECK(fb::inCommentOrString(line, 5));
     CHECK(fb::inCommentOrString(line, line.size())); // the end of a comment line
     const std::string str = "a4^\"x y\" b4";
@@ -499,10 +524,10 @@ TEST_CASE("fretboard replacePitches handles German names, rests and refusals", "
     CHECK(applied(rest, *r) == "{ fis'8.\\1 c }");
 
     CHECK_FALSE(replaceIn("{ <e\\4 g\\3>4 q4 }", "q4", "g\\3")); // q: no notes of its own
-    CHECK_FALSE(replaceIn("{ g4\\3 }", "g4\\3", "g"));            // no string
-    CHECK_FALSE(replaceIn("{ g4\\3 }", "g4\\3", "<g\\3"));        // unclosed token
+    CHECK_FALSE(replaceIn("{ g4\\3 }", "g4\\3", "g"));           // no string
+    CHECK_FALSE(replaceIn("{ g4\\3 }", "g4\\3", "<g\\3"));       // unclosed token
     CHECK_FALSE(replaceIn("{ g4\\3 }", "g4\\3", ""));
-    CHECK_FALSE(fb::replacePitches("{ g4\\3 }", 0, 3, "a\\3"));     // not an event range
+    CHECK_FALSE(fb::replacePitches("{ g4\\3 }", 0, 3, "a\\3"));           // not an event range
     CHECK_FALSE(replaceIn("{ <e\\4 g\\3 4 }", "<e\\4 g\\3 4 }", "a\\3")); // unclosed chord
 }
 
@@ -521,4 +546,110 @@ TEST_CASE("fretboard positionsOfEvent needs every note to have a string", "[fret
     const auto single = text.find("g'\\1");
     CHECK(fb::positionsOfEvent(text, single, single + 4, guitar, false) == Positions{{1, 3}});
     CHECK(fb::positionsOfEvent(text, first, first + 5, guitar, false).empty());
+}
+
+namespace {
+
+const std::string twoStaves = R"LY(\version "2.24.0"
+\score {
+  <<
+    \new TabStaff \with {
+      stringTunings = #banjo-open-g-tuning
+    } {
+      \set Staff.midiInstrument = "banjo"
+      g'\5 d'\3
+    }
+    \new TabStaff \with {
+      \set Staff.midiInstrument = "acoustic guitar (steel)"
+    } {
+      e'\1 b\2
+    }
+  >>
+}
+)LY";
+
+bool isBanjo(const fb::TuningAt& t) {
+    return t.tuning.shortString != 0 && t.tuning.open.size() == 5;
+}
+
+} // namespace
+
+TEST_CASE("tuningAt follows the staff the cursor is in", "[fretboard][staff]") {
+    const auto& t = twoStaves;
+    const auto banjoNote = t.find("d'\\3");
+    const auto guitarNote = t.find("b\\2");
+    auto r = fb::tuningAt(t, banjoNote);
+    CHECK(isBanjo(r));
+    CHECK(r.staff == 0);
+    CHECK(r.unknownName.empty());
+    r = fb::tuningAt(t, guitarNote);
+    CHECK_FALSE(isBanjo(r));
+    CHECK(r.tuning.open == fb::guitar().open);
+    CHECK(r.staff == 1);
+    // Inside a \with block too.
+    CHECK(isBanjo(fb::tuningAt(t, t.find("stringTunings"))));
+    CHECK(fb::tuningAt(t, t.find("acoustic")).staff == 1);
+    // Outside any staff: the whole-score guess (banjo, as the text mentions it).
+    const auto outside = fb::tuningAt(t, t.find("\\version"));
+    CHECK(outside.staff == zub::score::noPosition);
+    CHECK(isBanjo(outside));
+    CHECK(isBanjo(fb::tuningAt(t, t.size())));
+}
+
+TEST_CASE("tuningAt: variables, global tunings, unknown names", "[fretboard][staff]") {
+    const std::string vars = R"(banjoPart = {
+  g'\5 d'\3
+}
+guitarPart = {
+  e'\1 b\2
+}
+\score {
+  <<
+    \new TabStaff \with { stringTunings = #banjo-open-g-tuning } \banjoPart
+    \new TabStaff \guitarPart
+  >>
+}
+)";
+    // The cursor inside a variable takes the tuning of the staff that plays it.
+    CHECK(isBanjo(fb::tuningAt(vars, vars.find("d'\\3"))));
+    CHECK_FALSE(isBanjo(fb::tuningAt(vars, vars.find("b\\2"))));
+    CHECK(fb::tuningAt(vars, vars.find("b\\2")).staff == 1);
+
+    // A variable played by two staves with different tunings: the whole-score guess.
+    const std::string shared = R"(part = { c'\1 }
+\score { <<
+  \new TabStaff \with { stringTunings = #banjo-open-g-tuning } \part
+  \new TabStaff \part
+>> }
+)";
+    const auto s = fb::tuningAt(shared, shared.find("c'"));
+    CHECK(s.staff == zub::score::noPosition);
+    CHECK(isBanjo(s));
+
+    // A context-wide banjo tuning (outside the staves) holds for a staff without its own.
+    const std::string global = R"(\score {
+  \layout { \context { \TabStaff stringTunings = #banjo-open-g-tuning } }
+  \new TabStaff { g'\5 }
+})";
+    CHECK(isBanjo(fb::tuningAt(global, global.find("g'\\5"))));
+    // A \set inside the staff only counts for that staff.
+    const std::string set = R"(\score { <<
+  \new TabStaff { \set TabStaff.stringTunings = #banjo-open-g-tuning g'\5 }
+  \new TabStaff { e'\1 }
+>> })";
+    CHECK(isBanjo(fb::tuningAt(set, set.find("g'\\5"))));
+    CHECK_FALSE(isBanjo(fb::tuningAt(set, set.find("e'\\1"))));
+    // A commented banjo does not count.
+    const std::string commented = "\\score { \\new TabStaff { % banjo-open-g-tuning\n e'\\1 } }";
+    CHECK_FALSE(isBanjo(fb::tuningAt(commented, commented.find("e'"))));
+
+    // Unknown named tuning: guitar, reported.
+    const std::string odd =
+        R"(\score { \new TabStaff \with { stringTunings = #bass-tuning } { e,\4 } })";
+    const auto u = fb::tuningAt(odd, odd.find("e,"));
+    CHECK(u.tuning.open == fb::guitar().open);
+    CHECK(u.unknownName == "bass-tuning");
+
+    // No staff at all.
+    CHECK(fb::tuningAt("{ c'4 }", 2).staff == zub::score::noPosition);
 }
