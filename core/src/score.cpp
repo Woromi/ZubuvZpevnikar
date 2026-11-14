@@ -4,6 +4,7 @@
 #include <cctype>
 #include <charconv>
 #include <system_error>
+#include <zub/core/safety.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -37,6 +38,24 @@ std::optional<int> toInt(std::string_view digits) {
 
 } // namespace
 
+namespace {
+
+// The approval (zub::safety::lilypondRisks) is given for the score text alone. Appending the
+// playback score must not change how anything is read: after a text that ends inside a string,
+// a %{ comment or a #'( list, the appended copy of the music would be read differently (text that
+// was harmless string or comment content could become Scheme). So the text must end in a neutral
+// state (a Scheme form appended after it is seen as Scheme), and the result must have exactly the
+// risks of the text alone.
+bool appendIsNeutral(const std::string& content, const std::string& withPlayback) {
+    const auto risks = safety::lilypondRisks(content);
+    auto probe = risks;
+    probe.emplace_back("#(zub-sentinel");
+    return safety::lilypondRisks(content + "\n#(zub-sentinel)\n") == probe &&
+           safety::lilypondRisks(withPlayback) == risks;
+}
+
+} // namespace
+
 std::expected<Command, std::string> prepare(const Request& request) {
     if (const auto reason = invalidScoreName(request.inputName))
         return std::unexpected("invalid score name: " + *reason);
@@ -59,11 +78,17 @@ std::expected<Command, std::string> prepare(const Request& request) {
         MidiOptions options = *request.midi;
         options.germanNames = request.germanNames;
         if (const auto played = midiScore(content, options)) {
-            if (!content.empty() && content.back() != '\n')
-                content += '\n';
-            content += *played;
-            content += '\n';
-            withMidi = true;
+            // In a book of its own, so its file name is ours even when the score has its own
+            // \midi (that one writes score.midi).
+            std::string appended = content;
+            if (!appended.empty() && appended.back() != '\n')
+                appended += '\n';
+            appended += "\\book {\n\\bookOutputName \"" + std::string(playbackOutputName) +
+                        "\"\n" + *played + "\n}\n";
+            if (appendIsNeutral(content, appended)) {
+                content = std::move(appended);
+                withMidi = true;
+            }
         }
     }
     const fs::path copy = scoreDir / fs::path(request.inputName);
@@ -103,7 +128,7 @@ std::expected<Command, std::string> prepare(const Request& request) {
     cmd.environment = {{"LC_ALL", "C"}};
     cmd.svg = outDir / "score.cropped.svg";
     if (withMidi)
-        cmd.midi = outDir / "score.midi";
+        cmd.midi = outDir / (std::string(playbackOutputName) + ".midi");
     cmd.scoreCopy = copy;
     return cmd;
 }

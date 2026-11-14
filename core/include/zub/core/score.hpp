@@ -37,6 +37,10 @@ struct Request {
     std::optional<MidiOptions> midi;
 };
 
+// The base name of the playback MIDI file that prepare's appended score writes (in a \book of its
+// own, so a score with its own \midi, which writes score.midi, does not clash).
+inline constexpr std::string_view playbackOutputName = "zub-playback";
+
 struct Command {
     std::string program; // "lilypond"
     std::vector<std::string> arguments;

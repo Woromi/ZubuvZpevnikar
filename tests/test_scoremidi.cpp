@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 #include <zub/core/midi.hpp>
+#include <zub/core/safety.hpp>
 #include <zub/core/score.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/songbook.hpp>
@@ -221,7 +222,7 @@ TEST_CASE("prepare appends the midi score and reports the MIDI file", "[score][m
     request.midi = options();
     cmd = sc::prepare(request);
     REQUIRE(cmd);
-    CHECK(cmd->midi == dir.path / "work" / "out" / "score.midi");
+    CHECK(cmd->midi == dir.path / "work" / "out" / "zub-playback.midi");
     CHECK(cmd->svg == dir.path / "work" / "out" / "score.cropped.svg");
     std::ifstream copy(cmd->scoreCopy);
     std::stringstream copied;
@@ -234,6 +235,35 @@ TEST_CASE("prepare appends the midi score and reports the MIDI file", "[score][m
     cmd = sc::prepare(request);
     REQUIRE(cmd);
     CHECK(cmd->midi.empty());
+}
+
+TEST_CASE("prepare appends no playback score after text that would change how it is read",
+          "[score][midi][safety]") {
+    // Each text is harmless as it is (no risks), but ends inside a string, a %{ comment or a
+    // quoted Scheme list: a copy of its music appended after it would turn the payload into code.
+    TempDir dir;
+    sc::Request request;
+    request.workDir = dir.path / "work";
+    request.inputName = "Artist/Title.ly";
+    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    request.midi = options();
+    for (const std::string text :
+         {"\\score { { c'4^\"#(ly:warning (symbol->string 'PWNED))\" } }\n\"\n",
+          "\\score { { c'4 %} #(ly:warning \"PWNEDB\")\n } }\n%{\n",
+          "\\score { { c'4 % ) #(ly:warning \"PWNEDQ\")\n } }\n#'(\n"}) {
+        CAPTURE(text);
+        REQUIRE(zub::safety::lilypondRisks(text).empty());
+        CHECK(sc::midiScore(text, options())); // there is music to play: the guard refuses it
+        request.content = text;
+        const auto cmd = sc::prepare(request);
+        REQUIRE(cmd);
+        CHECK(cmd->midi.empty()); // no playback, and the copy is the text alone
+        std::ifstream copy(cmd->scoreCopy);
+        std::stringstream copied;
+        copied << copy.rdbuf();
+        CHECK(copied.str() == text);
+        CHECK(zub::safety::lilypondRisks(copied.str()).empty());
+    }
 }
 
 // Hidden: needs lilypond and the real ../ZubuvZpevnik checkout.
