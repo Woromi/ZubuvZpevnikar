@@ -115,9 +115,12 @@ private:
     // score editor; the preview marks the notes of the selection a moment after it changes.
     void updateRegionActions();
     void updateScoreHighlights();
-    void clickScoreNote(const QPoint& position, bool extend);  // from the preview
-    void selectScoreNotes(const QPoint& anchor, const QPoint& current); // a drag in the preview
-    void selectScoreEvents(std::size_t first, std::size_t last);
+    void clickScoreNote(const QPoint& position, bool after, bool extend); // from the preview
+    void selectScoreNotes(const QPoint& anchor, bool anchorAfter, const QPoint& current,
+                          bool currentAfter); // a drag in the preview
+    void doubleClickScoreNote(const QPoint& position); // selects that event
+    void selectScoreOffsets(std::size_t anchor, std::size_t current); // caret offsets, any order
+    std::optional<std::size_t> caretOffsetOf(const QPoint& position, bool after) const;
     void indexScoreEvents();
     void insertStagedNotes(FretboardWidget* fretboard); // the staged positions as a note or chord
     void setScoreWidth(const std::string& name, bool narrow); // the song and all its score tabs; false if the user cancelled
@@ -256,7 +259,7 @@ private:
     std::vector<zub::scoreregion::Range> scoreEvents_;
     std::map<std::pair<int, int>, std::size_t> linkEvent_;
     std::map<std::size_t, QPoint> eventLink_;
-    std::optional<std::size_t> scoreAnchor_;
+    std::optional<std::size_t> scoreAnchor_; // byte offset where a selection started
     QAction* fretboardAction_ = nullptr;     // "Fretboard": shows the input panels
     QTimer* scoreSyncTimer_ = nullptr;       // song text changed: look for new \lilypondfile
     QTimer* scorePreviewTimer_ = nullptr;    // score text changed: rebuild the score preview

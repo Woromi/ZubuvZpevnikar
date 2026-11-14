@@ -39,9 +39,9 @@ public:
     // The links that are notes of the music (the others are chord names, lyrics ...): only these
     // can be clicked, dragged over, or carry the caret. A new build clears them.
     void setSelectableNotes(const QList<QPoint>& positions);
-    // The score cursor, a vertical line before the note at this position (x = column, y = line);
-    // a null point hides it.
-    void setCaretNote(const QPoint& position);
+    // The score cursor, a vertical line before (`after`: behind) the note at this position
+    // (x = column, y = line); a null point hides it.
+    void setCaretNote(const QPoint& position, bool after = false);
     bool hasCaret() const; // for tests
     // Draws a translucent box around the notes at these positions (the editor's selection);
     // empty clears them. A new build clears them too: positions refer to its text.
@@ -55,11 +55,15 @@ signals:
     // An error located in the score was double-clicked (1-based line and column).
     void errorActivated(int line, int column);
     // A note of the rendered score was clicked: its position in the score text (x = 0-based
-    // column in code points, y = 1-based line). `extend`: Shift was held (select up to it).
-    void noteClicked(const QPoint& position, bool extend);
+    // column in code points, y = 1-based line). `after`: the click was right of the note (the text
+    // cursor goes behind it, else before it). `extend`: Shift was held (select up to it).
+    void noteClicked(const QPoint& position, bool after, bool extend);
     // The mouse was dragged from the note `anchor` over the score; `current` is the note nearest
-    // the mouse. Emitted whenever that note changes.
-    void notesDragged(const QPoint& anchor, const QPoint& current);
+    // the mouse, each with the side the mouse was on. Emitted whenever that changes.
+    void notesDragged(const QPoint& anchor, bool anchorAfter, const QPoint& current,
+                      bool currentAfter);
+    // A note was double-clicked: select exactly it.
+    void noteDoubleClicked(const QPoint& position);
 
 private:
     void showLog();

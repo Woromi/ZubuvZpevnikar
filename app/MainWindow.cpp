@@ -488,6 +488,8 @@ void MainWindow::createCentralWidget() {
     scorePreview_->setRegionActions(regionActions_);
     connect(scorePreview_, &ScorePreviewPane::notesDragged, this, &MainWindow::selectScoreNotes);
     connect(scorePreview_, &ScorePreviewPane::noteClicked, this, &MainWindow::clickScoreNote);
+    connect(scorePreview_, &ScorePreviewPane::noteDoubleClicked, this,
+            &MainWindow::doubleClickScoreNote);
     scoreRunner_ = new ScoreRunner(this);
     connect(scoreRunner_, &ScoreRunner::started, scorePreview_, &ScorePreviewPane::showBuilding);
     connect(scoreRunner_, &ScoreRunner::finished, this, &MainWindow::showScoreResult);
@@ -2350,7 +2352,8 @@ void MainWindow::updateRegionActions() {
 }
 
 // The notes of the preview whose events the editor's selection touches get a highlight box; with
-// no selection the score cursor stands before the note the text cursor is in (or before).
+// no selection the score cursor stands where the text cursor is: behind the event that ends
+// there, else before the event the cursor is in or before, else (past the last event) behind it.
 void MainWindow::updateScoreHighlights() {
     highlightTimer_->stop();
     SongEditor* editor = currentEditor();
@@ -2362,6 +2365,7 @@ void MainWindow::updateScoreHighlights() {
     const auto range = editor->selectedByteRange();
     QList<QPoint> inside;
     QPoint caret;
+    bool after = false;
     if (range) {
         std::vector<bool> touched(scoreEvents_.size());
         for (std::size_t i = 0; i < scoreEvents_.size(); ++i)
@@ -2370,65 +2374,105 @@ void MainWindow::updateScoreHighlights() {
             if (touched[event])
                 inside.append(QPoint(key.second, key.first));
         }
-    } else {
+    } else if (!scoreEvents_.empty()) {
         const std::size_t offset = editor->cursorByteOffset();
-        auto event = zub::scoreregion::eventAt(scoreEvents_, offset);
-        if (!event) { // between events: before the next one
+        std::optional<std::size_t> event;
+        const auto ending = std::ranges::find_if(
+            scoreEvents_, [offset](const auto& e) { return e.end == offset; });
+        if (ending != scoreEvents_.end()) {
+            event = static_cast<std::size_t>(ending - scoreEvents_.begin());
+            after = true;
+        } else if (event = zub::scoreregion::eventAt(scoreEvents_, offset); !event) {
             const auto next = std::ranges::find_if(
                 scoreEvents_, [offset](const auto& e) { return e.begin >= offset; });
-            if (next != scoreEvents_.end())
+            if (next != scoreEvents_.end()) {
                 event = static_cast<std::size_t>(next - scoreEvents_.begin());
+            } else { // past the last event
+                event = scoreEvents_.size() - 1;
+                after = true;
+            }
         }
         if (const auto link = event ? eventLink_.find(*event) : eventLink_.end();
             link != eventLink_.end())
             caret = link->second;
     }
     scorePreview_->setHighlightedNotes(inside);
-    scorePreview_->setCaretNote(caret);
+    scorePreview_->setCaretNote(caret, after);
 }
 
-// A click on a note of the rendered score: the text cursor goes there (the score cursor follows),
-// with Shift the selection extends from where it started.
-void MainWindow::clickScoreNote(const QPoint& position, bool extend) {
+// The text position of a click on the note at `position`: its event's begin, or its end when the
+// click was right of the note.
+std::optional<std::size_t> MainWindow::caretOffsetOf(const QPoint& position, bool after) const {
+    const auto found = linkEvent_.find({position.y(), position.x()});
+    if (found == linkEvent_.end())
+        return std::nullopt;
+    const auto& event = scoreEvents_[found->second];
+    return after ? event.end : event.begin;
+}
+
+// A click on a note of the rendered score: the text cursor goes before it (or behind it when the
+// click was right of the note; the score cursor follows), with Shift the selection extends from
+// where it started.
+void MainWindow::clickScoreNote(const QPoint& position, bool after, bool extend) {
     SongEditor* editor = currentEditor();
     if (!editor || onSongTab() || !scoreLinksFresh_)
         return;
-    const auto found = linkEvent_.find({position.y(), position.x()});
-    if (found == linkEvent_.end())
+    const auto offset = caretOffsetOf(position, after);
+    if (!offset)
         return;
     if (extend) {
-        std::optional<std::size_t> anchor = scoreAnchor_;
-        if (!anchor)
-            anchor = zub::scoreregion::eventAt(scoreEvents_, editor->cursorByteOffset());
-        if (anchor) {
-            selectScoreEvents(*anchor, found->second);
-            return;
-        }
+        selectScoreOffsets(scoreAnchor_.value_or(editor->cursorByteOffset()), *offset);
+        return;
     }
-    scoreAnchor_ = found->second;
-    editor->goToLineColumn(position.y(), position.x());
+    scoreAnchor_ = *offset;
+    editor->setCursorByteOffset(*offset);
     updateScoreHighlights();
 }
 
-// A drag over the preview: the notes from the one pressed on to the one nearest the mouse.
-void MainWindow::selectScoreNotes(const QPoint& anchor, const QPoint& current) {
+// A drag over the preview: the notes between where it started and the position of the mouse.
+void MainWindow::selectScoreNotes(const QPoint& anchor, bool anchorAfter, const QPoint& current,
+                                  bool currentAfter) {
     if (!scoreLinksFresh_)
         return;
-    const auto a = linkEvent_.find({anchor.y(), anchor.x()});
-    const auto b = linkEvent_.find({current.y(), current.x()});
-    if (a != linkEvent_.end() && b != linkEvent_.end())
-        selectScoreEvents(a->second, b->second);
+    const auto a = caretOffsetOf(anchor, anchorAfter);
+    const auto b = caretOffsetOf(current, currentAfter);
+    if (a && b)
+        selectScoreOffsets(*a, *b);
 }
 
-// The editor selects the events `first` to `last` (either order): from the start of the earlier
-// (with its prefix functions) to the end of the later, whole notes and chords, in text order.
-void MainWindow::selectScoreEvents(std::size_t first, std::size_t last) {
+// Like a word in a text: a double-click selects exactly that event.
+void MainWindow::doubleClickScoreNote(const QPoint& position) {
     SongEditor* editor = currentEditor();
-    if (!editor || onSongTab() || first >= scoreEvents_.size() || last >= scoreEvents_.size())
+    const auto found = linkEvent_.find({position.y(), position.x()});
+    if (!editor || onSongTab() || !scoreLinksFresh_ || found == linkEvent_.end())
         return;
-    scoreAnchor_ = first;
-    const auto [low, high] = std::minmax(first, last);
-    editor->selectByteRange(scoreEvents_[low].begin, scoreEvents_[high].end);
+    const auto& event = scoreEvents_[found->second];
+    scoreAnchor_ = event.begin;
+    editor->selectByteRange(event.begin, event.end);
+    updateScoreHighlights();
+}
+
+// The editor selects the events that lie between the two text positions (either order): whole
+// notes and chords, in text order. The anchor stays where the selection started. Between two
+// events, or at one position, only the text cursor goes there.
+void MainWindow::selectScoreOffsets(std::size_t anchor, std::size_t current) {
+    SongEditor* editor = currentEditor();
+    if (!editor || onSongTab())
+        return;
+    scoreAnchor_ = anchor;
+    const auto [low, high] = std::minmax(anchor, current);
+    std::optional<std::size_t> first, last;
+    for (std::size_t i = 0; i < scoreEvents_.size(); ++i) {
+        if (scoreEvents_[i].begin >= low && scoreEvents_[i].end <= high) {
+            if (!first)
+                first = i;
+            last = i;
+        }
+    }
+    if (first)
+        editor->selectByteRange(scoreEvents_[*first].begin, scoreEvents_[*last].end);
+    else
+        editor->setCursorByteOffset(current);
     updateScoreHighlights();
 }
 

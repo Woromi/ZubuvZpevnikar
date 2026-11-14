@@ -195,17 +195,23 @@ public:
     void setSelectable(const std::vector<std::pair<int, int>>& positions) {
         selectable_ = std::set<std::pair<int, int>>(positions.begin(), positions.end());
     }
-    // A click on the score (shift: extend the selection) and a drag over it, like in a text: the
-    // note is the one at the mouse (pickAt).
-    std::function<void(const NoteLink& link, bool extend)> onNoteClicked;
-    std::function<void(const NoteLink& anchor, const NoteLink& current)> onNotesDragged;
+    // A click on the score (shift: extend the selection), a drag over it and a double-click, like
+    // in a text: the note is the one at the mouse (pickAt), `after` tells on which side of it the
+    // mouse is (right of the note: the text cursor goes behind it).
+    std::function<void(const NoteLink& link, bool after, bool extend)> onNoteClicked;
+    std::function<void(const NoteLink& anchor, bool anchorAfter, const NoteLink& current,
+                       bool currentAfter)>
+        onNotesDragged;
+    std::function<void(const NoteLink& link)> onNoteDoubleClicked;
     std::function<void(const QPoint& globalPosition)> onContextMenu;
 
-    // The score cursor: a vertical line before the note linked at {line, column}; none clears it.
-    void setCaret(std::optional<std::pair<int, int>> position) {
-        if (position == caret_)
+    // The score cursor: a vertical line before (or after) the note linked at {line, column}; none
+    // clears it.
+    void setCaret(std::optional<std::pair<int, int>> position, bool after = false) {
+        if (position == caret_ && after == caretAfter_)
             return;
         caret_ = position;
+        caretAfter_ = after;
         update();
     }
     bool hasCaret() const { return caret_.has_value(); }
@@ -271,6 +277,10 @@ public:
                 best = &links_[i];
         }
         return best;
+    }
+    // Is `position` right of the note's centre (the caret goes behind it)?
+    bool isAfter(const NoteLink& link, const QPoint& position) const {
+        return position.x() > toWidget(link.point).x();
     }
     // The selectable note nearest to `position`, however far.
     const NoteLink* nearestLink(const QPoint& position) const {
@@ -341,10 +351,12 @@ protected:
             (position - pressAt_).manhattanLength() >= QApplication::startDragDistance())
             dragging_ = true;
         if (dragging_) {
-            if (const NoteLink* nearest = pickAt(position);
-                nearest && nearest != dragLink_ && onNotesDragged) {
+            const NoteLink* nearest = pickAt(position);
+            const bool after = nearest && isAfter(*nearest, position);
+            if (nearest && (nearest != dragLink_ || after != dragAfter_) && onNotesDragged) {
                 dragLink_ = nearest;
-                onNotesDragged(*pressLink_, *nearest);
+                dragAfter_ = after;
+                onNotesDragged(*pressLink_, pressAfter_, *nearest, after);
             }
             return;
         }
@@ -358,6 +370,7 @@ protected:
         dragLink_ = nullptr;
         pressAt_ = event->position().toPoint();
         pressLink_ = pickAt(pressAt_);
+        pressAfter_ = pressLink_ && isAfter(*pressLink_, pressAt_);
         pressExtend_ = event->modifiers().testFlag(Qt::ShiftModifier);
     }
     void mouseReleaseEvent(QMouseEvent* event) override {
@@ -368,7 +381,16 @@ protected:
         pressed_ = dragging_ = false;
         pressLink_ = dragLink_ = nullptr;
         if (!wasDragging && link && onNoteClicked)
-            onNoteClicked(*link, pressExtend_);
+            onNoteClicked(*link, pressAfter_, pressExtend_);
+    }
+    // Like a word in a text: a double-click selects the note at the mouse.
+    void mouseDoubleClickEvent(QMouseEvent* event) override {
+        if (event->button() != Qt::LeftButton)
+            return;
+        pressed_ = dragging_ = false;
+        pressLink_ = dragLink_ = nullptr;
+        if (const NoteLink* link = pickAt(event->position().toPoint()); link && onNoteDoubleClicked)
+            onNoteDoubleClicked(*link);
     }
     void contextMenuEvent(QContextMenuEvent* event) override {
         if (onContextMenu)
@@ -403,7 +425,7 @@ protected:
                 const QPointF at = toWidget(link->point);
                 const auto [top, bottom] = staffSpan(*link);
                 painter.setPen(QPen(edge, 2, Qt::SolidLine, Qt::FlatCap));
-                const double x = at.x() - highlightSize / 2;
+                const double x = at.x() + (caretAfter_ ? 1 : -1) * highlightSize / 2;
                 painter.drawLine(QPointF(x, top), QPointF(x, bottom));
             }
         }
@@ -560,7 +582,10 @@ private:
     std::set<std::pair<int, int>> selectable_;  // {line, column} of the links that are notes
     std::vector<Staff> staves_;
     std::vector<int> linkStaff_; // for each link, the index of its staff in staves_ (-1: none)
-    std::optional<std::pair<int, int>> caret_;  // the link the score cursor is before
+    std::optional<std::pair<int, int>> caret_;  // the link the score cursor is before or after
+    bool caretAfter_ = false;                   // ... after it
+    bool pressAfter_ = false;                   // the press was right of the pressed note
+    bool dragAfter_ = false;                    // the last reported drag position was right of it
     bool pressed_ = false;                      // the left button is down on the score
     bool dragging_ = false;                     // ... and has moved far enough: a selection
     bool pressExtend_ = false;                  // Shift was down at the press
@@ -609,11 +634,16 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     layout->addWidget(scroll_, 1);
     layout->addWidget(errors_);
 
-    canvas_->onNoteClicked = [this](const NoteLink& link, bool extend) {
-        emit noteClicked(QPoint(link.column, link.line), extend);
+    canvas_->onNoteClicked = [this](const NoteLink& link, bool after, bool extend) {
+        emit noteClicked(QPoint(link.column, link.line), after, extend);
     };
-    canvas_->onNotesDragged = [this](const NoteLink& anchor, const NoteLink& current) {
-        emit notesDragged(QPoint(anchor.column, anchor.line), QPoint(current.column, current.line));
+    canvas_->onNotesDragged = [this](const NoteLink& anchor, bool anchorAfter,
+                                     const NoteLink& current, bool currentAfter) {
+        emit notesDragged(QPoint(anchor.column, anchor.line), anchorAfter,
+                          QPoint(current.column, current.line), currentAfter);
+    };
+    canvas_->onNoteDoubleClicked = [this](const NoteLink& link) {
+        emit noteDoubleClicked(QPoint(link.column, link.line));
     };
     canvas_->onContextMenu = [this](const QPoint& at) {
         if (regionActions_.isEmpty())
@@ -711,11 +741,11 @@ void ScorePreviewPane::setSelectableNotes(const QList<QPoint>& positions) {
     canvas_->setSelectable(list);
 }
 
-void ScorePreviewPane::setCaretNote(const QPoint& position) {
+void ScorePreviewPane::setCaretNote(const QPoint& position, bool after) {
     if (position.isNull())
         canvas_->setCaret(std::nullopt);
     else
-        canvas_->setCaret(std::make_pair(position.y(), position.x()));
+        canvas_->setCaret(std::make_pair(position.y(), position.x()), after);
 }
 
 bool ScorePreviewPane::hasCaret() const {
