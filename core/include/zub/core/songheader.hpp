@@ -32,8 +32,8 @@ std::optional<std::string> option(std::string_view songText, std::string_view ke
 std::string measuredPapers(std::string_view currentPap, const std::optional<songsuggest::Measured>& a4,
                            const std::optional<songsuggest::Measured>& a5);
 
-// `songText` with its `pap` set to `pap` (the bare list, "a4,a5"; empty removes the option and
-// an emptied header's brackets), the rules of checkpaper.py's set_pap.
+// `songText` with its `pap` set to `pap` (the bare list, "a4,a5"; empty writes `pap={}`: "fits
+// nothing", as chords_converter spells it; checkpaper.py's set_pap removes the key instead).
 std::string setPap(std::string_view songText, std::string_view pap);
 
 } // namespace zub::songheader

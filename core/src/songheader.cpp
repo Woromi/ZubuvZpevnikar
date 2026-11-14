@@ -372,9 +372,11 @@ std::string measuredPapers(std::string_view currentPap, const std::optional<song
 }
 
 std::string setPap(std::string_view songText, std::string_view pap) {
+    // An empty list keeps the key as `pap={}` ("fits nothing"), the converter's spelling (its
+    // drafts end their prelude with it). scripts/checkpaper.py --write removes the key instead;
+    // the app follows the converter.
     const std::string value = "{" + std::string{pap} + "}";
-    return setOption(songText, "pap", pap.empty() ? std::string_view{} : std::string_view{value},
-                     true);
+    return setOption(songText, "pap", value);
 }
 
 } // namespace zub::songheader

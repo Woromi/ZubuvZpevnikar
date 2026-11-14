@@ -44,18 +44,23 @@ TEST_CASE("setPap in one-line headers", "[songheader]") {
     CHECK(setPap(song("\\beginsong{T}[]\n"), "a4") == song("\\beginsong{T}[pap={a4}]\n"));
 }
 
-TEST_CASE("setPap removes the option", "[songheader]") {
+TEST_CASE("setPap with an empty list keeps the key as pap={}", "[songheader]") {
     const auto in = song("\\beginsong{T}[\n    by={X},\n    pap={a4,a5},\n    lang={czech},\n]\n");
-    CHECK(setPap(in, "") == song("\\beginsong{T}[\n    by={X},\n    lang={czech},\n]\n"));
+    CHECK(setPap(in, "") == song("\\beginsong{T}[\n    by={X},\n    pap={},\n    lang={czech},\n]\n"));
     CHECK(setPap(song("\\beginsong{T}[by={X}, pap={a4}, lang={c}]\n"), "") ==
-          song("\\beginsong{T}[by={X}, lang={c}]\n"));
-    CHECK(setPap(song("\\beginsong{T}[by={X}, pap={a4}]\n"), "") == song("\\beginsong{T}[by={X}]\n"));
-    // The only option: the brackets go too.
-    CHECK(setPap(song("\\beginsong{T}[pap={a4}]\n"), "") == song("\\beginsong{T}\n"));
-    CHECK(setPap(song("\\beginsong{T}[\n    pap={a4},\n]\n"), "") == song("\\beginsong{T}\n"));
-    // Nothing to remove.
-    CHECK(setPap(song("\\beginsong{T}[by={X}]\n"), "") == song("\\beginsong{T}[by={X}]\n"));
-    // setOption alone keeps the brackets.
+          song("\\beginsong{T}[by={X}, pap={}, lang={c}]\n"));
+    // The only option: the header keeps its brackets.
+    CHECK(setPap(song("\\beginsong{T}[pap={a4}]\n"), "") == song("\\beginsong{T}[pap={}]\n"));
+    CHECK(setPap(song("\\beginsong{T}[\n    pap={a4},\n]\n"), "") ==
+          song("\\beginsong{T}[\n    pap={},\n]\n"));
+    // Already empty: unchanged. Absent: written.
+    CHECK(setPap(song("\\beginsong{T}[by={X}, pap={}]\n"), "") ==
+          song("\\beginsong{T}[by={X}, pap={}]\n"));
+    CHECK(option(song("\\beginsong{T}[pap={}]\n"), "pap") == "");
+    CHECK(setPap(song("\\beginsong{T}[by={X}]\n"), "") == song("\\beginsong{T}[by={X}, pap={}]\n"));
+    // ... and a list can be added to it again.
+    CHECK(setPap(song("\\beginsong{T}[pap={}]\n"), "a4") == song("\\beginsong{T}[pap={a4}]\n"));
+    // setOption alone still removes the key and keeps the brackets.
     CHECK(setOption(song("\\beginsong{T}[pap={a4}]\n"), "pap", std::nullopt) ==
           song("\\beginsong{T}[]\n"));
 }
@@ -68,7 +73,9 @@ TEST_CASE("setPap keeps CRLF and other keys", "[songheader]") {
     CHECK(out ==
           "\\beginsong{T}[\r\n    by={X},\r\n    pap={a4,a5},\r\n    tags={fav},\r\n]\r\n"
           "\\beginverse\r\nLa\r\n\\endverse\r\n\\endsong\r\n");
-    CHECK(setPap(out, "") == in);
+    CHECK(setPap(out, "") ==
+          "\\beginsong{T}[\r\n    by={X},\r\n    pap={},\r\n    tags={fav},\r\n]\r\n"
+          "\\beginverse\r\nLa\r\n\\endverse\r\n\\endsong\r\n");
 }
 
 TEST_CASE("setPap ignores commented-out options", "[songheader]") {
@@ -110,7 +117,7 @@ TEST_CASE("setOption pap round-trips every real song", "[.integration][songheade
         ss << f.rdbuf();
         const std::string text = ss.str();
         const auto pap = option(text, "pap");
-        if (!pap || pap->empty())
+        if (!pap)
             continue;
         ++n;
         INFO(e.path().string());
