@@ -59,6 +59,7 @@ constexpr std::array kKnown = std::to_array<std::string_view>({
     "ifchorded", // the songs package: chords shown or not (\ifchorded … \else … \fi)
     "iflargepaper",
     "insertchorus",
+    "insertprechorus", // a repeatable part (\newSongPartType*{prechorus}), like \insertchorus
     "itshape",
     "lilypondfile",
     "lrep",
