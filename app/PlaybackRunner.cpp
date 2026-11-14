@@ -129,8 +129,10 @@ void PlaybackRunner::start(PlaybackRequest request) {
     const std::string effect =
         current_.amp ? std::string(zub::audio::ampId) + std::to_string(zub::audio::ampVersion)
                      : std::string();
-    std::vector<std::string_view> parts{
-        std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())), soundfont};
+    const std::string rawMidi(bytes.constData(), static_cast<std::size_t>(bytes.size()));
+    // The bends and slides are part of what is played: their version is part of the key too.
+    const std::string bends = "bend" + std::to_string(zub::midi::bendVersion);
+    std::vector<std::string_view> parts{rawMidi, soundfont, bends};
     if (!effect.empty())
         parts.push_back(effect);
     const std::string key = zub::midi::cacheKey(parts);
@@ -148,10 +150,23 @@ void PlaybackRunner::start(PlaybackRequest request) {
         return;
     }
 
+    // fluidsynth plays the file with the bends and slides as pitch bend events; the file is small,
+    // so this is no work for a worker thread. Without it (not a file the rewrite reads) the
+    // original is played.
+    fs::path playedMidi = current_.midiFile;
+    if (const auto smoothed = zub::midi::smoothBends(rawMidi); smoothed && *smoothed != rawMidi) {
+        const fs::path smoothFile = current_.cacheDir / (key + ".mid");
+        QFile out(toQString(smoothFile));
+        if (out.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
+            out.write(smoothed->data(), static_cast<qint64>(smoothed->size())) ==
+                static_cast<qint64>(smoothed->size()))
+            playedMidi = smoothFile;
+    }
+
     running_ = true;
     emit started();
     const auto render = zub::midi::renderCommand(toStdString(current_.fluidsynth),
-                                                 current_.soundfont, current_.midiFile, wavTemp_);
+                                                 current_.soundfont, playedMidi, wavTemp_);
     QStringList list;
     for (const std::string& argument : render.arguments)
         list << toQString(argument);
@@ -269,4 +284,9 @@ void PlaybackRunner::trimCache() const {
         dir.entryInfoList({QStringLiteral("*.wav")}, QDir::Files, QDir::Time); // newest first
     for (int i = keptWavFiles; i < files.size(); ++i)
         QFile::remove(files[i].absoluteFilePath());
+    // The rewritten MIDI files (<key>.mid) of the same keys.
+    const QFileInfoList midis =
+        dir.entryInfoList({QStringLiteral("*.mid")}, QDir::Files, QDir::Time);
+    for (int i = keptWavFiles; i < midis.size(); ++i)
+        QFile::remove(midis[i].absoluteFilePath());
 }
