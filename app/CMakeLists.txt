@@ -18,6 +18,8 @@ qt_add_executable(zpevnikar
     ScoreInputBar.cpp
     NoteSounds.hpp
     NoteSounds.cpp
+    WavFile.hpp
+    WavFile.cpp
     PlaybackRunner.hpp
     PlaybackRunner.cpp
     ScorePlayer.hpp

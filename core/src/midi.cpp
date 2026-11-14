@@ -97,10 +97,9 @@ void putLe32(std::string& s, std::size_t at, unsigned v) {
 }
 } // namespace
 
-std::string trimSilence(std::string_view wav, int threshold, int keepMs) {
-    const std::string unchanged(wav);
+std::optional<WavTrim> trimPlan(std::string_view wav, int threshold, int keepMs) {
     if (wav.size() < 12 || wav.substr(0, 4) != "RIFF" || wav.substr(8, 4) != "WAVE")
-        return unchanged;
+        return std::nullopt;
     unsigned channels = 0, rate = 0, bits = 0;
     std::size_t dataAt = 0, dataSize = 0;
     for (std::size_t pos = 12; pos + 8 <= wav.size();) {
@@ -108,7 +107,7 @@ std::string trimSilence(std::string_view wav, int threshold, int keepMs) {
         const std::size_t size = le32(wav, pos + 4);
         if (id == "fmt " && pos + 8 + 16 <= wav.size()) {
             if (le16(wav, pos + 8) != 1)
-                return unchanged; // not PCM
+                return std::nullopt; // not PCM
             channels = le16(wav, pos + 10);
             rate = le32(wav, pos + 12);
             bits = le16(wav, pos + 22);
@@ -120,7 +119,7 @@ std::string trimSilence(std::string_view wav, int threshold, int keepMs) {
         pos += 8 + size + (size & 1);
     }
     if (dataAt == 0 || channels == 0 || bits != 16 || rate == 0)
-        return unchanged;
+        return std::nullopt;
     const std::size_t frameBytes = channels * 2;
     const std::size_t frames = dataSize / frameBytes;
     std::size_t last = frames; // one past the last loud frame
@@ -135,13 +134,24 @@ std::string trimSilence(std::string_view wav, int threshold, int keepMs) {
         --last;
     }
     if (last == 0)
-        return unchanged;
+        return std::nullopt;
     const std::size_t keep = static_cast<std::size_t>(keepMs) * rate / 1000;
     const std::size_t newFrames = std::min(frames, last + keep);
     if (newFrames == frames && dataSize == frames * frameBytes && dataAt + dataSize == wav.size())
-        return unchanged;
-    std::string out(wav.substr(0, dataAt + newFrames * frameBytes));
-    putLe32(out, dataAt - 4, static_cast<unsigned>(newFrames * frameBytes));
+        return std::nullopt;
+    WavTrim plan;
+    plan.size = dataAt + newFrames * frameBytes;
+    plan.dataSizeAt = dataAt - 4;
+    plan.dataSize = static_cast<unsigned>(newFrames * frameBytes);
+    return plan;
+}
+
+std::string trimSilence(std::string_view wav, int threshold, int keepMs) {
+    const auto plan = trimPlan(wav, threshold, keepMs);
+    if (!plan)
+        return std::string(wav);
+    std::string out(wav.substr(0, plan->size));
+    putLe32(out, plan->dataSizeAt, plan->dataSize);
     putLe32(out, 4, static_cast<unsigned>(out.size() - 8));
     return out;
 }

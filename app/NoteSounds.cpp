@@ -1,5 +1,6 @@
 #include "NoteSounds.hpp"
 
+#include "WavFile.hpp"
 #include "convert.hpp"
 
 #include <QCoreApplication>
@@ -29,18 +30,13 @@ NoteSounds::NoteSounds(fs::path cacheDir, QObject* parent)
         const bool ok = process_->exitStatus() == QProcess::NormalExit &&
                         process_->exitCode() == 0 && fs::is_regular_file(temp, ec) &&
                         fs::file_size(temp, ec) > 44;
+        if (ok && !trimWavFile(temp)) {
+            fs::remove(temp, ec);
+            emit failed(tr("Cannot trim the rendered note sound."));
+            renderNext();
+            return;
+        }
         if (ok) {
-            {
-                QFile file(toQString(temp));
-                if (file.open(QIODevice::ReadOnly)) {
-                    const QByteArray audio = file.readAll();
-                    file.close();
-                    const std::string trimmed = zub::midi::trimSilence(std::string_view(
-                        audio.constData(), static_cast<std::size_t>(audio.size())));
-                    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-                        file.write(trimmed.data(), static_cast<qint64>(trimmed.size()));
-                }
-            }
             fs::rename(temp, wav, ec);
             if (wanted_ == note)
                 playFile(wav);

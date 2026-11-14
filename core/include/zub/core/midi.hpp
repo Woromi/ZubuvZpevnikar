@@ -36,6 +36,16 @@ findSoundfont(const std::vector<std::filesystem::path>& candidates);
 // FluidSynth renders until the soundfont's samples have died away, which can be ten seconds of
 // silence behind the music. Returns the 16-bit PCM WAV file `wav` cut `keepMs` after its last
 // sample louder than `threshold` (of 32767); unchanged when it is not such a file or has no sound.
+// A cut that trimPlan found: shorten the file to `size` bytes, write `dataSize` (little endian,
+// 4 bytes) at `dataSizeAt` and `size - 8` at offset 4 (the RIFF size). Nothing else changes, so a
+// big file needs no copy.
+struct WavTrim {
+    std::size_t size = 0;
+    std::size_t dataSizeAt = 0;
+    unsigned dataSize = 0;
+};
+// nullopt when trimSilence would leave the input unchanged. Reads only the tail of the data.
+std::optional<WavTrim> trimPlan(std::string_view wav, int threshold = 64, int keepMs = 300);
 std::string trimSilence(std::string_view wav, int threshold = 64, int keepMs = 300);
 
 // A Standard MIDI File (format 0, one track, 1000 ticks per quarter at 60 bpm: one tick is one

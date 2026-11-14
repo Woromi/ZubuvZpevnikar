@@ -1,5 +1,6 @@
 #include "PlaybackRunner.hpp"
 
+#include "WavFile.hpp"
 #include "convert.hpp"
 
 #include <QCoreApplication>
@@ -178,17 +179,13 @@ void PlaybackRunner::onProcessFinished() {
         finishWith(failure);
         return;
     }
-    {
-        // Cut the silence the soundfont's long release leaves behind the music.
-        QFile file(toQString(wavTemp_));
-        if (file.open(QIODevice::ReadOnly)) {
-            const QByteArray audio = file.readAll();
-            file.close();
-            const std::string trimmed = zub::midi::trimSilence(
-                std::string_view(audio.constData(), static_cast<std::size_t>(audio.size())));
-            if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-                file.write(trimmed.data(), static_cast<qint64>(trimmed.size()));
-        }
+    // Cut the silence the soundfont's long release leaves behind the music. A failed trim leaves
+    // the temp file in an unknown state: it never reaches the cache.
+    if (!trimWavFile(wavTemp_)) {
+        fs::remove(wavTemp_, ec);
+        failure.message = tr("Cannot trim the rendered audio.");
+        finishWith(failure);
+        return;
     }
     fs::rename(wavTemp_, wav_, ec);
     if (ec) {

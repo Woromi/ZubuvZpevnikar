@@ -112,3 +112,36 @@ TEST_CASE("midi trimSilence leaves other input alone", "[midi]") {
     const auto silent = wavOf(std::vector<int>(50, 0));
     CHECK(mi::trimSilence(silent) == silent);
 }
+
+TEST_CASE("midi trimPlan describes the cut without a copy", "[midi]") {
+    std::vector<int> samples(200, 0);
+    samples[40] = 5000;
+    const std::string wav = wavOf(samples);
+    const auto plan = mi::trimPlan(wav, 64, 100);
+    REQUIRE(plan);
+    const std::string expected = mi::trimSilence(wav, 64, 100);
+    CHECK(plan->size == expected.size());
+    CHECK(plan->size < wav.size());
+    CHECK(plan->dataSize == 141u * 2u);
+    // The patch the app applies to the file gives the same bytes as the copy.
+    std::string patched = wav.substr(0, plan->size);
+    for (std::size_t i = 0; i < 4; ++i) {
+        patched[plan->dataSizeAt + i] = static_cast<char>((plan->dataSize >> (8 * i)) & 0xff);
+        patched[4 + i] = static_cast<char>(((plan->size - 8) >> (8 * i)) & 0xff);
+    }
+    CHECK(patched == expected);
+
+    CHECK_FALSE(mi::trimPlan("", 64, 100));
+    CHECK_FALSE(mi::trimPlan("RIFF", 64, 100));
+    CHECK_FALSE(mi::trimPlan(wav, 64, 1000));
+    CHECK_FALSE(mi::trimPlan(wavOf(std::vector<int>(50, 0))));
+    CHECK_FALSE(mi::trimPlan(wav.substr(0, 30), 64, 100)); // cut inside the header
+    // A data chunk that claims more than the file holds stays within the file.
+    std::string lying = wav;
+    lying[wav.find("data") + 4] = '\xff';
+    lying[wav.find("data") + 5] = '\xff';
+    lying[wav.find("data") + 6] = '\xff';
+    const auto lyingPlan = mi::trimPlan(lying, 64, 100);
+    REQUIRE(lyingPlan);
+    CHECK(lyingPlan->size <= lying.size());
+}
