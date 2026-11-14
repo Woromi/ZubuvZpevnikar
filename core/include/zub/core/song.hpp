@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace zub {
 
@@ -30,5 +31,12 @@ std::map<std::string, std::string, std::less<>> parseOptions(std::string_view op
 // Why `inputName` ("Artist/Title", relative, '/'-separated, no .tex) cannot name a song the
 // songbook can \input; nullopt if it is fine.
 std::optional<std::string> invalidInputName(std::string_view inputName);
+
+// The languages of a `lang` value ("czech, quenya", with or without its braces): split on commas,
+// trimmed, empties dropped. The first is the song's language (grammar, chord and note naming,
+// index order, book filtering); the rest only tag it (lokalizace.cfg). Port of songfile.py's
+// song_langs / main_lang.
+std::vector<std::string> songLanguages(std::string_view lang);
+std::string mainLanguage(std::string_view lang); // "" without one
 
 } // namespace zub

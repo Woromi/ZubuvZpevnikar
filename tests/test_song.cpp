@@ -98,3 +98,14 @@ TEST_CASE("invalidInputName", "[song]") {
     CHECK(zub::invalidInputName("A/"));
     CHECK(zub::invalidInputName("A/B\n"));
 }
+
+TEST_CASE("songLanguages and mainLanguage read a lang list like songfile.py", "[song]") {
+    CHECK(zub::songLanguages("czech") == std::vector<std::string>{"czech"});
+    CHECK(zub::songLanguages("{czech, quenya}") == std::vector<std::string>{"czech", "quenya"});
+    CHECK(zub::songLanguages(" czech ,, hebrew ") == std::vector<std::string>{"czech", "hebrew"});
+    CHECK(zub::songLanguages("").empty());
+    CHECK(zub::songLanguages("{}").empty());
+    CHECK(zub::mainLanguage("{czech, hebrew}") == "czech");
+    CHECK(zub::mainLanguage("english") == "english");
+    CHECK(zub::mainLanguage(" , ").empty());
+}

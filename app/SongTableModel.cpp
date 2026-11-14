@@ -29,7 +29,12 @@ SongTableModel::Row SongTableModel::makeRow(zub::SongEntry entry) {
     Row row;
     row.title = toQString(zub::latex::toDisplayText(entry.meta.title));
     row.artist = toQString(zub::latex::toDisplayText(entry.meta.value("by")));
-    row.language = toQString(entry.meta.value("lang"));
+    // lang={czech, hebrew}: the first is the song's language; the column and the language filter
+    // know them all (a song is found under each of its languages).
+    const auto languages = zub::songLanguages(entry.meta.value("lang"));
+    for (const auto& language : languages)
+        row.languages << toQString(language);
+    row.languagesText = row.languages.join(QStringLiteral(", "));
     row.key = toQString(zub::latex::toDisplayText(entry.meta.value("key")));
     row.tempo = toQString(zub::latex::toDisplayText(entry.meta.value("tem")));
     row.meter = toQString(zub::latex::toDisplayText(entry.meta.value("met")));
@@ -47,7 +52,7 @@ SongTableModel::Row SongTableModel::makeRow(zub::SongEntry entry) {
     row.todo = todos.join(QStringLiteral("; "));
     row.todoToolTip = todos.join(QLatin1Char('\n'));
     row.searchText = foldForSearch(
-        QStringList{row.title, row.artist, row.language, row.key, row.labelsText, row.todo}.join(
+        QStringList{row.title, row.artist, row.languagesText, row.key, row.labelsText, row.todo}.join(
             QLatin1Char('\n')));
     row.toolTip = toQString(entry.inputName) + QLatin1Char('\n') + toQString(entry.path);
     row.entry = std::move(entry);
@@ -155,7 +160,7 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
         case Artist:
             return row.artist;
         case Language:
-            return row.language;
+            return row.languagesText;
         case Key:
             return row.key;
         case Tempo:
@@ -203,7 +208,7 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
     case LabelsRole:
         return row.labels;
     case LanguageRole:
-        return row.language;
+        return row.languages;
     case SearchTextRole:
         return row.searchText;
     case InputNameRole:

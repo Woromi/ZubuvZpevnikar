@@ -107,6 +107,10 @@ TEST_CASE("germanNames follows zubuvzpevnik.sty", "[score]") {
     CHECK_FALSE(sc::germanNames("english"));
     CHECK_FALSE(sc::germanNames(""));
     CHECK_FALSE(sc::germanNames("french"));
+    // A list: the first is the song's language (lokalizace.cfg), the rest only tag it.
+    CHECK(sc::germanNames("{czech, hebrew}"));
+    CHECK(sc::germanNames("slovak,english"));
+    CHECK_FALSE(sc::germanNames("english, czech"));
 }
 
 TEST_CASE("score errors are read from the log", "[score]") {

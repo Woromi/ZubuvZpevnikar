@@ -136,6 +136,34 @@ std::expected<SongMetadata, std::string> parseSong(std::string_view content) {
     return meta;
 }
 
+std::vector<std::string> songLanguages(std::string_view lang) {
+    const auto blank = [](char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; };
+    while (!lang.empty() && (blank(lang.front()) || lang.front() == '{'))
+        lang.remove_prefix(1);
+    while (!lang.empty() && (blank(lang.back()) || lang.back() == '}'))
+        lang.remove_suffix(1);
+    std::vector<std::string> languages;
+    while (true) {
+        const auto comma = lang.find(',');
+        std::string_view part = lang.substr(0, comma);
+        while (!part.empty() && blank(part.front()))
+            part.remove_prefix(1);
+        while (!part.empty() && blank(part.back()))
+            part.remove_suffix(1);
+        if (!part.empty())
+            languages.emplace_back(part);
+        if (comma == std::string_view::npos)
+            break;
+        lang.remove_prefix(comma + 1);
+    }
+    return languages;
+}
+
+std::string mainLanguage(std::string_view lang) {
+    auto languages = songLanguages(lang);
+    return languages.empty() ? std::string() : std::move(languages.front());
+}
+
 std::optional<std::string> invalidInputName(std::string_view name) {
     if (name.empty())
         return "empty";

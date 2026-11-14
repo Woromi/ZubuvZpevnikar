@@ -27,7 +27,7 @@ public:
         ColumnCount
     };
     enum Role {
-        LanguageRole = Qt::UserRole, // raw lang value, e.g. "czech"
+        LanguageRole = Qt::UserRole, // QStringList: every language of lang={...}, the main one first
         SearchTextRole,              // all columns, case- and accent-folded, for filtering
         InputNameRole,               // "Artist/Title"
         HasTodoRole,                 // bool: the song has TODO comments
@@ -71,11 +71,13 @@ public:
 private:
     struct Row {
         zub::SongEntry entry;
-        QString title, artist, language, key, tempo, meter, capo, todo, todoToolTip, searchText,
+        QString title, artist, key, tempo, meter, capo, todo, todoToolTip, searchText,
             toolTip, labelsText;
         QStringList labels;
         bool favourite = false;
         QString changes, changesToolTip; // from a songbook scan
+        QStringList languages;           // every language of lang={...}, the song's own first
+        QString languagesText;           // the same, joined for the column
         int changeCount = 0;             // the items listed in changesToolTip
     };
     static Row makeRow(zub::SongEntry entry);

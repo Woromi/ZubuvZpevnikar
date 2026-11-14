@@ -357,8 +357,9 @@ void SongbooksPage::refreshLanguages() {
     const QString current = language_->currentData().toString();
     std::set<QString> languages;
     for (int row = 0; row < model_->rowCount(); ++row) {
-        const QString lang = model_->index(row, 0).data(SongTableModel::LanguageRole).toString();
-        if (!lang.isEmpty())
+        // Every language of every song: also the ones a song is only tagged with.
+        for (const QString& lang :
+             model_->index(row, 0).data(SongTableModel::LanguageRole).toStringList())
             languages.insert(lang);
     }
     const QSignalBlocker blocker(language_);
@@ -1004,7 +1005,7 @@ void SongbooksPage::requestSort(int sectionIndex, SortMode mode, const std::set<
         const auto it = byName.find(name);
         if (it != byName.end()) {
             entry.title = it->second->meta.title;
-            entry.lang = it->second->meta.value("lang");
+            entry.lang = zub::mainLanguage(it->second->meta.value("lang")); // the first of a list
         } else {
             const auto slash = name.rfind('/');
             entry.title = slash == std::string::npos ? name : name.substr(slash + 1);

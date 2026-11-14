@@ -692,8 +692,9 @@ void MainWindow::updateLanguageFilter() {
     const QString current = language_->currentData().toString();
     std::set<QString> languages;
     for (int row = 0; row < model_->rowCount(); ++row) {
-        const QString lang = model_->index(row, 0).data(SongTableModel::LanguageRole).toString();
-        if (!lang.isEmpty())
+        // Every language of every song: also the ones a song is only tagged with.
+        for (const QString& lang :
+             model_->index(row, 0).data(SongTableModel::LanguageRole).toStringList())
             languages.insert(lang);
     }
 
@@ -1607,7 +1608,7 @@ void MainWindow::onTidyFinished(const std::expected<ConverterOutput, QString>& o
     std::string lang;
     if (const auto meta = zub::parseSong(after)) {
         if (const auto it = meta->keys.find("lang"); it != meta->keys.end())
-            lang = it->second;
+            lang = zub::mainLanguage(it->second); // lang={czech, hebrew}: the first counts
     }
     if (lang.empty())
         message += tr(" (chord positions not checked: set lang in the song header)");

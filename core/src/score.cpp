@@ -166,11 +166,8 @@ std::expected<Command, std::string> prepare(const Request& request) {
 }
 
 bool germanNames(std::string_view lang) {
-    while (!lang.empty() && (lang.front() == '{' || lang.front() == ' ' || lang.front() == '\t'))
-        lang.remove_prefix(1);
-    while (!lang.empty() && (lang.back() == '}' || lang.back() == ' ' || lang.back() == '\t'))
-        lang.remove_suffix(1);
-    std::string lower(lang);
+    // The song's language is the first of a list (lang={czech, hebrew}), as in lokalizace.cfg.
+    std::string lower = mainLanguage(lang);
     std::ranges::transform(lower, lower.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lower == "czech" || lower == "slovak";

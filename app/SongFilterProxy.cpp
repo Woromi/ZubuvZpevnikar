@@ -52,7 +52,8 @@ void SongFilterProxy::setOnlyNames(std::optional<std::set<std::string>> names) {
 
 bool SongFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const {
     const QModelIndex index = sourceModel()->index(sourceRow, 0, sourceParent);
-    if (!language_.isEmpty() && index.data(SongTableModel::LanguageRole).toString() != language_)
+    if (!language_.isEmpty() &&
+        !index.data(SongTableModel::LanguageRole).toStringList().contains(language_))
         return false;
     if (todoOnly_ && !index.data(SongTableModel::HasTodoRole).toBool())
         return false;
