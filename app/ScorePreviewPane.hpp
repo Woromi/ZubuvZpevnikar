@@ -9,6 +9,10 @@
 struct ScoreResult;
 class QAction;
 class QComboBox;
+class QFrame;
+class QHBoxLayout;
+class QVBoxLayout;
+class StaffInstrumentRow;
 class QLabel;
 class QListWidget;
 class QScrollArea;
@@ -36,8 +40,19 @@ public:
     void setPlayState(PlayState state);
     void showPlaybackMessage(const QString& message, bool error); // in the status line
     double tempoFactor() const; // 0.5 ... 1.25 of the song's tempo
-    // The chosen instrument: "auto" (by the score) or a zub::midi::Instrument id.
-    QString instrumentId() const;
+    // The staves of the shown score (zub::score::staves), one instrument choice each. A score with
+    // one staff gets a combo in the toolbar, one with more an "Instruments..." button that opens a
+    // list of them; none without staves. `label` names the staff, `fileInstrument` is the General
+    // MIDI name the score file sets ("" if none: then "Automatic" means the app's guess).
+    // `choices` are zub::midi::Instrument ids ("auto" = as the file or the app's guess), by index;
+    // missing ones are "auto". Setting them emits nothing.
+    struct StaffInfo {
+        QString label;
+        QString fileInstrument;
+        bool operator==(const StaffInfo&) const = default;
+    };
+    void setStaves(const QList<StaffInfo>& staves, const QStringList& choices);
+    QStringList staffChoices() const; // by staff index
     QWidget* playButton() const; // for tests
 
     // Where the note that LilyPond linked to `line` (1-based) and `column` (0-based) is drawn, in
@@ -73,7 +88,9 @@ public:
 signals:
     void rebuildRequested();
     void tempoChanged(); // the playback speed combo changed: the MIDI file must be built again
-    void instrumentChanged(); // ... and so did the instrument combo
+    void instrumentChanged(); // ... and so did a staff's instrument choice
+    // "Save to file" of a staff: the General MIDI name of its chosen instrument.
+    void saveInstrumentRequested(int staff, const QString& gmName);
     void playRequested(); // the Play button was pressed while idle
     void stopRequested(); // ... or Stop while preparing or playing
     // An error located in the score was double-clicked (1-based line and column).
@@ -99,7 +116,16 @@ private:
     QToolButton* logButton_ = nullptr;
     QToolButton* play_ = nullptr;
     QComboBox* tempo_ = nullptr;
-    QComboBox* instrument_ = nullptr;
+    void rebuildStaffRows();
+    void markStaffChoicesFromRows();
+
+    QToolButton* instrumentsButton_ = nullptr; // opens the popup (two or more staves)
+    QFrame* instrumentsPopup_ = nullptr;
+    QVBoxLayout* popupLayout_ = nullptr;
+    QHBoxLayout* instrumentSlot_ = nullptr; // the toolbar's place of the single staff's row
+    QList<StaffInfo> staves_;
+    QStringList staffChoices_;
+    QList<StaffInstrumentRow*> staffRows_;
     PlayState playState_ = PlayState::Idle;
     bool playbackAvailable_ = true;
     QString unavailableReason_;

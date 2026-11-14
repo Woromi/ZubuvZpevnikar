@@ -532,10 +532,15 @@ void MainWindow::createCentralWidget() {
             [this] { scorePreviewTimer_->start(); });
     // ... and a new instrument is another instrument in the MIDI file.
     connect(scorePreview_, &ScorePreviewPane::instrumentChanged, this, [this] {
+        if (!onSongTab() && tabs_->currentIndex() >= 1)
+            staffChoices_[scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name] =
+                scorePreview_->staffChoices();
         scoreRunner_->cancel(); // a build under way has the old instrument
         forgetScoreMidi(); // the old MIDI file has the old instrument: no Play until the rebuild
         scorePreviewTimer_->start();
     });
+    connect(scorePreview_, &ScorePreviewPane::saveInstrumentRequested, this,
+            &MainWindow::saveStaffInstrument);
     connect(scoreRunner_, &ScoreRunner::finished, this, &MainWindow::showScoreResult);
     playbackRunner_ = new PlaybackRunner(this);
     scorePlayer_ = new ScorePlayer(this);
@@ -2423,6 +2428,7 @@ void MainWindow::requestScorePreview(bool userAsked) {
     }
     const std::string name = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name;
     std::string content = editor->content();
+    showStaves(editor, name);
 
     // lilypond runs Scheme: a score is code, like a song.
     QString list;
@@ -2451,17 +2457,69 @@ void MainWindow::requestScorePreview(bool userAsked) {
     zub::score::MidiOptions midi;
     midi.factor = scorePreview_->tempoFactor();
     midi.instrument = zub::score::midiInstrument(request.content);
-    bool amp = false;
-    if (const auto* chosen = zub::midi::findInstrument(toStdString(scorePreview_->instrumentId()))) {
-        midi.instrument = std::string(chosen->name);
-        amp = chosen->amp;
-    }
+    for (const QString& id : scorePreview_->staffChoices())
+        midi.staffInstruments.push_back(toStdString(id));
     if (const auto meta = zub::parseSong(editor_->content())) {
         midi.tempo = zub::score::songTempo(meta->value("tem"));
         midi.transpose = zub::score::songCapo(meta->value("cap")); // sounds as with the capo on
     }
     request.midi = std::move(midi);
-    scoreRunner_->request(std::move(request), amp);
+    scoreRunner_->request(std::move(request));
+}
+
+// The staves of the score in the editor for the toolbar's instrument choices, with the session's
+// choices of this score (cut or padded to the staves that are there now).
+void MainWindow::showStaves(SongEditor* editor, const std::string& name) {
+    const std::string text = editor->editorText();
+    QList<ScorePreviewPane::StaffInfo> infos;
+    int number = 0;
+    for (const zub::score::Staff& staff : zub::score::staves(text)) {
+        ++number;
+        ScorePreviewPane::StaffInfo info;
+        const bool tab = staff.type == "TabStaff";
+        if (!staff.name.empty())
+            info.label = toQString(staff.name);
+        else if (tab && staff.tuning.find("banjo") != std::string::npos)
+            info.label = tr("Staff %1 (banjo tab)").arg(number);
+        else if (tab)
+            info.label = tr("Staff %1 (tab)").arg(number);
+        else
+            info.label = tr("Staff %1").arg(number);
+        info.fileInstrument = toQString(staff.instrument);
+        infos.append(info);
+    }
+    QStringList choices = staffChoices_[name];
+    while (choices.size() < infos.size())
+        choices.append(QStringLiteral("auto"));
+    while (choices.size() > infos.size())
+        choices.removeLast();
+    staffChoices_[name] = choices;
+    scorePreview_->setStaves(infos, choices);
+}
+
+// "Save to file" of a staff: writes the chosen General MIDI instrument into the score as one edit.
+void MainWindow::saveStaffInstrument(int staff, const QString& gmName) {
+    SongEditor* editor = currentEditor();
+    if (!editor || onSongTab() || staff < 0)
+        return;
+    const auto change = zub::score::saveStaffInstrument(editor->editorText(),
+                                                        static_cast<std::size_t>(staff),
+                                                        toStdString(gmName));
+    if (!change || !editor->replaceScoreText(change->text)) {
+        statusBar()->showMessage(
+            tr("The instrument cannot be written into this score (read-only, or the staff's music "
+               "is a bare variable)."),
+            6000);
+        return;
+    }
+    // The file says it now: back to "as the file" for this staff.
+    const std::string name = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name;
+    QStringList& choices = staffChoices_[name];
+    if (staff < choices.size())
+        choices[staff] = QStringLiteral("auto");
+    showStaves(editor, name);
+    statusBar()->showMessage(tr("Instrument written into the score; save the file to keep it."),
+                             6000);
 }
 
 void MainWindow::updateSoundAvailability() {
@@ -2507,6 +2565,7 @@ void MainWindow::playScore() {
     request.soundfont = tools.soundfont;
     request.cacheDir = playbackCacheDir_;
     request.amp = scoreAmp_;
+    request.ampMidiFile = scoreAmpMidi_;
     scorePlayer_->stop();
     playbackRunner_->request(std::move(request));
 }
@@ -2537,9 +2596,32 @@ void MainWindow::soundFret(FretboardWidget* fretboard, int string, int fret) {
     // The chosen instrument; "automatic" is the banjo for a banjo fretboard, else the steel guitar.
     int program = banjo ? zub::midi::programBanjo : zub::midi::programSteelGuitar;
     bool amp = false;
-    if (const auto* chosen = zub::midi::findInstrument(toStdString(scorePreview_->instrumentId()))) {
-        program = chosen->program;
-        amp = chosen->amp;
+    // The staff the cursor is in (else the first tab staff, else the first): its choice, else the
+    // instrument the file sets for it.
+    if (SongEditor* scoreEditor = currentEditor(); scoreEditor && !onSongTab()) {
+        const auto staves = zub::score::staves(scoreEditor->editorText());
+        std::size_t at = staves.size();
+        const std::size_t cursor = scoreEditor->cursorByteOffset();
+        for (std::size_t i = 0; i < staves.size() && at == staves.size(); ++i)
+            if (staves[i].begin <= cursor && cursor < staves[i].end)
+                at = i;
+        for (std::size_t i = 0; i < staves.size() && at == staves.size(); ++i)
+            if (staves[i].type == "TabStaff")
+                at = i;
+        if (at == staves.size() && !staves.empty())
+            at = 0;
+        if (at < staves.size()) {
+            const QStringList choices = scorePreview_->staffChoices();
+            const auto* chosen = at < static_cast<std::size_t>(choices.size())
+                                     ? zub::midi::findInstrument(toStdString(choices[static_cast<qsizetype>(at)]))
+                                     : nullptr;
+            if (!chosen)
+                chosen = zub::midi::findInstrumentByName(staves[at].instrument);
+            if (chosen) {
+                program = chosen->program;
+                amp = chosen->amp;
+            }
+        }
     }
     noteSounds_->play(tools, program, fretboard->midiAt(string, fret) + capo, amp);
 }
@@ -2553,6 +2635,7 @@ void MainWindow::showScoreResult(const ScoreResult& result) {
     scorePreview_->showResult(result);
     scoreMidi_ = result.midi;
     scoreAmp_ = result.amp; // of the build the MIDI file belongs to
+    scoreAmpMidi_ = result.ampMidi;
     updateSoundAvailability();
     scoreLinksFresh_ = result.success && !scorePreviewTimer_->isActive();
     indexScoreEvents();

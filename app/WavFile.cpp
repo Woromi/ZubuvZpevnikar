@@ -3,6 +3,7 @@
 #include "convert.hpp"
 
 #include <QFile>
+#include <QSaveFile>
 #include <string_view>
 #include <span>
 #include <zub/core/audio.hpp>
@@ -47,4 +48,24 @@ bool ampWavFile(const std::filesystem::path& wav) {
         std::span<char>(reinterpret_cast<char*>(mapped), static_cast<std::size_t>(size)));
     file.unmap(mapped);
     return done && file.flush();
+}
+
+bool mixWavFiles(const std::filesystem::path& base, const std::filesystem::path& other) {
+    QFile first(toQString(base));
+    QFile second(toQString(other));
+    if (!first.open(QIODevice::ReadOnly) || !second.open(QIODevice::ReadOnly))
+        return false;
+    const QByteArray a = first.readAll();
+    const QByteArray b = second.readAll();
+    first.close();
+    const auto mixed = zub::audio::mixWav(std::span<const char>(a.constData(), static_cast<std::size_t>(a.size())),
+                                          std::span<const char>(b.constData(), static_cast<std::size_t>(b.size())));
+    if (!mixed)
+        return false;
+    QSaveFile out(toQString(base));
+    if (!out.open(QIODevice::WriteOnly))
+        return false;
+    return out.write(mixed->data(), static_cast<qint64>(mixed->size())) ==
+               static_cast<qint64>(mixed->size()) &&
+           out.commit();
 }

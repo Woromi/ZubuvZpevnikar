@@ -137,6 +137,9 @@ public:
     // Selects [begin, end) of the editor text, shows it and focuses the editor (unless `focus` is
     // false: the score preview keeps the keyboard).
     void selectByteRange(std::size_t begin, std::size_t end, bool focus = true);
+    // Replaces the whole editor text by `text` (LF line ends) as ONE undo step; only the differing
+    // middle is edited, so the cursor and scroll stay. False in a read-only editor (Kind::Score only).
+    bool replaceScoreText(const std::string& text);
     // Replaces [begin, end) of the editor text by `text` as ONE undo step (cursor and scroll stay,
     // nothing else changes), then selects [selectBegin, selectEnd) of the NEW text. False in a
     // read-only editor (Kind::Score only).

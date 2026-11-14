@@ -995,6 +995,13 @@ bool SongEditor::replaceScoreRange(std::size_t begin, std::size_t end, const std
     return true;
 }
 
+bool SongEditor::replaceScoreText(const std::string& text) {
+    if (edit_->isReadOnly() || kind_ != Kind::Score)
+        return false;
+    replaceDocumentText(toQString(text));
+    return true;
+}
+
 bool SongEditor::applyRegionAction(zub::scoreregion::Action action,
                                    zub::scoreregion::Refusal* why) {
     if (edit_->isReadOnly() || kind_ != Kind::Score)

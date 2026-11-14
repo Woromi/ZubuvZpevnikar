@@ -12,3 +12,8 @@ bool trimWavFile(const std::filesystem::path& wav);
 // an I/O error (the file may then be damaged: delete it). Touches the whole file: for a long one
 // call it off the UI thread.
 bool ampWavFile(const std::filesystem::path& wav);
+
+// Mixes the WAV file `other` into `base` (zub::audio::mixWav): `base` is replaced by the sum, as
+// long as the longer of the two. False when either is no 16-bit PCM WAV file of the other's format
+// or on an I/O error; `base` is then unchanged. Reads both files whole: call it off the UI thread.
+bool mixWavFiles(const std::filesystem::path& base, const std::filesystem::path& other);

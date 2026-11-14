@@ -15,6 +15,9 @@ struct PlaybackRequest {
     std::filesystem::path soundfont;
     std::filesystem::path cacheDir; // the WAV files <key>.wav live here
     bool amp = false;               // run the rendered audio through zub::audio::applyAmp
+    // The MIDI file of the staves that sound through the amp while the others (midiFile) do not:
+    // rendered on its own, run through the amp, and mixed into the other audio. Empty without.
+    std::filesystem::path ampMidiFile;
 };
 
 struct PlaybackResult {
@@ -46,6 +49,7 @@ signals:
 
 private:
     void start(PlaybackRequest request);
+    void startRender(const std::filesystem::path& midi, const std::filesystem::path& wav);
     void onProcessFinished();
     void finishWith(PlaybackResult result);
     void killTree();
@@ -60,6 +64,10 @@ private:
     std::optional<PlaybackRequest> pending_; // waits for the killed process to exit
     std::filesystem::path wav_;              // the final file of the running request
     std::filesystem::path wavTemp_;          // fluidsynth writes here first
+    std::filesystem::path ampTemp_;          // ... and the amp staves' audio here (second render)
+    std::filesystem::path playedMidi_;       // the files fluidsynth reads (bends smoothed)
+    std::filesystem::path playedAmpMidi_;
+    bool renderingAmp_ = false;              // the running fluidsynth renders the amp staves
     bool timedOut_ = false;
     bool cancelled_ = false;
     bool startFailed_ = false;

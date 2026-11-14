@@ -130,16 +130,37 @@ void PlaybackRunner::start(PlaybackRequest request) {
         current_.amp ? std::string(zub::audio::ampId) + std::to_string(zub::audio::ampVersion)
                      : std::string();
     const std::string rawMidi(bytes.constData(), static_cast<std::size_t>(bytes.size()));
+    std::string rawAmpMidi;
+    if (!current_.ampMidiFile.empty()) {
+        QFile ampMidi(toQString(current_.ampMidiFile));
+        if (!ampMidi.open(QIODevice::ReadOnly)) {
+            failure.message = tr("Cannot read the MIDI file: %1").arg(ampMidi.errorString());
+            emit finished(failure);
+            return;
+        }
+        const QByteArray ampBytes = ampMidi.readAll();
+        rawAmpMidi.assign(ampBytes.constData(), static_cast<std::size_t>(ampBytes.size()));
+    }
+    // The amp staves are mixed in: another sound for the same main MIDI file.
+    const bool mixAmp = !current_.ampMidiFile.empty();
     // The bends and slides are part of what is played: their version is part of the key too.
     const std::string bends = "bend" + std::to_string(zub::midi::bendVersion);
     std::vector<std::string_view> parts{rawMidi, soundfont, bends};
     if (!effect.empty())
         parts.push_back(effect);
+    const std::string ampEffect =
+        std::string(zub::audio::ampId) + std::to_string(zub::audio::ampVersion) + "-mixed";
+    if (mixAmp) {
+        parts.push_back(rawAmpMidi);
+        parts.push_back(ampEffect);
+    }
     const std::string key = zub::midi::cacheKey(parts);
     fs::create_directories(current_.cacheDir, ec);
     wav_ = current_.cacheDir / (key + ".wav");
-    wavTemp_ = current_.cacheDir /
-               (key + "." + std::to_string(QCoreApplication::applicationPid()) + ".tmp");
+    const std::string pid = std::to_string(QCoreApplication::applicationPid());
+    wavTemp_ = current_.cacheDir / (key + "." + pid + ".tmp");
+    ampTemp_ = current_.cacheDir / (key + "." + pid + ".amp.tmp");
+    renderingAmp_ = false;
     if (fs::is_regular_file(wav_, ec) && fs::file_size(wav_, ec) > 0) {
         fs::last_write_time(wav_, fs::file_time_type::clock::now(), ec); // newest again
         PlaybackResult result;
@@ -153,20 +174,31 @@ void PlaybackRunner::start(PlaybackRequest request) {
     // fluidsynth plays the file with the bends and slides as pitch bend events; the file is small,
     // so this is no work for a worker thread. Without it (not a file the rewrite reads) the
     // original is played.
-    fs::path playedMidi = current_.midiFile;
-    if (const auto smoothed = zub::midi::smoothBends(rawMidi); smoothed && *smoothed != rawMidi) {
-        const fs::path smoothFile = current_.cacheDir / (key + ".mid");
-        QFile out(toQString(smoothFile));
-        if (out.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
-            out.write(smoothed->data(), static_cast<qint64>(smoothed->size())) ==
-                static_cast<qint64>(smoothed->size()))
-            playedMidi = smoothFile;
-    }
+    const auto smoothed = [this](const std::filesystem::path& file, const std::string& raw,
+                                 const std::string& name) {
+        if (const auto smooth = zub::midi::smoothBends(raw); smooth && *smooth != raw) {
+            const fs::path smoothFile = current_.cacheDir / (name + ".mid");
+            QFile out(toQString(smoothFile));
+            if (out.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
+                out.write(smooth->data(), static_cast<qint64>(smooth->size())) ==
+                    static_cast<qint64>(smooth->size()))
+                return smoothFile;
+        }
+        return file;
+    };
+    playedMidi_ = smoothed(current_.midiFile, rawMidi, key);
+    playedAmpMidi_.clear();
+    if (mixAmp)
+        playedAmpMidi_ = smoothed(current_.ampMidiFile, rawAmpMidi, key + ".amp");
 
     running_ = true;
     emit started();
+    startRender(playedMidi_, wavTemp_);
+}
+
+void PlaybackRunner::startRender(const fs::path& midi, const fs::path& wav) {
     const auto render = zub::midi::renderCommand(toStdString(current_.fluidsynth),
-                                                 current_.soundfont, playedMidi, wavTemp_);
+                                                 current_.soundfont, midi, wav);
     QStringList list;
     for (const std::string& argument : render.arguments)
         list << toQString(argument);
@@ -191,6 +223,7 @@ void PlaybackRunner::onProcessFinished() {
         auto next = std::move(*pending_);
         pending_.reset();
         fs::remove(wavTemp_, ec);
+        fs::remove(ampTemp_, ec);
         start(std::move(next));
         return;
     }
@@ -199,6 +232,7 @@ void PlaybackRunner::onProcessFinished() {
         timedOut_ = false;
         running_ = false;
         fs::remove(wavTemp_, ec);
+        fs::remove(ampTemp_, ec);
         return;
     }
 
@@ -213,12 +247,21 @@ void PlaybackRunner::onProcessFinished() {
         failure.message = tr("fluidsynth crashed.");
     } else if (process_->exitCode() != 0) {
         failure.message = tr("fluidsynth failed: %1").arg(QString::fromUtf8(output).trimmed());
-    } else if (!fs::is_regular_file(wavTemp_, ec) || fs::file_size(wavTemp_, ec) <= 44) {
-        failure.message = tr("fluidsynth wrote no audio.");
+    } else {
+        const fs::path& written = renderingAmp_ ? ampTemp_ : wavTemp_;
+        if (!fs::is_regular_file(written, ec) || fs::file_size(written, ec) <= 44)
+            failure.message = tr("fluidsynth wrote no audio.");
     }
     if (!failure.message.isEmpty()) {
         fs::remove(wavTemp_, ec);
+        fs::remove(ampTemp_, ec);
         finishWith(failure);
+        return;
+    }
+    if (!playedAmpMidi_.empty() && !renderingAmp_) {
+        // The other staves are done: the amp staves are rendered on their own.
+        renderingAmp_ = true;
+        startRender(playedAmpMidi_, ampTemp_);
         return;
     }
     postProcess();
@@ -229,10 +272,18 @@ void PlaybackRunner::onProcessFinished() {
 // a worker thread: both map the whole file, which can be tens of megabytes.
 void PlaybackRunner::postProcess() {
     const fs::path temp = wavTemp_;
+    const fs::path ampTemp = renderingAmp_ ? ampTemp_ : fs::path();
     const bool amp = current_.amp;
     auto ok = std::make_shared<std::atomic<bool>>(false);
-    worker_ = QThread::create([temp, amp, ok] {
-        ok->store((!amp || ampWavFile(temp)) && trimWavFile(temp));
+    worker_ = QThread::create([temp, ampTemp, amp, ok] {
+        bool done = !amp || ampWavFile(temp);
+        if (done && !ampTemp.empty()) {
+            // The amp staves go through the effect on their own, then join the others.
+            done = ampWavFile(ampTemp) && mixWavFiles(temp, ampTemp);
+            std::error_code ec;
+            fs::remove(ampTemp, ec);
+        }
+        ok->store(done && trimWavFile(temp));
     });
     connect(worker_, &QThread::finished, this, [this, ok] {
         worker_->deleteLater();
@@ -255,6 +306,7 @@ void PlaybackRunner::onPostProcessed(bool ok) {
             fs::remove(wavTemp_, ec);
         else
             trimCache();
+        fs::remove(ampTemp_, ec);
         start(std::move(next));
         return;
     }
@@ -262,11 +314,13 @@ void PlaybackRunner::onPostProcessed(bool ok) {
         cancelled_ = false;
         running_ = false;
         fs::remove(wavTemp_, ec);
+        fs::remove(ampTemp_, ec);
         return;
     }
     // A failed trim leaves the temp file in an unknown state: it never reaches the cache.
     if (!ok) {
         fs::remove(wavTemp_, ec);
+        fs::remove(ampTemp_, ec);
         failure.message = tr("Cannot trim the rendered audio.");
         finishWith(failure);
         return;

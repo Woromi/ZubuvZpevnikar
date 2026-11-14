@@ -176,6 +176,8 @@ private:
     void showPlaybackResult(const PlaybackResult& result);
     void updateSoundAvailability(); // fluidsynth and a soundfont: enables Play and Sound
     void soundFret(FretboardWidget* fretboard, int string, int fret);
+    void saveStaffInstrument(int staff, const QString& gmName);
+    void showStaves(SongEditor* editor, const std::string& name);
     // Labels (the `tags` header option; "fav" = favourite). `change` maps a song's current tags to
     // its new ones. An open song gets the new header in its editor (one undo step, unsaved); any
     // other song is rewritten on disk, if it round-trips, and its table row updated. Returns an
@@ -304,6 +306,10 @@ private:
     ScorePlayer* scorePlayer_ = nullptr;
     NoteSounds* noteSounds_ = nullptr;
     bool scoreAmp_ = false; // the latest preview build's MIDI file is for the amp instrument
+    std::filesystem::path scoreAmpMidi_; // ... and the amp staves' own file when others don't use it
+    // The instrument choices of each staff (zub::midi::Instrument ids, "auto" = as the file), by
+    // score name ("Artist/X.ly"): kept for the session only.
+    std::map<std::string, QStringList> staffChoices_;
     QAction* soundAction_ = nullptr; // "Sound": clicking a fret plays the note
     std::filesystem::path scoreMidi_;        // the MIDI file of the latest successful build
     std::filesystem::path playbackCacheDir_; // the rendered WAV files

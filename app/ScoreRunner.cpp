@@ -42,7 +42,6 @@ ScoreRunner::ScoreRunner(QObject* parent)
         }
         ScoreResult result;
         result.inputName = inputName_;
-        result.amp = amp_;
         result.elapsedMs = clock_.isValid() ? clock_.elapsed() : 0;
         result.message =
             tr("Cannot start lilypond: %1. Is LilyPond installed?").arg(process_->errorString());
@@ -68,17 +67,16 @@ bool ScoreRunner::isRunning() const {
     return process_->state() != QProcess::NotRunning;
 }
 
-void ScoreRunner::request(zub::score::Request request, bool amp) {
+void ScoreRunner::request(zub::score::Request request) {
     if (isRunning()) {
         // The work dir files must not be rewritten while the old build runs; the newest
         // request starts once that process has exited.
         pending_ = std::move(request);
-        pendingAmp_ = amp;
         emit started();
         killTree();
         return;
     }
-    start(std::move(request), true, amp);
+    start(std::move(request), true);
 }
 
 void ScoreRunner::cancel() {
@@ -103,17 +101,15 @@ void ScoreRunner::startPending() {
     pending_.reset();
     cancelled_ = false;
     timedOut_ = false;
-    start(std::move(next), false, pendingAmp_);
+    start(std::move(next), false);
 }
 
-void ScoreRunner::start(zub::score::Request request, bool announce, bool amp) {
-    amp_ = amp;
+void ScoreRunner::start(zub::score::Request request, bool announce) {
     inputName_ = request.inputName;
     auto prepared = zub::score::prepare(request);
     if (!prepared) {
         ScoreResult result;
         result.inputName = inputName_;
-        result.amp = amp_;
         result.message = toQString(prepared.error());
         emit finished(result);
         return;
@@ -158,7 +154,6 @@ void ScoreRunner::onProcessFinished() {
 
     ScoreResult result;
     result.inputName = inputName_;
-    result.amp = amp_;
     result.elapsedMs = clock_.elapsed();
     const zub::score::Command cmd = command_.value_or(zub::score::Command{});
     result.scoreCopy = cmd.scoreCopy;
@@ -194,8 +189,12 @@ void ScoreRunner::onProcessFinished() {
             result.success = false;
         std::error_code ec;
         if (result.success && process_->exitCode() == 0 && !cmd.midi.empty() &&
-            std::filesystem::is_regular_file(cmd.midi, ec))
+            std::filesystem::is_regular_file(cmd.midi, ec)) {
             result.midi = cmd.midi;
+            result.amp = cmd.midiIsAmp;
+            if (!cmd.ampMidi.empty() && std::filesystem::is_regular_file(cmd.ampMidi, ec))
+                result.ampMidi = cmd.ampMidi;
+        }
     }
     if (!result.success) {
         result.svg.clear();

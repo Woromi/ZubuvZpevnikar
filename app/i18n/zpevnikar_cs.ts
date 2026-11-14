@@ -915,6 +915,26 @@ Použijte vestavěný.</translation>
         <translation>Nesestaveno automaticky: notová ukázka používá %1, což notové ukázky běžně nepoužívají. Sestavení to spustí s plným přístupem k vašim souborům. Zkontrolujte notovou ukázku a pak ji tlačítkem Sestavit znovu přesto sestavte.</translation>
     </message>
     <message>
+        <source>Staff %1 (banjo tab)</source>
+        <translation>Osnova %1 (banjová tabulatura)</translation>
+    </message>
+    <message>
+        <source>Staff %1 (tab)</source>
+        <translation>Osnova %1 (tabulatura)</translation>
+    </message>
+    <message>
+        <source>Staff %1</source>
+        <translation>Osnova %1</translation>
+    </message>
+    <message>
+        <source>The instrument cannot be written into this score (read-only, or the staff&apos;s music is a bare variable).</source>
+        <translation>Nástroj nelze do notové ukázky zapsat (je jen pro čtení, nebo je hudba osnovy jen proměnná).</translation>
+    </message>
+    <message>
+        <source>Instrument written into the score; save the file to keep it.</source>
+        <translation>Nástroj je zapsán do notové ukázky; soubor uložte, ať se zachová.</translation>
+    </message>
+    <message>
         <source>Playing</source>
         <translation>Hraje</translation>
     </message>
@@ -1492,14 +1512,6 @@ Vynecháno (neplatný název písně): %1</translation>
         <translation>%1 %</translation>
     </message>
     <message>
-        <source>The instrument the score is played with</source>
-        <translation>Nástroj, kterým se skladba přehrává</translation>
-    </message>
-    <message>
-        <source>Automatic</source>
-        <translation>Automaticky</translation>
-    </message>
-    <message>
         <source>Classical guitar (nylon)</source>
         <translation>Klasická kytara (nylon)</translation>
     </message>
@@ -1536,16 +1548,16 @@ Vynecháno (neplatný název písně): %1</translation>
         <translation>Baskytara</translation>
     </message>
     <message>
-        <source>The guitar for tablature, the banjo for banjo tuning, the whistle for tin whistle scores</source>
-        <translation>Kytara pro tabulatury, banjo pro ladění banja, píšťalka pro skladby pro píšťalku</translation>
-    </message>
-    <message>
         <source>Distorted electric guitar</source>
         <translation>Zkreslená elektrická kytara</translation>
     </message>
     <message>
-        <source>The clean electric guitar through a distortion applied to everything played together: chords sound rougher than their notes alone.</source>
-        <translation>Čistá elektrická kytara se zkreslením, které se použije na všechno, co hraje společně: akordy znějí drsněji než jejich jednotlivé tóny.</translation>
+        <source>Instruments…</source>
+        <translation>Nástroje…</translation>
+    </message>
+    <message>
+        <source>The instrument of each staff of the score</source>
+        <translation>Nástroj každé osnovy notové ukázky</translation>
     </message>
     <message>
         <source>Building…</source>
@@ -2495,6 +2507,49 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Sound needs a General MIDI soundfont: install a package such as fluid-soundfont-gm, or set playback/soundfont in the settings.</source>
         <translation>Zvuk potřebuje soundfont General MIDI: nainstalujte balíček, např. fluid-soundfont-gm, nebo nastavte playback/soundfont v nastavení.</translation>
+    </message>
+</context>
+<context>
+    <name>StaffInstrumentRow</name>
+    <message>
+        <source>The instrument of %1 when the score is played</source>
+        <translation>Nástroj osnovy %1 při přehrávání notové ukázky</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automaticky</translation>
+    </message>
+    <message>
+        <source>From the file: %1</source>
+        <translation>Ze souboru: %1</translation>
+    </message>
+    <message>
+        <source>The guitar for tablature, the banjo for banjo tuning, the whistle for tin whistle scores</source>
+        <translation>Kytara pro tabulatury, banjo pro ladění banja, píšťalka pro skladby pro píšťalku</translation>
+    </message>
+    <message>
+        <source>The instrument the score file sets for this staff</source>
+        <translation>Nástroj, který soubor notové ukázky pro tuto osnovu nastavuje</translation>
+    </message>
+    <message>
+        <source>The clean electric guitar through a distortion applied to everything played together: chords sound rougher than their notes alone.</source>
+        <translation>Čistá elektrická kytara se zkreslením, které se použije na všechno, co hraje společně: akordy znějí drsněji než jejich jednotlivé tóny.</translation>
+    </message>
+    <message>
+        <source>Save to file</source>
+        <translation>Uložit do souboru</translation>
+    </message>
+    <message>
+        <source>The distorted guitar is this app&apos;s own effect, not a MIDI instrument: it cannot be saved to the file.</source>
+        <translation>Zkreslená kytara je vlastní efekt této aplikace, ne nástroj MIDI: do souboru ji nelze uložit.</translation>
+    </message>
+    <message>
+        <source>Choose an instrument first.</source>
+        <translation>Nejdřív vyberte nástroj.</translation>
+    </message>
+    <message>
+        <source>Write this instrument into the score file as \set Staff.midiInstrument (one undo step; save the file as usual). The songbook&apos;s PDF ignores it.</source>
+        <translation>Zapíše tento nástroj do souboru notové ukázky jako \set Staff.midiInstrument (jeden krok zpět; soubor uložte jako obvykle). PDF zpěvníku to ignoruje.</translation>
     </message>
 </context>
 </TS>
