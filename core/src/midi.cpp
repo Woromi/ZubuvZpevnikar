@@ -156,6 +156,38 @@ std::string trimSilence(std::string_view wav, int threshold, int keepMs) {
     return out;
 }
 
+const std::vector<Instrument>& instruments() {
+    static const std::vector<Instrument> all = {
+        {"nylon", 24, "acoustic guitar (nylon)", false},
+        {"steel", programSteelGuitar, "acoustic guitar (steel)", false},
+        {"jazz", 26, "electric guitar (jazz)", false},
+        {"clean", 27, "electric guitar (clean)", false},
+        {"overdriven", 29, "overdriven guitar", false},
+        {"distortion", 30, "distorted guitar", false},
+        {"amp", 27, "electric guitar (clean)", true},
+        {"banjo", programBanjo, "banjo", false},
+        {"piano", 0, "acoustic grand", false},
+        {"whistle", programWhistle, "whistle", false},
+        {"flute", 73, "flute", false},
+        {"bass", 33, "electric bass (finger)", false},
+    };
+    return all;
+}
+
+const Instrument* findInstrument(std::string_view id) {
+    for (const Instrument& instrument : instruments())
+        if (instrument.id == id)
+            return &instrument;
+    return nullptr;
+}
+
+const Instrument* findInstrumentByName(std::string_view name) {
+    for (const Instrument& instrument : instruments())
+        if (instrument.name == name)
+            return &instrument;
+    return nullptr;
+}
+
 std::uint64_t fnv1a64(std::string_view data) {
     std::uint64_t hash = 14695981039346656037ull;
     for (const char c : data) {

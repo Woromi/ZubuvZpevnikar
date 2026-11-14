@@ -16,6 +16,21 @@ inline constexpr int programSteelGuitar = 25; // "acoustic guitar (steel)"
 inline constexpr int programBanjo = 105;      // "banjo"
 inline constexpr int programWhistle = 78;     // "whistle"
 
+// An instrument the playback can use: a stable id (what the app remembers), the General MIDI
+// program (0-based) and the name LilyPond's midiInstrument knows for it. `amp` is the clean
+// electric guitar sound that goes through zub::audio::applyAmp afterwards.
+struct Instrument {
+    std::string_view id;
+    int program;
+    std::string_view name;
+    bool amp;
+};
+// All of them in the order of the instrument menu (the "automatic" choice is the app's).
+const std::vector<Instrument>& instruments();
+// By id, or by LilyPond name (the first one with it); nullptr when unknown.
+const Instrument* findInstrument(std::string_view id);
+const Instrument* findInstrumentByName(std::string_view name);
+
 struct Command {
     std::string program; // the fluidsynth executable as given
     std::vector<std::string> arguments;
