@@ -1,5 +1,7 @@
 #include "CodeTextEdit.hpp"
 
+#include <QApplication>
+#include <QClipboard>
 #include <QContextMenuEvent>
 #include <QKeyEvent>
 #include <QMenu>
@@ -32,9 +34,13 @@ CodeTextEdit::CodeTextEdit(QWidget* parent)
     occurrenceTimer_->setSingleShot(true);
     occurrenceTimer_->setInterval(80);
     connect(occurrenceTimer_, &QTimer::timeout, this, &CodeTextEdit::markOccurrences);
-    connect(this, &QPlainTextEdit::selectionChanged, occurrenceTimer_,
-            qOverload<>(&QTimer::start));
+    connect(this, &QPlainTextEdit::selectionChanged, occurrenceTimer_, qOverload<>(&QTimer::start));
     connect(this, &QPlainTextEdit::textChanged, occurrenceTimer_, qOverload<>(&QTimer::start));
+    // The main cursor moved by anything but a multi-cursor edit: back to one cursor.
+    connect(this, &QPlainTextEdit::cursorPositionChanged, this, [this] {
+        if (!keepingCursors_)
+            clearExtraCursors();
+    });
     updateAreaWidth();
 }
 
@@ -57,7 +63,284 @@ void CodeTextEdit::markOccurrences() {
             found = document()->find(text, found, QTextDocument::FindCaseSensitively);
         }
     }
-    setExtraSelections(marks);
+    occurrenceMarks_ = marks;
+    updateExtraSelections();
+}
+
+void CodeTextEdit::updateExtraSelections() {
+    QList<QTextEdit::ExtraSelection> all = occurrenceMarks_;
+    QTextCharFormat format;
+    format.setBackground(palette().color(QPalette::Highlight));
+    format.setForeground(palette().color(QPalette::HighlightedText));
+    for (const QTextCursor& cursor : std::as_const(extraCursors_))
+        if (cursor.hasSelection())
+            all.append({cursor, format});
+    setExtraSelections(all);
+}
+
+QList<QTextCursor> CodeTextEdit::cursors() const {
+    QList<QTextCursor> all{textCursor()};
+    all.append(extraCursors_);
+    return all;
+}
+
+void CodeTextEdit::clearExtraCursors() {
+    multiColumn_ = -1;
+    if (extraCursors_.isEmpty())
+        return;
+    extraCursors_.clear();
+    updateExtraSelections();
+    viewport()->update();
+}
+
+void CodeTextEdit::addCursorVertically(int direction) {
+    if (isReadOnly())
+        return;
+    const QList<QTextCursor> all = cursors();
+    if (multiColumn_ < 0)
+        multiColumn_ = textCursor().positionInBlock();
+    const QTextCursor edge =
+        *std::ranges::max_element(all, [direction](const QTextCursor& a, const QTextCursor& b) {
+            return direction < 0 ? a.position() > b.position() : a.position() < b.position();
+        });
+    const QTextBlock block = direction < 0 ? edge.block().previous() : edge.block().next();
+    if (!block.isValid())
+        return;
+    QTextCursor added(document());
+    added.setPosition(block.position() + std::min(multiColumn_, block.length() - 1));
+    extraCursors_.append(added);
+    dropDuplicateCursors();
+    updateExtraSelections();
+    viewport()->update();
+}
+
+void CodeTextEdit::dropDuplicateCursors() {
+    QList<int> seen{textCursor().position()};
+    QList<QTextCursor> kept;
+    for (const QTextCursor& cursor : std::as_const(extraCursors_)) {
+        if (seen.contains(cursor.position()))
+            continue;
+        seen.append(cursor.position());
+        kept.append(cursor);
+    }
+    extraCursors_ = kept;
+}
+
+void CodeTextEdit::editKeepingCursors(const std::function<void()>& edit) {
+    const bool was = keepingCursors_;
+    keepingCursors_ = true;
+    QTextCursor block(document());
+    block.beginEditBlock();
+    edit();
+    block.endEditBlock();
+    keepingCursors_ = was;
+    dropDuplicateCursors();
+    updateExtraSelections();
+    viewport()->update();
+}
+
+void CodeTextEdit::editAtCursors(const std::function<void(QTextCursor&)>& edit) {
+    editKeepingCursors([&] {
+        QTextCursor main = textCursor();
+        edit(main);
+        for (QTextCursor& cursor : extraCursors_)
+            edit(cursor);
+        setTextCursor(main);
+    });
+    ensureCursorVisible();
+}
+
+namespace {
+
+// The cursors in text order.
+QList<QTextCursor> inTextOrder(QList<QTextCursor> cursors) {
+    std::ranges::sort(cursors, {}, [](const QTextCursor& c) { return c.selectionStart(); });
+    return cursors;
+}
+
+// Enter at `cursor`: a line break and the leading spaces and tabs of its line up to the cursor.
+void insertLineBreak(QTextCursor& cursor) {
+    cursor.removeSelectedText();
+    const QString line = cursor.block().text();
+    const int column = cursor.positionInBlock();
+    int indent = 0;
+    while (indent < line.size() && indent < column &&
+           (line[indent] == QLatin1Char(' ') || line[indent] == QLatin1Char('\t')))
+        ++indent;
+    cursor.insertBlock();
+    cursor.insertText(line.left(indent));
+}
+
+} // namespace
+
+bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
+    const Qt::KeyboardModifiers modifiers =
+        event->modifiers() & ~(Qt::KeypadModifier | Qt::GroupSwitchModifier);
+    const bool shift = modifiers & Qt::ShiftModifier;
+    const bool ctrl = modifiers & Qt::ControlModifier;
+    const bool alt = modifiers & (Qt::AltModifier | Qt::MetaModifier);
+    const int key = event->key();
+    if (key == Qt::Key_Escape && modifiers == Qt::NoModifier) {
+        clearExtraCursors();
+        return true;
+    }
+    if (key == Qt::Key_Shift || key == Qt::Key_Control || key == Qt::Key_Alt ||
+        key == Qt::Key_Meta || key == Qt::Key_AltGr)
+        return true; // a modifier alone changes nothing
+    if (event->matches(QKeySequence::Copy) || event->matches(QKeySequence::Cut)) {
+        QStringList parts;
+        for (const QTextCursor& cursor : inTextOrder(cursors()))
+            parts.append(
+                cursor.selectedText().replace(QChar::ParagraphSeparator, QLatin1Char('\n')));
+        if (std::ranges::any_of(parts, [](const QString& part) { return !part.isEmpty(); })) {
+            QApplication::clipboard()->setText(parts.join(QLatin1Char('\n')));
+            if (event->matches(QKeySequence::Cut) && !isReadOnly())
+                editAtCursors([](QTextCursor& cursor) { cursor.removeSelectedText(); });
+        }
+        return true;
+    }
+    if (isReadOnly()) {
+        clearExtraCursors();
+        return false;
+    }
+    if (event->matches(QKeySequence::Paste)) {
+        const QString text = QApplication::clipboard()->text();
+        QStringList lines = text.split(QLatin1Char('\n'));
+        if (lines.size() > 1 && lines.last().isEmpty())
+            lines.removeLast();
+        // As many lines as cursors (e.g. copied from as many cursors): one line each, in text
+        // order.
+        const bool spread = lines.size() == cursors().size();
+        editKeepingCursors([&] {
+            QTextCursor main = textCursor();
+            QList<QTextCursor*> all{&main};
+            for (QTextCursor& extra : extraCursors_)
+                all.append(&extra);
+            std::ranges::sort(all, {}, [](const QTextCursor* c) { return c->selectionStart(); });
+            for (qsizetype i = 0; i < all.size(); ++i)
+                all[i]->insertText(spread ? lines[i] : text);
+            setTextCursor(main);
+        });
+        ensureCursorVisible();
+        return true;
+    }
+
+    using Move = QTextCursor::MoveOperation;
+    const auto move = [&](Move plain, Move word) {
+        const auto mode = shift ? QTextCursor::KeepAnchor : QTextCursor::MoveAnchor;
+        keepingCursors_ = true;
+        QTextCursor main = textCursor();
+        for (QTextCursor* cursor : [&] {
+                 QList<QTextCursor*> all{&main};
+                 for (QTextCursor& extra : extraCursors_)
+                     all.append(&extra);
+                 return all;
+             }()) {
+            if (!shift && cursor->hasSelection() && (key == Qt::Key_Left || key == Qt::Key_Right)) {
+                // Like a code editor: Left/Right first collapse a selection to its edge.
+                cursor->setPosition(key == Qt::Key_Left ? cursor->selectionStart()
+                                                        : cursor->selectionEnd());
+                continue;
+            }
+            cursor->movePosition(ctrl ? word : plain, mode);
+        }
+        setTextCursor(main);
+        keepingCursors_ = false;
+        dropDuplicateCursors();
+        updateExtraSelections();
+        viewport()->update();
+        ensureCursorVisible();
+        return true;
+    };
+    if (!alt) {
+        switch (key) {
+        case Qt::Key_Left:
+            return move(Move::Left, Move::PreviousWord);
+        case Qt::Key_Right:
+            return move(Move::Right, Move::NextWord);
+        case Qt::Key_Up:
+            if (!ctrl)
+                return move(Move::Up, Move::Up);
+            break;
+        case Qt::Key_Down:
+            if (!ctrl)
+                return move(Move::Down, Move::Down);
+            break;
+        case Qt::Key_Home:
+            if (!ctrl)
+                return move(Move::StartOfLine, Move::StartOfLine);
+            break;
+        case Qt::Key_End:
+            if (!ctrl)
+                return move(Move::EndOfLine, Move::EndOfLine);
+            break;
+        case Qt::Key_Backspace:
+        case Qt::Key_Delete: {
+            const bool back = key == Qt::Key_Backspace;
+            editAtCursors([&](QTextCursor& cursor) {
+                if (!cursor.hasSelection()) {
+                    if (ctrl)
+                        cursor.movePosition(back ? Move::PreviousWord : Move::NextWord,
+                                            QTextCursor::KeepAnchor);
+                    else
+                        cursor.movePosition(back ? Move::PreviousCharacter : Move::NextCharacter,
+                                            QTextCursor::KeepAnchor);
+                }
+                cursor.removeSelectedText();
+            });
+            return true;
+        }
+        case Qt::Key_Return:
+        case Qt::Key_Enter:
+            if (!ctrl) {
+                editAtCursors(insertLineBreak);
+                return true;
+            }
+            break;
+        default:
+            break;
+        }
+        const QString text = event->text();
+        if (!ctrl && !text.isEmpty() && std::ranges::all_of(text, [](QChar c) {
+                return c.isPrint() || c == QLatin1Char('\t');
+            })) {
+            editAtCursors([&](QTextCursor& cursor) { cursor.insertText(text); });
+            return true;
+        }
+    }
+    clearExtraCursors();
+    return false;
+}
+
+bool CodeTextEdit::event(QEvent* event) {
+    // With several cursors, copy, cut and paste and Escape act at all of them, before any
+    // shortcut of the window gets these keys.
+    if (event->type() == QEvent::ShortcutOverride && !extraCursors_.isEmpty()) {
+        auto* key = static_cast<QKeyEvent*>(event);
+        if (key->matches(QKeySequence::Copy) || key->matches(QKeySequence::Cut) ||
+            key->matches(QKeySequence::Paste) || key->key() == Qt::Key_Escape) {
+            event->accept();
+            return true;
+        }
+    }
+    return QPlainTextEdit::event(event);
+}
+
+void CodeTextEdit::paintEvent(QPaintEvent* event) {
+    QPlainTextEdit::paintEvent(event);
+    if (extraCursors_.isEmpty())
+        return;
+    QPainter painter(viewport());
+    for (const QTextCursor& cursor : std::as_const(extraCursors_)) {
+        const QRect rect = cursorRect(cursor);
+        painter.fillRect(rect.x(), rect.y(), std::max(1, cursorWidth()), rect.height(),
+                         palette().text());
+    }
+}
+
+void CodeTextEdit::mousePressEvent(QMouseEvent* event) {
+    clearExtraCursors();
+    QPlainTextEdit::mousePressEvent(event);
 }
 
 void CodeTextEdit::setLineNumberColors(const QColor& background, const QColor& number,
@@ -103,6 +386,14 @@ void CodeTextEdit::contextMenuEvent(QContextMenuEvent* event) {
 }
 
 void CodeTextEdit::keyPressEvent(QKeyEvent* event) {
+    const auto modifiers = event->modifiers() & ~Qt::KeypadModifier;
+    if ((event->key() == Qt::Key_Up || event->key() == Qt::Key_Down) &&
+        modifiers == (Qt::ControlModifier | Qt::ShiftModifier)) {
+        addCursorVertically(event->key() == Qt::Key_Up ? -1 : +1);
+        return;
+    }
+    if (!extraCursors_.isEmpty() && multiCursorKey(event))
+        return;
     if (keyFilter_ && keyFilter_(event))
         return;
     processKey(event);
