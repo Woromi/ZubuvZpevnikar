@@ -249,6 +249,80 @@ std::optional<ChordSpan> chordAt(std::string_view line, std::size_t cursor) {
     return std::nullopt;
 }
 
+namespace {
+
+struct EnvironmentCommand {
+    bool begin;
+    std::size_t start;     // the backslash
+    std::size_t nameBegin; // after "\\begin" / "\\end" (or after its "{")
+    std::size_t nameEnd;
+};
+
+bool isAsciiLetter(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+std::vector<EnvironmentCommand> environmentCommands(std::string_view text) {
+    std::vector<EnvironmentCommand> found;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (c == '%') { // a comment, to the end of the line
+            while (i < text.size() && text[i] != '\n')
+                ++i;
+            continue;
+        }
+        if (c != '\\')
+            continue;
+        const std::string_view rest = text.substr(i + 1);
+        const bool begin = rest.starts_with("begin");
+        if (!begin && !rest.starts_with("end")) {
+            ++i; // the escaped character (\%, \\) is not special
+            continue;
+        }
+        std::size_t name = i + 1 + (begin ? 5 : 3);
+        std::size_t end = name;
+        if (end < text.size() && text[end] == '{') {
+            ++name;
+            end = name;
+            while (end < text.size() && text[end] != '}' && text[end] != '\n')
+                ++end;
+            if (end >= text.size() || text[end] != '}')
+                continue;
+        } else {
+            while (end < text.size() && isAsciiLetter(text[end]))
+                ++end;
+        }
+        found.push_back({begin, i, name, end});
+        i = end > i ? end - 1 : i;
+    }
+    return found;
+}
+
+} // namespace
+
+std::optional<EnvironmentLink> environmentLinkAt(std::string_view text, std::size_t cursor) {
+    const auto commands = environmentCommands(text);
+    std::vector<std::size_t> open;
+    std::vector<std::size_t> partner(commands.size(), commands.size());
+    for (std::size_t i = 0; i < commands.size(); ++i) {
+        if (commands[i].begin) {
+            open.push_back(i);
+        } else if (!open.empty()) {
+            partner[i] = open.back();
+            partner[open.back()] = i;
+            open.pop_back();
+        }
+    }
+    for (std::size_t i = 0; i < commands.size(); ++i) {
+        const auto& command = commands[i];
+        if (cursor <= command.start || cursor > command.nameEnd || partner[i] == commands.size())
+            continue;
+        const auto& other = commands[partner[i]];
+        return EnvironmentLink{command.nameBegin, command.nameEnd, other.nameBegin, other.nameEnd};
+    }
+    return std::nullopt;
+}
+
 std::optional<std::size_t> spaceTarget(std::string_view line, std::size_t cursor) {
     for (const auto& chord : chordsIn(line))
         if (cursor >= chord.begin + 2 && cursor < chord.end)

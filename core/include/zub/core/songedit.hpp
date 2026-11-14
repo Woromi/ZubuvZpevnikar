@@ -57,6 +57,18 @@ std::optional<ChordSpan> chordAt(std::string_view line, std::size_t cursor);
 // after the chord's "]", or nullopt when the cursor is not inside a chord's name.
 std::optional<std::size_t> spaceTarget(std::string_view line, std::size_t cursor);
 
+// Linked editing of environment names, like matching tags in code editors: the name of the
+// \begin... or \end... command the cursor is in, and the name of its partner. Both forms count:
+// \beginverse ... \endverse (the name is the letters after \begin / \end; a following * as in
+// \beginverse* is not part of it) and \begin{name} ... \end{name}. Begins and ends pair by
+// nesting, whatever their names (so a half-typed name still finds its partner); % comments are
+// skipped. The cursor counts as in a command from its backslash to the end of its name.
+struct EnvironmentLink {
+    std::size_t nameBegin, nameEnd;   // the name at the cursor (may be empty)
+    std::size_t otherBegin, otherEnd; // its partner's name
+};
+std::optional<EnvironmentLink> environmentLinkAt(std::string_view text, std::size_t cursor);
+
 enum class Step { Letter, Word };
 
 // Moves the chord at the cursor one step left (direction < 0) or right (> 0). Letter: past one

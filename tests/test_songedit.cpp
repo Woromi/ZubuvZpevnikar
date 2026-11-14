@@ -358,3 +358,55 @@ TEST_CASE("a space typed inside a chord's name goes after the chord", "[songedit
     CHECK_FALSE(spaceTarget(line, 2));
     CHECK(spaceTarget(line, line.size() - 1) == line.size()); // before the last "]"
 }
+
+TEST_CASE("environmentLinkAt finds the partner of a begin or end command", "[songedit]") {
+    using zub::songedit::environmentLinkAt;
+    const std::string text = "\\beginsong{X}\n\\beginverse*\n\\[C]A % \\endverse\n\\endverse\n"
+                             "\\begin{intersong}\nB\n\\end{intersong}\n\\endsong\n";
+    const auto at = [&](std::string_view needle, std::size_t plus) {
+        return text.find(needle) + plus;
+    };
+    const auto name = [&](std::size_t b, std::size_t e) { return text.substr(b, e - b); };
+
+    auto link = environmentLinkAt(text, at("\\beginverse", 7)); // inside "verse"
+    REQUIRE(link);
+    CHECK(name(link->nameBegin, link->nameEnd) == "verse"); // the * is not part of the name
+    CHECK(link->otherBegin == at("\\endverse\n\\begin", 4)); // not the one in the comment
+    CHECK(name(link->otherBegin, link->otherEnd) == "verse");
+
+    // From the end, and at the end of the name.
+    link = environmentLinkAt(text, at("\\endverse\n\\begin", 9));
+    REQUIRE(link);
+    CHECK(link->otherBegin == at("\\beginverse", 6));
+
+    // Brace form.
+    link = environmentLinkAt(text, at("\\end{intersong}", 7));
+    REQUIRE(link);
+    CHECK(name(link->otherBegin, link->otherEnd) == "intersong");
+    CHECK(link->otherBegin == at("\\begin{intersong}", 7));
+
+    // The song itself, from inside its name.
+    link = environmentLinkAt(text, at("\\endsong", 5));
+    REQUIRE(link);
+    CHECK(link->otherBegin == 6);
+
+    // Outside any command, before a backslash, in a comment: none.
+    CHECK_FALSE(environmentLinkAt(text, at("\\[C]A", 4)));
+    CHECK_FALSE(environmentLinkAt(text, at("\\beginverse", 0)));
+    CHECK_FALSE(environmentLinkAt(text, at("% \\endverse", 5)));
+}
+
+TEST_CASE("environmentLinkAt pairs by nesting, so half-typed names still link", "[songedit]") {
+    using zub::songedit::environmentLinkAt;
+    const std::string text = "\\beginch\nA\n\\endverse\n\\begin\nB\n\\endchorus\n\\endsong";
+    auto link = environmentLinkAt(text, 8); // at the end of "ch"
+    REQUIRE(link);
+    CHECK(text.substr(link->otherBegin, link->otherEnd - link->otherBegin) == "verse");
+    // An empty name ("\begin") still has a partner.
+    link = environmentLinkAt(text, text.find("\\begin\n") + 6);
+    REQUIRE(link);
+    CHECK(link->nameBegin == link->nameEnd);
+    CHECK(text.substr(link->otherBegin, link->otherEnd - link->otherBegin) == "chorus");
+    // An end without a begin: none.
+    CHECK_FALSE(environmentLinkAt(text, text.find("\\endsong") + 5));
+}
