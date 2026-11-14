@@ -513,6 +513,7 @@ void MainWindow::createCentralWidget() {
     scorePreview_->setRegionActions(regionActions_);
     connect(scorePreview_, &ScorePreviewPane::notesDragged, this, &MainWindow::selectScoreNotes);
     connect(scorePreview_, &ScorePreviewPane::noteClicked, this, &MainWindow::clickScoreNote);
+    connect(scorePreview_, &ScorePreviewPane::keyCommand, this, &MainWindow::scoreKey);
     connect(scorePreview_, &ScorePreviewPane::noteDoubleClicked, this,
             &MainWindow::doubleClickScoreNote);
     scoreRunner_ = new ScoreRunner(this);
@@ -2627,7 +2628,120 @@ void MainWindow::clickScoreNote(const QPoint& position, bool after, bool extend)
         return;
     }
     scoreAnchor_ = *offset;
-    editor->setCursorByteOffset(*offset);
+    scoreStops_.reset();
+    editor->setCursorByteOffset(*offset, false); // the preview keeps the keyboard
+    updateScoreHighlights();
+}
+
+// Keys of the preview, like a text cursor over the music events of the score text (not over the
+// links of the preview, which are stale after an edit): Left/Right move by one event, Shift
+// selects, Home/End go to the start/end of the staff (Ctrl: of the score), Backspace/Delete
+// delete the selected events or the one before/after the cursor, Ctrl+Z / Ctrl+Shift+Z undo.
+void MainWindow::scoreKey(ScorePreviewPane::KeyCommand command, bool extend, bool wholeScore) {
+    using Key = ScorePreviewPane::KeyCommand;
+    SongEditor* editor = currentEditor();
+    if (!editor || onSongTab())
+        return;
+    if (command == Key::Undo || command == Key::Redo) {
+        if (command == Key::Undo)
+            editor->textEdit()->undo();
+        else
+            editor->textEdit()->redo();
+        return;
+    }
+    const std::string text = editor->editorText();
+    const auto events = zub::scoreregion::musicEvents(text);
+    if (events.empty())
+        return;
+    const std::size_t count = events.size();
+    const std::size_t cursor = editor->cursorByteOffset();
+    const auto selection = editor->selectedByteRange();
+    const std::size_t low = selection ? selection->first : cursor;
+    const std::size_t high = selection ? selection->second : cursor;
+
+    if (command == Key::Backspace || command == Key::Delete) {
+        std::optional<std::pair<std::size_t, std::size_t>> range = selection;
+        if (!range && command == Key::Backspace) { // the event that ends at or before the cursor
+            const std::size_t stop = zub::scoreregion::caretStop(events, cursor);
+            if (stop > 0)
+                range = std::make_pair(events[stop - 1].begin, events[stop - 1].end);
+        } else if (!range) { // the event that ends after the cursor
+            const auto next = std::ranges::find_if(
+                events, [cursor](const auto& e) { return e.end > cursor; });
+            if (next != events.end())
+                range = std::make_pair(next->begin, next->end);
+        }
+        if (!range)
+            return;
+        zub::scoreregion::RemoveRefusal why = zub::scoreregion::RemoveRefusal::NothingToRemove;
+        if (!editor->deleteScoreEvents(*range, &why) &&
+            why == zub::scoreregion::RemoveRefusal::UnclosedChord)
+            statusBar()->showMessage(
+                tr("A chord is not closed (a > is missing): nothing was deleted."), 6000);
+        scoreStops_.reset();
+        scoreAnchor_ = editor->cursorByteOffset();
+        updateScoreHighlights();
+        return;
+    }
+
+    // The stops the selection stands between: the keys' own when the selection is still theirs.
+    const auto spanOf = [&](std::size_t a, std::size_t b) {
+        const auto [lo, hi] = std::minmax(a, b);
+        if (lo == hi)
+            return std::make_pair(zub::scoreregion::stopOffset(events, lo),
+                                  zub::scoreregion::stopOffset(events, lo));
+        return std::make_pair(events[lo].begin, events[hi - 1].end);
+    };
+    std::size_t anchorStop = zub::scoreregion::caretStop(events, low);
+    std::size_t activeStop = zub::scoreregion::caretStop(events, high);
+    if (scoreStops_ && spanOf(scoreStops_->first, scoreStops_->second) == std::make_pair(low, high)) {
+        anchorStop = scoreStops_->first;
+        activeStop = scoreStops_->second;
+    } else if (!selection) {
+        anchorStop = activeStop = zub::scoreregion::caretStop(events, cursor);
+    }
+
+    // Where the move goes: a stop, or (Home/End on a staff) an event's begin or end.
+    std::size_t targetStop = activeStop;
+    std::optional<std::size_t> targetOffset;
+    if (command == Key::Left || command == Key::Right) {
+        if (!extend && selection) { // like a text: collapse to the selection's side
+            targetOffset = command == Key::Left ? low : high;
+            targetStop = zub::scoreregion::caretStop(events, *targetOffset);
+        } else {
+            targetStop = command == Key::Left ? (activeStop > 0 ? activeStop - 1 : 0)
+                                              : std::min(activeStop + 1, count);
+        }
+    } else {
+        const bool end = command == Key::End;
+        std::optional<std::size_t> event;
+        if (!wholeScore) {
+            if (const auto edge = scorePreview_->staffEdgeNote(end)) {
+                if (const auto found = linkEvent_.find({edge->y(), edge->x()});
+                    found != linkEvent_.end() && found->second < count)
+                    event = found->second;
+            }
+        }
+        if (!event)
+            event = end ? count - 1 : 0;
+        targetOffset = end ? events[*event].end : events[*event].begin;
+        targetStop = end ? *event + 1 : *event;
+    }
+
+    if (extend) {
+        const auto [begin, finish] = spanOf(anchorStop, targetStop);
+        scoreStops_ = std::make_pair(anchorStop, targetStop);
+        scoreAnchor_ = zub::scoreregion::stopOffset(events, anchorStop);
+        if (begin < finish)
+            editor->selectByteRange(begin, finish, false);
+        else
+            editor->setCursorByteOffset(begin, false);
+    } else {
+        const std::size_t offset = targetOffset.value_or(zub::scoreregion::stopOffset(events, targetStop));
+        scoreStops_.reset();
+        scoreAnchor_ = offset;
+        editor->setCursorByteOffset(offset, false);
+    }
     updateScoreHighlights();
 }
 
@@ -2650,7 +2764,8 @@ void MainWindow::doubleClickScoreNote(const QPoint& position) {
         return;
     const auto& event = scoreEvents_[found->second];
     scoreAnchor_ = event.begin;
-    editor->selectByteRange(event.begin, event.end);
+    scoreStops_.reset();
+    editor->selectByteRange(event.begin, event.end, false);
     updateScoreHighlights();
 }
 
@@ -2671,10 +2786,11 @@ void MainWindow::selectScoreOffsets(std::size_t anchor, std::size_t current) {
             last = i;
         }
     }
+    scoreStops_.reset();
     if (first)
-        editor->selectByteRange(scoreEvents_[*first].begin, scoreEvents_[*last].end);
+        editor->selectByteRange(scoreEvents_[*first].begin, scoreEvents_[*last].end, false);
     else
-        editor->setCursorByteOffset(current);
+        editor->setCursorByteOffset(current, false);
     updateScoreHighlights();
 }
 

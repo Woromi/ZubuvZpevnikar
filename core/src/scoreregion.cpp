@@ -1,6 +1,8 @@
 #include "scorescan.hpp"
 
 #include <algorithm>
+#include <map>
+#include <zub/core/fretboard.hpp>
 #include <zub/core/scoreregion.hpp>
 
 namespace zub::scoreregion {
@@ -23,6 +25,8 @@ bool unclosed(std::string_view text, const Event& e) {
 
 // Where the post-events and articulations of a note or chord start.
 std::size_t tailBegin(const Event& e) {
+    if (e.rest)
+        return e.begin + 1; // `r`, `R`, `s`; pitchEnd is not set
     return e.chord ? e.closeAt + 1 : e.pitchEnd;
 }
 
@@ -55,8 +59,15 @@ std::optional<std::size_t> deadNoteBefore(std::string_view text, std::size_t pit
 }
 
 // The edits, front to back and not overlapping; the selection follows them.
+void sortEdits(std::vector<Edit>& edits) {
+    // Front to back; an insertion before an erase at the same place.
+    std::ranges::stable_sort(edits, [](const Edit& a, const Edit& b) {
+        return a.pos != b.pos ? a.pos < b.pos : a.erase == 0 && b.erase > 0;
+    });
+}
+
 std::string applyEdits(std::string_view text, std::vector<Edit>& edits) {
-    std::ranges::stable_sort(edits, {}, &Edit::pos);
+    sortEdits(edits);
     std::string out;
     std::size_t at = 0;
     for (const Edit& edit : edits) {
@@ -136,6 +147,137 @@ void strokeEdits(std::string_view text, const Event& e, std::string_view wanted,
         edits.push_back({e.postEnd, 0, std::string(wanted)});
 }
 
+bool isBlank(char c) {
+    return c == ' ' || c == '\t';
+}
+
+// One `( ) \( \) [ ]` written against an event: [pos, pos + length) with its direction mark.
+struct Mark {
+    std::size_t event;
+    int kind; // 0 slur, 1 phrasing slur, 2 beam
+    bool open;
+    std::size_t pos, length;
+};
+
+// The mark at `i` (after an optional direction character `-^_`): its kind, which end, its length
+// without the direction character.
+bool markAt(std::string_view text, std::size_t i, int& kind, bool& open, std::size_t& length) {
+    const char c = text[i];
+    length = 1;
+    if (c == '\\' && i + 1 < text.size() && (text[i + 1] == '(' || text[i + 1] == ')')) {
+        kind = 1;
+        open = text[i + 1] == '(';
+        length = 2;
+    } else if (c == '(' || c == ')') {
+        kind = 0;
+        open = c == '(';
+    } else if (c == '[' || c == ']') {
+        kind = 2;
+        open = c == '[';
+    } else {
+        return false;
+    }
+    return true;
+}
+
+// The marks of `e`: those in its tail, and those that the scan leaves after it (`\(`, `-[`: only
+// blanks between them and the event). `reach` is the end of the last one.
+void marksOf(std::string_view text, const Event& e, std::size_t index, std::vector<Mark>& out,
+             std::size_t& reach) {
+    const std::size_t from = std::min(tailBegin(e), e.postEnd);
+    const auto add = [&](std::size_t i, std::size_t floor) {
+        int kind = 0;
+        bool open = false;
+        std::size_t length = 0;
+        if (!markAt(text, i, kind, open, length))
+            return false;
+        std::size_t begin = i;
+        if (begin > floor && (text[begin - 1] == '-' || text[begin - 1] == '^' ||
+                              text[begin - 1] == '_')) {
+            --begin;
+            ++length;
+        }
+        out.push_back({index, kind, open, begin, length});
+        return true;
+    };
+    for (std::size_t i = from; i < e.postEnd; ++i) {
+        if (text[i] == '"') {
+            for (++i; i < e.postEnd && text[i] != '"'; ++i)
+                if (text[i] == '\\')
+                    ++i;
+        } else if (add(i, from) && text[i] == '\\') {
+            ++i;
+        }
+    }
+    reach = e.postEnd;
+    for (std::size_t i = e.postEnd; i < text.size();) {
+        std::size_t j = i;
+        while (j < text.size() && isBlank(text[j]))
+            ++j;
+        const std::size_t mark = j + ((j < text.size() && (text[j] == '-' || text[j] == '^' ||
+                                                           text[j] == '_'))
+                                          ? 1
+                                          : 0);
+        if (mark >= text.size() || !add(mark, j))
+            break;
+        reach = i = out.back().pos + out.back().length;
+    }
+}
+
+// The `~` in the tail of `e`, or written after blanks right behind it.
+std::optional<Edit> tieAfter(std::string_view text, const Event& e, std::size_t limit) {
+    const std::string_view tail = tailOf(text, e);
+    const std::size_t from = std::min(tailBegin(e), e.postEnd);
+    for (std::size_t i = 0; i < tail.size(); ++i) {
+        if (tail[i] == '"') {
+            for (++i; i < tail.size() && tail[i] != '"'; ++i)
+                if (tail[i] == '\\')
+                    ++i;
+        } else if (tail[i] == '~') {
+            return Edit{from + i, 1, {}};
+        }
+    }
+    const std::size_t next = skipSpaces(text, e.postEnd);
+    if (next < limit && text[next] == '~')
+        return Edit{e.postEnd, next + 1 - e.postEnd, {}};
+    return std::nullopt;
+}
+
+// The erase of the blanks around the removed [begin, end) (see removeEvents).
+Edit eraseWithBlanks(std::string_view text, std::size_t begin, std::size_t end) {
+    std::size_t before = 0;
+    while (before < begin && isBlank(text[begin - before - 1]))
+        ++before;
+    std::size_t after = 0;
+    while (end + after < text.size() && isBlank(text[end + after]))
+        ++after;
+    const bool leftEmpty = begin == before || text[begin - before - 1] == '\n';
+    const std::size_t rest = end + after;
+    const bool rightEmpty = rest >= text.size() || text[rest] == '\n' || text[rest] == '\r';
+    std::size_t from = begin;
+    std::size_t to = end;
+    std::string insert;
+    if (leftEmpty && rightEmpty) {
+        from = begin - before;
+        to = rest;
+    } else if (leftEmpty) {
+        to = rest;
+    } else if (rightEmpty) {
+        from = begin - before;
+        to = rest;
+    } else if (before > 0) {
+        if (after == 0 && text[end] == '}')
+            from = begin - before;
+        else
+            to = rest;
+    } else if (std::string_view("{<([").find(text[begin - 1]) != std::string_view::npos) {
+        to = rest;
+    } else if (after == 0 && std::string_view("}>)]").find(text[end]) == std::string_view::npos) {
+        insert = " ";
+    }
+    return {from, to - from, std::move(insert)};
+}
+
 } // namespace
 
 std::optional<std::size_t> offsetOf(std::string_view text, int line, int column) {
@@ -171,6 +313,18 @@ std::optional<std::size_t> eventAt(const std::vector<Range>& events, std::size_t
     if (it == events.end() || it->begin > offset)
         return std::nullopt;
     return static_cast<std::size_t>(it - events.begin());
+}
+
+std::size_t caretStop(const std::vector<Range>& events, std::size_t offset) {
+    // The first event that ends after the offset.
+    return static_cast<std::size_t>(std::ranges::upper_bound(events, offset, {}, &Range::end) -
+                                    events.begin());
+}
+
+std::size_t stopOffset(const std::vector<Range>& events, std::size_t stop) {
+    if (events.empty())
+        return 0;
+    return stop < events.size() ? events[stop].begin : events.back().end;
 }
 
 std::optional<Range> expandToEvents(std::string_view text, Range range) {
@@ -309,6 +463,110 @@ std::optional<Result> apply(Action action, std::string_view text, Range range, R
     }
     }
     return finish(text, std::move(edits), *region);
+}
+
+std::optional<Result> removeEvents(std::string_view text, Range range, RemoveRefusal* why) {
+    const auto refuse = [&](RemoveRefusal reason) -> std::optional<Result> {
+        if (why)
+            *why = reason;
+        return std::nullopt;
+    };
+    const auto region = expandToEvents(text, range);
+    if (!region)
+        return refuse(RemoveRefusal::NothingToRemove);
+    std::vector<Event> events;
+    for (Event& e : sd::scan(text, sd::Names::Any)) {
+        if (!e.definition)
+            events.push_back(std::move(e));
+    }
+    std::vector<bool> removed(events.size(), false);
+    std::vector<Range> gone;
+    std::vector<std::size_t> goneIndex;
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        const Event& e = events[i];
+        if (e.begin < region->begin || e.postEnd > region->end)
+            continue;
+        if (unclosed(text, e))
+            return refuse(RemoveRefusal::UnclosedChord);
+        removed[i] = true;
+        gone.push_back({e.prefixBegin, e.postEnd}); // widened below
+        goneIndex.push_back(i);
+    }
+    if (gone.empty())
+        return refuse(RemoveRefusal::NothingToRemove);
+
+    std::vector<Edit> edits;
+    // The partners of slurs and beams that lose one end.
+    std::vector<Mark> marks;
+    std::vector<std::size_t> reach(events.size());
+    for (std::size_t i = 0; i < events.size(); ++i)
+        marksOf(text, events[i], i, marks, reach[i]);
+    for (std::size_t g = 0; g < gone.size(); ++g)
+        gone[g].end = reach[goneIndex[g]]; // with the marks that follow the event
+    std::map<int, std::vector<const Mark*>> open;
+    for (const Mark& mark : marks) {
+        auto& stack = open[mark.kind];
+        if (mark.open) {
+            stack.push_back(&mark);
+        } else if (!stack.empty()) {
+            const Mark& partner = *stack.back();
+            stack.pop_back();
+            if (removed[partner.event] != removed[mark.event]) {
+                const Mark& left = removed[mark.event] ? partner : mark;
+                edits.push_back({left.pos, left.length, {}});
+            }
+        }
+    }
+    // A tie from the event before the range.
+    std::size_t before = events.size();
+    std::size_t after = events.size();
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        if (!removed[i] && events[i].postEnd <= region->begin)
+            before = i;
+        if (!removed[i] && events[i].begin >= region->end && after == events.size())
+            after = i;
+    }
+    if (before < events.size()) {
+        if (const auto tie = tieAfter(text, events[before], region->begin))
+            edits.push_back(*tie);
+    }
+    // The blanks around the removed events (a run of events separated by blanks goes together).
+    std::size_t first = 0;
+    while (first < gone.size()) {
+        std::size_t last = first;
+        while (last + 1 < gone.size() &&
+               std::ranges::all_of(text.substr(gone[last].end, gone[last + 1].begin - gone[last].end),
+                                   isBlank))
+            ++last;
+        edits.push_back(eraseWithBlanks(text, gone[first].begin, gone[last].end));
+        first = last + 1;
+    }
+    // The next event keeps its length.
+    if (after < events.size()) {
+        const Event& next = events[after];
+        const std::string inForce = zub::fretboard::effectiveDuration(text, region->end);
+        if (next.durBegin == next.durEnd && !unclosed(text, next) &&
+            inForce != zub::fretboard::effectiveDuration(text, region->begin))
+            edits.push_back({next.durBegin, 0, inForce});
+    }
+
+    sortEdits(edits);
+    // Where the removed text began, in the result.
+    std::ptrdiff_t cursor = static_cast<std::ptrdiff_t>(region->begin);
+    std::ptrdiff_t shift = 0;
+    for (const Edit& edit : edits) {
+        if (edit.pos >= region->begin)
+            break;
+        if (edit.pos + edit.erase <= region->begin) {
+            shift += static_cast<std::ptrdiff_t>(edit.insert.size()) -
+                     static_cast<std::ptrdiff_t>(edit.erase);
+        } else {
+            cursor = static_cast<std::ptrdiff_t>(edit.pos);
+            break;
+        }
+    }
+    const auto at = static_cast<std::size_t>(std::max<std::ptrdiff_t>(cursor + shift, 0));
+    return Result{applyEdits(text, edits), {at, at}};
 }
 
 } // namespace zub::scoreregion

@@ -919,6 +919,10 @@ Použijte vestavěný.</translation>
         <translation>Hraje</translation>
     </message>
     <message>
+        <source>A chord is not closed (a &gt; is missing): nothing was deleted.</source>
+        <translation>Akord není uzavřený (chybí &gt;): nic se nesmazalo.</translation>
+    </message>
+    <message>
         <source>The song is not in an artist folder.</source>
         <translation>Píseň není ve složce interpreta.</translation>
     </message>

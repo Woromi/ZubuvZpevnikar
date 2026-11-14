@@ -80,8 +80,8 @@ public:
     // Moves the cursor to the 1-based `line` and the 0-based `column` (code points, as LilyPond
     // counts them; past the end of the line: its end), centres it and focuses the editor.
     void goToLineColumn(int line, int column);
-    // Puts the cursor at `byteOffset` of the editor text (UTF-8, LF line ends) and focuses it.
-    void setCursorByteOffset(std::size_t byteOffset);
+    // Puts the cursor at `byteOffset` of the editor text (UTF-8, LF line ends) and focuses it (unless `focus` is false).
+    void setCursorByteOffset(std::size_t byteOffset, bool focus = true);
     QPlainTextEdit* textEdit() const { return edit_; }
 
     // Song-editing helpers (zub::songedit on the cursor's line); each is one undo step and does
@@ -121,8 +121,9 @@ public:
     std::string editorText() const;
     // The selection as byte offsets into the editor text (UTF-8, LF line ends); none without one.
     std::optional<std::pair<std::size_t, std::size_t>> selectedByteRange() const;
-    // Selects [begin, end) of the editor text, shows it and focuses the editor.
-    void selectByteRange(std::size_t begin, std::size_t end);
+    // Selects [begin, end) of the editor text, shows it and focuses the editor (unless `focus` is
+    // false: the score preview keeps the keyboard).
+    void selectByteRange(std::size_t begin, std::size_t end, bool focus = true);
     // Replaces [begin, end) of the editor text by `text` as ONE undo step (cursor and scroll stay,
     // nothing else changes), then selects [selectBegin, selectEnd) of the NEW text. False in a
     // read-only editor (Kind::Score only).
@@ -133,6 +134,11 @@ public:
     // `why` (when given) tells why the core refused.
     bool applyRegionAction(zub::scoreregion::Action action,
                            zub::scoreregion::Refusal* why = nullptr);
+    // Deletes the music events in [range) of the score text (zub::scoreregion::removeEvents):
+    // ONE undo step, the cursor where they were, no focus change. False when nothing was deleted
+    // (read-only, no event, refused); `why` (when given) tells why the core refused.
+    bool deleteScoreEvents(std::pair<std::size_t, std::size_t> range,
+                           zub::scoreregion::RemoveRefusal* why = nullptr);
     // Added to the end of the editor's context menu.
     void setRegionMenuActions(const QList<QAction*>& actions);
 

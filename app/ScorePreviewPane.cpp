@@ -11,6 +11,8 @@
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QIcon>
+#include <QKeyEvent>
+#include <QKeySequence>
 #include <QLabel>
 #include <QListWidget>
 #include <QMenu>
@@ -179,6 +181,7 @@ public:
         policy.setHeightForWidth(true);
         setSizePolicy(policy);
         setMouseTracking(true);
+        setFocusPolicy(Qt::StrongFocus);
     }
 
     // The links of the loaded SVG (set after load()). None is selectable until setSelectable().
@@ -206,6 +209,31 @@ public:
         onNotesDragged;
     std::function<void(const NoteLink& link)> onNoteDoubleClicked;
     std::function<void(const QPoint& globalPosition)> onContextMenu;
+    // Keys that edit like a text cursor (see ScorePreviewPane::KeyCommand): `extend` is Shift,
+    // `wholeScore` is Ctrl.
+    std::function<void(int command, bool extend, bool wholeScore)> onKeyCommand;
+
+    // The leftmost (rightmost) selectable note on the staff the caret is on; none without a caret
+    // or when it is not on a staff.
+    std::optional<std::pair<int, int>> staffEdge(bool right) const {
+        if (!caret_)
+            return std::nullopt;
+        const NoteLink* caretLink = findLink(caret_->first, caret_->second);
+        if (!caretLink || staffOf(*caretLink) < 0)
+            return std::nullopt;
+        const int staff = staffOf(*caretLink);
+        const NoteLink* best = nullptr;
+        for (std::size_t i = 0; i < links_.size(); ++i) {
+            if (linkStaff_[i] != staff || !isSelectable(links_[i]))
+                continue;
+            if (!best || (right ? links_[i].point.x() > best->point.x()
+                                : links_[i].point.x() < best->point.x()))
+                best = &links_[i];
+        }
+        if (!best)
+            return std::nullopt;
+        return std::make_pair(best->line, best->column);
+    }
 
     // The score cursor: a vertical line before (or after) the note linked at {line, column}; none
     // clears it.
@@ -367,6 +395,7 @@ protected:
     void mousePressEvent(QMouseEvent* event) override {
         if (event->button() != Qt::LeftButton)
             return;
+        setFocus(Qt::MouseFocusReason); // the keys edit the score from here
         pressed_ = true;
         dragging_ = false;
         dragLink_ = nullptr;
@@ -393,6 +422,43 @@ protected:
         pressLink_ = dragLink_ = nullptr;
         if (const NoteLink* link = pickAt(event->position().toPoint()); link && onNoteDoubleClicked)
             onNoteDoubleClicked(*link);
+    }
+    void keyPressEvent(QKeyEvent* event) override {
+        const Qt::KeyboardModifiers mods = event->modifiers();
+        const bool shift = mods.testFlag(Qt::ShiftModifier);
+        const bool ctrl = mods.testFlag(Qt::ControlModifier);
+        const bool others = mods.testFlag(Qt::AltModifier) || mods.testFlag(Qt::MetaModifier);
+        int command = -1;
+        if (event->matches(QKeySequence::Undo))
+            command = static_cast<int>(ScorePreviewPane::KeyCommand::Undo);
+        else if (event->matches(QKeySequence::Redo))
+            command = static_cast<int>(ScorePreviewPane::KeyCommand::Redo);
+        else if (!others && event->key() == Qt::Key_Left)
+            command = static_cast<int>(ScorePreviewPane::KeyCommand::Left);
+        else if (!others && event->key() == Qt::Key_Right)
+            command = static_cast<int>(ScorePreviewPane::KeyCommand::Right);
+        else if (!others && event->key() == Qt::Key_Home)
+            command = static_cast<int>(ScorePreviewPane::KeyCommand::Home);
+        else if (!others && event->key() == Qt::Key_End)
+            command = static_cast<int>(ScorePreviewPane::KeyCommand::End);
+        else if (!others && !shift && !ctrl && event->key() == Qt::Key_Backspace)
+            command = static_cast<int>(ScorePreviewPane::KeyCommand::Backspace);
+        else if (!others && !shift && !ctrl && event->key() == Qt::Key_Delete)
+            command = static_cast<int>(ScorePreviewPane::KeyCommand::Delete);
+        if (command < 0 || !onKeyCommand) {
+            QWidget::keyPressEvent(event);
+            return;
+        }
+        event->accept();
+        onKeyCommand(command, shift, ctrl);
+    }
+    void focusInEvent(QFocusEvent* event) override {
+        QWidget::focusInEvent(event);
+        update();
+    }
+    void focusOutEvent(QFocusEvent* event) override {
+        QWidget::focusOutEvent(event);
+        update();
     }
     void contextMenuEvent(QContextMenuEvent* event) override {
         if (onContextMenu)
@@ -430,6 +496,12 @@ protected:
                 const double x = at.x() + (caretAfter_ ? 1 : -1) * highlightSize / 2;
                 painter.drawLine(QPointF(x, top), QPointF(x, bottom));
             }
+        }
+        if (hasFocus()) { // the keys go to the score
+            edge.setAlpha(140);
+            painter.setPen(QPen(edge, 2));
+            painter.setBrush(Qt::NoBrush);
+            painter.drawRect(rect().adjusted(1, 1, -1, -1));
         }
     }
 
@@ -660,6 +732,9 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     canvas_->onNoteDoubleClicked = [this](const NoteLink& link) {
         emit noteDoubleClicked(QPoint(link.column, link.line));
     };
+    canvas_->onKeyCommand = [this](int command, bool extend, bool wholeScore) {
+        emit keyCommand(static_cast<KeyCommand>(command), extend, wholeScore);
+    };
     canvas_->onContextMenu = [this](const QPoint& at) {
         if (regionActions_.isEmpty())
             return;
@@ -750,6 +825,17 @@ QList<QPoint> ScorePreviewPane::notePositions() const {
     for (const NoteLink& link : canvas_->links())
         positions.append(QPoint(link.column, link.line));
     return positions;
+}
+
+std::optional<QPoint> ScorePreviewPane::staffEdgeNote(bool right) const {
+    const auto edge = canvas_->staffEdge(right);
+    if (!edge)
+        return std::nullopt;
+    return QPoint(edge->second, edge->first);
+}
+
+QWidget* ScorePreviewPane::canvasWidget() const {
+    return canvas_;
 }
 
 void ScorePreviewPane::setHighlightedNotes(const QList<QPoint>& positions) {

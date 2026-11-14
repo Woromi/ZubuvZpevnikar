@@ -559,3 +559,171 @@ TEST_CASE("every action on the real scores keeps the rest of the text", "[.integ
                   << ", nothing to apply " << nothing[name] << "\n";
     }
 }
+
+namespace {
+
+// The text after removing the events from the one that contains `from` to the one that contains
+// `to` (both substrings of the text), with the cursor shown as `^`.
+std::string removed(const std::string& text, const std::string& from, const std::string& to) {
+    const auto begin = text.find(from);
+    REQUIRE(begin != std::string::npos);
+    const auto end = text.find(to, begin);
+    REQUIRE(end != std::string::npos);
+    const auto result = sr::removeEvents(text, {begin, end + to.size()});
+    REQUIRE(result);
+    CHECK(result->selection.begin == result->selection.end);
+    std::string s = result->text;
+    s.insert(result->selection.begin, "^");
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("removeEvents deletes notes and chords with the blanks around them", "[scoreregion][remove]") {
+    CHECK(removed("{ c4 d e f }", "d", "d") == "{ c4 ^e f }");
+    CHECK(removed("{ c4 d <e g>8 f }", "<e", ">8") == "{ c4 d ^f8 }");
+    CHECK(removed("{ c4  d  e }", "d", "d") == "{ c4  ^e }");
+    // The first and the last event of a line: no leading gap, no trailing blanks.
+    CHECK(removed("{\n  c4 d e  \n  f g\n}", "c4", "c4") == "{\n  ^d e  \n  f g\n}");
+    CHECK(removed("{\n  c4 d e  \n  f g\n}", "e", "e") == "{\n  c4 d^\n  f g\n}");
+    // The last event of the score, with and without a closing brace right behind it.
+    CHECK(removed("{ c4 d e }", "e", "e") == "{ c4 d ^}");
+    CHECK(removed("{c4 d e}", "e", "e") == "{c4 d^}");
+    CHECK(removed("{c4 d e}", "c4", "c4") == "{^d e}");
+    CHECK(removed("c4 d e\n", "e", "e") == "c4 d^\n");
+    // The only event on a line: the line stays, empty.
+    CHECK(removed("{\n  c4\n  d\n  e\n}", "d", "d") == "{\n  c4\n^\n  e\n}");
+    // A selection over two lines; nothing but events goes, the bar check and the line breaks stay.
+    CHECK(removed("{\n  c4 d |\n  e f g\n}", "d", "f") == "{\n  c4 ^|\n  g\n}");
+    // Prefix functions go with their note; comments stay.
+    CHECK(removed("{ c4 \\deadNote d8 e }", "d8", "d8") == "{ c4 ^e8 }");
+    CHECK(removed("{ c4 \\once \\override NoteHead.color = #red d e }", "d e", "d") ==
+          "{ c4 ^e }");
+    CHECK(removed("{ c4 d % ahoj\n  e }", "d", "d") == "{ c4 ^% ahoj\n  e }");
+    CHECK(removed("{ c4 d\n  % Příliš žluťoučký\n  e }", "d", "d") ==
+          "{ c4^\n  % Příliš žluťoučký\n  e }");
+}
+
+TEST_CASE("removeEvents keeps the length of the next event", "[scoreregion][remove]") {
+    // `e` inherited the 8 of `d8`.
+    CHECK(removed("{ c4 d8 e f }", "d8", "d8") == "{ c4 ^e8 f }");
+    // The removed events leave the duration of the one before: nothing to write.
+    CHECK(removed("{ c4 d4 e f }", "d4", "d4") == "{ c4 ^e f }");
+    CHECK(removed("{ c8 d4 e f }", "d4", "d4") == "{ c8 ^e4 f }");
+    // On the next line, and for a chord.
+    CHECK(removed("{\n  c4 d8\n  <e g> f\n}", "d8", "d8") == "{\n  c4^\n  <e g>8 f\n}");
+    // Several removed: the last duration counts.
+    CHECK(removed("{ c4 d8 e16 f g }", "d8", "e16") == "{ c4 ^f16 g }");
+    // The next event has its own duration.
+    CHECK(removed("{ c4 d8 e2 f }", "d8", "d8") == "{ c4 ^e2 f }");
+    // Nothing follows.
+    CHECK(removed("{ c4 d8 }", "d8", "d8") == "{ c4 ^}");
+}
+
+TEST_CASE("removeEvents keeps slurs, phrasing slurs and beams balanced", "[scoreregion][remove]") {
+    CHECK(removed("{ c8( d e) f }", "c8", "c8") == "{ ^d8 e f }");
+    CHECK(removed("{ c8( d e) f }", "e", "e") == "{ c8 d ^f }");
+    CHECK(removed("{ c8( d e8) f }", "d", "d") == "{ c8( ^e8) f }");
+    // The whole slur goes: nothing left over.
+    CHECK(removed("{ c8( d e8) f }", "c8", "e8") == "{ ^f8 }");
+    // Phrasing slurs and beams, with direction marks.
+    CHECK(removed("{ c8\\( d e8\\) f }", "c8", "c8") == "{ ^d8 e8 f }");
+    CHECK(removed("{ c8-[ d e8-] f }", "e8", "e8") == "{ c8 d ^f }");
+    CHECK(removed("{ c8[ d e]8 f }", "c8", "c8") == "{ ^d8 e8 f }");
+    // The partner right behind the next event's duration, which that event must also get.
+    CHECK(removed("{ c8 d16( e) f }", "d16", "d16") == "{ c8 ^e16 f }");
+    // A slur that stays whole.
+    CHECK(removed("{ a b( c d) e }", "e", "e") == "{ a b( c d) ^}");
+}
+
+TEST_CASE("removeEvents removes the tie that would dangle", "[scoreregion][remove]") {
+    CHECK(removed("{ c4~ d e }", "d", "d") == "{ c4 ^e }");
+    CHECK(removed("{ c4 ~ d e }", "d", "d") == "{ c4 ^e }");
+    CHECK(removed("{ c4~ d }", "d", "d") == "{ c4 ^}");
+    CHECK(removed("{ c4~\n  d e }", "d", "d") == "{ c4\n  ^e }");
+    // A tie inside or after the removed range stays with it / leaves the next note alone.
+    CHECK(removed("{ c4 d~ e f }", "d", "d") == "{ c4 ^e f }");
+    // Not touching the tie of an earlier pair.
+    CHECK(removed("{ c4~ c d e }", "e", "e") == "{ c4~ c d ^}");
+}
+
+TEST_CASE("removeEvents refuses what it cannot read", "[scoreregion][remove]") {
+    sr::RemoveRefusal why{};
+    CHECK_FALSE(sr::removeEvents("{ c4 d }", {1, 1}, &why));
+    CHECK(why == sr::RemoveRefusal::NothingToRemove);
+    CHECK_FALSE(sr::removeEvents("{ c4 <d e", {0, 9}, &why));
+    CHECK(why == sr::RemoveRefusal::UnclosedChord);
+}
+
+TEST_CASE("caret stops between events", "[scoreregion][remove]") {
+    const std::string text = "{ c4 d <e g> }";
+    const auto events = sr::musicEvents(text);
+    REQUIRE(events.size() == 3);
+    CHECK(sr::caretStop(events, 0) == 0);
+    CHECK(sr::caretStop(events, events[0].begin) == 0);
+    CHECK(sr::caretStop(events, events[0].begin + 1) == 0);
+    // Behind an event and before the next one: one stop.
+    CHECK(sr::caretStop(events, events[0].end) == 1);
+    CHECK(sr::caretStop(events, events[1].begin) == 1);
+    CHECK(sr::caretStop(events, events[2].end) == 3);
+    CHECK(sr::caretStop(events, text.size()) == 3);
+    CHECK(sr::stopOffset(events, 1) == events[1].begin);
+    CHECK(sr::stopOffset(events, 3) == events[2].end);
+    CHECK(sr::stopOffset({}, 0) == 0);
+}
+
+// Run with: build/debug/tests/zub_core_tests "[integration]"
+// Deletes every music event of every real score, one at a time (read-only, in memory): the braces
+// stay balanced, the text before the removed event's line and after the next event's line is
+// untouched, no line break goes, and exactly one event less remains.
+TEST_CASE("deleting each event of the real scores keeps the rest of the text",
+          "[.integration][scoreregion][remove]") {
+    namespace fs = std::filesystem;
+    const fs::path songs = fs::path(ZUB_REAL_SONGBOOK_DIR) / "songs";
+    if (!fs::is_directory(songs))
+        SKIP("no songbook checkout at " << songs);
+    const auto count = [](const std::string& s, char c) { return std::ranges::count(s, c); };
+    std::size_t files = 0, deleted = 0, shorter = 0;
+    for (const auto& entry : fs::recursive_directory_iterator(songs)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".ly")
+            continue;
+        const auto content = zub::readTextFile(entry.path());
+        REQUIRE(content);
+        const std::string& text = *content;
+        const auto all = sr::musicEvents(text);
+        ++files;
+        const auto lineStart = [&](std::size_t at) {
+            const auto nl = text.rfind('\n', at == 0 ? 0 : at - 1);
+            return nl == std::string::npos || at == 0 ? std::size_t{0} : nl + 1;
+        };
+        const auto lineEnd = [&](std::size_t at) {
+            const auto nl = text.find('\n', at);
+            return nl == std::string::npos ? text.size() : nl;
+        };
+        for (std::size_t i = 0; i < all.size(); ++i) {
+            INFO(entry.path().string() << " event " << i);
+            const auto result = sr::removeEvents(text, all[i]);
+            REQUIRE(result);
+            ++deleted;
+            const std::string& out = result->text;
+            REQUIRE(count(out, '{') == count(text, '{'));
+            REQUIRE(count(out, '}') == count(text, '}'));
+            REQUIRE(count(out, '\n') == count(text, '\n'));
+            REQUIRE(sr::musicEvents(out).size() == all.size() - 1);
+            // Untouched: before the line of the previous event and after the next event's line.
+            const std::size_t head = i > 0 ? lineStart(all[i - 1].begin) : lineStart(all[i].begin);
+            const std::size_t tail = i + 1 < all.size() ? lineEnd(all[i + 1].end) : lineEnd(all[i].end);
+            REQUIRE(out.starts_with(text.substr(0, head)));
+            REQUIRE(out.ends_with(text.substr(tail)));
+            REQUIRE(result->selection.begin == result->selection.end);
+            REQUIRE(result->selection.begin <= out.size());
+            // A duration written on the next event makes the result longer than the text minus
+            // the event.
+            if (text.size() - out.size() < all[i].end - all[i].begin)
+                ++shorter;
+        }
+    }
+    CHECK(files > 0);
+    std::cerr << "scores: " << files << ", events deleted one by one: " << deleted
+              << ", of them with a duration written on the next event: " << shorter << "\n";
+}

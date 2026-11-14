@@ -4,6 +4,7 @@
 #include <QPoint>
 #include <QString>
 #include <QWidget>
+#include <optional>
 
 struct ScoreResult;
 class QAction;
@@ -57,8 +58,15 @@ public:
     // empty clears them. A new build clears them too: positions refer to its text.
     void setHighlightedNotes(const QList<QPoint>& positions);
     int highlightedNoteCount() const; // how many links are drawn highlighted; for tests
+    // The leftmost (`right`: rightmost) selectable note on the staff the score cursor is on (x =
+    // column, y = line); none without a score cursor (the links are stale) or off any staff.
+    std::optional<QPoint> staffEdgeNote(bool right) const;
+    QWidget* canvasWidget() const; // takes the keyboard focus; for tests
     // The actions of the context menu (the owner keeps them and their enabled state).
     void setRegionActions(const QList<QAction*>& actions);
+
+    // Keys that edit the score like a text cursor, while the score has the keyboard focus.
+    enum class KeyCommand { Left, Right, Home, End, Backspace, Delete, Undo, Redo };
 
 signals:
     void rebuildRequested();
@@ -75,6 +83,9 @@ signals:
     // the mouse, each with the side the mouse was on. Emitted whenever that changes.
     void notesDragged(const QPoint& anchor, bool anchorAfter, const QPoint& current,
                       bool currentAfter);
+    // A key of the score cursor: `extend` is Shift (select), `wholeScore` is Ctrl (Home/End go to
+    // the whole score's start/end instead of the staff's).
+    void keyCommand(ScorePreviewPane::KeyCommand command, bool extend, bool wholeScore);
     // A note was double-clicked: select exactly it.
     void noteDoubleClicked(const QPoint& position);
 

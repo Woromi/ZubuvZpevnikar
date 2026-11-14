@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ScorePreviewPane.hpp"
+
 #include <QByteArray>
 #include <QMainWindow>
 #include <QPoint>
@@ -46,7 +48,6 @@ class PlaybackRunner;
 struct PlaybackResult;
 class ScoreInputBar;
 class ScorePlayer;
-class ScorePreviewPane;
 class ScoreRunner;
 struct ScoreResult;
 class SongEditor;
@@ -125,6 +126,9 @@ private:
     void selectScoreNotes(const QPoint& anchor, bool anchorAfter, const QPoint& current,
                           bool currentAfter); // a drag in the preview
     void doubleClickScoreNote(const QPoint& position); // selects that event
+    // A key pressed while the preview has the focus: moves the score cursor, extends the
+    // selection, deletes events, undoes.
+    void scoreKey(ScorePreviewPane::KeyCommand command, bool extend, bool wholeScore);
     void selectScoreOffsets(std::size_t anchor, std::size_t current); // caret offsets, any order
     std::optional<std::size_t> caretOffsetOf(const QPoint& position, bool after) const;
     void indexScoreEvents();
@@ -274,6 +278,9 @@ private:
     std::vector<zub::scoreregion::Range> scoreEvents_;
     std::map<std::pair<int, int>, std::size_t> linkEvent_;
     std::map<std::size_t, QPoint> eventLink_;
+    // The stops (zub::scoreregion::caretStop) the keys of the preview selected from and to; valid
+    // while the editor's selection is still what they stand for.
+    std::optional<std::pair<std::size_t, std::size_t>> scoreStops_;
     std::optional<std::size_t> scoreAnchor_; // byte offset where a selection started
     QAction* fretboardAction_ = nullptr;     // "Fretboard": shows the input panels
     QTimer* scoreSyncTimer_ = nullptr;       // song text changed: look for new \lilypondfile
