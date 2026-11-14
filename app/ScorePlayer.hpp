@@ -23,6 +23,7 @@ signals:
     void failed(const QString&); // no audio device, unreadable file ...
 
 private:
+    void ensurePlayer(); // made on the first play()
     QMediaPlayer* player_ = nullptr;
     QAudioOutput* output_ = nullptr;
 };
