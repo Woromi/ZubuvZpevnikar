@@ -1572,6 +1572,10 @@ Vynecháno (neplatný název písně): %1</translation>
         <translation>Zkreslená elektrická kytara</translation>
     </message>
     <message>
+        <source>Chord names</source>
+        <translation>Akordy</translation>
+    </message>
+    <message>
         <source>Instruments…</source>
         <translation>Nástroje…</translation>
     </message>
@@ -2534,6 +2538,18 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>The instrument of %1 when the score is played</source>
         <translation>Nástroj osnovy %1 při přehrávání notové ukázky</translation>
+    </message>
+    <message>
+        <source>The instrument that plays the chord names when the score is played (their chords in their rhythm)</source>
+        <translation>Nástroj, který při přehrávání hraje akordy nad notami (v jejich rytmu)</translation>
+    </message>
+    <message>
+        <source>Silent</source>
+        <translation>Ticho</translation>
+    </message>
+    <message>
+        <source>The chord names make no sound</source>
+        <translation>Akordy nehrají</translation>
     </message>
     <message>
         <source>Automatic</source>

@@ -46,13 +46,17 @@ public:
     // MIDI name the score file sets ("" if none: then "Automatic" means the app's guess).
     // `choices` are zub::midi::Instrument ids ("auto" = as the file or the app's guess), by index;
     // missing ones are "auto". Setting them emits nothing.
+    // `chords`: the score's chord names get a row of their own after the staves, silent unless
+    // `chordChoice` (an instrument id, "silent") picks an instrument; it has no "Save to file".
     struct StaffInfo {
         QString label;
         QString fileInstrument;
         bool operator==(const StaffInfo&) const = default;
     };
-    void setStaves(const QList<StaffInfo>& staves, const QStringList& choices);
+    void setStaves(const QList<StaffInfo>& staves, const QStringList& choices, bool chords = false,
+                   const QString& chordChoice = QStringLiteral("silent"));
     QStringList staffChoices() const; // by staff index
+    QString chordChoice() const;      // "silent" without chord names
     QWidget* playButton() const; // for tests
 
     // Where the note that LilyPond linked to `line` (1-based) and `column` (0-based) is drawn, in
@@ -124,7 +128,9 @@ private:
     QVBoxLayout* popupLayout_ = nullptr;
     QHBoxLayout* instrumentSlot_ = nullptr; // the toolbar's place of the single staff's row
     QList<StaffInfo> staves_;
+    bool chords_ = false; // the last row is the chord names'
     QStringList staffChoices_;
+    QString chordChoice_ = QStringLiteral("silent");
     QList<StaffInstrumentRow*> staffRows_;
     PlayState playState_ = PlayState::Idle;
     bool playbackAvailable_ = true;

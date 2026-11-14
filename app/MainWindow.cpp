@@ -533,8 +533,12 @@ void MainWindow::createCentralWidget() {
     // ... and a new instrument is another instrument in the MIDI file.
     connect(scorePreview_, &ScorePreviewPane::instrumentChanged, this, [this] {
         if (!onSongTab() && tabs_->currentIndex() >= 1)
-            staffChoices_[scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name] =
-                scorePreview_->staffChoices();
+        {
+            const std::string& name =
+                scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name;
+            staffChoices_[name] = scorePreview_->staffChoices();
+            chordChoices_[name] = scorePreview_->chordChoice();
+        }
         scoreRunner_->cancel(); // a build under way has the old instrument
         forgetScoreMidi(); // the old MIDI file has the old instrument: no Play until the rebuild
         scorePreviewTimer_->start();
@@ -2473,6 +2477,7 @@ void MainWindow::requestScorePreview(bool userAsked) {
     midi.instrument = zub::score::midiInstrument(request.content);
     for (const QString& id : scorePreview_->staffChoices())
         midi.staffInstruments.push_back(toStdString(id));
+    midi.chordInstrument = toStdString(scorePreview_->chordChoice());
     if (const auto meta = zub::parseSong(editor_->content())) {
         midi.tempo = zub::score::songTempo(meta->value("tem"));
         midi.transpose = zub::score::songCapo(meta->value("cap")); // sounds as with the capo on
@@ -2508,7 +2513,10 @@ void MainWindow::showStaves(SongEditor* editor, const std::string& name) {
     while (choices.size() > infos.size())
         choices.removeLast();
     staffChoices_[name] = choices;
-    scorePreview_->setStaves(infos, choices);
+    const auto chordChoice = chordChoices_.find(name);
+    scorePreview_->setStaves(infos, choices, zub::score::hasChordNames(text),
+                             chordChoice != chordChoices_.end() ? chordChoice->second
+                                                                : QStringLiteral("silent"));
 }
 
 // "Save to file" of a staff: writes the chosen General MIDI instrument into the score as one edit.

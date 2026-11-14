@@ -704,8 +704,9 @@ public:
         return QCoreApplication::translate("StaffInstrumentRow", text);
     }
 
+    // `chords`: the row of the chord names: "Silent" first, no "Save to file".
     StaffInstrumentRow(const QString& label, const QString& fileInstrument, bool showLabel,
-                       QWidget* parent)
+                       bool chords, QWidget* parent)
         : QWidget(parent), combo_(new QComboBox), save_(new QPushButton) {
         auto* layout = new QHBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
@@ -716,15 +717,22 @@ public:
         }
         combo_->setObjectName(QStringLiteral("scoreInstrument"));
         combo_->setToolTip(tr("The instrument of %1 when the score is played").arg(label));
-        combo_->addItem(fileInstrument.isEmpty() ? tr("Automatic")
-                                                 : tr("From the file: %1").arg(fileInstrument),
-                        QStringLiteral("auto"));
-        combo_->setItemData(0,
-                            fileInstrument.isEmpty()
-                                ? tr("The guitar for tablature, the banjo for banjo tuning, the "
-                                     "whistle for tin whistle scores")
-                                : tr("The instrument the score file sets for this staff"),
-                            Qt::ToolTipRole);
+        if (chords) {
+            combo_->setToolTip(tr("The instrument that plays the chord names when the score is "
+                                  "played (their chords in their rhythm)"));
+            combo_->addItem(tr("Silent"), QStringLiteral("silent"));
+            combo_->setItemData(0, tr("The chord names make no sound"), Qt::ToolTipRole);
+        } else {
+            combo_->addItem(fileInstrument.isEmpty() ? tr("Automatic")
+                                                     : tr("From the file: %1").arg(fileInstrument),
+                            QStringLiteral("auto"));
+            combo_->setItemData(0,
+                                fileInstrument.isEmpty()
+                                    ? tr("The guitar for tablature, the banjo for banjo tuning, "
+                                         "the whistle for tin whistle scores")
+                                    : tr("The instrument the score file sets for this staff"),
+                                Qt::ToolTipRole);
+        }
         for (const auto& instrument : zub::midi::instruments())
             combo_->addItem(instrumentText(QString::fromLatin1(instrument.id)),
                             QString::fromLatin1(instrument.id));
@@ -737,6 +745,7 @@ public:
         save_->setText(tr("Save to file"));
         layout->addWidget(combo_);
         layout->addWidget(save_);
+        save_->setVisible(!chords);
         connect(combo_, &QComboBox::currentIndexChanged, this, [this] {
             updateSave();
             if (!quiet_ && onChanged)
@@ -765,7 +774,8 @@ public:
 private:
     void updateSave() {
         const QString id = choice();
-        const bool saveable = id != QStringLiteral("auto") && id != QStringLiteral("amp");
+        const bool saveable = id != QStringLiteral("auto") && id != QStringLiteral("amp") &&
+                              id != QStringLiteral("silent");
         save_->setEnabled(saveable);
         save_->setToolTip(
             id == QStringLiteral("amp")
@@ -788,13 +798,15 @@ void ScorePreviewPane::rebuildStaffRows() {
         row->deleteLater();
     }
     staffRows_.clear();
-    const bool single = staves_.size() == 1;
-    instrumentsButton_->setVisible(staves_.size() >= 2);
-    if (staves_.size() < 2)
+    const qsizetype rows = staves_.size() + (chords_ ? 1 : 0);
+    const bool single = rows == 1;
+    instrumentsButton_->setVisible(rows >= 2);
+    if (rows < 2)
         instrumentsPopup_->hide();
-    for (qsizetype i = 0; i < staves_.size(); ++i) {
-        const StaffInfo& info = staves_[i];
-        auto* row = new StaffInstrumentRow(info.label, info.fileInstrument, !single,
+    for (qsizetype i = 0; i < rows; ++i) {
+        const bool chordRow = i == staves_.size();
+        const StaffInfo info = chordRow ? StaffInfo{tr("Chord names"), {}} : staves_[i];
+        auto* row = new StaffInstrumentRow(info.label, info.fileInstrument, !single, chordRow,
                                            single ? static_cast<QWidget*>(this)
                                                   : static_cast<QWidget*>(instrumentsPopup_));
         row->onChanged = [this] {
@@ -812,17 +824,28 @@ void ScorePreviewPane::rebuildStaffRows() {
 
 void ScorePreviewPane::markStaffChoicesFromRows() {
     staffChoices_.clear();
-    for (const StaffInstrumentRow* row : std::as_const(staffRows_))
-        staffChoices_.append(row->choice());
+    chordChoice_ = QStringLiteral("silent");
+    for (qsizetype i = 0; i < staffRows_.size(); ++i) {
+        if (i < staves_.size())
+            staffChoices_.append(staffRows_[i]->choice());
+        else
+            chordChoice_ = staffRows_[i]->choice();
+    }
 }
 
-void ScorePreviewPane::setStaves(const QList<StaffInfo>& staves, const QStringList& choices) {
-    const bool same = staves == staves_;
+void ScorePreviewPane::setStaves(const QList<StaffInfo>& staves, const QStringList& choices,
+                                 bool chords, const QString& chordChoice) {
+    const bool same = staves == staves_ && chords == chords_;
     staves_ = staves;
+    chords_ = chords;
     if (!same)
         rebuildStaffRows();
-    for (qsizetype i = 0; i < staffRows_.size(); ++i)
-        staffRows_[i]->setChoice(i < choices.size() ? choices[i] : QStringLiteral("auto"));
+    for (qsizetype i = 0; i < staffRows_.size(); ++i) {
+        if (i < staves_.size())
+            staffRows_[i]->setChoice(i < choices.size() ? choices[i] : QStringLiteral("auto"));
+        else
+            staffRows_[i]->setChoice(chordChoice);
+    }
     markStaffChoicesFromRows();
 }
 
@@ -1108,6 +1131,10 @@ double ScorePreviewPane::tempoFactor() const {
 
 QStringList ScorePreviewPane::staffChoices() const {
     return staffChoices_;
+}
+
+QString ScorePreviewPane::chordChoice() const {
+    return chordChoice_;
 }
 
 QWidget* ScorePreviewPane::playButton() const {

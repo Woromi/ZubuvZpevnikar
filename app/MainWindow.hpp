@@ -310,6 +310,7 @@ private:
     // The instrument choices of each staff (zub::midi::Instrument ids, "auto" = as the file), by
     // score name ("Artist/X.ly"): kept for the session only.
     std::map<std::string, QStringList> staffChoices_;
+    std::map<std::string, QString> chordChoices_; // the chord names' instrument per score (session)
     QAction* soundAction_ = nullptr; // "Sound": clicking a fret plays the note
     std::filesystem::path scoreMidi_;        // the MIDI file of the latest successful build
     std::filesystem::path playbackCacheDir_; // the rendered WAV files
