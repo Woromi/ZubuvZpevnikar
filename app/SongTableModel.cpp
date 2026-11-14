@@ -92,6 +92,11 @@ void SongTableModel::setScanResult(const std::filesystem::path& path, const QStr
     Row& r = rows_[static_cast<std::size_t>(row)];
     r.changes = summary;
     r.changesToolTip = summary.isEmpty() ? QString() : details;
+    r.changeCount = 0;
+    if (!summary.isEmpty())
+        for (const QStringView line : QStringView(details).split(QLatin1Char('\n')))
+            if (line.startsWith(QStringLiteral("  \u2022 ")))
+                ++r.changeCount;
     emit dataChanged(index(row, Changes), index(row, Changes));
 }
 
@@ -99,6 +104,7 @@ void SongTableModel::clearScanResults() {
     for (Row& row : rows_) {
         row.changes.clear();
         row.changesToolTip.clear();
+        row.changeCount = 0;
     }
     if (!rows_.empty())
         emit dataChanged(index(0, Changes), index(rowCount() - 1, Changes));
@@ -186,6 +192,9 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
                 ++digits;
             return digits > 0 ? text.left(digits).toInt() : -1;
         }
+        // Possible changes by their number (9 before 10), not as text.
+        if (index.column() == Changes)
+            return row.changeCount;
         return data(index, Qt::DisplayRole);
     case HasChangesRole:
         return !row.changes.isEmpty();

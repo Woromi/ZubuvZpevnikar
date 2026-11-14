@@ -48,7 +48,8 @@ public:
     // Row of the song stored at `path`, -1 if absent.
     int rowOf(const std::filesystem::path& path) const;
     // What a songbook scan found in the song at `path` (this session only): a short summary for
-    // the Changes column and the details for its tooltip. Empty `summary` clears it.
+    // the Changes column and the details for its tooltip. Empty `summary` clears it. The column
+    // sorts by the number of items listed in `details` (its "  • " lines).
     void setScanResult(const std::filesystem::path& path, const QString& summary,
                        const QString& details);
     void clearScanResults();
@@ -75,6 +76,7 @@ private:
         QStringList labels;
         bool favourite = false;
         QString changes, changesToolTip; // from a songbook scan
+        int changeCount = 0;             // the items listed in changesToolTip
     };
     static Row makeRow(zub::SongEntry entry);
     std::vector<Row> rows_;
