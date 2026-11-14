@@ -113,6 +113,9 @@ private:
     bool confirmCloseAll();
     bool confirmCloseScore(const std::string& name, SongEditor* score);
     void removeScoreReference(const std::string& name);
+    // Offers the `pap` header after a measurement of `measuredText` (a bar above the editor).
+    void offerPapers(SongEditor* editor, const std::string& measuredText,
+                     const zub::songsuggest::Suggestions& suggestions);
     void replaceSongText(const std::string& after); // one undo step in the song editor
     void updateScoreWidthBars();
     void updateFretboard(); // the current score tab's input panel

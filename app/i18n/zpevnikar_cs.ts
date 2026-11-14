@@ -1039,6 +1039,38 @@ Použijte vestavěný.</translation>
         </translation>
     </message>
     <message>
+        <source>Measured: the song fits one page of %1.</source>
+        <translation>Změřeno: píseň se vejde na jednu stránku %1.</translation>
+    </message>
+    <message>
+        <source> and </source>
+        <translation> a </translation>
+    </message>
+    <message>
+        <source>Measured: the song no longer fits one page of %1.</source>
+        <translation>Změřeno: píseň se už nevejde na jednu stránku %1.</translation>
+    </message>
+    <message>
+        <source>none</source>
+        <translation>žádné</translation>
+    </message>
+    <message>
+        <source>pap: %1 → %2</source>
+        <translation>pap: %1 → %2</translation>
+    </message>
+    <message>
+        <source>Mark</source>
+        <translation>Označit</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Aktualizovat</translation>
+    </message>
+    <message>
+        <source>Paper marks updated. Save to keep them.</source>
+        <translation>Značky papíru změněny. Uložte, aby se zachovaly.</translation>
+    </message>
+    <message>
         <source>Applying…</source>
         <translation>Provádím změnu…</translation>
     </message>
@@ -1684,6 +1716,10 @@ Vynecháno (neplatný název písně): %1</translation>
 </context>
 <context>
     <name>SongEditor</name>
+    <message>
+        <source>Close</source>
+        <translation>Zavřít</translation>
+    </message>
     <message>
         <source>%1 is open read-only because it can&apos;t be edited safely here (%2).</source>
         <translation>%1 je otevřen jen pro čtení, protože ho zde nelze bezpečně upravovat (%2).</translation>

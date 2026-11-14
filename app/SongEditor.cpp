@@ -19,6 +19,8 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QStringList>
+#include <QToolButton>
+#include <QHBoxLayout>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
@@ -44,6 +46,33 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
         QStringLiteral("background-color: #fff3cd; color: #664d03; padding: 6px;"));
     banner_->hide();
     layout->addWidget(banner_);
+
+    suggestionBar_ = new QWidget(this);
+    suggestionBar_->setObjectName(QStringLiteral("suggestionBar"));
+    suggestionBar_->setStyleSheet(QStringLiteral(
+        "#suggestionBar { background-color: #d1e7dd; } QLabel { color: #0a3622; }"));
+    auto* barLayout = new QHBoxLayout(suggestionBar_);
+    barLayout->setContentsMargins(6, 4, 6, 4);
+    suggestionLabel_ = new QLabel(suggestionBar_);
+    suggestionLabel_->setWordWrap(true);
+    suggestionLabel_->setTextFormat(Qt::PlainText);
+    barLayout->addWidget(suggestionLabel_, 1);
+    suggestionButton_ = new QPushButton(suggestionBar_);
+    barLayout->addWidget(suggestionButton_);
+    auto* closeButton = new QToolButton(suggestionBar_);
+    closeButton->setText(QStringLiteral("\u00d7"));
+    closeButton->setAutoRaise(true);
+    closeButton->setToolTip(tr("Close"));
+    barLayout->addWidget(closeButton);
+    suggestionBar_->hide();
+    layout->addWidget(suggestionBar_);
+    connect(closeButton, &QToolButton::clicked, this, &SongEditor::hideSuggestion);
+    connect(suggestionButton_, &QPushButton::clicked, this, [this] {
+        const auto action = std::move(suggestionAction_);
+        hideSuggestion();
+        if (action)
+            action();
+    });
 
     auto* codeEdit = new CodeTextEdit(this);
     edit_ = codeEdit;
@@ -80,6 +109,8 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
     connect(watcher_, &QFileSystemWatcher::fileChanged, this, [this] { onFileChanged(); });
     connect(watcher_, &QFileSystemWatcher::directoryChanged, this,
             [this] { onDirectoryChanged(); });
+    connect(edit_->document(), &QTextDocument::contentsChanged, this,
+            &SongEditor::hideSuggestion);
     connect(edit_->document(), &QTextDocument::modificationChanged, this,
             &SongEditor::modificationChanged);
 }
@@ -202,6 +233,23 @@ void SongEditor::checkLossless(const std::string& bytes) {
     }
     edit_->setReadOnly(lossy_);
     updateBanner();
+}
+
+void SongEditor::showSuggestion(const QString& message, const QString& detail,
+                                const QString& button, std::function<void()> action) {
+    suggestionLabel_->setText(detail.isEmpty() ? message : message + QLatin1Char(' ') + detail);
+    suggestionButton_->setText(button);
+    suggestionAction_ = std::move(action);
+    suggestionBar_->show();
+}
+
+void SongEditor::hideSuggestion() {
+    suggestionAction_ = nullptr;
+    suggestionBar_->hide();
+}
+
+bool SongEditor::suggestionShown() const {
+    return !suggestionBar_->isHidden();
 }
 
 void SongEditor::updateBanner() {

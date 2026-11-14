@@ -6,6 +6,7 @@ class QKeyEvent;
 #include <QString>
 #include <QWidget>
 #include <expected>
+#include <functional>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -17,6 +18,7 @@ class QAction;
 class QFileSystemWatcher;
 class QLabel;
 class QPlainTextEdit;
+class QPushButton;
 
 namespace KSyntaxHighlighting {
 class Repository;
@@ -85,6 +87,15 @@ public:
     // Puts the cursor at `byteOffset` of the editor text (UTF-8, LF line ends) and focuses it (unless `focus` is false).
     void setCursorByteOffset(std::size_t byteOffset, bool focus = true);
     QPlainTextEdit* textEdit() const { return edit_; }
+
+    // A bar above the editor offering one change ("Measured: ... fits one page of A5." with the
+    // change as `detail` and a button): `action` runs on a click of `button`, then the bar
+    // closes. It never makes the editor read-only. It closes by itself when the text changes
+    // (also through the action), by its x, or by hideSuggestion().
+    void showSuggestion(const QString& message, const QString& detail, const QString& button,
+                        std::function<void()> action);
+    void hideSuggestion();
+    bool suggestionShown() const;
 
     // Song-editing helpers (zub::songedit on the cursor's line); each is one undo step and does
     // nothing in a read-only editor.
@@ -174,6 +185,10 @@ private:
     bool crlf_ = false;       // the file used CRLF line endings
     bool askingAboutReload_ = false;
     QLabel* banner_ = nullptr;
+    QWidget* suggestionBar_ = nullptr;
+    QLabel* suggestionLabel_ = nullptr;
+    QPushButton* suggestionButton_ = nullptr;
+    std::function<void()> suggestionAction_;
     bool lossy_ = false; // the file does not round-trip: editor is read-only
     QString lossyReason_;
     bool missing_ = false; // the file vanished from disk

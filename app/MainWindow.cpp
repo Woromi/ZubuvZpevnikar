@@ -91,6 +91,7 @@
 #include <zub/core/song.hpp>
 #include <zub/core/songbook.hpp>
 #include <zub/core/songedit.hpp>
+#include <zub/core/songheader.hpp>
 #include <zub/core/songimport.hpp>
 #include <zub/core/songsuggest.hpp>
 #include <zub/core/songtags.hpp>
@@ -746,6 +747,8 @@ SongEditor* MainWindow::openEditor(const std::filesystem::path& path, const QStr
 }
 
 void MainWindow::showSong(SongEditor* editor, const QString& title, const QString& toolTip) {
+    if (editor_ && editor_ != editor)
+        editor_->hideSuggestion();
     editor_ = editor;
     editor->setWindowTitle(title.isEmpty() ? editor->windowTitle() : title);
     inputLabel_->setText(toolTip);
@@ -3003,6 +3006,8 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
         return;
     }
     const zub::songsuggest::Suggestions& suggestions = *result;
+    if (action != SongAction::Check)
+        offerPapers(editor, input, suggestions);
     if (suggestions.proposals.empty()) {
         const QString summary = ShrinkDialog::summary(suggestions);
         QString text;
@@ -3097,6 +3102,72 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
     applyRestructures_ = std::ranges::any_of(
         chosen, [](const auto& proposal) { return proposal.category == "restructure"; });
     startApply(std::move(ids), description);
+}
+
+void MainWindow::offerPapers(SongEditor* editor, const std::string& measuredText,
+                             const zub::songsuggest::Suggestions& suggestions) {
+    if (!editor || editor != editor_ || editor->textEdit()->isReadOnly() ||
+        editor->kind() != SongEditor::Kind::Song || editor->content() != measuredText ||
+        (!suggestions.a4 && !suggestions.a5))
+        return;
+    const std::string current = zub::songheader::option(measuredText, "pap").value_or("");
+    const std::string wanted =
+        zub::songheader::measuredPapers(current, suggestions.a4, suggestions.a5);
+    if (wanted == current)
+        return;
+    const auto parts = [](const std::string& list) {
+        std::vector<std::string> out;
+        for (std::size_t start = 0; start <= list.size();) {
+            const auto comma = list.find(',', start);
+            const auto end = comma == std::string::npos ? list.size() : comma;
+            if (end > start)
+                out.push_back(list.substr(start, end - start));
+            start = end + 1;
+        }
+        return out;
+    };
+    const auto before = parts(current);
+    const auto after = parts(wanted);
+    // The measured papers the song fits one page of / no longer fits (and was marked for).
+    QStringList fitting;
+    QStringList notFitting;
+    bool added = false;
+    const std::pair<const char*, const std::optional<zub::songsuggest::Measured>*> measured[] = {
+        {"a4", &suggestions.a4}, {"a5", &suggestions.a5}};
+    for (const auto& [paper, m] : measured) {
+        if (!*m)
+            continue;
+        const bool had = std::ranges::find(before, paper) != before.end();
+        const bool has = std::ranges::find(after, paper) != after.end();
+        const QString label = QString::fromLatin1(paper).toUpper();
+        if ((*m)->fits && (*m)->pages == 1)
+            fitting << label;
+        if (has && !had)
+            added = true;
+        if (had && !has)
+            notFitting << label;
+    }
+    QString message;
+    if (!fitting.isEmpty())
+        message = tr("Measured: the song fits one page of %1.").arg(fitting.join(tr(" and ")));
+    if (!notFitting.isEmpty()) {
+        if (!message.isEmpty())
+            message += QLatin1Char(' ');
+        message += tr("Measured: the song no longer fits one page of %1.")
+                       .arg(notFitting.join(tr(" and ")));
+    }
+    const auto shown = [this](const std::string& list) {
+        return list.empty() ? tr("none") : toQString(list);
+    };
+    const QString detail = tr("pap: %1 \u2192 %2").arg(shown(current), shown(wanted));
+    QPointer<SongEditor> guard = editor;
+    editor->showSuggestion(
+        message, detail, added ? tr("Mark") : tr("Update"), [this, guard, wanted] {
+            if (!guard || guard != editor_ || guard->textEdit()->isReadOnly())
+                return;
+            replaceSongText(zub::songheader::setPap(guard->content(), wanted));
+            statusBar()->showMessage(tr("Paper marks updated. Save to keep them."), 8000);
+        });
 }
 
 void MainWindow::startApply(std::vector<std::string> ids, const QString& description) {
