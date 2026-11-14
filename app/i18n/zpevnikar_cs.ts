@@ -811,6 +811,10 @@ Použijte vestavěný.</translation>
         <translation>Upravit štítky písně (jeden krok zpět; uložením se zachovají)</translation>
     </message>
     <message>
+        <source>Toggle Comment</source>
+        <translation>Zakomentovat/odkomentovat</translation>
+    </message>
+    <message>
         <source>%1: the song is open read-only.</source>
         <translation>%1: píseň je otevřená jen pro čtení.</translation>
     </message>

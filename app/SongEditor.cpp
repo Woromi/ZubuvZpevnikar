@@ -1,5 +1,4 @@
 #include "SongEditor.hpp"
-
 #include "CodeTextEdit.hpp"
 #include "convert.hpp"
 
@@ -11,6 +10,7 @@
 #include <QFileSystemWatcher>
 #include <QFontDatabase>
 #include <QFontMetricsF>
+#include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMessageBox>
@@ -19,15 +19,15 @@
 #include <QPushButton>
 #include <QScrollBar>
 #include <QStringList>
-#include <QToolButton>
-#include <QHBoxLayout>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTimer>
+#include <QToolButton>
 #include <QUtf8StringView>
 #include <QVBoxLayout>
 #include <algorithm>
+#include <set>
 #include <utility>
 #include <zub/core/fretboard.hpp>
 #include <zub/core/scoreregion.hpp>
@@ -49,8 +49,8 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
 
     suggestionBar_ = new QWidget(this);
     suggestionBar_->setObjectName(QStringLiteral("suggestionBar"));
-    suggestionBar_->setStyleSheet(QStringLiteral(
-        "#suggestionBar { background-color: #d1e7dd; } QLabel { color: #0a3622; }"));
+    suggestionBar_->setStyleSheet(
+        QStringLiteral("#suggestionBar { background-color: #d1e7dd; } QLabel { color: #0a3622; }"));
     auto* barLayout = new QHBoxLayout(suggestionBar_);
     barLayout->setContentsMargins(6, 4, 6, 4);
     suggestionLabel_ = new QLabel(suggestionBar_);
@@ -76,9 +76,8 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
 
     auto* codeEdit = new CodeTextEdit(this);
     edit_ = codeEdit;
-    codeEdit->setKeyFilter([this](QKeyEvent* event) {
-        return typeSpaceOutsideChord(event) || editLinkedName(event);
-    });
+    codeEdit->setKeyFilter(
+        [this](QKeyEvent* event) { return typeSpaceOutsideChord(event) || editLinkedName(event); });
     layout->addWidget(edit_);
 
     const QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
@@ -111,8 +110,7 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
     connect(watcher_, &QFileSystemWatcher::fileChanged, this, [this] { onFileChanged(); });
     connect(watcher_, &QFileSystemWatcher::directoryChanged, this,
             [this] { onDirectoryChanged(); });
-    connect(edit_->document(), &QTextDocument::contentsChanged, this,
-            &SongEditor::hideSuggestion);
+    connect(edit_->document(), &QTextDocument::contentsChanged, this, &SongEditor::hideSuggestion);
     connect(edit_->document(), &QTextDocument::modificationChanged, this,
             &SongEditor::modificationChanged);
     if (kind_ == Kind::Song) {
@@ -637,6 +635,40 @@ bool SongEditor::moveLines(int direction) {
     return true;
 }
 
+bool SongEditor::toggleComments() {
+    auto* edit = static_cast<CodeTextEdit*>(edit_);
+    if (edit->isReadOnly())
+        return false;
+    QTextDocument* document = edit->document();
+    std::set<int> numbers;
+    for (const QTextCursor& cursor : edit->cursors()) {
+        const QTextBlock first = document->findBlock(cursor.selectionStart());
+        QTextBlock last = document->findBlock(cursor.selectionEnd());
+        // A selection that ends at the start of a line does not take that line along.
+        if (cursor.hasSelection() && last != first && cursor.selectionEnd() == last.position())
+            last = last.previous();
+        for (int n = first.blockNumber(); n <= last.blockNumber(); ++n)
+            numbers.insert(n);
+    }
+    const std::vector<int> blocks(numbers.begin(), numbers.end());
+    std::vector<std::string> lines;
+    for (const int n : blocks)
+        lines.push_back(document->findBlockByNumber(n).text().toUtf8().toStdString());
+    const auto edits = zub::songedit::toggleLineComments(lines);
+    // The columns are inside the indentation and the "% ": ASCII, so bytes are UTF-16 units.
+    edit->editKeepingCursors([&] {
+        QTextCursor writer(document);
+        for (auto e = edits.rbegin(); e != edits.rend(); ++e) {
+            const int start = document->findBlockByNumber(blocks[e->line]).position() +
+                              static_cast<int>(e->column);
+            writer.setPosition(start);
+            writer.setPosition(start + static_cast<int>(e->length), QTextCursor::KeepAnchor);
+            writer.insertText(QString::fromStdString(e->text));
+        }
+    });
+    return true;
+}
+
 namespace {
 
 // The cursor's line and the cursor and selection in it (byte offsets); a selection over several
@@ -844,17 +876,16 @@ void SongEditor::insertChord() {
         return;
     const auto state = lineState(edit_->textCursor());
     applyChange(edit_, state,
-                zub::songedit::insertChord(state.line, state.cursor, state.selStart,
-                                           state.selEnd));
+                zub::songedit::insertChord(state.line, state.cursor, state.selStart, state.selEnd));
 }
 
 void SongEditor::insertMultivoice() {
     if (edit_->isReadOnly() || kind_ != Kind::Song)
         return;
     const auto state = lineState(edit_->textCursor());
-    applyChange(edit_, state,
-                zub::songedit::insertMultivoice(state.line, state.cursor, state.selStart,
-                                                state.selEnd));
+    applyChange(
+        edit_, state,
+        zub::songedit::insertMultivoice(state.line, state.cursor, state.selStart, state.selEnd));
 }
 
 void SongEditor::insertRole() {
@@ -862,8 +893,7 @@ void SongEditor::insertRole() {
         return;
     const auto state = lineState(edit_->textCursor());
     applyChange(edit_, state,
-                zub::songedit::insertRole(state.line, state.cursor, state.selStart,
-                                          state.selEnd));
+                zub::songedit::insertRole(state.line, state.cursor, state.selStart, state.selEnd));
 }
 
 bool SongEditor::removeElement() {

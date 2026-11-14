@@ -116,6 +116,10 @@ public:
     // Moves the cursor's line, or every line the selection touches, one line up (-1) or down
     // (+1), keeping the selection on the moved lines; false at the top or bottom.
     bool moveLines(int direction);
+    // Toggle Comment: `%` line comments on or off for the lines of every cursor and selection
+    // (zub::songedit::toggleLineComments over all of them together), one undo step. False when
+    // read-only.
+    bool toggleComments();
 
     // Score editing from the fretboard (Kind::Score), each one undo step on the cursor's line,
     // nothing in a read-only editor. `duration` is what the note should have ("4", "8."); it is

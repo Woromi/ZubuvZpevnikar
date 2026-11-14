@@ -7,15 +7,14 @@
 #include "ImportDialog.hpp"
 #include "LabelFilterBox.hpp"
 #include "LabelsDialog.hpp"
+#include "NoteSounds.hpp"
+#include "PlaybackRunner.hpp"
 #include "PreviewPane.hpp"
 #include "PreviewRunner.hpp"
 #include "ScoreInputBar.hpp"
-#include "ScorePreviewPane.hpp"
-#include "NoteSounds.hpp"
-#include "PlaybackRunner.hpp"
 #include "ScorePlayer.hpp"
+#include "ScorePreviewPane.hpp"
 #include "ScoreRunner.hpp"
-#include "SoundTools.hpp"
 #include "ShrinkDialog.hpp"
 #include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
@@ -25,6 +24,7 @@
 #include "SongbookSorter.hpp"
 #include "SongbookStore.hpp"
 #include "SongbooksPage.hpp"
+#include "SoundTools.hpp"
 #include "convert.hpp"
 
 #include <KSyntaxHighlighting/Repository>
@@ -80,10 +80,10 @@
 #include <system_error>
 #include <utility>
 #include <zub/core/fretboard.hpp>
-#include <zub/core/midi.hpp>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/linediff.hpp>
+#include <zub/core/midi.hpp>
 #include <zub/core/preview.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/score.hpp>
@@ -532,8 +532,7 @@ void MainWindow::createCentralWidget() {
             [this] { scorePreviewTimer_->start(); });
     // ... and a new instrument is another instrument in the MIDI file.
     connect(scorePreview_, &ScorePreviewPane::instrumentChanged, this, [this] {
-        if (!onSongTab() && tabs_->currentIndex() >= 1)
-        {
+        if (!onSongTab() && tabs_->currentIndex() >= 1) {
             const std::string& name =
                 scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name;
             staffChoices_[name] = scorePreview_->staffChoices();
@@ -1191,6 +1190,13 @@ void MainWindow::createEditMenu() {
                 editor->moveLines(+1);
         },
         false);
+    add(
+        tr("Toggle Comment"), {QKeySequence(Qt::CTRL | Qt::Key_Slash)},
+        [this] {
+            if (SongEditor* editor = currentEditor())
+                editor->toggleComments();
+        },
+        false);
     for (const auto& [key, step] : {std::pair{Qt::Key_Up, -1}, std::pair{Qt::Key_Down, +1}}) {
         auto* scroll = new QAction(this);
         scroll->setShortcut(QKeySequence(Qt::CTRL | key));
@@ -1733,7 +1739,8 @@ void MainWindow::createPreview() {
             ? QStringLiteral("score")
             : QStringLiteral("score-%1").arg(QApplication::applicationPid())));
     playbackCacheDir_ = toPath(QDir(cache).absoluteFilePath(QStringLiteral("playback")));
-    noteSounds_ = new NoteSounds(toPath(QDir(cache).absoluteFilePath(QStringLiteral("sounds"))), this);
+    noteSounds_ =
+        new NoteSounds(toPath(QDir(cache).absoluteFilePath(QStringLiteral("sounds"))), this);
     connect(noteSounds_, &NoteSounds::failed, this,
             [this](const QString& message) { statusBar()->showMessage(message, 8000); });
 }
@@ -2035,8 +2042,8 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     // Insert and Clear work anywhere on the tab while something is staged.
     auto* insertAction = new QAction(tr("Insert Staged Notes"), page);
     insertAction->setObjectName(QStringLiteral("scoreInsertStaged"));
-    insertAction->setShortcuts({QKeySequence(Qt::CTRL | Qt::Key_Return),
-                                QKeySequence(Qt::CTRL | Qt::Key_Enter)});
+    insertAction->setShortcuts(
+        {QKeySequence(Qt::CTRL | Qt::Key_Return), QKeySequence(Qt::CTRL | Qt::Key_Enter)});
     insertAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     insertAction->setEnabled(false);
     auto* clearAction = new QAction(tr("Clear Staged Notes"), page);
@@ -2046,7 +2053,8 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     clearAction->setEnabled(false);
     page->addAction(insertAction);
     page->addAction(clearAction);
-    connect(insertAction, &QAction::triggered, this, [this, fretboard] { insertStagedNotes(fretboard); });
+    connect(insertAction, &QAction::triggered, this,
+            [this, fretboard] { insertStagedNotes(fretboard); });
     connect(clearAction, &QAction::triggered, fretboard, &FretboardWidget::clearStaged);
     connect(fretboard, &FretboardWidget::insertRequested, this,
             [this, fretboard] { insertStagedNotes(fretboard); });
@@ -2401,9 +2409,9 @@ void MainWindow::insertStagedNotes(FretboardWidget* fretboard) {
     std::ranges::sort(positions, std::greater<>{}, &zub::fretboard::Position::string);
     std::vector<std::string> tokens;
     for (const auto& position : positions)
-        tokens.push_back(zub::fretboard::noteToken(fretboard->midiAt(position.string, position.fret),
-                                                   position.string, fretboard->german(),
-                                                   fretboard->flats()));
+        tokens.push_back(
+            zub::fretboard::noteToken(fretboard->midiAt(position.string, position.fret),
+                                      position.string, fretboard->german(), fretboard->flats()));
     std::string token = tokens.front();
     if (tokens.size() > 1) {
         token = "<";
@@ -2413,8 +2421,8 @@ void MainWindow::insertStagedNotes(FretboardWidget* fretboard) {
     }
     if (replacing) {
         // Only the notes change; the length, ties and articulations of the event stay.
-        const auto replacement = zub::fretboard::replacePitches(editor->editorText(), target->begin,
-                                                                target->end, token);
+        const auto replacement =
+            zub::fretboard::replacePitches(editor->editorText(), target->begin, target->end, token);
         if (!replacement) {
             statusBar()->showMessage(tr("The selected note cannot be replaced."), 5000);
             return;
@@ -2524,9 +2532,8 @@ void MainWindow::saveStaffInstrument(int staff, const QString& gmName) {
     SongEditor* editor = currentEditor();
     if (!editor || onSongTab() || staff < 0)
         return;
-    const auto change = zub::score::saveStaffInstrument(editor->editorText(),
-                                                        static_cast<std::size_t>(staff),
-                                                        toStdString(gmName));
+    const auto change = zub::score::saveStaffInstrument(
+        editor->editorText(), static_cast<std::size_t>(staff), toStdString(gmName));
     if (!change || !editor->replaceScoreText(change->text)) {
         statusBar()->showMessage(
             tr("The instrument cannot be written into this score (read-only, or the staff's music "
@@ -2634,9 +2641,10 @@ void MainWindow::soundFret(FretboardWidget* fretboard, int string, int fret) {
             at = 0;
         if (at < staves.size()) {
             const QStringList choices = scorePreview_->staffChoices();
-            const auto* chosen = at < static_cast<std::size_t>(choices.size())
-                                     ? zub::midi::findInstrument(toStdString(choices[static_cast<qsizetype>(at)]))
-                                     : nullptr;
+            const auto* chosen =
+                at < static_cast<std::size_t>(choices.size())
+                    ? zub::midi::findInstrument(toStdString(choices[static_cast<qsizetype>(at)]))
+                    : nullptr;
             if (!chosen)
                 chosen = zub::midi::findInstrumentByName(staves[at].instrument);
             if (chosen) {
@@ -2717,7 +2725,8 @@ void MainWindow::updateScoreHighlights() {
     if (range) {
         std::vector<bool> touched(scoreEvents_.size());
         for (std::size_t i = 0; i < scoreEvents_.size(); ++i)
-            touched[i] = scoreEvents_[i].begin < range->second && range->first < scoreEvents_[i].end;
+            touched[i] =
+                scoreEvents_[i].begin < range->second && range->first < scoreEvents_[i].end;
         for (const auto& [key, event] : linkEvent_) {
             if (touched[event])
                 inside.append(QPoint(key.second, key.first));
@@ -2725,8 +2734,8 @@ void MainWindow::updateScoreHighlights() {
     } else if (!scoreEvents_.empty()) {
         const std::size_t offset = editor->cursorByteOffset();
         std::optional<std::size_t> event;
-        const auto ending = std::ranges::find_if(
-            scoreEvents_, [offset](const auto& e) { return e.end == offset; });
+        const auto ending =
+            std::ranges::find_if(scoreEvents_, [offset](const auto& e) { return e.end == offset; });
         if (ending != scoreEvents_.end()) {
             event = static_cast<std::size_t>(ending - scoreEvents_.begin());
             after = true;
@@ -2811,8 +2820,8 @@ void MainWindow::scoreKey(ScorePreviewPane::KeyCommand command, bool extend, boo
             if (stop > 0)
                 range = std::make_pair(events[stop - 1].begin, events[stop - 1].end);
         } else if (!range) { // the event that ends after the cursor
-            const auto next = std::ranges::find_if(
-                events, [cursor](const auto& e) { return e.end > cursor; });
+            const auto next =
+                std::ranges::find_if(events, [cursor](const auto& e) { return e.end > cursor; });
             if (next != events.end())
                 range = std::make_pair(next->begin, next->end);
         }
@@ -2839,7 +2848,8 @@ void MainWindow::scoreKey(ScorePreviewPane::KeyCommand command, bool extend, boo
     };
     std::size_t anchorStop = zub::scoreregion::caretStop(events, low);
     std::size_t activeStop = zub::scoreregion::caretStop(events, high);
-    if (scoreStops_ && spanOf(scoreStops_->first, scoreStops_->second) == std::make_pair(low, high)) {
+    if (scoreStops_ &&
+        spanOf(scoreStops_->first, scoreStops_->second) == std::make_pair(low, high)) {
         anchorStop = scoreStops_->first;
         activeStop = scoreStops_->second;
     } else if (!selection) {
@@ -2882,7 +2892,8 @@ void MainWindow::scoreKey(ScorePreviewPane::KeyCommand command, bool extend, boo
         else
             editor->setCursorByteOffset(begin, false);
     } else {
-        const std::size_t offset = targetOffset.value_or(zub::scoreregion::stopOffset(events, targetStop));
+        const std::size_t offset =
+            targetOffset.value_or(zub::scoreregion::stopOffset(events, targetStop));
         scoreStops_.reset();
         scoreAnchor_ = offset;
         editor->setCursorByteOffset(offset, false);
@@ -3373,8 +3384,7 @@ void MainWindow::startMeasure(SongEditor* editor) {
     // Measuring builds the song: only when it is approved already, never a new question.
     if (!approveBuild(editor, content, false))
         return;
-    const auto paper =
-        zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
+    const auto paper = zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
     const std::filesystem::path root = songbookRoot_;
     runKind_ = RunKind::Measure;
     runEditor_ = editor;
