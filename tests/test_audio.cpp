@@ -194,6 +194,8 @@ TEST_CASE("the instrument menu names real General MIDI programs", "[midi]") {
     CHECK(mi::findInstrument("banjo")->program == 105);
     CHECK(mi::findInstrument("whistle")->program == 78);
     CHECK(mi::findInstrument("bass")->program == 33);
+    CHECK_FALSE(mi::findInstrument("overdriven")); // removed: it distorts each note alone
+    CHECK_FALSE(mi::findInstrument("distortion"));
     CHECK_FALSE(mi::findInstrument("auto"));
     CHECK_FALSE(mi::findInstrument(""));
     // midiInstrument's names resolve (the automatic choice); the clean guitar wins over amp.

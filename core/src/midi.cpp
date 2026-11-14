@@ -162,8 +162,6 @@ const std::vector<Instrument>& instruments() {
         {"steel", programSteelGuitar, "acoustic guitar (steel)", false},
         {"jazz", 26, "electric guitar (jazz)", false},
         {"clean", 27, "electric guitar (clean)", false},
-        {"overdriven", 29, "overdriven guitar", false},
-        {"distortion", 30, "distorted guitar", false},
         {"amp", 27, "electric guitar (clean)", true},
         {"banjo", programBanjo, "banjo", false},
         {"piano", 0, "acoustic grand", false},

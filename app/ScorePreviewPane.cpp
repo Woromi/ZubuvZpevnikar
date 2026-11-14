@@ -704,9 +704,7 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
         {"steel", tr("Acoustic guitar (steel)")},
         {"jazz", tr("Jazz guitar")},
         {"clean", tr("Electric guitar (clean)")},
-        {"overdriven", tr("Overdriven guitar")},
-        {"distortion", tr("Distorted guitar")},
-        {"amp", tr("Distortion (amp)")},
+        {"amp", tr("Distorted electric guitar")},
         {"banjo", tr("Banjo")},
         {"piano", tr("Piano")},
         {"whistle", tr("Tin whistle")},
@@ -720,12 +718,16 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
                                 "for tin whistle scores"),
                              Qt::ToolTipRole);
     instrument_->setItemData(instrument_->findData(QStringLiteral("amp")),
-                             tr("The clean electric guitar through a distortion: chords sound "
-                                "rougher than their notes alone"),
+                             tr("The clean electric guitar through a distortion applied to everything "
+                                "played together: chords sound rougher than their notes alone."),
                              Qt::ToolTipRole);
-    instrument_->setCurrentIndex(std::max(
-        0, instrument_->findData(
-               QSettings().value(QStringLiteral("playback/instrument"), QStringLiteral("auto")))));
+    // The overdriven and distorted guitar presets were removed (they distort every note alone).
+    QString savedInstrument =
+        QSettings().value(QStringLiteral("playback/instrument"), QStringLiteral("auto")).toString();
+    if (savedInstrument == QStringLiteral("overdriven") ||
+        savedInstrument == QStringLiteral("distortion"))
+        savedInstrument = QStringLiteral("amp");
+    instrument_->setCurrentIndex(std::max(0, instrument_->findData(savedInstrument)));
     setPlayState(PlayState::Idle);
 
     status_->setTextInteractionFlags(Qt::TextSelectableByMouse);

@@ -1516,18 +1516,6 @@ Vynecháno (neplatný název písně): %1</translation>
         <translation>Elektrická kytara (čistá)</translation>
     </message>
     <message>
-        <source>Overdriven guitar</source>
-        <translation>Kytara s overdrivem</translation>
-    </message>
-    <message>
-        <source>Distorted guitar</source>
-        <translation>Zkreslená kytara</translation>
-    </message>
-    <message>
-        <source>Distortion (amp)</source>
-        <translation>Zkreslení (zesilovač)</translation>
-    </message>
-    <message>
         <source>Banjo</source>
         <translation>Banjo</translation>
     </message>
@@ -1552,8 +1540,12 @@ Vynecháno (neplatný název písně): %1</translation>
         <translation>Kytara pro tabulatury, banjo pro ladění banja, píšťalka pro skladby pro píšťalku</translation>
     </message>
     <message>
-        <source>The clean electric guitar through a distortion: chords sound rougher than their notes alone</source>
-        <translation>Čistá elektrická kytara přes zkreslení: akordy znějí drsněji než jejich tóny samotné</translation>
+        <source>Distorted electric guitar</source>
+        <translation>Zkreslená elektrická kytara</translation>
+    </message>
+    <message>
+        <source>The clean electric guitar through a distortion applied to everything played together: chords sound rougher than their notes alone.</source>
+        <translation>Čistá elektrická kytara se zkreslením, které se použije na všechno, co hraje společně: akordy znějí drsněji než jejich jednotlivé tóny.</translation>
     </message>
     <message>
         <source>Building…</source>
