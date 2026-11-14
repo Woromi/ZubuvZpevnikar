@@ -1477,6 +1477,26 @@ Vynecháno (neplatný název písně): %1</translation>
         <translation>Zruší připravené noty z hmatníku (Escape)</translation>
     </message>
     <message>
+        <source>Tuning:</source>
+        <translation>Ladění:</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automaticky</translation>
+    </message>
+    <message>
+        <source>Guitar</source>
+        <translation>Kytara</translation>
+    </message>
+    <message>
+        <source>Banjo (open G)</source>
+        <translation>Banjo (open G)</translation>
+    </message>
+    <message>
+        <source>Automatic follows the staff at the cursor (its stringTunings); Guitar or Banjo force the fretboard&apos;s tuning for this score.</source>
+        <translation>Automaticky se řídí linkou u kurzoru (její stringTunings); Kytara nebo Banjo vynutí ladění hmatníku pro tuto partituru.</translation>
+    </message>
+    <message>
         <source>Replace</source>
         <translation>Nahradit</translation>
     </message>

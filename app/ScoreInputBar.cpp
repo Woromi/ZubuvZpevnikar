@@ -2,6 +2,7 @@
 
 #include <QAction>
 #include <QButtonGroup>
+#include <QComboBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QToolButton>
@@ -63,6 +64,15 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
     layout->addWidget(rest);
     layout->addWidget(bar);
     layout->addStretch();
+    layout->addWidget(new QLabel(tr("Tuning:")));
+    tuning_ = new QComboBox;
+    tuning_->setObjectName(QStringLiteral("scoreTuning"));
+    tuning_->addItem(tr("Automatic"));
+    tuning_->addItem(tr("Guitar"));
+    tuning_->addItem(tr("Banjo (open G)"));
+    tuning_->setToolTip(tr("Automatic follows the staff at the cursor (its stringTunings); Guitar "
+                           "or Banjo force the fretboard's tuning for this score."));
+    layout->addWidget(tuning_);
 
     connect(group_, &QButtonGroup::idClicked, this, [this] { onPicked(); });
     connect(dot_, &QToolButton::clicked, this, [this] { onPicked(); });
@@ -70,7 +80,12 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
     connect(clear_, &QToolButton::clicked, this, &ScoreInputBar::clearRequested);
     connect(rest, &QToolButton::clicked, this, &ScoreInputBar::restRequested);
     connect(bar, &QToolButton::clicked, this, &ScoreInputBar::barCheckRequested);
+    connect(tuning_, &QComboBox::currentIndexChanged, this, &ScoreInputBar::tuningChoiceChanged);
     showDuration();
+}
+
+ScoreInputBar::TuningChoice ScoreInputBar::tuningChoice() const {
+    return static_cast<TuningChoice>(tuning_->currentIndex());
 }
 
 void ScoreInputBar::setStagedCount(int count) {

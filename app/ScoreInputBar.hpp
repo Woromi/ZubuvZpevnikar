@@ -6,6 +6,7 @@
 
 class QAction;
 class QButtonGroup;
+class QComboBox;
 class QHBoxLayout;
 class QToolButton;
 
@@ -30,11 +31,17 @@ public:
     void setReplaceMode(bool replace);
     void setRegionActions(const QList<QAction*>& actions);
 
+    enum class TuningChoice { Automatic, Guitar, Banjo };
+    // The fretboard's tuning as the combo has it (per score tab, session only). Automatic follows
+    // the staff at the cursor.
+    TuningChoice tuningChoice() const;
+
 signals:
     void restRequested();
     void barCheckRequested();
     void insertRequested();
     void clearRequested();
+    void tuningChoiceChanged();
 
 private:
     void onPicked();
@@ -44,6 +51,7 @@ private:
     QToolButton* dot_ = nullptr;
     QToolButton* insert_ = nullptr;
     QToolButton* clear_ = nullptr;
+    QComboBox* tuning_ = nullptr;
     QHBoxLayout* regionRow_ = nullptr;
     QString duration_ = QStringLiteral("4");
     bool updating_ = false;

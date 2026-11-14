@@ -2049,6 +2049,7 @@ void MainWindow::addScoreTab(const std::string& name, SongEditor* editor) {
     connect(inputBar, &ScoreInputBar::insertRequested, this,
             [this, fretboard] { insertStagedNotes(fretboard); });
     connect(inputBar, &ScoreInputBar::clearRequested, fretboard, &FretboardWidget::clearStaged);
+    connect(inputBar, &ScoreInputBar::tuningChoiceChanged, this, &MainWindow::updateFretboard);
     connect(fretboard, &FretboardWidget::stagedChanged, this,
             [fretboard, inputBar, insertAction, clearAction] {
                 const int count = static_cast<int>(fretboard->staged().size());
@@ -2332,11 +2333,23 @@ void MainWindow::updateFretboard() {
     if (!tab.editor || !tab.fretboard)
         return;
     // The score's own text decides the tuning; the song's lang and key the note names.
-    const std::string text = tab.editor->content();
+    const std::string text = tab.editor->editorText();
     const auto meta = zub::parseSong(editor_->content());
     const bool german = meta && zub::score::germanNames(meta->value("lang"));
     const bool flats = meta && zub::fretboard::prefersFlats(meta->value("key"));
-    const auto tuning = zub::fretboard::tuningOf(text);
+    // Automatic: the tuning of the staff at the cursor; the combo can force one.
+    zub::fretboard::Tuning tuning;
+    switch (tab.inputBar->tuningChoice()) {
+    case ScoreInputBar::TuningChoice::Guitar:
+        tuning = zub::fretboard::guitar();
+        break;
+    case ScoreInputBar::TuningChoice::Banjo:
+        tuning = zub::fretboard::banjoOpenG();
+        break;
+    default:
+        tuning = zub::fretboard::tuningAt(text, tab.editor->cursorByteOffset()).tuning;
+        break;
+    }
     if (tab.fretboard->tuning().open != tuning.open ||
         tab.fretboard->tuning().shortString != tuning.shortString)
         tab.replaceTarget.reset(); // a new tuning clears the staging
