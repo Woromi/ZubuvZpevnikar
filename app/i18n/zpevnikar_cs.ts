@@ -1198,8 +1198,20 @@ Použijte vestavěný.</translation>
 <context>
     <name>NoteSounds</name>
     <message>
+        <source>The sound was not rendered within %1 s.</source>
+        <translation>Zvuk nebyl vytvořen do %1 s.</translation>
+    </message>
+    <message>
         <source>Cannot render the note sound: %1</source>
         <translation>Nelze vytvořit zvuk tónu: %1</translation>
+    </message>
+    <message>
+        <source>Cannot trim the rendered note sound.</source>
+        <translation>Nelze zkrátit vytvořený zvuk tónu.</translation>
+    </message>
+    <message>
+        <source>Cannot load the note sound %1.</source>
+        <translation>Nelze načíst zvuk tónu %1.</translation>
     </message>
 </context>
 <context>
@@ -1227,6 +1239,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>fluidsynth wrote no audio.</source>
         <translation>fluidsynth nevytvořil žádný zvuk.</translation>
+    </message>
+    <message>
+        <source>Cannot trim the rendered audio.</source>
+        <translation>Nelze zkrátit vytvořený zvuk.</translation>
     </message>
 </context>
 <context>

@@ -1708,6 +1708,8 @@ void MainWindow::createPreview() {
             : QStringLiteral("score-%1").arg(QApplication::applicationPid())));
     playbackCacheDir_ = toPath(QDir(cache).absoluteFilePath(QStringLiteral("playback")));
     noteSounds_ = new NoteSounds(toPath(QDir(cache).absoluteFilePath(QStringLiteral("sounds"))), this);
+    connect(noteSounds_, &NoteSounds::failed, this,
+            [this](const QString& message) { statusBar()->showMessage(message, 8000); });
 }
 
 std::string MainWindow::inputNameOf(const SongEditor* editor) const {

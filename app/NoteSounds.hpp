@@ -11,6 +11,7 @@
 #include <vector>
 
 class QProcess;
+class QTimer;
 class QSoundEffect;
 
 // The short sound of one note (a fret that was clicked): a one-note MIDI file
@@ -34,7 +35,14 @@ signals:
 
 private:
     using Note = std::pair<int, int>; // program, pitch
+    // The note being rendered with the paths it was started with.
+    struct Rendering {
+        Note note;
+        std::filesystem::path temp; // fluidsynth writes here
+        std::filesystem::path wav;  // moved here when it is complete
+    };
     void renderNext();
+    void killTree();
     void playFile(const std::filesystem::path& wav);
 
     std::filesystem::path baseDir_;
@@ -42,7 +50,10 @@ private:
     SoundTools tools_;
     QProcess* process_ = nullptr;
     std::vector<Note> queue_;      // waiting to be rendered
-    std::optional<Note> rendering_; // being rendered
+    QTimer* timeout_ = nullptr;
+    bool timedOut_ = false;
+    std::optional<Rendering> rendering_;
     std::optional<Note> wanted_;    // the newest request: plays when it is ready
+    std::filesystem::path wantedFile_; // its sound file (a soundfont change makes another one)
     std::map<QString, QSoundEffect*> effects_;
 };
