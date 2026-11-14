@@ -209,6 +209,11 @@ private:
     void onSuggestFinished(const std::expected<ConverterOutput, QString>& output);
     void startApply(std::vector<std::string> ids, const QString& description);
     void onApplyFinished(const std::expected<ConverterOutput, QString>& output);
+    // After a proposal was applied: measures the new text in the background (the same shrink
+    // --fit --measure; no dialog) and offers the `pap` header from its result alone.
+    void startMeasure(SongEditor* editor);
+    void onMeasureFinished(const std::expected<ConverterOutput, QString>& output);
+    void cancelMeasure(); // the background measurement, if one runs (the text changed ...)
     // Takes over the state of the run that just finished; the editor it belongs to, or nullptr
     // (after a status message) when the song changed meanwhile. `input` gets the bytes sent.
     SongEditor* takeRun(std::string& input, const QString& what);
@@ -306,13 +311,15 @@ private:
     QWidget* tidyPanel_ = nullptr; // "Tidy changed:" list under the editor area
     QListWidget* tidyList_ = nullptr;
     ConverterRunner* converterRunner_ = nullptr;
-    enum class RunKind { Tidy, Suggest, Apply };
+    enum class RunKind { Tidy, Suggest, Apply, Measure };
     RunKind runKind_ = RunKind::Tidy;
     QPointer<SongEditor> runEditor_; // the editor the running converter belongs to
     std::string runInput_;           // the bytes that were sent
     QString tidyNote_;               // appended to the status message when a tidy is done
     QString applyDescription_;       // of the proposal being applied
     SongAction songAction_ = SongAction::Shrink; // the action whose shrink/join/check/apply runs
+    bool measuredRun_ = false;       // the running/last shrink or join measured (was approved)
+    bool measureAfterApply_ = false; // measure the text again once the proposals are applied
     bool applyRestructures_ = false; // the proposals being applied make a part a chorus: Tidy after
     QAction* tidyAction_ = nullptr;
     QAction* makeSmallerAction_ = nullptr;

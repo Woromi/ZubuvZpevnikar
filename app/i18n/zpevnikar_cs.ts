@@ -1083,6 +1083,10 @@ Použijte vestavěný.</translation>
         <translation> (po převedení části na refrén)</translation>
     </message>
     <message>
+        <source>Measuring…</source>
+        <translation>Měřím…</translation>
+    </message>
+    <message>
         <source>Import Song</source>
         <translation>Importovat píseň</translation>
     </message>

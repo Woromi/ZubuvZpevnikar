@@ -790,6 +790,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
         scoreSyncTimer_->start(); // a \lilypondfile may have been typed
         updateScoreWidthBars();
         fretboardTimer_->start(); // lang or key may have changed
+        cancelMeasure();          // its result would be for the old text
     });
     connect(edit, &QPlainTextEdit::redoAvailable, this, [this] { updateEditState(); });
     connect(edit, &QPlainTextEdit::copyAvailable, this, [this] { updateEditState(); });
@@ -1475,6 +1476,7 @@ void MainWindow::updateMarkChecked() {
 
 void MainWindow::startTidy(const QString& note) {
     SongEditor* editor = editor_;
+    cancelMeasure();
     if (!editor || editor->textEdit()->isReadOnly() || converterRunner_->isRunning())
         return;
     const std::filesystem::path converter = findConverter();
@@ -1510,6 +1512,9 @@ void MainWindow::onConverterFinished(const std::expected<ConverterOutput, QStrin
         break;
     case RunKind::Apply:
         onApplyFinished(output);
+        break;
+    case RunKind::Measure:
+        onMeasureFinished(output);
         break;
     }
 }
@@ -2918,6 +2923,7 @@ QString MainWindow::actionName(SongAction action) const {
 
 void MainWindow::startProposals(SongAction action) {
     SongEditor* editor = editor_;
+    cancelMeasure();
     if (!editor || editor->textEdit()->isReadOnly() || converterRunner_->isRunning() ||
         songbookRoot_.empty())
         return;
@@ -2934,12 +2940,14 @@ void MainWindow::startProposals(SongAction action) {
     const std::filesystem::path root = songbookRoot_;
     std::function<zub::converter::Command(const std::filesystem::path&)> command;
     QString status;
+    measuredRun_ = false;
     switch (action) {
     case SongAction::Shrink: {
         // --measure builds the song with lualatex -shell-escape: the same rule as for a preview.
         // Declined, the proposals are still useful, just without page counts.
         const bool measure = approveBuild(editor, content, true, nullptr, tr("Measure"),
                                           tr("Suggest Without Measuring"));
+        measuredRun_ = measure;
         if (measure)
             requestPreview(); // approved now: the pane's "Not built automatically" message goes
         // No paper known (a class without a paper option): no --fit, the converter measures both.
@@ -2963,6 +2971,7 @@ void MainWindow::startProposals(SongAction action) {
         if (!approveBuild(editor, content, true, nullptr, tr("Build"), tr("Cancel")))
             return;
         requestPreview();
+        measuredRun_ = true;
         command = [converter, root](const std::filesystem::path& file) {
             return zub::songsuggest::joinCommand(converter, file, root);
         };
@@ -3101,6 +3110,7 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
     songAction_ = action;
     applyRestructures_ = std::ranges::any_of(
         chosen, [](const auto& proposal) { return proposal.category == "restructure"; });
+    measureAfterApply_ = measuredRun_ && action != SongAction::Check;
     startApply(std::move(ids), description);
 }
 
@@ -3195,6 +3205,7 @@ void MainWindow::onApplyFinished(const std::expected<ConverterOutput, QString>& 
     applyDescription_.clear();
     const SongAction action = songAction_;
     const bool restructured = std::exchange(applyRestructures_, false);
+    const bool measureAgain = std::exchange(measureAfterApply_, false);
     SongEditor* editor = takeRun(input, actionName(action));
     if (!editor) {
         updateSongActions();
@@ -3223,6 +3234,58 @@ void MainWindow::onApplyFinished(const std::expected<ConverterOutput, QString>& 
     // (its own undo step).
     if (restructured && editor == editor_)
         startTidy(tr(" (after making a part a chorus)"));
+    else if (measureAgain && editor == editor_)
+        startMeasure(editor);
+}
+
+void MainWindow::startMeasure(SongEditor* editor) {
+    const std::filesystem::path converter = findConverter();
+    if (!editor || editor->textEdit()->isReadOnly() || converterRunner_->isRunning() ||
+        songbookRoot_.empty() || converter.empty() || !converterProblem(converter).isEmpty())
+        return;
+    const std::string content = editor->content();
+    // Measuring builds the song: only when it is approved already, never a new question.
+    if (!approveBuild(editor, content, false))
+        return;
+    const auto paper =
+        zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
+    const std::filesystem::path root = songbookRoot_;
+    runKind_ = RunKind::Measure;
+    runEditor_ = editor;
+    runInput_ = content;
+    statusBar()->showMessage(tr("Measuring…"));
+    if (!converterRunner_->start(
+            [converter, paper, root](const std::filesystem::path& file) {
+                return zub::songsuggest::shrinkCommand(converter, file, paper, true, root);
+            },
+            content, toQString(editor->path().stem())))
+        return;
+    updateSongActions();
+}
+
+void MainWindow::onMeasureFinished(const std::expected<ConverterOutput, QString>& output) {
+    SongEditor* editor = runEditor_.data();
+    const std::string input = std::move(runInput_);
+    runEditor_.clear();
+    runInput_.clear();
+    updateSongActions();
+    statusBar()->clearMessage();
+    // Quiet: a failure or a changed text just means no offer.
+    if (!editor || editor != editor_ || editor->content() != input || !output)
+        return;
+    if (auto interpreted =
+            zub::songsuggest::interpretProposals(output->exitCode, output->out, output->err))
+        offerPapers(editor, input, *interpreted);
+}
+
+void MainWindow::cancelMeasure() {
+    if (runKind_ != RunKind::Measure || !converterRunner_->isRunning())
+        return;
+    converterRunner_->cancel(); // reports nothing
+    runEditor_.clear();
+    runInput_.clear();
+    statusBar()->clearMessage();
+    updateSongActions();
 }
 
 namespace {
