@@ -52,11 +52,23 @@ std::expected<Command, std::string> prepare(const Request& request) {
     fs::remove_all(scoreDir, ec);
     if (ec)
         return std::unexpected(utf8(scoreDir) + ": " + ec.message());
+    // The score that makes LilyPond play the music too goes last: line numbers stay valid.
+    std::string content = request.content;
+    bool withMidi = false;
+    if (request.midi) {
+        if (const auto played = midiScore(content, *request.midi)) {
+            if (!content.empty() && content.back() != '\n')
+                content += '\n';
+            content += *played;
+            content += '\n';
+            withMidi = true;
+        }
+    }
     const fs::path copy = scoreDir / fs::path(request.inputName);
     fs::create_directories(copy.parent_path(), ec);
     if (ec)
         return std::unexpected(utf8(copy.parent_path()) + ": " + ec.message());
-    if (auto w = writeTextFileAtomic(copy, request.content); !w)
+    if (auto w = writeTextFileAtomic(copy, content); !w)
         return std::unexpected(w.error());
 
     // LilyPond fails with "cannot change directory" if the output directory is missing.
@@ -88,6 +100,8 @@ std::expected<Command, std::string> prepare(const Request& request) {
     cmd.workingDirectory = work;
     cmd.environment = {{"LC_ALL", "C"}};
     cmd.svg = outDir / "score.cropped.svg";
+    if (withMidi)
+        cmd.midi = outDir / "score.midi";
     cmd.scoreCopy = copy;
     return cmd;
 }

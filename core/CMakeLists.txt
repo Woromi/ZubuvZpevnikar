@@ -7,8 +7,10 @@ add_library(zub_core STATIC
     src/json.cpp
     src/latex.cpp
     src/library.cpp
+    src/midi.cpp
     src/preview.cpp
     src/safety.cpp
+    src/scoremidi.cpp
     src/scoreregion.cpp
     src/score.cpp
     src/linediff.cpp

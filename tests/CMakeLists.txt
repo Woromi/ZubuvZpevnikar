@@ -7,8 +7,10 @@ add_executable(zub_core_tests
     test_latex.cpp
     test_library.cpp
     test_linediff.cpp
+    test_midi.cpp
     test_preview.cpp
     test_safety.cpp
+    test_scoremidi.cpp
     test_scoreregion.cpp
     test_score.cpp
     test_song.cpp
