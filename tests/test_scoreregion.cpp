@@ -1,5 +1,5 @@
-#include <catch2/catch_test_macros.hpp>
 #include <algorithm>
+#include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <iostream>
 #include <map>
@@ -52,6 +52,19 @@ TEST_CASE("scoreregion offsetOf counts code points per line", "[scoreregion]") {
     CHECK_FALSE(sr::offsetOf(text, 0, 0));
     CHECK_FALSE(sr::offsetOf(text, 1, -1));
     CHECK(sr::offsetOf("", 1, 0) == 0);
+}
+
+TEST_CASE("scoreregion musicEvents reads past quoted values with spaces", "[scoreregion]") {
+    // A `\set` value in quotes is one value: before, the scan stopped at the space and took the
+    // rest of the score for a string, so the second staff of Rozárka had no notes to click.
+    const std::string text = "\\new TabStaff { \\set Staff.midiInstrument = \"banjo\" a4\\3 }\n"
+                             "\\new TabStaff { \\set Staff.midiInstrument = \"acoustic guitar "
+                             "(steel)\" \\tweak color \"dark red\" e4\\1 r2 q4 }";
+    std::vector<std::string> events;
+    for (const auto& e : sr::musicEvents(text))
+        events.push_back(text.substr(e.begin, e.end - e.begin));
+    CHECK(events ==
+          std::vector<std::string>{"a4\\3", "\\tweak color \"dark red\" e4\\1", "r2", "q4"});
 }
 
 TEST_CASE("scoreregion expandToEvents takes whole tokens", "[scoreregion]") {
@@ -324,8 +337,9 @@ TEST_CASE("scoreregion actions never touch chord names, lyrics, marks or definit
         CHECK(text.starts_with(head));
         CHECK(text.ends_with(tail));
     }
-    CHECK(touched(Action::StrokeDown).find("g'8\\3^\\strokeDown a\\2^\\strokeDown "
-                                           "<b\\3 d'\\2>4^\\strokeDown") != std::string::npos);
+    CHECK(touched(Action::StrokeDown)
+              .find("g'8\\3^\\strokeDown a\\2^\\strokeDown "
+                    "<b\\3 d'\\2>4^\\strokeDown") != std::string::npos);
     CHECK(touched(Action::Repeat).find("\\repeat volta 2 { g'8\\3 a\\2 <b\\3 d'\\2>4 }") !=
           std::string::npos);
     // Only a variable's definition in the range: nothing to do.
@@ -439,8 +453,7 @@ TEST_CASE("scoreregion musicEvents lists only the music, in text order", "[score
     for (const sr::Range& r : events)
         found.push_back(madeUpScore.substr(r.begin, r.end - r.begin));
     // The chord names, lyrics, marks, the variable's value: none of them.
-    const std::vector<std::string> want = {"g'8\\3", "a\\2",
-                                           "<b\\3 d'\\2>4"};
+    const std::vector<std::string> want = {"g'8\\3", "a\\2", "<b\\3 d'\\2>4"};
     CHECK(found == want);
     // Prefix functions belong to their event; `q` and rests are events.
     const std::string text = "\\deadNote c4 q8 r2 \\grace d16 e";
@@ -461,17 +474,20 @@ TEST_CASE("scoreregion musicEvents lists only the music, in text order", "[score
 // to a few contiguous ranges: the text outside the region stays byte for byte, the braces stay
 // balanced (Repeat adds one pair), what lies between the events of the region survives, and
 // applying again changes nothing (Repeat nests, Dead Notes toggles back).
-TEST_CASE("every action on the real scores keeps the rest of the text", "[.integration][scoreregion]") {
+TEST_CASE("every action on the real scores keeps the rest of the text",
+          "[.integration][scoreregion]") {
     namespace fs = std::filesystem;
     const fs::path songs = fs::path(ZUB_REAL_SONGBOOK_DIR) / "songs";
     if (!fs::is_directory(songs))
         SKIP("no songbook checkout at " << songs);
     const auto count = [](const std::string& s, char c) { return std::ranges::count(s, c); };
-    const std::vector<std::pair<const char*, Action>> actions = {
-        {"Tie", Action::Tie},           {"Slur", Action::Slur},
-        {"Glissando", Action::Glissando}, {"Repeat", Action::Repeat},
-        {"StrokeDown", Action::StrokeDown}, {"StrokeUp", Action::StrokeUp},
-        {"DeadNotes", Action::DeadNotes}};
+    const std::vector<std::pair<const char*, Action>> actions = {{"Tie", Action::Tie},
+                                                                 {"Slur", Action::Slur},
+                                                                 {"Glissando", Action::Glissando},
+                                                                 {"Repeat", Action::Repeat},
+                                                                 {"StrokeDown", Action::StrokeDown},
+                                                                 {"StrokeUp", Action::StrokeUp},
+                                                                 {"DeadNotes", Action::DeadNotes}};
     std::size_t files = 0, events = 0, applications = 0;
     std::map<std::string, std::size_t> applied, refused, nothing;
     for (const auto& entry : fs::recursive_directory_iterator(songs)) {
@@ -491,7 +507,8 @@ TEST_CASE("every action on the real scores keeps the rest of the text", "[.integ
             ranges.push_back(e);
         const std::size_t n = all.size();
         for (const std::size_t width : {std::size_t{2}, std::size_t{5}, std::size_t{12}, n}) {
-            for (const std::size_t start : {std::size_t{0}, n / 3, n / 2, n > width ? n - width : 0}) {
+            for (const std::size_t start :
+                 {std::size_t{0}, n / 3, n / 2, n > width ? n - width : 0}) {
                 const std::size_t last = std::min(n, start + width) - 1;
                 if (start <= last)
                     ranges.push_back({all[start].begin, all[last].end});
@@ -508,7 +525,8 @@ TEST_CASE("every action on the real scores keeps the rest of the text", "[.integ
                     gaps.push_back(text.substr(all[i].end, all[i + 1].begin - all[i].end));
             }
             for (const auto& [name, action] : actions) {
-                INFO(entry.path().string() << " " << name << " [" << range.begin << "," << range.end << ")");
+                INFO(entry.path().string()
+                     << " " << name << " [" << range.begin << "," << range.end << ")");
                 sr::Refusal why = sr::Refusal::NothingToApply;
                 const auto result = sr::apply(action, text, range, &why);
                 ++applications;
@@ -579,7 +597,8 @@ std::string removed(const std::string& text, const std::string& from, const std:
 
 } // namespace
 
-TEST_CASE("removeEvents deletes notes and chords with the blanks around them", "[scoreregion][remove]") {
+TEST_CASE("removeEvents deletes notes and chords with the blanks around them",
+          "[scoreregion][remove]") {
     CHECK(removed("{ c4 d e f }", "d", "d") == "{ c4 ^e f }");
     CHECK(removed("{ c4 d <e g>8 f }", "<e", ">8") == "{ c4 d ^f8 }");
     CHECK(removed("{ c4  d  e }", "d", "d") == "{ c4  ^e }");
@@ -597,8 +616,7 @@ TEST_CASE("removeEvents deletes notes and chords with the blanks around them", "
     CHECK(removed("{\n  c4 d |\n  e f g\n}", "d", "f") == "{\n  c4 ^|\n  g\n}");
     // Prefix functions go with their note; comments stay.
     CHECK(removed("{ c4 \\deadNote d8 e }", "d8", "d8") == "{ c4 ^e8 }");
-    CHECK(removed("{ c4 \\once \\override NoteHead.color = #red d e }", "d e", "d") ==
-          "{ c4 ^e }");
+    CHECK(removed("{ c4 \\once \\override NoteHead.color = #red d e }", "d e", "d") == "{ c4 ^e }");
     CHECK(removed("{ c4 d % ahoj\n  e }", "d", "d") == "{ c4 ^% ahoj\n  e }");
     CHECK(removed("{ c4 d\n  % Příliš žluťoučký\n  e }", "d", "d") ==
           "{ c4^\n  % Příliš žluťoučký\n  e }");
@@ -712,7 +730,8 @@ TEST_CASE("deleting each event of the real scores keeps the rest of the text",
             REQUIRE(sr::musicEvents(out).size() == all.size() - 1);
             // Untouched: before the line of the previous event and after the next event's line.
             const std::size_t head = i > 0 ? lineStart(all[i - 1].begin) : lineStart(all[i].begin);
-            const std::size_t tail = i + 1 < all.size() ? lineEnd(all[i + 1].end) : lineEnd(all[i].end);
+            const std::size_t tail =
+                i + 1 < all.size() ? lineEnd(all[i + 1].end) : lineEnd(all[i].end);
             REQUIRE(out.starts_with(text.substr(0, head)));
             REQUIRE(out.ends_with(text.substr(tail)));
             REQUIRE(result->selection.begin == result->selection.end);

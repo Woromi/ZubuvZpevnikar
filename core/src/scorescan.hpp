@@ -432,8 +432,7 @@ struct Scanner {
                     break;
                 // Only the first argument may be another command (`\bold \italic "x"`); later
                 // ones are music commands that follow the markup.
-                if (s[next] == '\\' &&
-                    (n > 0 || next + 1 >= s.size() || !isLetter(s[next + 1])))
+                if (s[next] == '\\' && (n > 0 || next + 1 >= s.size() || !isLetter(s[next + 1])))
                     break;
                 k = skipMarkupArgument(next, depth + 1);
             }
@@ -496,11 +495,13 @@ struct Scanner {
         return i;
     }
 
-    // A value after spaces: Scheme or one word.
+    // A value after spaces: Scheme, a string (`"acoustic guitar (steel)"`) or one word.
     std::size_t skipValue(std::size_t i) const {
         i = skipSpaces(i);
         if (i < s.size() && (s[i] == '#' || s[i] == '$'))
             return skipScheme(i);
+        if (i < s.size() && s[i] == '"')
+            return skipString(i);
         while (i < s.size() && !isSpace(s[i]))
             ++i;
         return i;
@@ -508,8 +509,7 @@ struct Scanner {
 
     // The music functions that belong to the note that follows. Returns where the scan goes on, or
     // npos when `command` is none of them; remembers where the first one started.
-    std::size_t prefixCommand(std::string_view command, std::size_t commandBegin,
-                              std::size_t i) {
+    std::size_t prefixCommand(std::string_view command, std::size_t commandBegin, std::size_t i) {
         if (command == "deadNote" || command == "grace" || command == "acciaccatura" ||
             command == "appoggiatura" || command == "slashedGrace" || command == "parenthesize" ||
             command == "once") {
