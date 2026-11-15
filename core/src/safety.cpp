@@ -340,6 +340,13 @@ std::vector<std::string> unknownConstructs(std::string_view songContent) {
         if (c == '\\') {
             if (i + 1 >= text.size())
                 break;
+            // `\^^64irectlua` is `\directlua`: TeX decodes `^^xx` before it reads a name, so the
+            // backslash must not take the first caret as a control symbol (`\^`).
+            if (text[i + 1] == '^' && i + 2 < text.size() && text[i + 2] == '^') {
+                report("\\^^");
+                ++i; // the ^^ branch reports what the escape stands for
+                continue;
+            }
             if (!isLetter(text[i + 1])) {
                 i += 2; // control symbol
                 continue;
@@ -517,8 +524,8 @@ std::vector<std::string> lilypondRisks(std::string_view ly) {
                 i = skipQuotedList(ly, i + 2, report);
             } else if (next == '#') {
                 i += 2; // "##t": the second '#' is not a sigil
-            } else if (next == '\'' || next == '"' || next == '+' || next == '-' ||
-                       next == '{' || next == '}' || next == '\\' || isDigit(next) ||
+            } else if (next == '\'' || next == '"' || next == '+' || next == '-' || next == '{' ||
+                       next == '}' || next == '\\' || isDigit(next) ||
                        (c == '#' && isIdentStart(next))) {
                 i += 1;
             } else if (c == '$' && isIdentStart(next)) {

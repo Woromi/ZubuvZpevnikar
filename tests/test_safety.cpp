@@ -56,6 +56,11 @@ TEST_CASE("unknown constructs are reported", "[safety]") {
     CHECK(scan("\\csname directlua\\endcsname") == Constructs{"\\csname", "\\endcsname"});
     CHECK(scan("^^5cdirectlua") == Constructs{"^^5c"});
     CHECK(scan("^^Z") == Constructs{"^^Z"});
+    // TeX decodes ^^xx before it reads a name: \^^64irectlua is \directlua. The backslash must
+    // not hide the escape as the control symbol \^.
+    CHECK(scan("\\^^64irectlua{os.execute('x')}") == Constructs{"\\^^", "^^64"});
+    CHECK(scan("\\[\\^^5cdirectlua]") == Constructs{"\\^^", "^^5c"});
+    CHECK(scan("\\^^M") == Constructs{"\\^^", "^^M"});
     CHECK(scan("\\beginverse \\[]\\directlua{}\\[ \\endverse") == Constructs{"\\directlua"});
     CHECK(scan("\\foo \\bar \\foo* \\foo") == Constructs{"\\foo", "\\bar"});
     CHECK(scan("100\\% \\directlua") == Constructs{"\\directlua"});
@@ -66,6 +71,7 @@ TEST_CASE("harmless text is not reported", "[safety]") {
     CHECK(scan("| ^\\[]\\[] | ^^ | ^^^ |").empty());
     CHECK(scan("\\[B&] \\[\\nochord] \\beginverse* \\endverse").empty());
     CHECK(scan("a \\\\ b \\, c \\& d \\ e").empty());
+    CHECK(scan("\\^{e} \\^e \\^ ^ ^^").empty()); // the accent, not the escape
 }
 
 namespace {
