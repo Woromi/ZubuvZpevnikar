@@ -1,4 +1,5 @@
 #include "SongEditor.hpp"
+
 #include "CodeTextEdit.hpp"
 #include "convert.hpp"
 
@@ -27,6 +28,7 @@
 #include <QUtf8StringView>
 #include <QVBoxLayout>
 #include <algorithm>
+#include <functional>
 #include <set>
 #include <utility>
 #include <zub/core/fretboard.hpp>
@@ -708,6 +710,32 @@ void applyChange(QPlainTextEdit* edit, const LineState& state,
     replaceBlockText(edit, state.block, updated, utf16Position(change.text, change.cursor));
 }
 
+// Applies a one-line edit (zub::songedit) at the main cursor and at every extra cursor, as one
+// undo step. Only the part of each line that changes is rewritten, so other cursors on the same
+// line keep their places.
+void applyAtCursors(CodeTextEdit* edit,
+                    const std::function<zub::songedit::Change(const LineState&)>& change) {
+    edit->editAtCursors([&](QTextCursor& cursor) {
+        const LineState state = lineState(cursor);
+        const zub::songedit::Change result = change(state);
+        const QString updated =
+            QString::fromUtf8(result.text.data(), static_cast<qsizetype>(result.text.size()));
+        const QString& old = state.text;
+        qsizetype prefix = 0;
+        while (prefix < old.size() && prefix < updated.size() && old[prefix] == updated[prefix])
+            ++prefix;
+        qsizetype suffix = 0;
+        while (suffix < old.size() - prefix && suffix < updated.size() - prefix &&
+               old[old.size() - 1 - suffix] == updated[updated.size() - 1 - suffix])
+            ++suffix;
+        const int start = state.block.position();
+        cursor.setPosition(start + static_cast<int>(prefix));
+        cursor.setPosition(start + static_cast<int>(old.size() - suffix), QTextCursor::KeepAnchor);
+        cursor.insertText(updated.mid(prefix, updated.size() - prefix - suffix));
+        cursor.setPosition(start + utf16Position(result.text, result.cursor));
+    });
+}
+
 } // namespace
 
 std::string SongEditor::editorText() const {
@@ -871,29 +899,29 @@ bool SongEditor::typeSpaceOutsideChord(QKeyEvent* event) {
     return true;
 }
 
+// The three inserts work at every cursor (Ctrl+Shift+Up/Down), each line with its own.
 void SongEditor::insertChord() {
     if (edit_->isReadOnly() || kind_ != Kind::Song)
         return;
-    const auto state = lineState(edit_->textCursor());
-    applyChange(edit_, state,
-                zub::songedit::insertChord(state.line, state.cursor, state.selStart, state.selEnd));
+    applyAtCursors(static_cast<CodeTextEdit*>(edit_), [](const LineState& s) {
+        return zub::songedit::insertChord(s.line, s.cursor, s.selStart, s.selEnd);
+    });
 }
 
 void SongEditor::insertMultivoice() {
     if (edit_->isReadOnly() || kind_ != Kind::Song)
         return;
-    const auto state = lineState(edit_->textCursor());
-    applyChange(
-        edit_, state,
-        zub::songedit::insertMultivoice(state.line, state.cursor, state.selStart, state.selEnd));
+    applyAtCursors(static_cast<CodeTextEdit*>(edit_), [](const LineState& s) {
+        return zub::songedit::insertMultivoice(s.line, s.cursor, s.selStart, s.selEnd);
+    });
 }
 
 void SongEditor::insertRole() {
     if (edit_->isReadOnly() || kind_ != Kind::Song)
         return;
-    const auto state = lineState(edit_->textCursor());
-    applyChange(edit_, state,
-                zub::songedit::insertRole(state.line, state.cursor, state.selStart, state.selEnd));
+    applyAtCursors(static_cast<CodeTextEdit*>(edit_), [](const LineState& s) {
+        return zub::songedit::insertRole(s.line, s.cursor, s.selStart, s.selEnd);
+    });
 }
 
 bool SongEditor::removeElement() {

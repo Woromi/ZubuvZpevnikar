@@ -45,6 +45,9 @@ public:
     // Runs `edit` (changes made through QTextCursors of the document) as one undo step, keeping
     // the extra cursors (they move with the text).
     void editKeepingCursors(const std::function<void()>& edit);
+    // Runs `edit` on every cursor (the main one included) as one undo step; each cursor ends
+    // where `edit` leaves it.
+    void editAtCursors(const std::function<void(QTextCursor&)>& edit);
 
 protected:
     bool event(QEvent* event) override;
@@ -62,8 +65,6 @@ private:
     // A key while there are extra cursors; false when it is not a multi-cursor key (the extra
     // cursors are gone then).
     bool multiCursorKey(QKeyEvent* event);
-    // Runs `edit` on every cursor (the main one included) as one undo step.
-    void editAtCursors(const std::function<void(QTextCursor&)>& edit);
     void dropDuplicateCursors();
     void updateExtraSelections();
     // Hides Qt's cursor while there are extra cursors (paintEvent draws them all), shows it after.
@@ -79,7 +80,7 @@ private:
     QList<QTextEdit::ExtraSelection> occurrenceMarks_;
     QTimer* blinkTimer_ = nullptr;
     bool blinkOn_ = true;
-    int ownCursorWidth_ = -1; // Qt's cursor width while it is hidden, else -1
+    int ownCursorWidth_ = -1;     // Qt's cursor width while it is hidden, else -1
     int growth_ = 0;              // -1 up, +1 down: where the extra cursors were added
     int multiColumn_ = -1;        // the column new cursors go to
     bool keepingCursors_ = false; // our own edits move the main cursor: keep the extra ones
