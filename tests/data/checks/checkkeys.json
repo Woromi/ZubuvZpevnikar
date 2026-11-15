@@ -1,0 +1,185 @@
+{
+ "tool": "checkkeys",
+ "songs": [
+  {
+   "file": "songs/chords/SonataArctica/Shy.tex",
+   "stated": "Dm",
+   "stated_keys": [
+    "Dm"
+   ],
+   "detected": "D#m",
+   "class": "mismatch",
+   "margin": 189.5,
+   "runner_up": "F#",
+   "capo": 1,
+   "tuning": 0,
+   "transpose": 0,
+   "modulates": false,
+   "key_from_parts": null,
+   "chords": 129,
+   "split": null
+  },
+  {
+   "file": "songs/chords/Wohnout/SvazCeskychBohemu.tex",
+   "stated": "G",
+   "stated_keys": [
+    "G"
+   ],
+   "detected": "Am",
+   "class": "mismatch",
+   "margin": 41.1,
+   "runner_up": "C",
+   "capo": 0,
+   "tuning": 0,
+   "transpose": 2,
+   "modulates": false,
+   "key_from_parts": null,
+   "chords": 89,
+   "split": null
+  },
+  {
+   "file": "songs/chords/Ikimonogakariikimonogakari/BlueBird.tex",
+   "stated": null,
+   "stated_keys": [],
+   "detected": "F#m",
+   "class": "propose",
+   "margin": 16.5,
+   "runner_up": "A",
+   "capo": 2,
+   "tuning": 0,
+   "transpose": 0,
+   "modulates": false,
+   "key_from_parts": null,
+   "chords": 167,
+   "split": null
+  },
+  {
+   "file": "songs/chords/PinkFloyd/NobodyHome.tex",
+   "stated": "C",
+   "stated_keys": [
+    "C"
+   ],
+   "detected": "Am",
+   "class": "relative",
+   "margin": 11.4,
+   "runner_up": "C",
+   "capo": 0,
+   "tuning": 0,
+   "transpose": 0,
+   "modulates": false,
+   "key_from_parts": null,
+   "chords": 75,
+   "split": null
+  },
+  {
+   "file": "songs/chords/PinkFloyd/WishYouWereHere.tex",
+   "stated": "Em",
+   "stated_keys": [
+    "Em"
+   ],
+   "detected": "G",
+   "class": "relative",
+   "margin": 10.0,
+   "runner_up": "C",
+   "capo": 0,
+   "tuning": 0,
+   "transpose": 0,
+   "modulates": false,
+   "key_from_parts": null,
+   "chords": 26,
+   "split": null
+  },
+  {
+   "file": "songs/chords/AgFlek/BlazniUmirajiNadvakrat.tex",
+   "stated": "Gm",
+   "stated_keys": [
+    "Gm"
+   ],
+   "detected": "Gm",
+   "class": "match",
+   "margin": 0.0,
+   "runner_up": "A#",
+   "capo": 3,
+   "tuning": 0,
+   "transpose": 0,
+   "modulates": false,
+   "key_from_parts": null,
+   "chords": 34,
+   "split": null
+  },
+  {
+   "file": "songs/chords/AgFlek/CarpeDiem.tex",
+   "stated": "Am",
+   "stated_keys": [
+    "Am"
+   ],
+   "detected": "Am",
+   "class": "match",
+   "margin": 0.0,
+   "runner_up": "C",
+   "capo": 0,
+   "tuning": 0,
+   "transpose": 0,
+   "modulates": false,
+   "key_from_parts": null,
+   "chords": 104,
+   "split": null
+  },
+  {
+   "file": "songs/chords/PoetickeHudebniSpolecenstvo/ZpevRadovskych.tex",
+   "stated": "G",
+   "stated_keys": [
+    "G"
+   ],
+   "detected": null,
+   "class": "no-chords",
+   "margin": null,
+   "runner_up": null,
+   "capo": 0,
+   "tuning": 0,
+   "transpose": 0,
+   "modulates": false,
+   "key_from_parts": null,
+   "chords": 0,
+   "split": null
+  },
+  {
+   "file": "songs/chords/Succuba/PrinceznaPastyrka.tex",
+   "stated": "Em",
+   "stated_keys": [
+    "Em"
+   ],
+   "detected": "Am",
+   "class": "mismatch",
+   "margin": 5.6,
+   "runner_up": "Em",
+   "capo": 0,
+   "tuning": 0,
+   "transpose": 0,
+   "modulates": false,
+   "key_from_parts": null,
+   "chords": 38,
+   "split": {
+    "parts": [
+     {
+      "type": "verseA",
+      "key": "Am"
+     },
+     {
+      "type": "verseB",
+      "key": "Am"
+     },
+     {
+      "type": "chorus",
+      "key": "Em"
+     },
+     {
+      "type": "verseC",
+      "key": "Am"
+     }
+    ],
+    "suggest": "Am\\rightarrow Em"
+   }
+  }
+ ]
+}

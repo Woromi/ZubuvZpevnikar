@@ -1,0 +1,59 @@
+{
+ "tool": "checksongs",
+ "songs": [
+  {
+   "file": "songs/chords/Ayreon/ConnectTheDots.tex",
+   "title": "Connect the Dots",
+   "issues": [
+    {
+     "severity": "warn",
+     "code": "bars-without-meter",
+     "message": "measure bars but no met: the first bar shows no meter",
+     "line": null
+    }
+   ]
+  },
+  {
+   "file": "songs/chords/FalesneSpolecenstvo/DraciJezero.tex",
+   "title": "Dračí jezero",
+   "issues": [
+    {
+     "severity": "warn",
+     "code": "missing-recommended",
+     "message": "missing recommended: tem",
+     "line": null
+    }
+   ]
+  }
+ ],
+ "orphans": [
+  "Greenhorns/Zuzana",
+  "Ikimonogakariikimonogakari/BlueBird",
+  "KarelPlihal/OBlechachATak",
+  "Kruh19/Dinosaur",
+  "PoetickeHudebniSpolecenstvo/ZpevRadovskych",
+  "PoetickeSpolecenstvo/PisnickaZUdoli",
+  "PoetickeSpolecenstvo/PustaPlanII",
+  "Tolkien/EntiPochodovaPisen"
+ ],
+ "summary": {
+  "scanned": 230,
+  "clean": 172,
+  "errors": 0,
+  "warnings": 62,
+  "orphans": 8
+ },
+ "fields": {
+  "by": 230,
+  "lang": 225,
+  "key": 229,
+  "tem": 181,
+  "met": 177,
+  "cap": 76,
+  "tun": 224,
+  "ori": 27,
+  "chr": 33,
+  "src": 90,
+  "pap": 228
+ }
+}
