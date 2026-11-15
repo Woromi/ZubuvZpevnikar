@@ -19,7 +19,7 @@
 //
 // A proposal id such as "chordsoff@81" is valid only for the text it was listed for; apply
 // refuses a stale id with exit code 1. --measure builds the song with lualatex -shell-escape
-// (the songbook's scripts/checkpaper.py), so callers apply the same safety rule as for a preview.
+// (the package's scripts/checkpaper.py), so callers apply the same safety rule as for a preview.
 namespace zub::songsuggest {
 
 enum class Paper { A4, A5 };
@@ -83,20 +83,26 @@ struct Suggestions {
     bool operator==(const Suggestions&) const = default;
 };
 
-// {"shrink", file, ["--fit", "a4"|"a5"], ["--measure"], "--songbook", root, "--json"}
+// {"shrink", file, ["--fit", "a4"|"a5"], ["--measure"], "--songbook", root, "--package",
+// packageDir, "--json"}: the measurement typesets with that package (converter 0.14.0); no
+// --package for an empty one (the converter then looks in the songbook)
 converter::Command shrinkCommand(const std::filesystem::path& converter,
                                   const std::filesystem::path& songFile,
                                   std::optional<Paper> fit, bool measure,
-                                  const std::filesystem::path& songbookRoot);
+                                  const std::filesystem::path& songbookRoot,
+                                  const std::filesystem::path& packageDir);
 // {"check", file, "--json"}: corrections (restructuring, typos), whether the song fits or not
 // (0.6.0). Builds nothing.
 converter::Command checkCommand(const std::filesystem::path& converter,
                                 const std::filesystem::path& songFile);
-// {"join", file, "--songbook", root, "--json"}: joining lines in pairs (0.5.0). Always builds the
-// song on A4 and A5 (seconds), so it needs the preview's safety approval; its output is suggest's.
+// {"join", file, "--songbook", root, "--package", packageDir, "--json"} (no --package for an empty
+// one): joining lines in pairs
+// (0.5.0). Always builds the song on A4 and A5 (seconds), so it needs the preview's safety
+// approval; its output is suggest's.
 converter::Command joinCommand(const std::filesystem::path& converter,
                                const std::filesystem::path& songFile,
-                               const std::filesystem::path& songbookRoot);
+                               const std::filesystem::path& songbookRoot,
+                               const std::filesystem::path& packageDir);
 // {"apply", file, "--id", id, "-o", "-"}
 converter::Command applyCommand(const std::filesystem::path& converter,
                                 const std::filesystem::path& songFile, std::string_view id);

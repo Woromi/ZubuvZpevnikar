@@ -28,7 +28,8 @@ struct Library {
     std::vector<ScanIssue> issues;
 };
 
-// Checks that `root` looks like a ZubuvZpevnik checkout (has songs/chords/ and zubuvzpevnik/).
+// Checks that `root` looks like a ZubuvZpevnik checkout: it has songs/chords/ (the package that
+// builds the songs may be the app's own copy, see zub::package).
 std::expected<void, std::string> validateSongbookRepo(const std::filesystem::path& root);
 
 // Reads every songs/chords/<Artist>/<Title>.tex under `root` (songs/tinwhistle/ is not

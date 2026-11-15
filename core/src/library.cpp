@@ -65,8 +65,7 @@ std::expected<void, std::string> validateSongbookRepo(const fs::path& root) {
         return std::unexpected("not a directory: " + utf8(root));
     if (!isDirectory(root / songsSubdir))
         return std::unexpected("no songs/chords/ in " + utf8(root));
-    if (!isDirectory(root / "zubuvzpevnik"))
-        return std::unexpected("no zubuvzpevnik/ in " + utf8(root));
+    // The package that builds the songs may be the app's own copy (zub::package).
     return {};
 }
 

@@ -809,9 +809,14 @@ std::string readme(const Songbook& book, std::string_view bookName) {
 
 std::expected<FolderExport, std::string> planFolderExport(const Songbook& book,
                                                           const std::filesystem::path& repoRoot,
+                                                          const std::filesystem::path& packageDir,
                                                           std::string_view bookName,
                                                           const std::function<std::string(std::string_view)>& titleOf) {
     namespace fs = std::filesystem;
+    // Without it the folder would build nothing, and relative script paths would be read from
+    // wherever the app runs.
+    if (packageDir.empty() || !packageDir.is_absolute())
+        return std::unexpected("no package (zubuvzpevnik-package) to copy");
     if (!validBookName(bookName))
         return std::unexpected("the book file name must be non-empty and use only letters, "
                                "digits, '_' and '-'");
@@ -847,12 +852,19 @@ std::expected<FolderExport, std::string> planFolderExport(const Songbook& book,
         }
     }
 
+    // The TeX side of the package: not its scripts (four of them go to scripts/ below), docs or
+    // git files.
     std::vector<fs::path> classFiles;
     std::error_code ec;
-    const fs::path classDir = repoRoot / "zubuvzpevnik";
-    if (fs::is_directory(classDir, ec)) {
-        for (fs::recursive_directory_iterator it(classDir, ec), end; !ec && it != end;
+    if (fs::is_directory(packageDir, ec)) {
+        for (fs::recursive_directory_iterator it(packageDir, ec), end; !ec && it != end;
              it.increment(ec)) {
+            const std::string first = utf8(*it->path().lexically_relative(packageDir).begin());
+            if (first == "scripts" || first == "docs" || first.starts_with('.')) {
+                if (it.depth() == 0 && it->is_directory(ec))
+                    it.disable_recursion_pending();
+                continue;
+            }
             std::error_code fileError;
             if (it->is_regular_file(fileError))
                 classFiles.push_back(it->path());
@@ -860,15 +872,14 @@ std::expected<FolderExport, std::string> planFolderExport(const Songbook& book,
     }
     std::ranges::sort(classFiles);
     for (const auto& file : classFiles)
-        addCopy(file, fs::path("zubuvzpevnik") / file.lexically_relative(classDir));
+        addCopy(file, fs::path("zubuvzpevnik") / file.lexically_relative(packageDir));
 
-    for (const char* script :
-         {"scripts/build.sh", "scripts/buildindex.sh", "scripts/songidx.lua", "scripts/cleanup.sh"})
-        addCopy(repoRoot / script, script);
+    for (const char* script : {"build.sh", "buildindex.sh", "songidx.lua", "cleanup.sh"})
+        addCopy(packageDir / "scripts" / script, fs::path("scripts") / script);
     if (book.bookClass == BookClass::Velky)
         addCopy(repoRoot / "img/zubuvzpevnik.png", "img/zubuvzpevnik.png");
     else if (book.bookClass == BookClass::Tabor)
-        addCopy(repoRoot / "img/kane.jpg", "img/kane.jpg");
+        addCopy(packageDir / "img/kane.jpg", "img/kane.jpg");
 
     const auto generated =
         generate(book, [&](std::string_view name) { return found.contains(std::string(name)); },
@@ -886,12 +897,13 @@ std::expected<FolderExport, std::string> planFolderExport(const Songbook& book,
 }
 
 BuildCommand buildCommand(const Songbook&, const std::filesystem::path& repoRoot,
+                          const std::filesystem::path& packageDir,
                           const std::filesystem::path& workDir, std::string_view bookName,
                           const std::vector<std::string>& indexes) {
     BuildCommand command;
     const std::string root = utf8(repoRoot);
     command.program = "bash";
-    command.arguments = {utf8(repoRoot / "scripts/build.sh")};
+    command.arguments = {utf8(packageDir / "scripts/build.sh")};
     for (const auto& index : indexes) {
         command.arguments.emplace_back("-i");
         command.arguments.push_back(index);
@@ -900,7 +912,7 @@ BuildCommand buildCommand(const Songbook&, const std::filesystem::path& repoRoot
     command.workingDirectory = workDir;
     command.environment.emplace_back(
         "TEXINPUTS", ".:" + utf8(workDir) + ":" + root + "/songs/chords:" + root +
-                         "/songs/tinwhistle:" + root + ":" + root + "/zubuvzpevnik:");
+                         "/songs/tinwhistle:" + root + ":" + utf8(packageDir) + ":");
     command.pdf = workDir / (std::string(bookName) + ".pdf");
     command.log = workDir / (std::string(bookName) + ".log");
     return command;

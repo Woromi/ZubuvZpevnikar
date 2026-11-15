@@ -12,7 +12,7 @@
 #include <zub/core/converter.hpp>
 
 // The songbook assembler: a songbook the app manages (a JSON file), the LaTeX document generated
-// from it, the title index order (the songbook's own scripts/songidx.lua does the sorting), the
+// from it, the title index order (the package's scripts/songidx.lua does the sorting), the
 // plan for exporting a self-contained folder and the command that builds the PDF.
 namespace zub::songbook {
 
@@ -158,10 +158,13 @@ struct FolderExport {
     std::vector<std::string> invalid;                                   // not valid song names
     std::vector<std::string> warnings;                                  // from generate()
 };
-// `bookName` is a file stem: non-empty, only [A-Za-z0-9_-]. scripts/* sources are listed even
-// when missing (the caller reports that).
+// `bookName` is a file stem: non-empty, only [A-Za-z0-9_-]. The folder gets the TeX side of the
+// package at `packageDir` (zub::package; not its scripts/, docs/ or git files) as zubuvzpevnik/
+// and four of its scripts as scripts/; those are listed even when missing (the caller reports
+// that).
 std::expected<FolderExport, std::string>
-planFolderExport(const Songbook&, const std::filesystem::path& repoRoot, std::string_view bookName,
+planFolderExport(const Songbook&, const std::filesystem::path& repoRoot,
+                 const std::filesystem::path& packageDir, std::string_view bookName,
                  const std::function<std::string(std::string_view inputName)>& titleOf = {});
 
 // ---- PDF build ----
@@ -174,9 +177,11 @@ struct BuildCommand {
     std::filesystem::path pdf, log;
 };
 // The build of a generated songbook in `workDir` (already holding only <bookName>.tex, the cover
-// and akordy.tex for Tabor); `indexes` is Generated::indexes, built with the songbook's scripts/build.sh. TEXINPUTS ends with ':' to keep the
-// defaults; the song folders come before the repo root so a name cannot find another file.
+// and akordy.tex for Tabor); `indexes` is Generated::indexes, built with the package's
+// scripts/build.sh. TEXINPUTS ends with ':' to keep the defaults; the song folders come before the
+// repo root so a name cannot find another file, the package after it.
 BuildCommand buildCommand(const Songbook&, const std::filesystem::path& repoRoot,
+                          const std::filesystem::path& packageDir,
                           const std::filesystem::path& workDir, std::string_view bookName,
                           const std::vector<std::string>& indexes);
 // Number of "Package zubuvzpevnik Warning"s about "not marked as fitting" (a warning wrapped at

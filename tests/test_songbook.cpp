@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <unistd.h>
 
 using namespace zub::songbook;
 
@@ -473,7 +474,7 @@ TEST_CASE("planFolderExport", "[songbook]") {
     b.sections = {{"", {"TheMamasAndThePapas/CaliforniaDreamin", "Abba/Nope"}},
                   {"S", {"TheMamasAndThePapas/CaliforniaDreamin"}}};
     const auto root = dataDir / "songbook";
-    const auto plan = planFolderExport(b, root, "my-book_1");
+    const auto plan = planFolderExport(b, root, root / "zubuvzpevnik", "my-book_1");
     REQUIRE(plan);
     CHECK(plan->skipped == std::vector<std::string>{"Abba/Nope"});
 
@@ -512,7 +513,7 @@ TEST_CASE("planFolderExport", "[songbook]") {
     CHECK(plan->written[2].second.find("./build.sh") != std::string::npos);
 
     b.bookClass = BookClass::Tabor;
-    const auto tabor = planFolderExport(b, root, "t");
+    const auto tabor = planFolderExport(b, root, root / "zubuvzpevnik", "t");
     REQUIRE(tabor);
     REQUIRE(tabor->written.size() == 4);
     CHECK(tabor->written[1].first == "akordy.tex");
@@ -522,7 +523,7 @@ TEST_CASE("planFolderExport", "[songbook]") {
                               [](const FileCopy& c) { return c.to == "img/kane.jpg"; }));
 
     b.bookClass = BookClass::Maly;
-    const auto maly = planFolderExport(b, root, "m");
+    const auto maly = planFolderExport(b, root, root / "zubuvzpevnik", "m");
     REQUIRE(maly);
     CHECK(std::ranges::none_of(maly->copies,
                                [](const FileCopy& c) { return c.to.parent_path() == "img"; }));
@@ -544,7 +545,7 @@ TEST_CASE("planFolderExport copies the scores a song includes", "[songbook]") {
 
     Songbook b;
     b.sections = {{"", {"Artist/Title", "Other/Tune"}}};
-    const auto plan = planFolderExport(b, root, "x");
+    const auto plan = planFolderExport(b, root, root / "zubuvzpevnik", "x");
     fs::remove_all(root);
     REQUIRE(plan);
     const auto copyOf = [&](const char* to) -> std::filesystem::path {
@@ -563,7 +564,7 @@ TEST_CASE("planFolderExport copies the cover", "[songbook]") {
     b.sections = {{"", {"TheMamasAndThePapas/CaliforniaDreamin"}}};
     TempFile cover("export.JPG");
     b.coverImage = cover.path.string();
-    const auto plan = planFolderExport(b, dataDir / "songbook", "x");
+    const auto plan = planFolderExport(b, dataDir / "songbook", dataDir / "songbook" / "zubuvzpevnik", "x");
     REQUIRE(plan);
     CHECK(plan->warnings.empty());
     CHECK(std::ranges::any_of(plan->copies, [&](const FileCopy& c) {
@@ -571,7 +572,7 @@ TEST_CASE("planFolderExport copies the cover", "[songbook]") {
     }));
     CHECK(has(plan->written[0].second, "\\makefrontcover{cover.jpg}"));
     b.coverImage = "/nonexistent/c.png";
-    const auto bad = planFolderExport(b, dataDir / "songbook", "x");
+    const auto bad = planFolderExport(b, dataDir / "songbook", dataDir / "songbook" / "zubuvzpevnik", "x");
     REQUIRE(bad);
     CHECK(bad->warnings.size() == 1);
     CHECK(std::ranges::none_of(bad->copies, [](const FileCopy& c) { return c.to == "cover.png"; }));
@@ -580,12 +581,14 @@ TEST_CASE("planFolderExport copies the cover", "[songbook]") {
 TEST_CASE("planFolderExport rejects bad input", "[songbook]") {
     Songbook b;
     const auto root = dataDir / "songbook";
-    CHECK_FALSE(planFolderExport(b, root, ""));
-    CHECK_FALSE(planFolderExport(b, root, "a b"));
-    CHECK_FALSE(planFolderExport(b, root, "a/b"));
-    CHECK_FALSE(planFolderExport(b, root, "č"));
+    CHECK_FALSE(planFolderExport(b, root, root / "zubuvzpevnik", ""));
+    CHECK_FALSE(planFolderExport(b, root, root / "zubuvzpevnik", "a b"));
+    CHECK_FALSE(planFolderExport(b, root, root / "zubuvzpevnik", "a/b"));
+    CHECK_FALSE(planFolderExport(b, root, root / "zubuvzpevnik", "č"));
+    CHECK_FALSE(planFolderExport(b, root, "", "x"));        // no package
+    CHECK_FALSE(planFolderExport(b, root, "relative", "x")); // read from the app's cwd
     b.sections = {{"", {"../x", "/etc/passwd", "a}b", "TheMamasAndThePapas/CaliforniaDreamin"}}};
-    const auto plan = planFolderExport(b, root, "x");
+    const auto plan = planFolderExport(b, root, root / "zubuvzpevnik", "x");
     REQUIRE(plan);
     CHECK(plan->invalid == std::vector<std::string>{"../x", "/etc/passwd", "a}b"});
     CHECK(plan->written[0].second.find("../x") == std::string::npos);
@@ -597,21 +600,21 @@ TEST_CASE("planFolderExport rejects bad input", "[songbook]") {
 
 TEST_CASE("buildCommand", "[songbook]") {
     Songbook b;
-    const auto c = buildCommand(b, "/r", "/w", "book", {"obsah", "idxs1", "obsahAutor"});
+    const auto c = buildCommand(b, "/r", "/p", "/w", "book", {"obsah", "idxs1", "obsahAutor"});
     CHECK(c.program == "bash");
-    CHECK(c.arguments == std::vector<std::string>{"/r/scripts/build.sh", "-i", "obsah", "-i",
+    CHECK(c.arguments == std::vector<std::string>{"/p/scripts/build.sh", "-i", "obsah", "-i",
                                                   "idxs1", "-i", "obsahAutor", "/w/book.tex"});
     CHECK(c.workingDirectory == "/w");
     REQUIRE(c.environment.size() == 1);
     CHECK(c.environment[0].first == "TEXINPUTS");
     CHECK(c.environment[0].second ==
-          ".:/w:/r/songs/chords:/r/songs/tinwhistle:/r:/r/zubuvzpevnik:");
+          ".:/w:/r/songs/chords:/r/songs/tinwhistle:/r:/p:");
     CHECK(c.pdf == "/w/book.pdf");
     CHECK(c.log == "/w/book.log");
 
     b.bookClass = BookClass::Tabor;
-    CHECK(buildCommand(b, "/r", "/w", "book", {"obsah"}).arguments ==
-          std::vector<std::string>{"/r/scripts/build.sh", "-i", "obsah", "/w/book.tex"});
+    CHECK(buildCommand(b, "/r", "/p", "/w", "book", {"obsah"}).arguments ==
+          std::vector<std::string>{"/p/scripts/build.sh", "-i", "obsah", "/w/book.tex"});
 }
 
 TEST_CASE("paperWarnings", "[songbook]") {
@@ -732,4 +735,37 @@ TEST_CASE("scoreRisks", "[songbook]") {
     CHECK(scoreRisks(root, chordsSong, "\\lilypondfile{../Evil.ly}\n") ==
           std::vector<std::string>{"\\lilypondfile{../Evil.ly}"});
     fs::remove_all(root);
+}
+
+TEST_CASE("planFolderExport takes the TeX side of the package and four of its scripts",
+          "[songbook]") {
+    namespace fs = std::filesystem;
+    const fs::path package =
+        fs::temp_directory_path() / ("zub-package-export-" + std::to_string(::getpid()));
+    fs::remove_all(package);
+    for (const char* dir : {"feature", "img", "scripts", "docs", ".git"})
+        fs::create_directories(package / dir);
+    for (const char* file :
+         {"zubuvzpevnik.sty", "velkyzpevnik.cls", "feature/akordy.cfg", "img/kane.jpg",
+          "scripts/build.sh", "scripts/buildindex.sh", "scripts/songidx.lua", "scripts/cleanup.sh",
+          "scripts/checkpaper.py", "docs/internals.md", ".git/HEAD", ".gitignore", "README.md"})
+        std::ofstream(package / file) << "x";
+    Songbook b;
+    b.sections = {{"", {"TheMamasAndThePapas/CaliforniaDreamin"}}};
+    b.bookClass = BookClass::Tabor;
+    const auto plan = planFolderExport(b, dataDir / "songbook", package, "x");
+    fs::remove_all(package);
+    REQUIRE(plan);
+    std::vector<std::string> to;
+    for (const FileCopy& c : plan->copies)
+        if (!c.to.string().starts_with("songs/"))
+            to.push_back(c.to.generic_string());
+    std::ranges::sort(to);
+    CHECK(to == std::vector<std::string>{"img/kane.jpg", "scripts/build.sh",
+                                         "scripts/buildindex.sh", "scripts/cleanup.sh",
+                                         "scripts/songidx.lua", "zubuvzpevnik/README.md",
+                                         "zubuvzpevnik/feature/akordy.cfg",
+                                         "zubuvzpevnik/img/kane.jpg",
+                                         "zubuvzpevnik/velkyzpevnik.cls",
+                                         "zubuvzpevnik/zubuvzpevnik.sty"});
 }

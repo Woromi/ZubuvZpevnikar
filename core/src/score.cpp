@@ -63,6 +63,9 @@ std::expected<Command, std::string> prepare(const Request& request) {
     const auto& work = request.workDir;
     if (!work.is_absolute())
         return std::unexpected("work directory must be an absolute path");
+    // The package's lilypond/ (zubuvzpevnik.ily): relative, lilypond would look in its cwd.
+    if (!request.includeDir.is_absolute())
+        return std::unexpected("no package to engrave the score with (zubuvzpevnik.ily)");
     std::error_code ec;
     fs::create_directories(work, ec);
     if (ec)

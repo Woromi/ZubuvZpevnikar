@@ -31,15 +31,22 @@ int exitCode(const char* name) {
 } // namespace
 
 TEST_CASE("shrink, check and apply build the command lines", "[songsuggest]") {
-    const auto full = ss::shrinkCommand("/opt/cc", "/tmp/x/S.tex", ss::Paper::A5, true, "/sb");
+    const auto full = ss::shrinkCommand("/opt/cc", "/tmp/x/S.tex", ss::Paper::A5, true, "/sb", "/pkg");
     CHECK(full.program == "/opt/cc");
     CHECK(full.arguments == std::vector<std::string>{"shrink", "/tmp/x/S.tex", "--fit", "a5",
-                                                     "--measure", "--songbook", "/sb", "--json"});
-    const auto plain = ss::shrinkCommand("/opt/cc", "/tmp/x/S.tex", std::nullopt, false, "/sb");
+                                                     "--measure", "--songbook", "/sb", "--package",
+                                                     "/pkg", "--json"});
+    const auto plain = ss::shrinkCommand("/opt/cc", "/tmp/x/S.tex", std::nullopt, false, "/sb", "/pkg");
     CHECK(plain.arguments ==
-          std::vector<std::string>{"shrink", "/tmp/x/S.tex", "--songbook", "/sb", "--json"});
-    const auto a4 = ss::shrinkCommand("/opt/cc", "S.tex", ss::Paper::A4, false, "/sb");
+          std::vector<std::string>{"shrink", "/tmp/x/S.tex", "--songbook", "/sb", "--package",
+                                   "/pkg", "--json"});
+    const auto a4 = ss::shrinkCommand("/opt/cc", "S.tex", ss::Paper::A4, false, "/sb", "/pkg");
     CHECK(a4.arguments[2] == "--fit");
+    // No package: no --package, the converter looks in the songbook and says what is missing.
+    CHECK(ss::shrinkCommand("/opt/cc", "S.tex", std::nullopt, false, "/sb", "").arguments ==
+          std::vector<std::string>{"shrink", "S.tex", "--songbook", "/sb", "--json"});
+    CHECK(ss::joinCommand("/opt/cc", "S.tex", "/sb", "").arguments ==
+          std::vector<std::string>{"join", "S.tex", "--songbook", "/sb", "--json"});
     CHECK(a4.arguments[3] == "a4");
     const std::vector<std::string> ids{"a@1", "b@2"};
     CHECK(ss::applyCommand("/opt/cc", "/tmp/x/S.tex", ids).arguments ==
@@ -195,9 +202,9 @@ TEST_CASE("a malformed dismiss edit is an error, null is none", "[songsuggest]")
 }
 
 TEST_CASE("join lists joined lines in shrink's shape", "[songsuggest]") {
-    const auto command = ss::joinCommand("/opt/cc", "/tmp/x/S.tex", "/sb");
-    CHECK(command.arguments ==
-          std::vector<std::string>{"join", "/tmp/x/S.tex", "--songbook", "/sb", "--json"});
+    const auto command = ss::joinCommand("/opt/cc", "/tmp/x/S.tex", "/sb", "/pkg");
+    CHECK(command.arguments == std::vector<std::string>{"join", "/tmp/x/S.tex", "--songbook", "/sb",
+                                                        "--package", "/pkg", "--json"});
     const auto result =
         ss::interpretProposals(exitCode("join"), slurp(converterData / "join.json"), "");
     REQUIRE(result);
@@ -325,14 +332,14 @@ TEST_CASE("apply interprets real runs", "[songsuggest]") {
 TEST_CASE("version output is parsed", "[converter]") {
     const auto version = cv::parseVersion(slurp(converterData / "version.out"));
     REQUIRE(version);
-    CHECK(*version == cv::Version{0, 10, 0});
-    CHECK(cv::toString(*version) == "0.10.0");
+    CHECK(*version == cv::Version{0, 14, 0});
+    CHECK(cv::toString(*version) == "0.14.0");
     CHECK(*version >= cv::kRequired);
 
     CHECK(cv::parseVersion("chords_converter 0.10.3\r\nmore")->minor == 10);
     CHECK(cv::parseVersion("chords_converter 1.0.0-beta")->major == 1);
-    CHECK(*cv::parseVersion("chords_converter 0.9.0") < cv::kRequired);
-    CHECK(*cv::parseVersion("chords_converter 0.10.1") > cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.13.0") < cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.14.1") > cv::kRequired);
 }
 
 TEST_CASE("unparseable version output gives nothing", "[converter]") {
@@ -371,12 +378,12 @@ TEST_CASE("paperOf reads the base class options", "[songsuggest][preview]") {
     root.write("commented", "% \\LoadClass[a4paper]{article}\n\\LoadClass[a5paper]{book}\n");
     root.write("none", "\\LoadClass{article}\n");
     root.write("later", "\\PassOptionsToClass{a4paper}{x}\n\\LoadClass[10pt]{book}\n");
-    CHECK(zub::preview::paperOf(root.path, "small") == ss::Paper::A5);
-    CHECK(zub::preview::paperOf(root.path, "big") == ss::Paper::A4);
-    CHECK(zub::preview::paperOf(root.path, "commented") == ss::Paper::A5);
-    CHECK_FALSE(zub::preview::paperOf(root.path, "none"));
-    CHECK_FALSE(zub::preview::paperOf(root.path, "later"));
-    CHECK_FALSE(zub::preview::paperOf(root.path, "missing"));
-    CHECK_FALSE(zub::preview::paperOf(root.path, "../small"));
-    CHECK_FALSE(zub::preview::paperOf(root.path, ""));
+    CHECK(zub::preview::paperOf(root.path / "zubuvzpevnik", "small") == ss::Paper::A5);
+    CHECK(zub::preview::paperOf(root.path / "zubuvzpevnik", "big") == ss::Paper::A4);
+    CHECK(zub::preview::paperOf(root.path / "zubuvzpevnik", "commented") == ss::Paper::A5);
+    CHECK_FALSE(zub::preview::paperOf(root.path / "zubuvzpevnik", "none"));
+    CHECK_FALSE(zub::preview::paperOf(root.path / "zubuvzpevnik", "later"));
+    CHECK_FALSE(zub::preview::paperOf(root.path / "zubuvzpevnik", "missing"));
+    CHECK_FALSE(zub::preview::paperOf(root.path / "zubuvzpevnik", "../small"));
+    CHECK_FALSE(zub::preview::paperOf(root.path / "zubuvzpevnik", ""));
 }

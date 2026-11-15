@@ -10,6 +10,7 @@ add_library(zub_core STATIC
     src/library.cpp
     src/midi.cpp
     src/midibend.cpp
+    src/package.cpp
     src/preview.cpp
     src/safety.cpp
     src/scoremidi.cpp

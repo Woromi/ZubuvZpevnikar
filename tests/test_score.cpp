@@ -97,6 +97,13 @@ TEST_CASE("score prepare rejects invalid requests", "[score]") {
     request = requestIn(dir);
     request.workDir = "relative/dir";
     CHECK_FALSE(sc::prepare(request));
+
+    // No package: lilypond would look for zubuvzpevnik.ily in its own cwd.
+    request = requestIn(dir);
+    request.includeDir.clear();
+    CHECK_FALSE(sc::prepare(request));
+    request.includeDir = "lilypond";
+    CHECK_FALSE(sc::prepare(request));
 }
 
 TEST_CASE("germanNames follows zubuvzpevnik.sty", "[score]") {

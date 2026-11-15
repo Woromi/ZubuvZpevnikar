@@ -58,6 +58,7 @@ std::string logFile(const std::string& name) {
 pv::Request requestIn(const TempDir& dir) {
     pv::Request r;
     r.songbookRoot = fixtureRepo;
+    r.packageDir = fixtureRepo / "zubuvzpevnik";
     r.workDir = dir.path / "work";
     r.inputName = "Artist/Title";
     r.songContent = "a\xC2\xA0"
@@ -108,7 +109,8 @@ TEST_CASE("prepare writes the wrapper, the song copy and the command", "[preview
     const auto g = [](const fs::path& p) { return p.generic_string(); };
     const std::string root = g(fixtureRepo);
     const std::string expected = std::string(".") + sep + g(work / "override") + sep + root + sep +
-                                 root + "/zubuvzpevnik" + sep + root + "/songs/chords" + sep +
+                                 g(fixtureRepo / "zubuvzpevnik") + sep + root + "/songs/chords" +
+                                 sep +
                                  root + "/songs/tinwhistle" + sep;
     REQUIRE(cmd->environment.size() == 4);
     CHECK(cmd->environment[0].first == "TEXINPUTS");
@@ -167,6 +169,13 @@ TEST_CASE("prepare rejects invalid requests", "[preview]") {
         REQUIRE_FALSE(result);
         CHECK_FALSE(result.error().empty());
     }
+    SECTION("no package") {
+        // An empty TEXINPUTS entry would be TeX's default path, not the package.
+        request.packageDir.clear();
+        const auto result = pv::prepare(request);
+        REQUIRE_FALSE(result);
+        CHECK(result.error() == "no package directory");
+    }
     SECTION("relative work directory") {
         request.workDir = "relative/work";
         const auto result = pv::prepare(request);
@@ -192,7 +201,8 @@ TEST_CASE("prepare accepts non-ASCII names", "[preview]") {
 }
 
 TEST_CASE("documentClasses lists the cls stems sorted", "[preview]") {
-    CHECK(pv::documentClasses(fixtureRepo) == std::vector<std::string>{"alpha", "beta"});
+    CHECK(pv::documentClasses(fixtureRepo / "zubuvzpevnik") ==
+          std::vector<std::string>{"alpha", "beta"});
     CHECK(pv::documentClasses(fixtureRepo / "nope").empty());
 }
 
@@ -326,6 +336,7 @@ TEST_CASE("a preview of a real song builds, and a broken one reports its line", 
     TempDir dir;
     pv::Request request;
     request.songbookRoot = realRepo;
+    request.packageDir = realRepo / "zubuvzpevnik"; // the TeX files, in either layout
     request.workDir = dir.path / "work";
     request.inputName = "AgFlek/BlazniUmirajiNadvakrat";
     request.songContent = *original;

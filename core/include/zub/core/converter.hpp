@@ -22,8 +22,9 @@ struct Version {
 };
 
 // The oldest converter whose tidy/suggest/apply interface this app uses (0.10.0: shrink, join and
-// check; proposals carry score, grade, sources and category; check findings carry a dismiss edit).
-inline constexpr Version kRequired{0, 10, 0};
+// check; proposals carry score, grade, sources and category; check findings carry a dismiss edit;
+// 0.14.0: shrink and join take --package, the package outside the songbook).
+inline constexpr Version kRequired{0, 14, 0};
 
 // Reads the output of "chords_converter --version": "chords_converter 0.2.0" (first line; an
 // optional "-suffix" after the patch number is ignored). Nullopt for anything else, which is

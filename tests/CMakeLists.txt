@@ -10,6 +10,7 @@ add_executable(zub_core_tests
     test_linediff.cpp
     test_midi.cpp
     test_midibend.cpp
+    test_package.cpp
     test_preview.cpp
     test_safety.cpp
     test_scoremidi.cpp

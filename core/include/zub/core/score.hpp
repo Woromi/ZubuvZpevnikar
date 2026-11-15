@@ -46,7 +46,7 @@ struct Request {
     std::string inputName;              // "Artist/X.ly", as in \lilypondfile{}
     std::string content;                // the score text to engrave (e.g. unsaved editor content)
     bool germanNames = false;           // note names deutsch, see germanNames()
-    std::filesystem::path includeDir;   // <root>/zubuvzpevnik/lilypond: zubuvzpevnik.ily etc.
+    std::filesystem::path includeDir;   // <package>/lilypond (absolute): zubuvzpevnik.ily etc.
     // Also write a MIDI file of the score (appended second score, see midiScore); the engraved
     // first score and its links are not touched.
     std::optional<MidiOptions> midi;

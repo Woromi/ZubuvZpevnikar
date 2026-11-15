@@ -22,6 +22,12 @@ const zub::SongEntry* find(const zub::Library& library, std::string_view inputNa
 TEST_CASE("validateSongbookRepo", "[library]") {
     CHECK(zub::validateSongbookRepo(fixtureRepo));
     CHECK_FALSE(zub::validateSongbookRepo(fixtureRepo / "songs"));
+    // The package may be the app's own copy: songs/chords/ is enough.
+    const auto bare = std::filesystem::temp_directory_path() / "zub-bare-songbook";
+    std::filesystem::remove_all(bare);
+    std::filesystem::create_directories(bare / "songs" / "chords");
+    CHECK(zub::validateSongbookRepo(bare));
+    std::filesystem::remove_all(bare);
     CHECK_FALSE(zub::validateSongbookRepo(fixtureRepo / "does-not-exist"));
 }
 

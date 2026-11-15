@@ -83,7 +83,8 @@ std::optional<Measured> readMeasured(const json::Value& object) {
 
 converter::Command shrinkCommand(const std::filesystem::path& converter,
                                   const std::filesystem::path& songFile, std::optional<Paper> fit,
-                                  bool measure, const std::filesystem::path& songbookRoot) {
+                                  bool measure, const std::filesystem::path& songbookRoot,
+                                  const std::filesystem::path& packageDir) {
     converter::Command command{utf8(converter), {"shrink", utf8(songFile)}};
     if (fit) {
         command.arguments.push_back("--fit");
@@ -93,6 +94,10 @@ converter::Command shrinkCommand(const std::filesystem::path& converter,
         command.arguments.push_back("--measure");
     command.arguments.push_back("--songbook");
     command.arguments.push_back(utf8(songbookRoot));
+    if (!packageDir.empty()) { // else the converter looks in the songbook and says what's missing
+        command.arguments.push_back("--package");
+        command.arguments.push_back(utf8(packageDir));
+    }
     command.arguments.push_back("--json");
     return command;
 }
@@ -104,9 +109,16 @@ converter::Command checkCommand(const std::filesystem::path& converter,
 
 converter::Command joinCommand(const std::filesystem::path& converter,
                                const std::filesystem::path& songFile,
-                               const std::filesystem::path& songbookRoot) {
-    return {utf8(converter),
-            {"join", utf8(songFile), "--songbook", utf8(songbookRoot), "--json"}};
+                               const std::filesystem::path& songbookRoot,
+                               const std::filesystem::path& packageDir) {
+    converter::Command command{utf8(converter),
+                               {"join", utf8(songFile), "--songbook", utf8(songbookRoot)}};
+    if (!packageDir.empty()) {
+        command.arguments.push_back("--package");
+        command.arguments.push_back(utf8(packageDir));
+    }
+    command.arguments.push_back("--json");
+    return command;
 }
 
 converter::Command applyCommand(const std::filesystem::path& converter,

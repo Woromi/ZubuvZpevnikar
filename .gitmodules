@@ -1,3 +1,6 @@
 [submodule "external/chords_converter"]
 	path = external/chords_converter
 	url = https://github.com/Woromi/chords_converter.git
+[submodule "external/zubuvzpevnik-package"]
+	path = external/zubuvzpevnik-package
+	url = https://github.com/Woromi/zubuvzpevnik-package.git

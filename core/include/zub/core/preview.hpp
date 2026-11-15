@@ -14,7 +14,8 @@
 namespace zub::preview {
 
 struct Request {
-    std::filesystem::path songbookRoot; // the ZubuvZpevnik checkout
+    std::filesystem::path songbookRoot; // the ZubuvZpevnik checkout (its songs)
+    std::filesystem::path packageDir;   // the package that builds them (zub::package)
     std::filesystem::path workDir;      // reused between builds: keeps LilyPond's tmp-ly cache
     std::string inputName;              // "Artist/Title", as in \input{}
     bool tinwhistleSong = false;        // the song is in songs/tinwhistle: that tree comes first
@@ -43,13 +44,13 @@ struct Command {
 // Fails on an invalid request (empty or unsafe inputName, invalid class name) or I/O errors.
 std::expected<Command, std::string> prepare(const Request& request);
 
-// Document classes the songbook provides: the stems of zubuvzpevnik/*.cls, sorted.
-std::vector<std::string> documentClasses(const std::filesystem::path& songbookRoot);
+// Document classes the package provides: the stems of <packageDir>/*.cls, sorted.
+std::vector<std::string> documentClasses(const std::filesystem::path& packageDir);
 
-// The paper size of a document class: zubuvzpevnik/<className>.cls loads its base class with
+// The paper size of a document class: <packageDir>/<className>.cls loads its base class with
 // \LoadClass[...a5paper...] (A5) or a4paper (A4). Nullopt when the file is unreadable, the
 // name is not a plain class name, or no paper option is found.
-std::optional<songsuggest::Paper> paperOf(const std::filesystem::path& songbookRoot,
+std::optional<songsuggest::Paper> paperOf(const std::filesystem::path& packageDir,
                                           std::string_view className);
 
 struct Error {

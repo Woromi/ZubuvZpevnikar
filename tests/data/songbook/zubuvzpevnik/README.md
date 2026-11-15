@@ -1,1 +1,1 @@
-Marker directory: makes tests/data/songbook look like a ZubuvZpevnik checkout to validateSongbookRepo().
+Stand-in for the package (zub::package) in tests: two classes for documentClasses() and the export.

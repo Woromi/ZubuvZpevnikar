@@ -193,6 +193,9 @@ std::expected<Command, std::string> prepare(const Request& request) {
     const auto& work = request.workDir;
     if (!work.is_absolute())
         return std::unexpected("work directory must be an absolute path");
+    // An empty entry in TEXINPUTS would mean TeX's default path, not the package.
+    if (request.packageDir.empty())
+        return std::unexpected("no package directory");
     std::error_code ec;
     fs::create_directories(work, ec);
     if (ec)
@@ -244,7 +247,7 @@ std::expected<Command, std::string> prepare(const Request& request) {
     // Scores are found in the song's own tree first (see songbook::findScoreFile).
     const std::string trees[2] = {root + "/songs/chords", root + "/songs/tinwhistle"};
     const std::string texinputs = std::string(".") + kSep + utf8(overrideDir) + kSep + root + kSep +
-                                  root + "/zubuvzpevnik" + kSep +
+                                  utf8(request.packageDir) + kSep +
                                   trees[request.tinwhistleSong ? 1 : 0] + kSep +
                                   trees[request.tinwhistleSong ? 0 : 1] + kSep;
     cmd.environment = {{"TEXINPUTS", texinputs},
@@ -257,10 +260,10 @@ std::expected<Command, std::string> prepare(const Request& request) {
     return cmd;
 }
 
-std::vector<std::string> documentClasses(const fs::path& songbookRoot) {
+std::vector<std::string> documentClasses(const fs::path& packageDir) {
     std::vector<std::string> names;
     std::error_code ec;
-    fs::directory_iterator it(songbookRoot / "zubuvzpevnik", ec);
+    fs::directory_iterator it(packageDir, ec);
     if (ec)
         return names;
     for (const fs::directory_iterator end; it != end; it.increment(ec)) {
@@ -274,13 +277,11 @@ std::vector<std::string> documentClasses(const fs::path& songbookRoot) {
     return names;
 }
 
-std::optional<songsuggest::Paper> paperOf(const fs::path& songbookRoot,
-                                          std::string_view className) {
+std::optional<songsuggest::Paper> paperOf(const fs::path& packageDir, std::string_view className) {
     if (className.empty() || className.find_first_of("/\\") != std::string_view::npos ||
         className.find("..") != std::string_view::npos)
         return std::nullopt;
-    const auto content =
-        readTextFile(songbookRoot / "zubuvzpevnik" / (std::string(className) + ".cls"));
+    const auto content = readTextFile(packageDir / (std::string(className) + ".cls"));
     if (!content)
         return std::nullopt;
     for (const std::string_view line : splitLines(*content)) {
@@ -291,9 +292,8 @@ std::optional<songsuggest::Paper> paperOf(const fs::path& songbookRoot,
         if (load == std::string_view::npos)
             continue;
         const auto close = line.find(']', load);
-        const auto options = line.substr(load, close == std::string_view::npos
-                                                   ? std::string_view::npos
-                                                   : close - load);
+        const auto options = line.substr(
+            load, close == std::string_view::npos ? std::string_view::npos : close - load);
         if (options.find("a5paper") != std::string_view::npos)
             return songsuggest::Paper::A5;
         if (options.find("a4paper") != std::string_view::npos)
