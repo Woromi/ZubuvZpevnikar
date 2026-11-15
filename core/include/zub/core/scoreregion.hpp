@@ -27,15 +27,15 @@ std::optional<std::size_t> offsetOf(std::string_view text, int line, int column)
 
 // Whole tokens: from the start of the first note, chord or rest that overlaps `range` (a chord
 // from its `<`, with the music functions written right before it: `\deadNote`, `\grace`,
-// `\tweak x #y`, `\once \override ...`) to the end of the last one, including its duration, string, `>`, and the
-// articulations written right against it. A range whose begin equals its end is a point. Nothing
-// when the range touches no note, chord or rest.
+// `\tweak x #y`, `\once \override ...`) to the end of the last one, including its duration, string,
+// `>`, and the articulations written right against it. A range whose begin equals its end is a
+// point. Nothing when the range touches no note, chord or rest.
 std::optional<Range> expandToEvents(std::string_view text, Range range);
 
 // The music events of a score in text order: notes, chords, `q` and rests, each from its first
 // prefix function (see expandToEvents) to the end of its articulations. Chord names, lyrics, marks,
-// markup, Scheme and the value of a variable definition (`emChord = <e\6 g\3>4`) are none. These are
-// the units of a selection in the rendered score: it runs over whole events, in this order.
+// markup, Scheme and the value of a variable definition (`emChord = <e\6 g\3>4`) are none. These
+// are the units of a selection in the rendered score: it runs over whole events, in this order.
 std::vector<Range> musicEvents(std::string_view text);
 
 // The index of the event with `begin <= offset < end`; nothing between events.
@@ -48,6 +48,10 @@ std::optional<std::size_t> eventAt(const std::vector<Range>& events, std::size_t
 // written (the event's begin, the last event's end for the last stop; 0 without events).
 std::size_t caretStop(const std::vector<Range>& events, std::size_t offset);
 std::size_t stopOffset(const std::vector<Range>& events, std::size_t stop);
+// The text between two stops, in either order: from the first event's begin to the last one's
+// end, or the caret offset twice for one stop. Nullopt when a stop lies beyond the events (stops
+// kept from an older text).
+std::optional<Range> stopSpan(const std::vector<Range>& events, std::size_t a, std::size_t b);
 
 enum class Action {
     Tie,        // `~` after each note or chord that a note or chord follows (not when already tied)

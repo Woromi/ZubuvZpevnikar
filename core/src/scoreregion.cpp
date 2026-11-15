@@ -192,8 +192,8 @@ void marksOf(std::string_view text, const Event& e, std::size_t index, std::vect
         if (!markAt(text, i, kind, open, length))
             return false;
         std::size_t begin = i;
-        if (begin > floor && (text[begin - 1] == '-' || text[begin - 1] == '^' ||
-                              text[begin - 1] == '_')) {
+        if (begin > floor &&
+            (text[begin - 1] == '-' || text[begin - 1] == '^' || text[begin - 1] == '_')) {
             --begin;
             ++length;
         }
@@ -214,10 +214,8 @@ void marksOf(std::string_view text, const Event& e, std::size_t index, std::vect
         std::size_t j = i;
         while (j < text.size() && isBlank(text[j]))
             ++j;
-        const std::size_t mark = j + ((j < text.size() && (text[j] == '-' || text[j] == '^' ||
-                                                           text[j] == '_'))
-                                          ? 1
-                                          : 0);
+        const std::size_t mark =
+            j + ((j < text.size() && (text[j] == '-' || text[j] == '^' || text[j] == '_')) ? 1 : 0);
         if (mark >= text.size() || !add(mark, j))
             break;
         reach = i = out.back().pos + out.back().length;
@@ -325,6 +323,15 @@ std::size_t stopOffset(const std::vector<Range>& events, std::size_t stop) {
     if (events.empty())
         return 0;
     return stop < events.size() ? events[stop].begin : events.back().end;
+}
+
+std::optional<Range> stopSpan(const std::vector<Range>& events, std::size_t a, std::size_t b) {
+    const auto [lo, hi] = std::minmax(a, b);
+    if (hi > events.size())
+        return std::nullopt;
+    if (lo == hi)
+        return Range{stopOffset(events, lo), stopOffset(events, lo)};
+    return Range{events[lo].begin, events[hi - 1].end};
 }
 
 std::optional<Range> expandToEvents(std::string_view text, Range range) {
@@ -535,8 +542,8 @@ std::optional<Result> removeEvents(std::string_view text, Range range, RemoveRef
     while (first < gone.size()) {
         std::size_t last = first;
         while (last + 1 < gone.size() &&
-               std::ranges::all_of(text.substr(gone[last].end, gone[last + 1].begin - gone[last].end),
-                                   isBlank))
+               std::ranges::all_of(
+                   text.substr(gone[last].end, gone[last + 1].begin - gone[last].end), isBlank))
             ++last;
         edits.push_back(eraseWithBlanks(text, gone[first].begin, gone[last].end));
         first = last + 1;

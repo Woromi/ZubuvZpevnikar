@@ -746,3 +746,19 @@ TEST_CASE("deleting each event of the real scores keeps the rest of the text",
     std::cerr << "scores: " << files << ", events deleted one by one: " << deleted
               << ", of them with a duration written on the next event: " << shorter << "\n";
 }
+
+TEST_CASE("scoreregion stopSpan is the text between two stops, nothing for stale stops",
+          "[scoreregion]") {
+    const std::string text = "c4 d e";
+    const auto events = sr::musicEvents(text);
+    REQUIRE(events.size() == 3);
+    CHECK(sr::stopSpan(events, 0, 3) == sr::Range{0, 6});
+    CHECK(sr::stopSpan(events, 3, 1) == sr::Range{3, 6}); // either order
+    CHECK(sr::stopSpan(events, 2, 2) == sr::Range{5, 5});
+    CHECK(sr::stopSpan(events, 3, 3) == sr::Range{6, 6});
+    // Stops kept from an older text with more events: nothing, not a read past the end.
+    CHECK_FALSE(sr::stopSpan(events, 0, 4));
+    CHECK_FALSE(sr::stopSpan(events, 7, 7));
+    CHECK_FALSE(sr::stopSpan({}, 0, 1));
+    CHECK(sr::stopSpan({}, 0, 0) == sr::Range{0, 0});
+}
