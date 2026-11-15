@@ -3685,7 +3685,9 @@ void MainWindow::scanSongbook() {
         scan_ = nullptr;
         table_->setColumnHidden(SongTableModel::Changes, false);
         changesOnlyAction_->setVisible(true);
-        changesOnly_->setChecked(true);
+        // Only when there is something to show: with nothing found, the filter would hide
+        // every song and the list would look empty.
+        changesOnly_->setChecked(scanFound_ > 0);
         statusBar()->showMessage(
             (cancelled ? tr("Scan cancelled. ") : QString()) +
                 tr("%n song(s) with possible changes: open one and use Tidy, Check Song or Make "
