@@ -436,12 +436,11 @@ std::string fileNameOf(std::string_view name) {
     return out;
 }
 
-NewSong newSong(std::string_view title, std::string_view artist, std::string_view lang) {
+NewSong newSong(std::string_view title, std::string_view artist) {
     std::string text = "\\beginsong{" + songbook::escapeText(title) + "}[\n";
     text += "    by={" + songbook::escapeText(artist) + "},\n";
-    text += lang.empty() ? std::string("    % lang={czech|english},\n")
-                         : "    lang={" + songbook::escapeText(lang) + "},\n";
-    text += "    % tem={},\n"
+    text += "    % lang={},\n"
+            "    % tem={},\n"
             "    % met={},\n"
             "    tun={Standard},\n"
             "    % key={},\n"

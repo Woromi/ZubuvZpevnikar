@@ -83,13 +83,13 @@ std::optional<std::filesystem::path> existingSong(const std::filesystem::path& s
 // Latin Extended-A) are left out. Empty when nothing is left.
 std::string fileNameOf(std::string_view name);
 
-// A new song by hand: the header of the converter's drafts (by, lang, the keys to fill in
-// commented out, tun={Standard}, pap={}), then one empty verse with the cursor in it, and
-// \endsong. Title and artist are escaped for LaTeX; an empty `lang` is left to fill in.
+// A new song by hand: the header of the converter's drafts (by, the keys to fill in commented
+// out, lang among them, tun={Standard}, pap={}), then one empty verse with the cursor in it, and
+// \endsong. Title and artist are escaped for LaTeX.
 struct NewSong {
     std::string text;
     std::size_t cursor; // byte offset: inside the verse
 };
-NewSong newSong(std::string_view title, std::string_view artist, std::string_view lang);
+NewSong newSong(std::string_view title, std::string_view artist);
 
 } // namespace zub::songimport

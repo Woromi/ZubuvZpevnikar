@@ -5,21 +5,19 @@
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
-#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <zub/core/songimport.hpp>
 
-NewSongDialog::NewSongDialog(const std::map<QString, QString>& artistFolders,
-                             const QStringList& languages, QWidget* parent)
+NewSongDialog::NewSongDialog(const std::map<QString, QString>& artistFolders, QWidget* parent)
     : QDialog(parent), artistFolders_(artistFolders), title_(new QLineEdit), artist_(new QComboBox),
-      language_(new QComboBox), file_(new QLabel),
+      file_(new QLineEdit),
       buttons_(new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel)) {
     setWindowTitle(tr("New Song"));
     title_->setObjectName(QStringLiteral("newSongTitle"));
     artist_->setObjectName(QStringLiteral("newSongArtist"));
-    language_->setObjectName(QStringLiteral("newSongLanguage"));
+    file_->setObjectName(QStringLiteral("newSongFile"));
 
     artist_->setEditable(true);
     artist_->setInsertPolicy(QComboBox::NoInsert);
@@ -29,24 +27,15 @@ NewSongDialog::NewSongDialog(const std::map<QString, QString>& artistFolders,
     artist_->setToolTip(tr("An artist of the songbook keeps their folder; a new one gets a folder "
                            "named after them"));
 
-    language_->setEditable(true);
-    QStringList offered = languages;
-    for (const QString& common :
-         {QStringLiteral("czech"), QStringLiteral("slovak"), QStringLiteral("english")})
-        if (!offered.contains(common))
-            offered << common;
-    language_->addItems(offered);
-    language_->setCurrentText(QStringLiteral("czech"));
-    language_->setToolTip(tr("The song's lang: chord and note names, index order. Leave it empty "
-                             "to fill it in later."));
-
-    file_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    file_->setWordWrap(true);
+    // Read-only and frameless: the whole path, however long (a label would wrap and be cut off).
+    file_->setReadOnly(true);
+    file_->setFrame(false);
+    file_->setFocusPolicy(Qt::NoFocus);
+    file_->setPlaceholderText(tr("(type a title and an artist)"));
 
     auto* form = new QFormLayout;
     form->addRow(tr("&Title:"), title_);
     form->addRow(tr("&Artist:"), artist_);
-    form->addRow(tr("&Language:"), language_);
     form->addRow(tr("File:"), file_);
     auto* layout = new QVBoxLayout(this);
     layout->addLayout(form);
@@ -56,7 +45,7 @@ NewSongDialog::NewSongDialog(const std::map<QString, QString>& artistFolders,
     connect(title_, &QLineEdit::textChanged, this, &NewSongDialog::update);
     connect(artist_, &QComboBox::currentTextChanged, this, &NewSongDialog::update);
     update();
-    resize(480, sizeHint().height());
+    resize(520, sizeHint().height());
 }
 
 QString NewSongDialog::title() const {
@@ -65,10 +54,6 @@ QString NewSongDialog::title() const {
 
 QString NewSongDialog::artist() const {
     return artist_->currentText().trimmed();
-}
-
-QString NewSongDialog::language() const {
-    return language_->currentText().trimmed();
 }
 
 QString NewSongDialog::inputName() const {
@@ -85,7 +70,8 @@ QString NewSongDialog::inputName() const {
 void NewSongDialog::update() {
     const QString name = inputName();
     file_->setText(name.isEmpty()
-                       ? tr("(type a title and an artist)")
+                       ? QString()
                        : QStringLiteral("songs/chords/") + name + QStringLiteral(".tex"));
+    file_->setCursorPosition(0);
     buttons_->button(QDialogButtonBox::Ok)->setEnabled(!name.isEmpty());
 }

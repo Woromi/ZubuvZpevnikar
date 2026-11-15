@@ -1298,20 +1298,12 @@ Použijte vestavěný.</translation>
         <translation>Interpret ze zpěvníku zůstane ve své složce; nový dostane složku podle svého jména</translation>
     </message>
     <message>
-        <source>The song&apos;s lang: chord and note names, index order. Leave it empty to fill it in later.</source>
-        <translation>Jazyk písně (lang): názvy akordů a not, řazení v obsahu. Prázdný doplníte později.</translation>
-    </message>
-    <message>
         <source>&amp;Title:</source>
         <translation>&amp;Název:</translation>
     </message>
     <message>
         <source>&amp;Artist:</source>
         <translation>&amp;Interpret:</translation>
-    </message>
-    <message>
-        <source>&amp;Language:</source>
-        <translation>&amp;Jazyk:</translation>
     </message>
     <message>
         <source>File:</source>

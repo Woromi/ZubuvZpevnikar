@@ -3621,7 +3621,6 @@ void MainWindow::newSong() {
     }
     // The songbook's artists keep their folders (some are named by hand: "SuchySlitr").
     std::map<QString, QString> artistFolders;
-    std::set<QString> languages;
     for (int row = 0; row < model_->rowCount(); ++row) {
         const auto* song = model_->song(row);
         if (!song)
@@ -3630,11 +3629,8 @@ void MainWindow::newSong() {
             model_->index(row, SongTableModel::Artist).data().toString().trimmed();
         if (!artist.isEmpty())
             artistFolders.emplace(artist, toQString(song->path.parent_path().filename()));
-        for (const QString& lang :
-             model_->index(row, 0).data(SongTableModel::LanguageRole).toStringList())
-            languages.insert(lang);
     }
-    NewSongDialog dialog(artistFolders, QStringList(languages.begin(), languages.end()), this);
+    NewSongDialog dialog(artistFolders, this);
     if (dialog.exec() != QDialog::Accepted)
         return;
     const std::string inputName = toStdString(dialog.inputName());
@@ -3654,9 +3650,8 @@ void MainWindow::newSong() {
         return;
     const auto dest = zub::songimport::destination(songbookRoot_, inputName);
     approvedConstructs_.erase(dest.path); // nothing of an earlier file at this path carries over
-    const auto song = zub::songimport::newSong(toStdString(dialog.title()),
-                                               toStdString(dialog.artist()),
-                                               toStdString(dialog.language()));
+    const auto song =
+        zub::songimport::newSong(toStdString(dialog.title()), toStdString(dialog.artist()));
     auto* editor = new SongEditor(dest.path, *repository_);
     editor->openNew(song.text);
     showSong(editor, dialog.title(), toQString(dest.inputName) + tr(" (new, not saved)"));

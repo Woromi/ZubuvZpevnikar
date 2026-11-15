@@ -408,11 +408,11 @@ TEST_CASE("fileNameOf names files like chords_converter", "[songimport]") {
 }
 
 TEST_CASE("newSong is a draft like the converter's, the cursor in its verse", "[songimport]") {
-    const auto song = zub::songimport::newSong("100% Tvůj", "A & B", "czech");
+    const auto song = zub::songimport::newSong("100% Tvůj", "A & B");
     CHECK(song.text ==
           "\\beginsong{100\\% Tvůj}[\n"
           "    by={A \\& B},\n"
-          "    lang={czech},\n"
+          "    % lang={},\n"
           "    % tem={},\n"
           "    % met={},\n"
           "    tun={Standard},\n"
@@ -430,9 +430,7 @@ TEST_CASE("newSong is a draft like the converter's, the cursor in its verse", "[
     const auto meta = zub::parseSong(song.text);
     REQUIRE(meta);
     CHECK(meta->title == "100\\% Tvůj");
-    CHECK(meta->value("lang") == "czech");
-    CHECK(zub::songimport::newSong("T", "A", "").text.find("    % lang={czech|english},\n") !=
-          std::string::npos);
+    CHECK(meta->value("lang").empty()); // commented out: to fill in
 }
 
 TEST_CASE("fileNameOf agrees with the real songbook's file names", "[.integration][songimport]") {
