@@ -4,16 +4,15 @@
 #include "convert.hpp"
 
 #include <QApplication>
-#include <QCoreApplication>
-#include <QHash>
 #include <QComboBox>
 #include <QContextMenuEvent>
+#include <QCoreApplication>
 #include <QDialog>
-#include <QFrame>
-#include <QPushButton>
 #include <QEvent>
 #include <QFontDatabase>
+#include <QFrame>
 #include <QHBoxLayout>
+#include <QHash>
 #include <QIcon>
 #include <QKeyEvent>
 #include <QKeySequence>
@@ -23,9 +22,10 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPlainTextEdit>
+#include <QPushButton>
 #include <QRegularExpression>
-#include <QSettings>
 #include <QScrollArea>
+#include <QSettings>
 #include <QSvgRenderer>
 #include <QToolButton>
 #include <QUrl>
@@ -34,8 +34,8 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
-#include <optional>
 #include <map>
+#include <optional>
 #include <set>
 #include <utility>
 #include <vector>
@@ -191,6 +191,10 @@ public:
 
     // The links of the loaded SVG (set after load()). None is selectable until setSelectable().
     void setLinks(ParsedScore parsed) {
+        // A press or drag in flight points into the old list (a build can finish while the
+        // button is down): it is over.
+        pressed_ = dragging_ = false;
+        pressLink_ = dragLink_ = nullptr;
         links_ = std::move(parsed.links);
         staves_ = groupStaves(parsed.staffLines);
         linkStaff_.clear();
@@ -293,7 +297,7 @@ public:
                 continue;
             const Staff& s = staves_[i];
             const double dx = at.x() < s.x1 ? s.x1 - at.x() : at.x() > s.x2 ? at.x() - s.x2 : 0;
-            const double dy = at.y() < s.top    ? s.top - at.y()
+            const double dy = at.y() < s.top      ? s.top - at.y()
                               : at.y() > s.bottom ? at.y() - s.bottom
                                                   : 0;
             const double distance = 10 * dx + dy; // a staff beside the mouse loses to one above it
@@ -308,7 +312,8 @@ public:
         for (std::size_t i = 0; i < links_.size(); ++i) {
             if (linkStaff_[i] != staff || !isSelectable(links_[i]))
                 continue;
-            if (!best || std::abs(links_[i].point.x() - at.x()) < std::abs(best->point.x() - at.x()))
+            if (!best ||
+                std::abs(links_[i].point.x() - at.x()) < std::abs(best->point.x() - at.x()))
                 best = &links_[i];
         }
         return best;
@@ -352,6 +357,8 @@ public:
         return true;
     }
     void clear() {
+        pressed_ = dragging_ = false; // as in setLinks
+        pressLink_ = dragLink_ = nullptr;
         links_.clear();
         staves_.clear();
         linkStaff_.clear();
@@ -511,7 +518,7 @@ protected:
     }
 
 private:
-    static constexpr int margin = 12;       // space around the score
+    static constexpr int margin = 12;           // space around the score
     static constexpr double highlightSize = 20; // pixels: the box around a selected note
 
     bool isSelectable(const NoteLink& link) const {
@@ -661,15 +668,15 @@ private:
     std::set<std::pair<int, int>> selectable_;  // {line, column} of the links that are notes
     std::vector<Staff> staves_;
     std::vector<int> linkStaff_; // for each link, the index of its staff in staves_ (-1: none)
-    std::optional<std::pair<int, int>> caret_;  // the link the score cursor is before or after
-    bool caretAfter_ = false;                   // ... after it
-    bool pressAfter_ = false;                   // the press was right of the pressed note
-    bool dragAfter_ = false;                    // the last reported drag position was right of it
-    bool pressed_ = false;                      // the left button is down on the score
-    bool dragging_ = false;                     // ... and has moved far enough: a selection
-    bool pressExtend_ = false;                  // Shift was down at the press
-    const NoteLink* pressLink_ = nullptr;       // the note pressed at (none: nothing selectable)
-    const NoteLink* dragLink_ = nullptr;        // the note last reported while dragging
+    std::optional<std::pair<int, int>> caret_; // the link the score cursor is before or after
+    bool caretAfter_ = false;                  // ... after it
+    bool pressAfter_ = false;                  // the press was right of the pressed note
+    bool dragAfter_ = false;                   // the last reported drag position was right of it
+    bool pressed_ = false;                     // the left button is down on the score
+    bool dragging_ = false;                    // ... and has moved far enough: a selection
+    bool pressExtend_ = false;                 // Shift was down at the press
+    const NoteLink* pressLink_ = nullptr;      // the note pressed at (none: nothing selectable)
+    const NoteLink* dragLink_ = nullptr;       // the note last reported while dragging
     QPoint pressAt_;
     QByteArray svg_; // as LilyPond wrote it
     QSvgRenderer renderer_;
@@ -850,8 +857,10 @@ void ScorePreviewPane::setStaves(const QList<StaffInfo>& staves, const QStringLi
 }
 
 ScorePreviewPane::ScorePreviewPane(QWidget* parent)
-    : QWidget(parent), rebuild_(new QToolButton), logButton_(new QToolButton), play_(new QToolButton), tempo_(new QComboBox), instrumentsButton_(new QToolButton), status_(new QLabel),
-      scroll_(new QScrollArea), canvas_(new SvgCanvas), errors_(new QListWidget) {
+    : QWidget(parent), rebuild_(new QToolButton), logButton_(new QToolButton),
+      play_(new QToolButton), tempo_(new QComboBox), instrumentsButton_(new QToolButton),
+      status_(new QLabel), scroll_(new QScrollArea), canvas_(new SvgCanvas),
+      errors_(new QListWidget) {
     rebuild_->setText(tr("Rebuild"));
     if (QIcon::hasThemeIcon(QStringLiteral("view-refresh"))) {
         rebuild_->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
@@ -869,9 +878,9 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     tempo_->setToolTip(tr("Playback speed, as a share of the song's tempo"));
     for (const int percent : {50, 75, 100, 125})
         tempo_->addItem(tr("%1 %").arg(percent), percent);
-    tempo_->setCurrentIndex(
-        std::max(0, tempo_->findData(QSettings().value(QStringLiteral("playback/tempoPercent"), 100)
-                                         .toInt())));
+    tempo_->setCurrentIndex(std::max(
+        0,
+        tempo_->findData(QSettings().value(QStringLiteral("playback/tempoPercent"), 100).toInt())));
     instrumentsButton_->setObjectName(QStringLiteral("scoreInstruments"));
     instrumentsButton_->setText(tr("Instruments…"));
     instrumentsButton_->setToolTip(tr("The instrument of each staff of the score"));
@@ -946,8 +955,8 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     });
     connect(instrumentsButton_, &QToolButton::clicked, this, [this] {
         instrumentsPopup_->adjustSize();
-        instrumentsPopup_->move(instrumentsButton_->mapToGlobal(
-            QPoint(0, instrumentsButton_->height())));
+        instrumentsPopup_->move(
+            instrumentsButton_->mapToGlobal(QPoint(0, instrumentsButton_->height())));
         instrumentsPopup_->show();
     });
     connect(logButton_, &QToolButton::clicked, this, [this] { showLog(); });
