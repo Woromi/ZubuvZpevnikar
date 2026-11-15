@@ -1,5 +1,8 @@
 #include "SongTableModel.hpp"
 
+#include <QGuiApplication>
+#include <QPalette>
+
 #include "convert.hpp"
 
 #include <QCollator>
@@ -46,6 +49,15 @@ SongTableModel::Row SongTableModel::makeRow(zub::SongEntry entry) {
             row.labels << toQString(tag);
     }
     row.labelsText = row.labels.join(QStringLiteral(", "));
+    if (!entry.scores.empty()) {
+        row.tabs = entry.scores.size() == 1
+                       ? QStringLiteral("♪")
+                       : QStringLiteral("♪ %1").arg(static_cast<int>(entry.scores.size()));
+        QStringList names;
+        for (const auto& score : entry.scores)
+            names << toQString(score);
+        row.tabsToolTip = names.join(QLatin1Char('\n'));
+    }
     QStringList todos;
     for (const auto& note : entry.todos)
         todos << toQString(note);
@@ -76,13 +88,15 @@ void SongTableModel::addSong(zub::SongEntry song) {
 }
 
 bool SongTableModel::updateSong(const std::filesystem::path& path, zub::SongMetadata meta,
-                                std::vector<std::string> todos) {
+                                std::vector<std::string> todos,
+                                std::vector<std::string> scores) {
     const auto it = std::ranges::find(rows_, path, [](const Row& row) { return row.entry.path; });
     if (it == rows_.end())
         return false;
     zub::SongEntry entry = std::move(it->entry);
     entry.meta = std::move(meta);
     entry.todos = std::move(todos);
+    entry.scores = std::move(scores);
     *it = makeRow(std::move(entry));
     const int row = static_cast<int>(it - rows_.begin());
     emit dataChanged(index(row, 0), index(row, ColumnCount - 1));
@@ -155,8 +169,8 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
         switch (index.column()) {
         case Title:
             return row.title;
-        case Favourite:
-            return row.favourite ? QStringLiteral("★") : QString();
+        case Favourite: // a hollow star invites the click (shown muted)
+            return row.favourite ? QStringLiteral("★") : QStringLiteral("☆");
         case Artist:
             return row.artist;
         case Language:
@@ -169,6 +183,8 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
             return row.meter;
         case Capo:
             return row.capo;
+        case Tabs:
+            return row.tabs;
         case Labels:
             return row.labelsText;
         case Todo:
@@ -178,11 +194,24 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
         default:
             return {};
         }
+    case Qt::TextAlignmentRole:
+        if (index.column() == Favourite || index.column() == Tabs)
+            return Qt::AlignCenter;
+        return {};
+    case Qt::ForegroundRole:
+        if (index.column() == Favourite && !row.favourite)
+            return QGuiApplication::palette().color(QPalette::PlaceholderText);
+        return {};
     case Qt::ToolTipRole:
         if (index.column() == Todo && !row.todoToolTip.isEmpty())
             return row.todoToolTip;
         if (index.column() == Changes && !row.changesToolTip.isEmpty())
             return row.changesToolTip;
+        if (index.column() == Tabs && !row.tabsToolTip.isEmpty())
+            return row.tabsToolTip;
+        if (index.column() == Favourite)
+            return row.favourite ? tr("A favourite: click to unmark it")
+                                 : tr("Click to mark it as a favourite");
         return row.toolTip;
     case HasTodoRole:
         return !row.entry.todos.empty();
@@ -197,12 +226,16 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
                 ++digits;
             return digits > 0 ? text.left(digits).toInt() : -1;
         }
-        // Possible changes by their number (9 before 10), not as text.
+        // Possible changes by their number (9 before 10), not as text; tabs likewise.
         if (index.column() == Changes)
             return row.changeCount;
+        if (index.column() == Tabs)
+            return static_cast<int>(row.entry.scores.size());
         return data(index, Qt::DisplayRole);
     case HasChangesRole:
         return !row.changes.isEmpty();
+    case HasTabsRole:
+        return !row.entry.scores.empty();
     case FavouriteRole:
         return row.favourite;
     case LabelsRole:
@@ -242,6 +275,8 @@ QVariant SongTableModel::headerData(int section, Qt::Orientation orientation, in
         return tr("Meter");
     case Capo:
         return tr("Capo");
+    case Tabs:
+        return tr("Tabs", "column: the song includes scores (tablature)");
     case Labels:
         return tr("Labels");
     case Todo:

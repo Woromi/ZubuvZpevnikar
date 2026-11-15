@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ActivityBar.hpp"
 #include "ScorePreviewPane.hpp"
 
 #include <QByteArray>
@@ -40,7 +41,7 @@ class QTableView;
 class QWidget;
 class DiffView;
 class FretboardWidget;
-class LabelFilterBox;
+class SongListPage;
 class PreviewPane;
 class PreviewRunner;
 class NoteSounds;
@@ -93,6 +94,10 @@ private:
     bool openSongbook(const std::filesystem::path& root, OpenOptions options);
     void reloadSongbook();
     void updateLanguageFilter();
+    // The views of the activity bar: the song list, the open song (Song falls back to the list
+    // without one) and the songbooks. Switching keeps the open song open.
+    void showView(ActivityBar::View view);
+    void openSettings(); // File → Settings…, the bar's gear
     void updateStatus();
 
     // The open song (one at a time)
@@ -261,15 +266,14 @@ private:
 
     SongTableModel* model_ = nullptr;
     SongFilterProxy* proxy_ = nullptr;
-    QTableView* table_ = nullptr;
     QStackedWidget* pages_ = nullptr;
-    QWidget* listPage_ = nullptr;
+    SongListPage* listPage_ = nullptr;
+    ActivityBar* activityBar_ = nullptr;
     QWidget* songPage_ = nullptr;
     SongbooksPage* songbooksPage_ = nullptr; // the songbook assembler
     SongbookStore* songbookStore_ = nullptr;
     SongbookSorter* songbookSorter_ = nullptr;
     SongbookExporter* songbookExporter_ = nullptr;
-    QAction* songbooksAction_ = nullptr;
     QToolBar* songToolBar_ = nullptr;
     QSplitter* songSplitter_ = nullptr; // editor area | preview
     bool songPageShown_ = false;        // the splitter has been laid out (its state is worth saving)
@@ -344,8 +348,6 @@ private:
     QAction* markCheckedAction_ = nullptr; // removes the import's "not checked yet" TODO line
     SongbookScan* scan_ = nullptr;         // while a songbook scan runs
     int scanFound_ = 0;                    // songs it marked so far
-    QCheckBox* changesOnly_ = nullptr;       // "Only songs with possible changes"
-    QAction* changesOnlyAction_ = nullptr;   // its place in the filter bar (hidden until a scan)
     QAction* joinLinesAction_ = nullptr;
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any
@@ -368,9 +370,6 @@ private:
     std::unique_ptr<QLockFile> previewLock_; // the work dir is this instance's while held
     // Per song, the unknown commands the user agreed to build anyway (this session only).
     std::map<std::filesystem::path, std::set<std::string>> approvedConstructs_;
-    QLineEdit* search_ = nullptr;
-    QComboBox* language_ = nullptr;
-    LabelFilterBox* labelFilter_ = nullptr;
     QLabel* countLabel_ = nullptr;
     QLabel* issuesLabel_ = nullptr;
 

@@ -16,9 +16,11 @@
 #include "ScorePlayer.hpp"
 #include "ScorePreviewPane.hpp"
 #include "ScoreRunner.hpp"
+#include "SettingsDialog.hpp"
 #include "ShrinkDialog.hpp"
 #include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
+#include "SongListPage.hpp"
 #include "SongTableModel.hpp"
 #include "SongbookExporter.hpp"
 #include "SongbookScan.hpp"
@@ -83,9 +85,9 @@
 #include <zub/core/fretboard.hpp>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
-#include <zub/core/package.hpp>
 #include <zub/core/linediff.hpp>
 #include <zub/core/midi.hpp>
+#include <zub/core/package.hpp>
 #include <zub/core/preview.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/score.hpp>
@@ -108,6 +110,7 @@ const auto previewClassKey = QStringLiteral("preview/class");
 const auto converterKey = QStringLiteral("converter/path");
 const auto geometryKey = QStringLiteral("window/geometry");
 const auto languageKey = QStringLiteral("ui/language");
+const auto soundfontKey = QStringLiteral("playback/soundfont"); // read by findSoundTools
 const auto fretboardKey = QStringLiteral("score/fretboard");
 const auto fretboardSoundKey = QStringLiteral("playback/fretboardSound");
 const auto songSplitterKey = QStringLiteral("window/songSplitter");
@@ -198,65 +201,62 @@ void MainWindow::createMenus() {
     closeSongAction_ = file->addAction(tr("&Close Song"));
     closeSongAction_->setShortcut(QKeySequence::Close);
     closeSongAction_->setIcon(QIcon::fromTheme(QStringLiteral("go-previous")));
-    closeSongAction_->setToolTip(tr("Back to the song list (Ctrl+W)"));
+    closeSongAction_->setToolTip(tr("Close the song (Ctrl+W)"));
     connect(closeSongAction_, &QAction::triggered, this, &MainWindow::closeSong);
 
-    QAction* newSongAction = file->addAction(tr("&New Song…"));
+    QAction* newSongAction =
+        file->addAction(QIcon::fromTheme(QStringLiteral("document-new")), tr("&New Song…"));
     newSongAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+N")));
     newSongAction->setToolTip(tr("Start a song by hand: title, artist and language, then an empty "
                                  "verse"));
     connect(newSongAction, &QAction::triggered, this, &MainWindow::newSong);
 
-    QAction* import = file->addAction(tr("&Import Song…"));
+    QAction* import =
+        file->addAction(QIcon::fromTheme(QStringLiteral("document-import")), tr("&Import Song…"));
     import->setShortcut(QKeySequence(QStringLiteral("Ctrl+I")));
+    import->setToolTip(tr("Convert a song from a chords website or a saved page (Ctrl+I)"));
     connect(import, &QAction::triggered, this, &MainWindow::importSong);
 
     file->addSeparator();
+    QAction* settings =
+        file->addAction(QIcon::fromTheme(QStringLiteral("configure")), tr("Se&ttings…"));
+    settings->setShortcut(QKeySequence(QStringLiteral("Ctrl+,")));
+    connect(settings, &QAction::triggered, this, &MainWindow::openSettings);
+    file->addSeparator();
     QAction* quit = file->addAction(tr("&Quit"));
     QMenu* songs = menuBar()->addMenu(tr("&Songs"));
-    songs->addAction(songbooksAction_);
-    QAction* scan = songs->addAction(tr("&Scan Songbook…"));
+    QAction* scan =
+        songs->addAction(QIcon::fromTheme(QStringLiteral("edit-find")), tr("&Scan Songbook…"));
     scan->setToolTip(tr("Find the songs Tidy, Check Song or Make Smaller would change"));
     connect(scan, &QAction::triggered, this, &MainWindow::scanSongbook);
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
+    // The Songs view's heading has the same actions as buttons.
+    listPage_->addHeaderAction(newSongAction);
+    listPage_->addHeaderAction(import); // the scan is an occasional check: Songs menu only
+
+    // View: the activity bar's views from the keyboard.
+    QMenu* view = menuBar()->addMenu(tr("&View"));
+    const auto addView = [this, view](const QString& text, const QList<QKeySequence>& keys,
+                                      ActivityBar::View target) {
+        QAction* action = view->addAction(text);
+        action->setShortcuts(keys);
+        connect(action, &QAction::triggered, this, [this, target] { showView(target); });
+    };
+    addView(tr("&Songs"), {QKeySequence(QStringLiteral("Ctrl+1"))}, ActivityBar::View::Songs);
+    addView(tr("The Open S&ong"), {QKeySequence(QStringLiteral("Ctrl+2"))},
+            ActivityBar::View::Song);
+    addView(tr("Song&books"),
+            {QKeySequence(QStringLiteral("Ctrl+3")), QKeySequence(QStringLiteral("Ctrl+B"))},
+            ActivityBar::View::Songbooks);
 
     createEditMenu();
-
-    // The language applies at the next start (the translators are installed in main()).
-    // The choices sit directly in the menu under a heading: a lone submenu was so narrow that its
-    // arrow ran into the text.
-    QMenu* languageMenu = menuBar()->addMenu(tr("&Settings"));
-    languageMenu->addSection(tr("Language"));
-    auto* languages = new QActionGroup(this);
-    languages->setExclusive(true);
-    const QString current = QSettings().value(languageKey).toString();
-    // The language names are not translated: everybody must find their own language.
-    const std::pair<QString, QString> choices[] = {
-        {QString(), tr("System Default")},
-        {QStringLiteral("cs"), QStringLiteral("Čeština")},
-        {QStringLiteral("en"), QStringLiteral("English")},
-    };
-    for (const auto& [code, name] : choices) {
-        QAction* action = languageMenu->addAction(name);
-        action->setCheckable(true);
-        action->setChecked(code == current);
-        languages->addAction(action);
-        connect(action, &QAction::triggered, this, [this, code] {
-            QSettings().setValue(languageKey, code);
-            QMessageBox::information(this, tr("Language"),
-                                     tr("The language changes when %1 is started again.")
-                                         .arg(QApplication::applicationDisplayName()));
-        });
-    }
 
     QAction* find = new QAction(this);
     find->setShortcut(QKeySequence::Find);
     connect(find, &QAction::triggered, this, [this] {
-        if (editor_) // no find & replace in the editor yet
-            return;
-        search_->setFocus();
-        search_->selectAll();
+        if (pages_->currentWidget() == listPage_) // no find & replace in the editor yet
+            listPage_->focusSearch();
     });
     addAction(find);
 }
@@ -268,91 +268,10 @@ void MainWindow::createCentralWidget() {
 
     pages_ = new QStackedWidget(this);
 
-    listPage_ = new QWidget(pages_);
-    auto* listLayout = new QVBoxLayout(listPage_);
-    listLayout->setContentsMargins(0, 0, 0, 0);
-    listLayout->setSpacing(0);
-
-    QToolBar* filters = new QToolBar(tr("Filter"), listPage_);
-    filters->setMovable(false);
-
-    search_ = new QLineEdit(filters);
-    search_->setPlaceholderText(tr("Search title, artist, key… (Ctrl+F)"));
-    search_->setClearButtonEnabled(true);
-    search_->setMinimumWidth(320);
-    connect(search_, &QLineEdit::textChanged, proxy_, &SongFilterProxy::setSearchText);
-    filters->addWidget(search_);
-
-    language_ = new QComboBox(filters);
-    language_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    connect(language_, &QComboBox::currentIndexChanged, this,
-            [this] { proxy_->setLanguage(language_->currentData().toString()); });
-    filters->addWidget(language_);
-
-    auto* favouritesOnly = new QCheckBox(tr("Only favourites"), filters);
-    favouritesOnly->setToolTip(tr("Songs marked with ★"));
-    connect(favouritesOnly, &QCheckBox::toggled, proxy_, &SongFilterProxy::setFavouritesOnly);
-    filters->addWidget(favouritesOnly);
-
-    labelFilter_ = new LabelFilterBox(model_, filters);
-    connect(labelFilter_, &LabelFilterBox::labelChanged, proxy_, &SongFilterProxy::setLabel);
-    filters->addWidget(labelFilter_);
-
-    auto* todoOnly = new QCheckBox(tr("Only songs with TODOs"), filters);
-    todoOnly->setToolTip(tr("Songs with a TODO comment, e.g. imported songs not checked yet"));
-    connect(todoOnly, &QCheckBox::toggled, proxy_, &SongFilterProxy::setTodoOnly);
-    filters->addWidget(todoOnly);
-
-    // Shown after a songbook scan (Songs → Scan Songbook…).
-    changesOnly_ = new QCheckBox(tr("Only songs with possible changes"), filters);
-    changesOnly_->setToolTip(tr("Songs the last Scan Songbook found changes in (this session)"));
-    connect(changesOnly_, &QCheckBox::toggled, proxy_, &SongFilterProxy::setChangesOnly);
-    changesOnlyAction_ = filters->addWidget(changesOnly_);
-    changesOnlyAction_->setVisible(false);
-
-    filters->addSeparator();
-    songbooksAction_ =
-        new QAction(QIcon::fromTheme(QStringLiteral("view-media-playlist"),
-                                     QIcon::fromTheme(QStringLiteral("folder-documents"))),
-                    tr("&Songbooks…"), this);
-    songbooksAction_->setShortcut(QKeySequence(QStringLiteral("Ctrl+B")));
-    songbooksAction_->setToolTip(tr("Assemble songbooks (Ctrl+B)"));
-    connect(songbooksAction_, &QAction::triggered, this, &MainWindow::showSongbooks);
-    filters->addAction(songbooksAction_);
-    filters->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    // Breathing room: the widgets sat edge to edge.
-    filters->layout()->setSpacing(8);
-    filters->setContentsMargins(6, 4, 6, 4);
-
-    table_ = new QTableView(listPage_);
-    table_->setModel(proxy_);
-    table_->setSortingEnabled(true);
-    table_->sortByColumn(SongTableModel::Title, Qt::AscendingOrder);
-    table_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table_->setAlternatingRowColors(true);
-    table_->verticalHeader()->hide();
-    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Title, QHeaderView::Stretch);
-    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Artist, QHeaderView::Stretch);
-    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Todo, QHeaderView::Stretch);
-    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Changes, QHeaderView::Stretch);
-    table_->setColumnHidden(SongTableModel::Changes, true); // until a songbook scan
-    table_->horizontalHeader()->setSectionResizeMode(SongTableModel::Favourite,
-                                                     QHeaderView::ResizeToContents);
-    // Click the ★ to toggle the favourite; right-click for the labels.
-    connect(table_, &QAbstractItemView::clicked, this, [this](const QModelIndex& index) {
-        if (index.column() != SongTableModel::Favourite)
-            return;
-        if (const auto* song = model_->song(proxy_->mapToSource(index).row()))
-            toggleFavourite(song->path);
-    });
-    table_->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(table_, &QWidget::customContextMenuRequested, this, &MainWindow::showTableMenu);
-    connect(table_, &QAbstractItemView::activated, this, &MainWindow::openSong);
-
-    listLayout->addWidget(filters);
-    listLayout->addWidget(table_);
-    table_->horizontalHeader()->setMinimumSectionSize(60);
+    listPage_ = new SongListPage(model_, proxy_, pages_);
+    connect(listPage_, &SongListPage::songActivated, this, &MainWindow::openSong);
+    connect(listPage_, &SongListPage::favouriteClicked, this, &MainWindow::toggleFavourite);
+    connect(listPage_, &SongListPage::contextMenuRequested, this, &MainWindow::showTableMenu);
 
     createPreview();
 
@@ -594,17 +513,24 @@ void MainWindow::createCentralWidget() {
     songbookExporter_ = new SongbookExporter(this);
     songbooksPage_ =
         new SongbooksPage(model_, songbookStore_, songbookSorter_, songbookExporter_, pages_);
-    connect(songbooksPage_, &SongbooksPage::backRequested, this, [this] {
-        pages_->setCurrentWidget(listPage_);
-        updateWindowTitle();
-    });
     connect(songbookExporter_, &SongbookExporter::finished, this,
             [this](const QString& message) { statusBar()->showMessage(message, 15000); });
 
     pages_->addWidget(listPage_);
     pages_->addWidget(songPage_);
     pages_->addWidget(songbooksPage_);
-    setCentralWidget(pages_);
+
+    // The activity bar at the left edge, like a code editor's: the views and Settings.
+    activityBar_ = new ActivityBar(this);
+    connect(activityBar_, &ActivityBar::viewRequested, this, &MainWindow::showView);
+    connect(activityBar_, &ActivityBar::settingsRequested, this, &MainWindow::openSettings);
+    auto* central = new QWidget(this);
+    auto* centralLayout = new QHBoxLayout(central);
+    centralLayout->setContentsMargins(0, 0, 0, 0);
+    centralLayout->setSpacing(0);
+    centralLayout->addWidget(activityBar_);
+    centralLayout->addWidget(pages_, 1);
+    setCentralWidget(central);
 
     connect(proxy_, &QAbstractItemModel::rowsInserted, this, &MainWindow::updateStatus);
     connect(proxy_, &QAbstractItemModel::rowsRemoved, this, &MainWindow::updateStatus);
@@ -713,30 +639,35 @@ void MainWindow::reloadSongbook() {
 }
 
 void MainWindow::showSongbooks() {
-    if (editor_ || songbookRoot_.empty()) // a song is open: back to the list first
-        return;
-    songbooksPage_->reloadList();
-    pages_->setCurrentWidget(songbooksPage_);
+    showView(ActivityBar::View::Songbooks);
+}
+
+void MainWindow::showView(ActivityBar::View view) {
+    using View = ActivityBar::View;
+    if (view == View::Song && !editor_)
+        view = View::Songs;
+    if (view == View::Songbooks) {
+        if (songbookRoot_.empty()) { // nothing to assemble from: stay where we are
+            activityBar_->setCurrent(pages_->currentWidget() == songPage_ ? View::Song
+                                                                          : View::Songs);
+            return;
+        }
+        if (pages_->currentWidget() != songbooksPage_)
+            songbooksPage_->reloadList();
+    }
+    pages_->setCurrentWidget(view == View::Songs  ? static_cast<QWidget*>(listPage_)
+                             : view == View::Song ? songPage_
+                                                  : static_cast<QWidget*>(songbooksPage_));
+    activityBar_->setCurrent(view);
+    updateWindowTitle();
+    if (view == View::Song) {
+        if (SongEditor* editor = currentEditor())
+            editor->textEdit()->setFocus();
+    }
 }
 
 void MainWindow::updateLanguageFilter() {
-    const QString current = language_->currentData().toString();
-    std::set<QString> languages;
-    for (int row = 0; row < model_->rowCount(); ++row) {
-        // Every language of every song: also the ones a song is only tagged with.
-        for (const QString& lang :
-             model_->index(row, 0).data(SongTableModel::LanguageRole).toStringList())
-            languages.insert(lang);
-    }
-
-    const QSignalBlocker blocker(language_);
-    language_->clear();
-    language_->addItem(tr("All languages"), QString{});
-    for (const QString& lang : languages)
-        language_->addItem(lang, lang);
-    const int index = language_->findData(current);
-    language_->setCurrentIndex(index >= 0 ? index : 0);
-    proxy_->setLanguage(language_->currentData().toString());
+    listPage_->updateLanguages();
 }
 
 void MainWindow::updateStatus() {
@@ -765,6 +696,11 @@ void MainWindow::openSong(const QModelIndex& proxyIndex) {
     const QString title = toQString(zub::latex::toDisplayText(song->meta.title));
     const QString inputName = toQString(song->inputName);
 
+    // The open song: just show it again (its edits and undo history stay).
+    if (editor_ && editor_->path() == path) {
+        showView(ActivityBar::View::Song);
+        return;
+    }
     if (!closeSong())
         return;
     if (SongEditor* editor = openEditor(path, title))
@@ -838,7 +774,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
     connect(edit, &QPlainTextEdit::redoAvailable, this, [this] { updateEditState(); });
     connect(edit, &QPlainTextEdit::copyAvailable, this, [this] { updateEditState(); });
 
-    pages_->setCurrentWidget(songPage_);
+    showView(ActivityBar::View::Song);
     syncScoreTabs();
     updateSongActions(); // after load: the editor may have made itself read-only
     updateWindowTitle();
@@ -978,12 +914,8 @@ void MainWindow::replaceSongText(const std::string& edited) {
 }
 
 void MainWindow::goBack() {
-    if (pages_->currentWidget() == songPage_) {
-        closeSong();
-    } else if (pages_->currentWidget() == songbooksPage_) {
-        pages_->setCurrentWidget(listPage_);
-        updateWindowTitle();
-    }
+    // To the list; the song stays open (the bar or Ctrl+2 bring it back, Ctrl+W closes it).
+    showView(ActivityBar::View::Songs);
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
@@ -1022,22 +954,14 @@ bool MainWindow::closeSong() {
     editor->setParent(nullptr); // out of the stack now; the next song takes index 0
     editor->deleteLater();
 
-    pages_->setCurrentWidget(listPage_);
+    if (pages_->currentWidget() == songPage_)
+        showView(ActivityBar::View::Songs);
     updateSongActions();
     updateWindowTitle();
     requestPreview(); // cancels the build and clears the pane
 
-    // Back on the list with the song that was open selected.
-    const int row = model_->rowOf(path);
-    if (row >= 0) {
-        const QModelIndex index = proxy_->mapFromSource(model_->index(row, 0));
-        if (index.isValid()) {
-            table_->selectRow(index.row());
-            table_->setCurrentIndex(index);
-            table_->scrollTo(index);
-        }
-    }
-    table_->setFocus();
+    // The list with the song that was open selected.
+    listPage_->selectSong(path);
     return true;
 }
 
@@ -1341,6 +1265,7 @@ void MainWindow::updateSongActions() {
     SongEditor* current = currentEditor();
     const bool songTab = onSongTab();
     closeSongAction_->setEnabled(open);
+    activityBar_->setSongEnabled(open);
     saveAction_->setEnabled(current && current->isModified());
     saveAction_->setText(current && !songTab ? tr("&Save Score") : tr("&Save Song"));
     const bool modified = open && editor_->isModified();
@@ -1430,7 +1355,8 @@ QString MainWindow::writeSongTags(
     if (auto written = zub::writeTextFileAtomic(path, updated); !written)
         return toQString(written.error());
     if (auto newMeta = zub::parseSong(updated))
-        model_->updateSong(path, std::move(*newMeta), zub::todo::notes(updated));
+        model_->updateSong(path, std::move(*newMeta), zub::todo::notes(updated),
+                           zub::songbook::referencedFiles(updated));
     return {};
 }
 
@@ -1496,7 +1422,7 @@ void MainWindow::editLabels(const std::vector<std::filesystem::path>& paths) {
 
 std::vector<std::filesystem::path> MainWindow::selectedSongPaths() const {
     std::vector<std::filesystem::path> paths;
-    for (const QModelIndex& index : table_->selectionModel()->selectedRows()) {
+    for (const QModelIndex& index : listPage_->table()->selectionModel()->selectedRows()) {
         if (const auto* song = model_->song(proxy_->mapToSource(index).row()))
             paths.push_back(song->path);
     }
@@ -1504,14 +1430,15 @@ std::vector<std::filesystem::path> MainWindow::selectedSongPaths() const {
 }
 
 void MainWindow::showTableMenu(const QPoint& position) {
-    const QModelIndex index = table_->indexAt(position);
+    QTableView* table = listPage_->table();
+    const QModelIndex index = table->indexAt(position);
     if (!index.isValid())
         return;
-    if (!table_->selectionModel()->isRowSelected(index.row(), {}))
-        table_->selectRow(index.row());
+    if (!table->selectionModel()->isRowSelected(index.row(), {}))
+        table->selectRow(index.row());
     QMenu menu(this);
     QAction* labels = menu.addAction(tr("Labels…"));
-    if (menu.exec(table_->viewport()->mapToGlobal(position)) == labels)
+    if (menu.exec(table->viewport()->mapToGlobal(position)) == labels)
         editLabels(selectedSongPaths());
 }
 
@@ -1533,7 +1460,9 @@ void MainWindow::startTidy(const QString& note) {
         return;
     const std::filesystem::path converter = findConverter();
     if (converter.empty()) {
-        statusBar()->showMessage(tr("Tidy needs chords_converter, which was not found."), 8000);
+        statusBar()->showMessage(
+            tr("Tidy needs chords_converter, which was not found: choose it in Settings (Ctrl+,)."),
+            8000);
         return;
     }
     if (!converterUsable(converter, tr("Tidy")))
@@ -1721,9 +1650,11 @@ void MainWindow::refreshSongMetadata(SongEditor* editor, const std::string& cont
         updateWindowTitle();
     }
     auto todos = zub::todo::notes(content);
-    if (!model_->updateSong(editor->path(), *meta, todos)) {
+    auto scores = zub::songbook::referencedFiles(content);
+    if (!model_->updateSong(editor->path(), *meta, todos, scores)) {
         // A new song's first save: it joins the table now.
-        model_->addSong({editor->path(), inputNameOf(editor), std::move(*meta), std::move(todos)});
+        model_->addSong({editor->path(), inputNameOf(editor), std::move(*meta), std::move(todos),
+                         std::move(scores)});
         updateLanguageFilter();
     }
 }
@@ -3100,8 +3031,10 @@ void MainWindow::startProposals(SongAction action) {
     const QString name = actionName(action);
     const std::filesystem::path converter = findConverter();
     if (converter.empty()) {
-        statusBar()->showMessage(tr("%1 needs chords_converter, which was not found.").arg(name),
-                                 8000);
+        statusBar()->showMessage(
+            tr("%1 needs chords_converter, which was not found: choose it in Settings (Ctrl+,).")
+                .arg(name),
+            8000);
         return;
     }
     if (!converterUsable(converter, name))
@@ -3116,17 +3049,17 @@ void MainWindow::startProposals(SongAction action) {
         // --measure builds the song with lualatex -shell-escape: the same rule as for a preview.
         // Declined, the proposals are still useful, just without page counts.
         // Without a package nothing can be typeset: the proposals come without page counts.
-        const bool measure = !packageDir_.empty() &&
-                             approveBuild(editor, content, true, nullptr, tr("Measure"),
-                                          tr("Suggest Without Measuring"));
+        const bool measure =
+            !packageDir_.empty() && approveBuild(editor, content, true, nullptr, tr("Measure"),
+                                                 tr("Suggest Without Measuring"));
         measuredRun_ = measure;
         if (measure)
             requestPreview(); // approved now: the pane's "Not built automatically" message goes
         // No paper known (a class without a paper option): no --fit, the converter measures both.
         const auto paper =
             zub::preview::paperOf(packageDir_, toStdString(preview_->documentClass()));
-        command = [converter, paper, measure, root, package = packageDir_](
-                      const std::filesystem::path& file) {
+        command = [converter, paper, measure, root,
+                   package = packageDir_](const std::filesystem::path& file) {
             return zub::songsuggest::shrinkCommand(converter, file, paper, measure, root, package);
         };
         status = tr("Looking for ways to make the song smaller…");
@@ -3507,6 +3440,51 @@ std::filesystem::path MainWindow::bundledPackage() const {
     return {};
 }
 
+void MainWindow::openSettings() {
+    SettingsDialog::State state;
+    QSettings settings;
+    state.language = settings.value(languageKey).toString();
+    state.builtInConverter = toQString(builtInConverter());
+    state.converter = toQString(findConverter());
+    state.converterChosen = !settings.value(converterKey).toString().isEmpty() &&
+                            state.converter == settings.value(converterKey).toString();
+    const SoundTools tools = findSoundTools();
+    state.soundfont = toQString(tools.soundfont);
+    state.soundfontChosen = !settings.value(soundfontKey).toString().isEmpty() &&
+                            state.soundfont == settings.value(soundfontKey).toString();
+    state.package = toQString(packageDir_);
+    state.ownPackage = !packageDir_.empty() && zub::package::ofSongbook(songbookRoot_).has_value();
+
+    SettingsDialog dialog(state, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    if (dialog.language() != state.language) {
+        settings.setValue(languageKey, dialog.language());
+        QMessageBox::information(this, tr("Language"),
+                                 tr("The language changes when %1 is started again.")
+                                     .arg(QApplication::applicationDisplayName()));
+    }
+    if (dialog.converterChanged()) {
+        // Never remember the built-in one: after an update it would shadow the new build.
+        if (dialog.converter().isEmpty() || toPath(dialog.converter()) == builtInConverter())
+            settings.remove(converterKey);
+        else if (usableConverter(dialog.converter()))
+            settings.setValue(converterKey, dialog.converter());
+        else
+            QMessageBox::warning(
+                this, tr("Settings"),
+                tr("%1 is not a program that can be run.").arg(dialog.converter()));
+        updateSongActions();
+    }
+    if (dialog.soundfontChanged()) {
+        if (dialog.soundfont().isEmpty())
+            settings.remove(soundfontKey);
+        else
+            settings.setValue(soundfontKey, dialog.soundfont());
+        updateSoundAvailability();
+    }
+}
+
 std::filesystem::path MainWindow::findConverter() const {
     // The built-in converter is the version this app is tested with. Another one is used only
     // when the user chose it in the import dialog; PATH and ~/.cargo/bin are fallbacks for an
@@ -3656,9 +3634,8 @@ void MainWindow::newSong() {
     editor->openNew(song.text);
     showSong(editor, dialog.title(), toQString(dest.inputName) + tr(" (new, not saved)"));
     editor->setCursorByteOffset(song.cursor);
-    statusBar()->showMessage(tr("New song %1: write it, then save with Ctrl+S.")
-                                 .arg(toQString(dest.inputName)),
-                             10000);
+    statusBar()->showMessage(
+        tr("New song %1: write it, then save with Ctrl+S.").arg(toQString(dest.inputName)), 10000);
 }
 
 void MainWindow::scanSongbook() {
@@ -3668,7 +3645,8 @@ void MainWindow::scanSongbook() {
     const std::filesystem::path converter = findConverter();
     if (converter.empty()) {
         QMessageBox::warning(this, name,
-                             tr("The scan needs chords_converter, which was not found."));
+                             tr("The scan needs chords_converter, which was not found: choose it "
+                                "in Settings (Ctrl+,)."));
         return;
     }
     if (!converterUsable(converter, name))
@@ -3807,11 +3785,9 @@ void MainWindow::scanSongbook() {
         progress->deleteLater();
         scan_->deleteLater();
         scan_ = nullptr;
-        table_->setColumnHidden(SongTableModel::Changes, false);
-        changesOnlyAction_->setVisible(true);
-        // Only when there is something to show: with nothing found, the filter would hide
-        // every song and the list would look empty.
-        changesOnly_->setChecked(scanFound_ > 0);
+        // Shown alone only when there is something to show: with nothing found, the filter
+        // would hide every song and the list would look empty.
+        listPage_->showScanResults(scanFound_ > 0);
         statusBar()->showMessage(
             (cancelled ? tr("Scan cancelled. ") : QString()) +
                 tr("%n song(s) with possible changes: open one and use Tidy, Check Song or Make "

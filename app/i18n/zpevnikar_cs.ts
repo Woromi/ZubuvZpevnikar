@@ -2,6 +2,25 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="cs">
 <context>
+    <name>ActivityBar</name>
+    <message>
+        <source>Songs (Ctrl+1)</source>
+        <translation>Písně (Ctrl+1)</translation>
+    </message>
+    <message>
+        <source>The open song (Ctrl+2)</source>
+        <translation>Otevřená píseň (Ctrl+2)</translation>
+    </message>
+    <message>
+        <source>Songbooks (Ctrl+3)</source>
+        <translation>Zpěvníky (Ctrl+3)</translation>
+    </message>
+    <message>
+        <source>Settings (Ctrl+,)</source>
+        <translation>Nastavení (Ctrl+,)</translation>
+    </message>
+</context>
+<context>
     <name>ConverterRunner</name>
     <message>
         <source>Cannot create a temporary directory: %1</source>
@@ -257,10 +276,6 @@ Použijte vestavěný.</translation>
         <translation>&amp;Zavřít píseň</translation>
     </message>
     <message>
-        <source>Back to the song list (Ctrl+W)</source>
-        <translation>Zpět na seznam písní (Ctrl+W)</translation>
-    </message>
-    <message>
         <source>&amp;Import Song…</source>
         <translation>&amp;Importovat píseň…</translation>
     </message>
@@ -281,52 +296,12 @@ Použijte vestavěný.</translation>
         <translation>Najít písně, které by změnilo Učesat, Zkontrolovat píseň nebo Zmenšit</translation>
     </message>
     <message>
-        <source>&amp;Settings</source>
-        <translation>&amp;Nastavení</translation>
-    </message>
-    <message>
-        <source>System Default</source>
-        <translation>Podle systému</translation>
-    </message>
-    <message>
         <source>Language</source>
         <translation>Jazyk</translation>
     </message>
     <message>
         <source>The language changes when %1 is started again.</source>
         <translation>Jazyk se změní po novém spuštění aplikace %1.</translation>
-    </message>
-    <message>
-        <source>Filter</source>
-        <translation>Filtr</translation>
-    </message>
-    <message>
-        <source>Search title, artist, key… (Ctrl+F)</source>
-        <translation>Hledat název, interpreta, tóninu… (Ctrl+F)</translation>
-    </message>
-    <message>
-        <source>Only songs with TODOs</source>
-        <translation>Jen písně s TODO</translation>
-    </message>
-    <message>
-        <source>Songs with a TODO comment, e.g. imported songs not checked yet</source>
-        <translation>Písně s komentářem TODO, např. dosud nezkontrolované importované písně</translation>
-    </message>
-    <message>
-        <source>Only songs with possible changes</source>
-        <translation>Jen písně s možnými změnami</translation>
-    </message>
-    <message>
-        <source>Songs the last Scan Songbook found changes in (this session)</source>
-        <translation>Písně, ve kterých poslední prohledání zpěvníku našlo možné změny (v tomto sezení)</translation>
-    </message>
-    <message>
-        <source>&amp;Songbooks…</source>
-        <translation>&amp;Zpěvníky…</translation>
-    </message>
-    <message>
-        <source>Assemble songbooks (Ctrl+B)</source>
-        <translation>Skládat zpěvníky (Ctrl+B)</translation>
     </message>
     <message>
         <source>Tidy changed:</source>
@@ -349,10 +324,6 @@ Použijte vestavěný.</translation>
 %1</source>
         <translation>Zpěvník nelze otevřít:
 %1</translation>
-    </message>
-    <message>
-        <source>All languages</source>
-        <translation>Všechny jazyky</translation>
     </message>
     <message>
         <source>No songbook open. Use File → Open Songbook Folder…</source>
@@ -405,6 +376,30 @@ Použijte vestavěný.</translation>
     <message>
         <source>Song</source>
         <translation>Píseň</translation>
+    </message>
+    <message>
+        <source>Close the song (Ctrl+W)</source>
+        <translation>Zavřít píseň (Ctrl+W)</translation>
+    </message>
+    <message>
+        <source>Convert a song from a chords website or a saved page (Ctrl+I)</source>
+        <translation>Převést píseň z webu s akordy nebo z uložené stránky (Ctrl+I)</translation>
+    </message>
+    <message>
+        <source>Se&amp;ttings…</source>
+        <translation>Na&amp;stavení…</translation>
+    </message>
+    <message>
+        <source>&amp;View</source>
+        <translation>&amp;Zobrazit</translation>
+    </message>
+    <message>
+        <source>The Open S&amp;ong</source>
+        <translation>&amp;Otevřená píseň</translation>
+    </message>
+    <message>
+        <source>Song&amp;books</source>
+        <translation>&amp;Zpěvníky</translation>
     </message>
     <message>
         <source>Show the fretboard: click frets to stage notes (one per string), Insert (Ctrl+Return) writes them as a note or chord, Escape clears; double-click a fret inserts at once</source>
@@ -623,8 +618,8 @@ Použijte vestavěný.</translation>
         <translation>&amp;Uložit notovou ukázku</translation>
     </message>
     <message>
-        <source>Tidy needs chords_converter, which was not found.</source>
-        <translation>Učesání potřebuje chords_converter, který nebyl nalezen.</translation>
+        <source>The scan needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
+        <translation>Prohledání potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
     </message>
     <message>
         <source>Tidying…</source>
@@ -701,14 +696,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>%1: the song header has a problem: %2</source>
         <translation>%1: problém v hlavičce písně: %2</translation>
-    </message>
-    <message>
-        <source>Only favourites</source>
-        <translation>Jen oblíbené</translation>
-    </message>
-    <message>
-        <source>Songs marked with ★</source>
-        <translation>Písně označené ★</translation>
     </message>
     <message>
         <source>Fretboard</source>
@@ -799,6 +786,10 @@ Použijte vestavěný.</translation>
         <translation>Nelze přehrát: %1</translation>
     </message>
     <message>
+        <source>%1 needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
+        <translation>%1 potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
+    </message>
+    <message>
         <source>No package to build the songs with: the songbook&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
         <translation>Písně není čím sestavit: složka zubuvzpevnik/ zpěvníku není stažená (git submodule update --init) a aplikace nemá vlastní kopii balíčku.</translation>
     </message>
@@ -857,6 +848,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Labels changed. Save to keep them.</source>
         <translation>Štítky změněny. Uložením je zachováte.</translation>
+    </message>
+    <message>
+        <source>Tidy needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
+        <translation>Učesání potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
     </message>
     <message>
         <source>The score %1 does not exist: create it, or remove its \lilypondfile line from the song.</source>
@@ -989,10 +984,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>New score %1. Save it with Ctrl+S to create the file.</source>
         <translation>Nová notová ukázka %1. Uložením (Ctrl+S) se soubor vytvoří.</translation>
-    </message>
-    <message>
-        <source>%1 needs chords_converter, which was not found.</source>
-        <translation>Akce „%1“ potřebuje chords_converter, který nebyl nalezen.</translation>
     </message>
     <message>
         <source>Measure</source>
@@ -1131,6 +1122,14 @@ Použijte vestavěný.</translation>
         <translation>Měřím…</translation>
     </message>
     <message>
+        <source>Settings</source>
+        <translation>Nastavení</translation>
+    </message>
+    <message>
+        <source>%1 is not a program that can be run.</source>
+        <translation>%1 není spustitelný program.</translation>
+    </message>
+    <message>
         <source>Import Song</source>
         <translation>Importovat píseň</translation>
     </message>
@@ -1181,10 +1180,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>Scan Songbook</source>
         <translation>Prohledat zpěvník</translation>
-    </message>
-    <message>
-        <source>The scan needs chords_converter, which was not found.</source>
-        <translation>Prohledání potřebuje chords_converter, který nebyl nalezen.</translation>
     </message>
     <message>
         <source>its paper</source>
@@ -1719,6 +1714,97 @@ Vynecháno (neplatný název písně): %1</translation>
     </message>
 </context>
 <context>
+    <name>SettingsDialog</name>
+    <message>
+        <source>Settings</source>
+        <translation>Nastavení</translation>
+    </message>
+    <message>
+        <source>System Default</source>
+        <translation>Podle systému</translation>
+    </message>
+    <message>
+        <source>Applies when %1 is started again.</source>
+        <translation>Projeví se po novém spuštění aplikace %1.</translation>
+    </message>
+    <message>
+        <source>&amp;Language:</source>
+        <translation>&amp;Jazyk:</translation>
+    </message>
+    <message>
+        <source>Choose…</source>
+        <translation>Vybrat…</translation>
+    </message>
+    <message>
+        <source>Use Built-in</source>
+        <translation>Použít vestavěný</translation>
+    </message>
+    <message>
+        <source>The converter built with this app, the version it is tested with</source>
+        <translation>Převodník sestavený s aplikací, verze, se kterou je vyzkoušená</translation>
+    </message>
+    <message>
+        <source>Choose chords_converter</source>
+        <translation>Vybrat chords_converter</translation>
+    </message>
+    <message>
+        <source>&amp;Converter:</source>
+        <translation>&amp;Převodník:</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automaticky</translation>
+    </message>
+    <message>
+        <source>The first General MIDI soundfont found in the usual places</source>
+        <translation>První soundfont General MIDI nalezený na obvyklých místech</translation>
+    </message>
+    <message>
+        <source>Choose a General MIDI soundfont</source>
+        <translation>Vybrat soundfont General MIDI</translation>
+    </message>
+    <message>
+        <source>Soundfonts (*.sf2 *.sf3)</source>
+        <translation>Soundfonty (*.sf2 *.sf3)</translation>
+    </message>
+    <message>
+        <source>&amp;Soundfont:</source>
+        <translation>&amp;Soundfont:</translation>
+    </message>
+    <message>
+        <source>none: the songbook&apos;s zubuvzpevnik/ is not checked out</source>
+        <translation>žádný: složka zubuvzpevnik/ zpěvníku není stažená</translation>
+    </message>
+    <message>
+        <source>the songbook&apos;s own</source>
+        <translation>vlastní balíček zpěvníku</translation>
+    </message>
+    <message>
+        <source>the app&apos;s copy</source>
+        <translation>kopie z aplikace</translation>
+    </message>
+    <message>
+        <source>Package:</source>
+        <translation>Balíček:</translation>
+    </message>
+    <message>
+        <source>not found: choose one</source>
+        <translation>nenalezen: vyberte ho</translation>
+    </message>
+    <message>
+        <source>Chosen by you</source>
+        <translation>Vybráno vámi</translation>
+    </message>
+    <message>
+        <source>Found automatically</source>
+        <translation>Nalezeno automaticky</translation>
+    </message>
+    <message>
+        <source>found automatically when Play needs it (or none installed)</source>
+        <translation>najde se automaticky, až ho přehrávání bude potřebovat (nebo žádný není nainstalovaný)</translation>
+    </message>
+</context>
+<context>
     <name>ShrinkDialog</name>
     <message numerus="yes">
         <source>fits (%n page(s))</source>
@@ -1961,6 +2047,57 @@ Vynecháno (neplatný název písně): %1</translation>
     </message>
 </context>
 <context>
+    <name>SongListPage</name>
+    <message>
+        <source>Songs</source>
+        <translation>Písně</translation>
+    </message>
+    <message>
+        <source>Filter</source>
+        <translation>Filtr</translation>
+    </message>
+    <message>
+        <source>Search title, artist, key… (Ctrl+F)</source>
+        <translation>Hledat název, interpreta, tóninu… (Ctrl+F)</translation>
+    </message>
+    <message>
+        <source>All songs</source>
+        <translation>Všechny písně</translation>
+    </message>
+    <message>
+        <source>★ Favourites</source>
+        <translation>★ Oblíbené</translation>
+    </message>
+    <message>
+        <source>With tabs</source>
+        <translation>S notami</translation>
+    </message>
+    <message>
+        <source>Songs that include a score (\lilypondfile)</source>
+        <translation>Písně s notovou ukázkou (\lilypondfile)</translation>
+    </message>
+    <message>
+        <source>With TODOs</source>
+        <translation>S poznámkami TODO</translation>
+    </message>
+    <message>
+        <source>Songs with a TODO comment, e.g. imported songs not checked yet</source>
+        <translation>Písně s komentářem TODO, např. dosud nezkontrolované importované písně</translation>
+    </message>
+    <message>
+        <source>All languages</source>
+        <translation>Všechny jazyky</translation>
+    </message>
+    <message>
+        <source>With possible changes</source>
+        <translation>S možnými změnami</translation>
+    </message>
+    <message>
+        <source>Songs the last Scan Songbook found changes in (this session)</source>
+        <translation>Písně, ve kterých poslední prohledání zpěvníku našlo možné změny (v tomto sezení)</translation>
+    </message>
+</context>
+<context>
     <name>SongPickerModel</name>
     <message>
         <source>Also in section: %1</source>
@@ -1969,6 +2106,14 @@ Vynecháno (neplatný název písně): %1</translation>
 </context>
 <context>
     <name>SongTableModel</name>
+    <message>
+        <source>A favourite: click to unmark it</source>
+        <translation>Oblíbená: kliknutím zrušíte</translation>
+    </message>
+    <message>
+        <source>Click to mark it as a favourite</source>
+        <translation>Kliknutím označíte jako oblíbenou</translation>
+    </message>
     <message>
         <source>Favourite</source>
         <translation>Oblíbená</translation>
@@ -2000,6 +2145,11 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>Capo</source>
         <translation>Kapodastr</translation>
+    </message>
+    <message>
+        <source>Tabs</source>
+        <comment>column: the song includes scores (tablature)</comment>
+        <translation>Noty</translation>
     </message>
     <message>
         <source>Labels</source>
@@ -2352,15 +2502,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Neseřazeno: %1</translation>
     </message>
     <message>
-        <source>Back</source>
-        <comment>go back to the song list</comment>
-        <translation>Zpět</translation>
-    </message>
-    <message>
-        <source>Back to the song list</source>
-        <translation>Zpět na seznam písní</translation>
-    </message>
-    <message>
         <source>Songbooks</source>
         <translation>Zpěvníky</translation>
     </message>
@@ -2604,8 +2745,8 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Zvuk potřebuje FluidSynth: nainstalujte balíček fluidsynth.</translation>
     </message>
     <message>
-        <source>Sound needs a General MIDI soundfont: install a package such as fluid-soundfont-gm, or set playback/soundfont in the settings.</source>
-        <translation>Zvuk potřebuje soundfont General MIDI: nainstalujte balíček, např. fluid-soundfont-gm, nebo nastavte playback/soundfont v nastavení.</translation>
+        <source>Sound needs a General MIDI soundfont: install a package such as fluid-soundfont-gm, or choose one in Settings (Ctrl+,).</source>
+        <translation>Zvuk potřebuje soundfont General MIDI: nainstalujte balíček jako fluid-soundfont-gm, nebo ho vyberte v Nastavení (Ctrl+,).</translation>
     </message>
 </context>
 <context>

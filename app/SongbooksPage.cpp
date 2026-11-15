@@ -94,11 +94,7 @@ void SongbooksPage::buildUi() {
 
     auto* bar = new QToolBar(this);
     bar->setMovable(false);
-    QAction* back = bar->addAction(QIcon::fromTheme(QStringLiteral("go-previous")),
-                                  tr("Back", "go back to the song list"));
-    back->setToolTip(tr("Back to the song list"));
     bar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    connect(back, &QAction::triggered, this, &SongbooksPage::backRequested);
     auto* heading = new QLabel(tr("Songbooks"), bar);
     QFont font = heading->font();
     font.setBold(true);
@@ -229,15 +225,18 @@ QWidget* SongbooksPage::buildEditPane() {
     layout->addWidget(count_);
 
     connect(add, &QPushButton::clicked, this, &SongbooksPage::addSection);
-    connect(renameSection_, &QPushButton::clicked, this, [this] { renameSection(currentSection()); });
-    connect(removeSection_, &QPushButton::clicked, this, [this] { removeSection(currentSection()); });
+    connect(renameSection_, &QPushButton::clicked, this,
+            [this] { renameSection(currentSection()); });
+    connect(removeSection_, &QPushButton::clicked, this,
+            [this] { removeSection(currentSection()); });
     connect(moveUp_, &QPushButton::clicked, this, [this] { moveSection(-1); });
     connect(moveDown_, &QPushButton::clicked, this, [this] { moveSection(1); });
     connect(removeSong_, &QPushButton::clicked, this, &SongbooksPage::removeSelectedSongs);
     connect(sortAll_, &QPushButton::clicked, this, &SongbooksPage::sortAll);
     connect(tree_, &QTreeWidget::currentItemChanged, this, &SongbooksPage::onTreeSelectionChanged);
     connect(tree_, &QTreeWidget::itemSelectionChanged, this, &SongbooksPage::updateButtons);
-    connect(tree_, &SongbookTree::removeSelectedRequested, this, &SongbooksPage::removeSelectedSongs);
+    connect(tree_, &SongbookTree::removeSelectedRequested, this,
+            &SongbooksPage::removeSelectedSongs);
     connect(tree_, &SongbookTree::songsDropped, this,
             [this](std::vector<std::string> names, quint64 from, quint64 to, int index) {
                 onSongsDropped(names, from, to, index);
@@ -247,12 +246,10 @@ QWidget* SongbooksPage::buildEditPane() {
         if (editable_ && s >= 0)
             requestSort(s, SortMode::Replace);
     });
-    connect(tree_, &SongbookTree::renameSectionRequested, this, [this](quint64 uid) {
-        renameSection(indexOfUid(uid));
-    });
-    connect(tree_, &SongbookTree::removeSectionRequested, this, [this](quint64 uid) {
-        removeSection(indexOfUid(uid));
-    });
+    connect(tree_, &SongbookTree::renameSectionRequested, this,
+            [this](quint64 uid) { renameSection(indexOfUid(uid)); });
+    connect(tree_, &SongbookTree::removeSectionRequested, this,
+            [this](quint64 uid) { removeSection(indexOfUid(uid)); });
     return editPane_;
 }
 
@@ -308,7 +305,8 @@ QWidget* SongbooksPage::buildPickerPane() {
     pickerView_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pickerView_->verticalHeader()->hide();
     for (const int column : {SongTableModel::Tempo, SongTableModel::Meter, SongTableModel::Capo,
-                             SongTableModel::Labels, SongTableModel::Todo, SongTableModel::Changes})
+                             SongTableModel::Tabs, SongTableModel::Labels, SongTableModel::Todo,
+                             SongTableModel::Changes})
         pickerView_->setColumnHidden(column, true);
     pickerView_->horizontalHeader()->setSectionResizeMode(SongTableModel::Title,
                                                           QHeaderView::Stretch);
@@ -342,11 +340,12 @@ QWidget* SongbooksPage::buildPickerPane() {
         updateButtons();
     });
     for (const auto key : {Qt::Key_Return, Qt::Key_Enter}) {
-        auto* enter = new QShortcut(QKeySequence(key), pickerView_, nullptr, nullptr,
-                                    Qt::WidgetShortcut);
+        auto* enter =
+            new QShortcut(QKeySequence(key), pickerView_, nullptr, nullptr, Qt::WidgetShortcut);
         connect(enter, &QShortcut::activated, this, &SongbooksPage::addPicked);
     }
-    connect(exportPdf_, &QPushButton::clicked, this, [this] { exporter_->exportPdf(id_, book_, titleLookup()); });
+    connect(exportPdf_, &QPushButton::clicked, this,
+            [this] { exporter_->exportPdf(id_, book_, titleLookup()); });
     connect(exportLatex_, &QPushButton::clicked, this,
             [this] { exporter_->exportLatex(id_, book_, titleLookup()); });
     refreshLanguages();
@@ -421,7 +420,8 @@ void SongbooksPage::onListRowChanged() {
             editable_ = true;
             showWarning({});
         } else {
-            showWarning(tr("Cannot read this songbook (the file is left alone): %1").arg(entry.error));
+            showWarning(
+                tr("Cannot read this songbook (the file is left alone): %1").arg(entry.error));
         }
     } else {
         showWarning({});
@@ -466,8 +466,8 @@ void SongbooksPage::deleteSongbook() {
     const QString name = list_->item(row)->text();
     if (QMessageBox::question(this, tr("Delete songbook"),
                               tr("Delete the songbook %1? This cannot be undone.").arg(name),
-                              QMessageBox::Yes | QMessageBox::No, QMessageBox::No) !=
-        QMessageBox::Yes)
+                              QMessageBox::Yes | QMessageBox::No,
+                              QMessageBox::No) != QMessageBox::Yes)
         return;
     if (!store_->remove(id_)) {
         QMessageBox::warning(this, tr("Songbooks"), tr("Cannot delete the songbook file."));
@@ -532,8 +532,8 @@ void SongbooksPage::chooseCover() {
     QString dir = settings.value(key).toString();
     if (dir.isEmpty() || !QDir(dir).exists())
         dir = QDir::homePath();
-    const QString file = QFileDialog::getOpenFileName(
-        this, tr("Cover image"), dir, tr("Images (*.png *.jpg *.jpeg *.pdf)"));
+    const QString file = QFileDialog::getOpenFileName(this, tr("Cover image"), dir,
+                                                      tr("Images (*.png *.jpg *.jpeg *.pdf)"));
     if (file.isEmpty())
         return;
     settings.setValue(key, QFileInfo(file).absolutePath());
@@ -629,10 +629,10 @@ void SongbooksPage::rebuildTree() {
             const auto& section = book_.sections[s];
             QTreeWidgetItem* header = nullptr;
             if (s > 0) {
-                header = tree_->addSection(sectionUids_[s],
-                                           toQString(section.name) + QStringLiteral(" — ") +
-                                               tr("%n song(s)", nullptr,
-                                                  static_cast<int>(section.songs.size())));
+                header = tree_->addSection(
+                    sectionUids_[s],
+                    toQString(section.name) + QStringLiteral(" — ") +
+                        tr("%n song(s)", nullptr, static_cast<int>(section.songs.size())));
                 if (static_cast<int>(s) == selectedSection)
                     selectedItem = header;
             }
@@ -738,9 +738,9 @@ void SongbooksPage::updateButtons() {
 bool SongbooksPage::askSectionName(const QString& title, const QString& initial, int ignoreSection,
                                    QString* name) {
     bool ok = false;
-    const QString text = QInputDialog::getText(this, title, tr("Section name:"), QLineEdit::Normal,
-                                               initial, &ok)
-                             .trimmed();
+    const QString text =
+        QInputDialog::getText(this, title, tr("Section name:"), QLineEdit::Normal, initial, &ok)
+            .trimmed();
     if (!ok)
         return false;
     if (text.isEmpty()) {
@@ -748,9 +748,9 @@ bool SongbooksPage::askSectionName(const QString& title, const QString& initial,
         return false;
     }
     for (int s = 1; s < static_cast<int>(book_.sections.size()); ++s) {
-        if (s != ignoreSection && toQString(book_.sections[static_cast<std::size_t>(s)].name) == text) {
-            QMessageBox::information(this, title,
-                                     tr("There is a section with this name already."));
+        if (s != ignoreSection &&
+            toQString(book_.sections[static_cast<std::size_t>(s)].name) == text) {
+            QMessageBox::information(this, title, tr("There is a section with this name already."));
             return false;
         }
     }
@@ -786,11 +786,12 @@ void SongbooksPage::removeSection(int s) {
     const auto& section = book_.sections[static_cast<std::size_t>(s)];
     if (!section.songs.empty() &&
         QMessageBox::question(this, tr("Remove Section"),
-                              tr("Remove the section %1 and its %n song(s) from the songbook?", nullptr,
-                                 static_cast<int>(section.songs.size()))
+                              tr("Remove the section %1 and its %n song(s) from the songbook?",
+                                 nullptr, static_cast<int>(section.songs.size()))
                                   .arg(toQString(section.name))) != QMessageBox::Yes)
         return;
-    jobs_.erase(id_ + QLatin1Char('/') + QString::number(sectionUids_[static_cast<std::size_t>(s)]));
+    jobs_.erase(id_ + QLatin1Char('/') +
+                QString::number(sectionUids_[static_cast<std::size_t>(s)]));
     book_.sections.erase(book_.sections.begin() + s);
     sectionUids_.erase(sectionUids_.begin() + s);
     section_ = std::min(s, static_cast<int>(book_.sections.size()) - 1);
@@ -862,9 +863,8 @@ void SongbooksPage::onPickerClicked(const QModelIndex& index) {
     option.text = index.data().toString();
     option.font = pickerView_->font();
     option.displayAlignment = Qt::AlignLeft | Qt::AlignVCenter;
-    const QRect box =
-        pickerView_->style()->subElementRect(QStyle::SE_ItemViewItemCheckIndicator, &option,
-                                             pickerView_);
+    const QRect box = pickerView_->style()->subElementRect(QStyle::SE_ItemViewItemCheckIndicator,
+                                                           &option, pickerView_);
     if (!box.contains(pickerView_->viewport()->mapFromGlobal(QCursor::pos())))
         return;
     const std::string name = index.data(SongTableModel::InputNameRole).toString().toStdString();
@@ -893,9 +893,8 @@ void SongbooksPage::removePicked() {
     auto& songs = book_.sections[static_cast<std::size_t>(currentSection())].songs;
     const auto names = pickerSelection();
     const std::set<std::string> remove(names.begin(), names.end());
-    const auto removed = std::ranges::remove_if(songs, [&](const std::string& s) {
-        return remove.contains(s);
-    });
+    const auto removed =
+        std::ranges::remove_if(songs, [&](const std::string& s) { return remove.contains(s); });
     if (removed.empty())
         return;
     songs.erase(removed.begin(), removed.end());
@@ -978,7 +977,8 @@ void SongbooksPage::sortAll() {
         requestSort(s, SortMode::Replace);
 }
 
-void SongbooksPage::requestSort(int sectionIndex, SortMode mode, const std::set<std::string>& pending) {
+void SongbooksPage::requestSort(int sectionIndex, SortMode mode,
+                                const std::set<std::string>& pending) {
     const auto& section = book_.sections[static_cast<std::size_t>(sectionIndex)];
     const QString key = id_ + QLatin1Char('/') +
                         QString::number(sectionUids_[static_cast<std::size_t>(sectionIndex)]);

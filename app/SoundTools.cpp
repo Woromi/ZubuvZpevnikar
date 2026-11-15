@@ -16,7 +16,7 @@ QString SoundTools::missingHint() const {
     if (soundfont.empty())
         return QCoreApplication::translate(
             "SoundTools", "Sound needs a General MIDI soundfont: install a package such as "
-                          "fluid-soundfont-gm, or set playback/soundfont in the settings.");
+                          "fluid-soundfont-gm, or choose one in Settings (Ctrl+,).");
     return {};
 }
 

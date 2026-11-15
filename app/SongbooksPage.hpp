@@ -42,9 +42,6 @@ public:
     // Reads the songbooks from the store again, keeping the selection where possible.
     void reloadList();
 
-signals:
-    void backRequested();
-
 private:
     void buildUi();
     QWidget* buildListPane();

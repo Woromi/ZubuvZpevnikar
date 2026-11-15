@@ -13,14 +13,15 @@ class SongTableModel : public QAbstractTableModel {
 
 public:
     enum Column {
+        Favourite, // ★ for a favourite, ☆ otherwise: first, like a checkbox
         Title,
-        Favourite, // ★ for a favourite
         Artist,
         Language,
         Key,
         Tempo,
         Meter,
         Capo,
+        Tabs,   // ♪ when the song includes a score (\lilypondfile), ♪ n for several
         Labels, // the tags except "fav"
         Todo,
         Changes,
@@ -35,6 +36,7 @@ public:
         SortRole,                    // what the column sorts by: numbers for Tempo and Capo
         FavouriteRole,               // bool: the song's tags include "fav"
         LabelsRole,                  // QStringList: the tags except "fav"
+        HasTabsRole,                 // bool: the song includes a score
     };
 
     explicit SongTableModel(QObject* parent = nullptr);
@@ -44,7 +46,7 @@ public:
     // Replaces the metadata and TODO notes of the song stored at `path` (e.g. after it was
     // edited). Returns false if no song in the model has that path.
     bool updateSong(const std::filesystem::path& path, zub::SongMetadata meta,
-                    std::vector<std::string> todos);
+                    std::vector<std::string> todos, std::vector<std::string> scores);
     // Row of the song stored at `path`, -1 if absent.
     int rowOf(const std::filesystem::path& path) const;
     // What a songbook scan found in the song at `path` (this session only): a short summary for
@@ -75,6 +77,7 @@ private:
             toolTip, labelsText;
         QStringList labels;
         bool favourite = false;
+        QString tabs, tabsToolTip; // "♪" / "♪ 2", and the score names
         QString changes, changesToolTip; // from a songbook scan
         QStringList languages;           // every language of lang={...}, the song's own first
         QString languagesText;           // the same, joined for the column

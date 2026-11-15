@@ -38,6 +38,12 @@ void SongFilterProxy::setFavouritesOnly(bool favouritesOnly) {
     endFilterChange(QSortFilterProxyModel::Direction::Rows);
 }
 
+void SongFilterProxy::setTabsOnly(bool tabsOnly) {
+    beginFilterChange();
+    tabsOnly_ = tabsOnly;
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+}
+
 void SongFilterProxy::setLabel(const QString& label) {
     beginFilterChange();
     label_ = label;
@@ -60,6 +66,8 @@ bool SongFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceP
     if (changesOnly_ && !index.data(SongTableModel::HasChangesRole).toBool())
         return false;
     if (favouritesOnly_ && !index.data(SongTableModel::FavouriteRole).toBool())
+        return false;
+    if (tabsOnly_ && !index.data(SongTableModel::HasTabsRole).toBool())
         return false;
     if (!label_.isEmpty() &&
         !index.data(SongTableModel::LabelsRole).toStringList().contains(label_))

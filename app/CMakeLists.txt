@@ -4,6 +4,12 @@ qt_standard_project_setup(REQUIRES 6.5)
 
 qt_add_executable(zpevnikar
     main.cpp
+    ActivityBar.hpp
+    ActivityBar.cpp
+    SettingsDialog.hpp
+    SettingsDialog.cpp
+    SongListPage.hpp
+    SongListPage.cpp
     ImportDialog.hpp
     ImportDialog.cpp
     MainWindow.hpp
