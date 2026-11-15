@@ -807,6 +807,14 @@ Použijte vestavěný.</translation>
         <translation>Zpěvník nemá ve složce zubuvzpevnik/ vlastní balíček: sestavuje se kopií z aplikace.</translation>
     </message>
     <message>
+        <source>&amp;New Song…</source>
+        <translation>&amp;Nová píseň…</translation>
+    </message>
+    <message>
+        <source>Start a song by hand: title, artist and language, then an empty verse</source>
+        <translation>Začít píseň ručně: název, interpret a jazyk, pak prázdná sloka</translation>
+    </message>
+    <message>
         <source>The songbook&apos;s zubuvzpevnik/ has the older layout (no scripts/ inside): building with the app&apos;s copy of the package.</source>
         <translation>Složka zubuvzpevnik/ zpěvníku má starší uspořádání (bez scripts/): sestavuje se kopií balíčku z aplikace.</translation>
     </message>
@@ -1159,6 +1167,18 @@ Použijte vestavěný.</translation>
         <translation>Importováno: %1. Zkontrolujte píseň a uložte ji pomocí Ctrl+S.</translation>
     </message>
     <message>
+        <source>New Song</source>
+        <translation>Nová píseň</translation>
+    </message>
+    <message>
+        <source> (new, not saved)</source>
+        <translation> (nová, neuložená)</translation>
+    </message>
+    <message>
+        <source>New song %1: write it, then save with Ctrl+S.</source>
+        <translation>Nová píseň %1: napište ji a uložte pomocí Ctrl+S.</translation>
+    </message>
+    <message>
         <source>Scan Songbook</source>
         <translation>Prohledat zpěvník</translation>
     </message>
@@ -1265,6 +1285,41 @@ Použijte vestavěný.</translation>
             <numerusform>%n písně s možnými změnami: otevřete některou a rozhodněte pomocí Učesat, Zkontrolovat píseň nebo Zmenšit.</numerusform>
             <numerusform>%n písní s možnými změnami: otevřete některou a rozhodněte pomocí Učesat, Zkontrolovat píseň nebo Zmenšit.</numerusform>
         </translation>
+    </message>
+</context>
+<context>
+    <name>NewSongDialog</name>
+    <message>
+        <source>New Song</source>
+        <translation>Nová píseň</translation>
+    </message>
+    <message>
+        <source>An artist of the songbook keeps their folder; a new one gets a folder named after them</source>
+        <translation>Interpret ze zpěvníku zůstane ve své složce; nový dostane složku podle svého jména</translation>
+    </message>
+    <message>
+        <source>The song&apos;s lang: chord and note names, index order. Leave it empty to fill it in later.</source>
+        <translation>Jazyk písně (lang): názvy akordů a not, řazení v obsahu. Prázdný doplníte později.</translation>
+    </message>
+    <message>
+        <source>&amp;Title:</source>
+        <translation>&amp;Název:</translation>
+    </message>
+    <message>
+        <source>&amp;Artist:</source>
+        <translation>&amp;Interpret:</translation>
+    </message>
+    <message>
+        <source>&amp;Language:</source>
+        <translation>&amp;Jazyk:</translation>
+    </message>
+    <message>
+        <source>File:</source>
+        <translation>Soubor:</translation>
+    </message>
+    <message>
+        <source>(type a title and an artist)</source>
+        <translation>(napište název a interpreta)</translation>
     </message>
 </context>
 <context>

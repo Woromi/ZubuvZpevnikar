@@ -102,6 +102,10 @@ private:
     SongEditor* openEditor(const std::filesystem::path& path, const QString& title);
     void showSong(SongEditor* editor, const QString& title, const QString& toolTip);
     void importSong();
+    void newSong(); // File → New Song…: an empty song by hand, unsaved
+    // Shows the song at `path` (already open: kept as it is), closing the open one; false if
+    // it could not be loaded or the user kept the open one.
+    bool openExistingSong(const std::filesystem::path& path);
     std::filesystem::path findConverter() const;
     std::filesystem::path builtInConverter() const; // empty if the app was built without it
     std::filesystem::path bundledPackage() const;   // the app's copy of the package, or empty

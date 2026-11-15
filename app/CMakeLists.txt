@@ -53,6 +53,8 @@ qt_add_executable(zpevnikar
     LabelFilterBox.cpp
     LabelsDialog.hpp
     LabelsDialog.cpp
+    NewSongDialog.hpp
+    NewSongDialog.cpp
     DiffView.hpp
     DiffView.cpp
     CodeTextEdit.hpp

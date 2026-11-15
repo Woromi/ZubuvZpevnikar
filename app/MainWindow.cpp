@@ -7,6 +7,7 @@
 #include "ImportDialog.hpp"
 #include "LabelFilterBox.hpp"
 #include "LabelsDialog.hpp"
+#include "NewSongDialog.hpp"
 #include "NoteSounds.hpp"
 #include "PlaybackRunner.hpp"
 #include "PreviewPane.hpp"
@@ -199,6 +200,12 @@ void MainWindow::createMenus() {
     closeSongAction_->setIcon(QIcon::fromTheme(QStringLiteral("go-previous")));
     closeSongAction_->setToolTip(tr("Back to the song list (Ctrl+W)"));
     connect(closeSongAction_, &QAction::triggered, this, &MainWindow::closeSong);
+
+    QAction* newSongAction = file->addAction(tr("&New Song…"));
+    newSongAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+N")));
+    newSongAction->setToolTip(tr("Start a song by hand: title, artist and language, then an empty "
+                                 "verse"));
+    connect(newSongAction, &QAction::triggered, this, &MainWindow::newSong);
 
     QAction* import = file->addAction(tr("&Import Song…"));
     import->setShortcut(QKeySequence(QStringLiteral("Ctrl+I")));
@@ -3553,20 +3560,7 @@ void MainWindow::importSong() {
         box.setDefaultButton(openExisting);
         box.exec();
         if (box.clickedButton() == openExisting) {
-            // Already open: keep it as it is (edits, undo history, approvals).
-            if (editor_ && editor_->path() == *existing) {
-                editor_->textEdit()->setFocus();
-                return;
-            }
-            // Load first, so a song that fails to load doesn't cost the open one.
-            SongEditor* editor = openEditor(*existing, {});
-            if (!editor)
-                return;
-            if (!closeSong()) {
-                delete editor;
-                return;
-            }
-            showSong(editor, {}, toQString(inputNameOf(editor)));
+            openExistingSong(*existing);
             return;
         }
         if (box.clickedButton() != importAnyway)
@@ -3600,6 +3594,76 @@ void MainWindow::importSong() {
     // converter's warnings.
     if (tidy)
         startTidy(message);
+}
+
+bool MainWindow::openExistingSong(const std::filesystem::path& path) {
+    // Already open: keep it as it is (edits, undo history, approvals).
+    if (editor_ && editor_->path() == path) {
+        editor_->textEdit()->setFocus();
+        return true;
+    }
+    // Load first, so a song that fails to load doesn't cost the open one.
+    SongEditor* editor = openEditor(path, {});
+    if (!editor)
+        return false;
+    if (!closeSong()) {
+        delete editor;
+        return false;
+    }
+    showSong(editor, {}, toQString(inputNameOf(editor)));
+    return true;
+}
+
+void MainWindow::newSong() {
+    if (songbookRoot_.empty()) {
+        QMessageBox::information(this, tr("New Song"), tr("Open a songbook folder first."));
+        return;
+    }
+    // The songbook's artists keep their folders (some are named by hand: "SuchySlitr").
+    std::map<QString, QString> artistFolders;
+    std::set<QString> languages;
+    for (int row = 0; row < model_->rowCount(); ++row) {
+        const auto* song = model_->song(row);
+        if (!song)
+            continue;
+        const QString artist =
+            model_->index(row, SongTableModel::Artist).data().toString().trimmed();
+        if (!artist.isEmpty())
+            artistFolders.emplace(artist, toQString(song->path.parent_path().filename()));
+        for (const QString& lang :
+             model_->index(row, 0).data(SongTableModel::LanguageRole).toStringList())
+            languages.insert(lang);
+    }
+    NewSongDialog dialog(artistFolders, QStringList(languages.begin(), languages.end()), this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    const std::string inputName = toStdString(dialog.inputName());
+    if (const auto existing = zub::songimport::existingSong(songbookRoot_, inputName)) {
+        QMessageBox box(QMessageBox::Question, tr("Song already exists"),
+                        tr("The songbook already has %1.")
+                            .arg(toQString(existing->lexically_relative(songbookRoot_))),
+                        QMessageBox::Cancel, this);
+        QPushButton* openExisting = box.addButton(tr("Open Existing"), QMessageBox::AcceptRole);
+        box.setDefaultButton(openExisting);
+        box.exec();
+        if (box.clickedButton() == openExisting)
+            openExistingSong(*existing);
+        return;
+    }
+    if (!closeSong())
+        return;
+    const auto dest = zub::songimport::destination(songbookRoot_, inputName);
+    approvedConstructs_.erase(dest.path); // nothing of an earlier file at this path carries over
+    const auto song = zub::songimport::newSong(toStdString(dialog.title()),
+                                               toStdString(dialog.artist()),
+                                               toStdString(dialog.language()));
+    auto* editor = new SongEditor(dest.path, *repository_);
+    editor->openNew(song.text);
+    showSong(editor, dialog.title(), toQString(dest.inputName) + tr(" (new, not saved)"));
+    editor->setCursorByteOffset(song.cursor);
+    statusBar()->showMessage(tr("New song %1: write it, then save with Ctrl+S.")
+                                 .arg(toQString(dest.inputName)),
+                             10000);
 }
 
 void MainWindow::scanSongbook() {
