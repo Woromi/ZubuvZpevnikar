@@ -75,8 +75,11 @@ enum class Step { Letter, Word };
 // Moves the chord at the cursor one step left (direction < 0) or right (> 0). Letter: past one
 // code point of the text next to it, or past a whole neighbouring chord. Word: to the start of
 // the previous/next word (letters, digits, apostrophes and anything non-ASCII), skipping other
-// chords. The cursor keeps its place inside the moved chord. nullopt when there is no chord at
-// the cursor or the chord cannot move (line start/end).
+// chords. Another command ("\enquote{" with the brace that opens its argument, "\dots", "\&") is
+// one piece that the chord passes whole, so it is never split ("\\[C]enquote" would be a line
+// break); a chord found inside one gets out of it first. The cursor keeps its place inside the
+// moved chord. nullopt when there is no chord at the cursor or the chord cannot move (line
+// start/end).
 std::optional<Change> moveChord(std::string_view line, std::size_t cursor, int direction,
                                 Step step);
 

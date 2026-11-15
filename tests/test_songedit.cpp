@@ -435,3 +435,50 @@ TEST_CASE("toggleLineComments comments and uncomments whole lines", "[songedit]"
     CHECK(toggleLineComments({"%"}) == std::vector<LineEdit>{{0, 0, 1, ""}});
     CHECK(toggleLineComments({"% Žluťoučký"}) == std::vector<LineEdit>{{0, 0, 2, ""}});
 }
+
+TEST_CASE("moveChord never splits a command", "[songedit]") {
+    // By letter: \enquote{ is one piece, the chord lands inside the quotes, and comes back out.
+    auto r = moveChord("la\\[C] \\enquote{Ahoj}", 2, +1, Step::Letter);
+    REQUIRE(r);
+    CHECK(r->text == "la \\[C]\\enquote{Ahoj}");
+    r = moveChord(r->text, r->cursor, +1, Step::Letter);
+    REQUIRE(r);
+    CHECK(r->text == "la \\enquote{\\[C]Ahoj}");
+    r = moveChord(r->text, r->cursor, -1, Step::Letter);
+    REQUIRE(r);
+    CHECK(r->text == "la \\[C]\\enquote{Ahoj}");
+    // Escaped characters are one piece too ("\\[C]&" would be a line break).
+    r = moveChord("a\\[C]\\&b", 1, +1, Step::Letter);
+    REQUIRE(r);
+    CHECK(r->text == "a\\&\\[C]b");
+    r = moveChord(r->text, r->cursor, -1, Step::Letter);
+    REQUIRE(r);
+    CHECK(r->text == "a\\[C]\\&b");
+    // A chord that already sits inside a command gets out of it first.
+    r = moveChord("\\en\\[C]quote{x}", 3, +1, Step::Letter);
+    REQUIRE(r);
+    CHECK(r->text == "\\enquote{\\[C]x}");
+    r = moveChord("\\en\\[C]quote{x}", 3, -1, Step::Letter);
+    REQUIRE(r);
+    CHECK(r->text == "\\[C]\\enquote{x}");
+    // By word: into the quoted word, past it, and back.
+    r = moveChord("\\[C]la \\enquote{Ahoj} x", 0, +1, Step::Word);
+    REQUIRE(r);
+    CHECK(r->text == "la \\enquote{\\[C]Ahoj} x");
+    r = moveChord(r->text, r->cursor, +1, Step::Word);
+    REQUIRE(r);
+    CHECK(r->text == "la \\enquote{Ahoj} \\[C]x");
+    r = moveChord(r->text, r->cursor, -1, Step::Word);
+    REQUIRE(r);
+    CHECK(r->text == "la \\enquote{\\[C]Ahoj} x");
+    r = moveChord(r->text, r->cursor, -1, Step::Word);
+    REQUIRE(r);
+    CHECK(r->text == "\\[C]la \\enquote{Ahoj} x");
+    // A command without braces is skipped whole.
+    r = moveChord("\\[C]a \\dots b", 0, +1, Step::Word);
+    REQUIRE(r);
+    CHECK(r->text == "a \\dots \\[C]b");
+    r = moveChord("a \\dots \\[C]b", 8, -1, Step::Word);
+    REQUIRE(r);
+    CHECK(r->text == "\\[C]a \\dots b");
+}

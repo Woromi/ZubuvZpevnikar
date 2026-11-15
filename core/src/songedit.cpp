@@ -70,6 +70,54 @@ const ChordSpan* endingAt(const std::vector<ChordSpan>& chords, std::size_t pos)
     return nullptr;
 }
 
+// The other backslash commands of a line, outside its chords: "\name" (letters, an optional
+// "*") together with the "{" that opens its argument when one follows at once, or a backslash
+// with one other character ("\&", "\\"). A chord never goes inside one: "\\[C]enquote{x}" is a
+// line break, "\enquote\[C]{x}" quotes the chord. Behind the "{" it quotes the word, as wanted.
+std::vector<ChordSpan> commandsIn(std::string_view line) {
+    std::vector<ChordSpan> commands;
+    const auto chords = chordsIn(line);
+    for (std::size_t i = 0; i < line.size();) {
+        if (const auto* chord = startingAt(chords, i)) {
+            i = chord->end;
+            continue;
+        }
+        if (line[i] != '\\') {
+            ++i;
+            continue;
+        }
+        std::size_t end = i + 1;
+        if (end < line.size() && std::isalpha(static_cast<unsigned char>(line[end]))) {
+            for (;;) { // the name, with a chord that was put into it by hand ("\en\[C]quote")
+                while (end < line.size() && std::isalpha(static_cast<unsigned char>(line[end])))
+                    ++end;
+                const auto* chord = startingAt(chords, end);
+                if (!chord || chord->end >= line.size() ||
+                    !std::isalpha(static_cast<unsigned char>(line[chord->end])))
+                    break;
+                end = chord->end;
+            }
+            if (end < line.size() && line[end] == '*')
+                ++end;
+            if (end < line.size() && line[end] == '{')
+                ++end;
+        } else if (end < line.size()) {
+            end = nextCodePoint(line, end);
+        }
+        commands.push_back({i, end});
+        i = end;
+    }
+    return commands;
+}
+
+// The command `pos` lies strictly inside, if any.
+const ChordSpan* inside(const std::vector<ChordSpan>& commands, std::size_t pos) {
+    for (const auto& command : commands)
+        if (command.begin < pos && pos < command.end)
+            return &command;
+    return nullptr;
+}
+
 // Where the chord, taken out of `line`, goes when moved right from its end `from`; npos if it
 // cannot move. Positions are in `line`.
 std::size_t targetRight(std::string_view line, const std::vector<ChordSpan>& chords,
@@ -77,9 +125,14 @@ std::size_t targetRight(std::string_view line, const std::vector<ChordSpan>& cho
     const std::size_t size = line.size();
     if (from >= size)
         return std::string_view::npos;
+    const auto commands = commandsIn(line);
+    if (const auto* command = inside(commands, from))
+        return command->end; // out of a command it was put into by hand
     if (step == Step::Letter) {
         if (const auto* next = startingAt(chords, from))
             return next->end;
+        if (const auto* command = startingAt(commands, from))
+            return command->end;
         return nextCodePoint(line, from);
     }
     std::size_t i = from;
@@ -95,6 +148,9 @@ std::size_t targetRight(std::string_view line, const std::vector<ChordSpan>& cho
     while (i < size) { // what separates it from the next word
         if (const auto* chord = startingAt(chords, i)) {
             i = chord->end;
+        } else if (const auto* command = startingAt(commands, i)) {
+            i = command->end; // a command is no place for the chord: behind it
+            landing = i;
         } else if (!isWordByte(line[i])) {
             ++i;
             landing = i;
@@ -109,15 +165,22 @@ std::size_t targetLeft(std::string_view line, const std::vector<ChordSpan>& chor
                        std::size_t from, Step step) {
     if (from == 0)
         return std::string_view::npos;
+    const auto commands = commandsIn(line);
+    if (const auto* command = inside(commands, from))
+        return command->begin;
     if (step == Step::Letter) {
         if (const auto* prev = endingAt(chords, from))
             return prev->begin;
+        if (const auto* command = endingAt(commands, from))
+            return command->begin;
         return previousCodePoint(line, from);
     }
     std::size_t i = from;
     while (i > 0) { // what separates the previous word from here
         if (const auto* chord = endingAt(chords, i))
             i = chord->begin;
+        else if (const auto* command = endingAt(commands, i))
+            i = command->begin;
         else if (!isWordByte(line[i - 1]))
             --i;
         else
@@ -127,6 +190,8 @@ std::size_t targetLeft(std::string_view line, const std::vector<ChordSpan>& chor
     while (i > 0) { // the word itself
         if (const auto* chord = endingAt(chords, i)) {
             i = chord->begin;
+        } else if (endingAt(commands, i)) {
+            break; // the word starts behind the command (inside its braces)
         } else if (isWordByte(line[i - 1])) {
             i = previousCodePoint(line, i);
             landing = i;
@@ -211,12 +276,13 @@ Change insertMultivoice(std::string_view line, std::size_t cursor, std::size_t s
     selEnd = std::min(selEnd, line.size());
     constexpr std::string_view head = "{\\multivoice{";
     if (selStart < selEnd) {
-        const std::string wrapped = "{" + std::string(line.substr(selStart, selEnd - selStart)) + "}";
+        const std::string wrapped =
+            "{" + std::string(line.substr(selStart, selEnd - selStart)) + "}";
         if (latex::findMatching(wrapped, 0) != wrapped.size() - 1)
             selStart = selEnd = cursor; // unbalanced braces would break the command: no selection
     }
-    const bool selected = selStart < selEnd && !chordContaining(line, selStart) &&
-                          !chordContaining(line, selEnd);
+    const bool selected =
+        selStart < selEnd && !chordContaining(line, selStart) && !chordContaining(line, selEnd);
     if (selected) {
         std::string text(line.substr(0, selStart));
         text += head;
@@ -464,8 +530,9 @@ std::vector<Element> elementsIn(std::string_view line) {
                 if (second) {
                     Element element{i, *second + 1,
                                     std::string(line.substr(open + 1, *first - open - 1))};
-                    if (i > 0 && line[i - 1] == '{' && latex::findMatching(line, i - 1) ==
-                                                           std::optional<std::size_t>(*second + 1)) {
+                    if (i > 0 && line[i - 1] == '{' &&
+                        latex::findMatching(line, i - 1) ==
+                            std::optional<std::size_t>(*second + 1)) {
                         element.begin = i - 1;
                         element.end = *second + 2;
                     }
@@ -495,7 +562,8 @@ std::optional<Change> removeElementAt(std::string_view line, std::size_t cursor)
         const std::size_t size = element.end - element.begin;
         const std::size_t bestSize = best->end - best->begin;
         // Smallest wins; where two meet, the one that starts at the cursor.
-        if (size < bestSize || (size == bestSize && element.begin == cursor && best->begin != cursor))
+        if (size < bestSize ||
+            (size == bestSize && element.begin == cursor && best->begin != cursor))
             best = &element;
     }
     if (!best)
