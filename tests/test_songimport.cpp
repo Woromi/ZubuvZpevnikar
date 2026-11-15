@@ -6,7 +6,9 @@
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <zub/core/latex.hpp>
 #include <zub/core/safety.hpp>
+#include <zub/core/song.hpp>
 #include <zub/core/songimport.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -386,4 +388,80 @@ TEST_CASE("interpret: Ultimate Guitar's no-song warning is a failure too", "[son
         "Warning: no song data found on https://tabs.ultimate-guitar.com/x.\n", "/nonexistent");
     REQUIRE_FALSE(result);
     CHECK(result.error().message.starts_with("No song was found on that page."));
+}
+
+TEST_CASE("fileNameOf names files like chords_converter", "[songimport]") {
+    using zub::songimport::fileNameOf;
+    CHECK(fileNameOf("California Dreamin'") == "CaliforniaDreamin");
+    CHECK(fileNameOf("The Mamas & the Papas") == "TheMamasAndThePapas");
+    CHECK(fileNameOf("Žluťoučký kůň") == "ZlutouckyKun");
+    CHECK(fileNameOf("AC/DC") == "AcDc");
+    CHECK(fileNameOf("ABBA") == "Abba");
+    CHECK(fileNameOf("21 Guns") == "21Guns");
+    CHECK(fileNameOf("Don't stop") == "DontStop");
+    CHECK(fileNameOf("It’s my life") == "ItsMyLife"); // a typographic apostrophe too
+    CHECK(fileNameOf("MacGyver") == "MacGyver");
+    CHECK(fileNameOf("XMLHttp request") == "XmlHttpRequest");
+    CHECK(fileNameOf("Straße Œuvre Ĳssel Łódź") == "StrasseOEuvreIJsselLodz"); // as the converter
+    CHECK(fileNameOf("ナルト") == "");
+    CHECK(fileNameOf("  ") == "");
+}
+
+TEST_CASE("newSong is a draft like the converter's, the cursor in its verse", "[songimport]") {
+    const auto song = zub::songimport::newSong("100% Tvůj", "A & B", "czech");
+    CHECK(song.text ==
+          "\\beginsong{100\\% Tvůj}[\n"
+          "    by={A \\& B},\n"
+          "    lang={czech},\n"
+          "    % tem={},\n"
+          "    % met={},\n"
+          "    tun={Standard},\n"
+          "    % key={},\n"
+          "    % cap={},\n"
+          "    pap={},\n"
+          "]\n"
+          "\n"
+          "\\beginverse\n"
+          "    \n"
+          "\\endverse\n"
+          "\n"
+          "\\endsong\n");
+    CHECK(song.text.substr(song.cursor, 12) == "\n\\endverse\n\n");
+    const auto meta = zub::parseSong(song.text);
+    REQUIRE(meta);
+    CHECK(meta->title == "100\\% Tvůj");
+    CHECK(meta->value("lang") == "czech");
+    CHECK(zub::songimport::newSong("T", "A", "").text.find("    % lang={czech|english},\n") !=
+          std::string::npos);
+}
+
+TEST_CASE("fileNameOf agrees with the real songbook's file names", "[.integration][songimport]") {
+    // The converter named most songs; some were named by hand. Most must agree.
+    namespace fs = std::filesystem;
+    const fs::path chords = fs::path(ZUB_REAL_SONGBOOK_DIR) / "songs" / "chords";
+    if (!fs::is_directory(chords))
+        SKIP("no real songbook");
+    int total = 0, same = 0;
+    for (const auto& entry : fs::recursive_directory_iterator(chords)) {
+        if (entry.path().extension() != ".tex")
+            continue;
+        const auto text = zub::readTextFile(entry.path());
+        if (!text)
+            continue;
+        const auto meta = zub::parseSong(*text);
+        if (!meta)
+            continue;
+        ++total;
+        const std::string expected = entry.path().parent_path().filename().string() + "/" +
+                                     entry.path().stem().string();
+        const std::string got =
+            zub::songimport::fileNameOf(zub::latex::toDisplayText(meta->value("by"))) + "/" +
+            zub::songimport::fileNameOf(zub::latex::toDisplayText(meta->title));
+        if (got == expected)
+            ++same;
+        else
+            UNSCOPED_INFO(expected << " <- " << got);
+    }
+    WARN(same << " of " << total << " real song files are named as fileNameOf names them");
+    CHECK(same * 10 >= total * 7);
 }

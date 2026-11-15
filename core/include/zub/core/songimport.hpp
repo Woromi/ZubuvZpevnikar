@@ -73,4 +73,23 @@ Destination destination(const std::filesystem::path& songbookRoot, std::string_v
 std::optional<std::filesystem::path> existingSong(const std::filesystem::path& songbookRoot,
                                                   std::string_view inputName);
 
+// The file name chords_converter gives an artist or a title (its sanitize_filename: heck's
+// to_upper_camel_case, then deunicode): words (split at anything but letters and digits, and
+// where a lowercase letter meets an uppercase one or an uppercase run ends) joined, each with
+// its first letter uppercase and the rest lowercase; diacritics dropped ("Žluťoučký kůň" ->
+// "ZlutouckyKun", "AC/DC" -> "AcDc", "21 Guns" -> "21Guns"). Two rules follow the songbook's
+// hand-named files instead of the converter: an apostrophe does not split a word ("It's my
+// life" -> "ItsMyLife") and "&" is "And". Letters it cannot spell in ASCII (outside Latin-1 and
+// Latin Extended-A) are left out. Empty when nothing is left.
+std::string fileNameOf(std::string_view name);
+
+// A new song by hand: the header of the converter's drafts (by, lang, the keys to fill in
+// commented out, tun={Standard}, pap={}), then one empty verse with the cursor in it, and
+// \endsong. Title and artist are escaped for LaTeX; an empty `lang` is left to fill in.
+struct NewSong {
+    std::string text;
+    std::size_t cursor; // byte offset: inside the verse
+};
+NewSong newSong(std::string_view title, std::string_view artist, std::string_view lang);
+
 } // namespace zub::songimport

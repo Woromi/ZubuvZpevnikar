@@ -1,6 +1,7 @@
 #include "zub/core/songimport.hpp"
 
 #include "zub/core/song.hpp"
+#include "zub/core/songbook.hpp"
 #include "zub/core/textfile.hpp"
 
 #include <algorithm>
@@ -318,6 +319,144 @@ std::optional<fs::path> existingSong(const fs::path& songbookRoot, std::string_v
         }
     }
     return std::nullopt;
+}
+
+namespace {
+
+// ASCII for the Latin-1 and Latin Extended-A letters (deunicode's spelling), keeping the case.
+std::string_view asciiOf(char32_t c) {
+    static const std::pair<char32_t, std::string_view> table[] = {
+        {0xC0, "A"},  {0xC1, "A"},  {0xC2, "A"},  {0xC3, "A"},  {0xC4, "A"},  {0xC5, "A"},
+        {0xC6, "AE"}, {0xC7, "C"},  {0xC8, "E"},  {0xC9, "E"},  {0xCA, "E"},  {0xCB, "E"},
+        {0xCC, "I"},  {0xCD, "I"},  {0xCE, "I"},  {0xCF, "I"},  {0xD0, "D"},  {0xD1, "N"},
+        {0xD2, "O"},  {0xD3, "O"},  {0xD4, "O"},  {0xD5, "O"},  {0xD6, "O"},  {0xD8, "O"},
+        {0xD9, "U"},  {0xDA, "U"},  {0xDB, "U"},  {0xDC, "U"},  {0xDD, "Y"},  {0xDE, "Th"},
+        {0xDF, "ss"}, {0xE0, "a"},  {0xE1, "a"},  {0xE2, "a"},  {0xE3, "a"},  {0xE4, "a"},
+        {0xE5, "a"},  {0xE6, "ae"}, {0xE7, "c"},  {0xE8, "e"},  {0xE9, "e"},  {0xEA, "e"},
+        {0xEB, "e"},  {0xEC, "i"},  {0xED, "i"},  {0xEE, "i"},  {0xEF, "i"},  {0xF0, "d"},
+        {0xF1, "n"},  {0xF2, "o"},  {0xF3, "o"},  {0xF4, "o"},  {0xF5, "o"},  {0xF6, "o"},
+        {0xF8, "o"},  {0xF9, "u"},  {0xFA, "u"},  {0xFB, "u"},  {0xFC, "u"},  {0xFD, "y"},
+        {0xFE, "th"}, {0xFF, "y"},  {0x152, "OE"}, {0x153, "oe"}, {0x141, "L"}, {0x142, "l"},
+        {0x132, "IJ"}, {0x133, "ij"}, {0x110, "D"}, {0x111, "d"}, {0x131, "i"}, {0x138, "q"}, {0x149, "n"}, {0x17F, "s"},
+    };
+    for (const auto& [code, ascii] : table)
+        if (code == c)
+            return ascii;
+    // Latin Extended-A (0x100-0x17F) is pairs of upper and lower case: the letter without its
+    // mark, in the case of the code point.
+    static constexpr std::string_view base =
+        "AaAaAaCcCcCcCcDdDdEeEeEeEeEeGgGgGgGgHhHhIiIiIiIiIiJjJjKkkLlLlLlLlLlNnNnNnnNnOoOoOoOoRrRrRr"
+        "SsSsSsSsTtTtTtUuUuUuUuUuUuWwYyYZzZzZzs";
+    if (c >= 0x100 && c <= 0x17F) {
+        const std::size_t i = c - 0x100;
+        return i < base.size() ? base.substr(i, 1) : std::string_view{};
+    }
+    return {};
+}
+
+// The code points of UTF-8 text (invalid bytes are skipped).
+std::u32string codePoints(std::string_view text) {
+    std::u32string out;
+    for (std::size_t i = 0; i < text.size();) {
+        const auto b = static_cast<unsigned char>(text[i]);
+        const int length = b < 0x80 ? 1 : (b >> 5) == 6 ? 2 : (b >> 4) == 14 ? 3 : (b >> 3) == 30 ? 4 : 0;
+        if (length == 0 || i + static_cast<std::size_t>(length) > text.size()) {
+            ++i;
+            continue;
+        }
+        char32_t c = length == 1 ? b : b & (0x7F >> length);
+        for (int k = 1; k < length; ++k)
+            c = (c << 6) | (static_cast<unsigned char>(text[i + static_cast<std::size_t>(k)]) & 0x3F);
+        out += c;
+        i += static_cast<std::size_t>(length);
+    }
+    return out;
+}
+
+bool isUpper(char c) {
+    return c >= 'A' && c <= 'Z';
+}
+bool isLower(char c) {
+    return c >= 'a' && c <= 'z';
+}
+bool isAlnum(char c) {
+    return isUpper(c) || isLower(c) || (c >= '0' && c <= '9');
+}
+
+} // namespace
+
+std::string fileNameOf(std::string_view name) {
+    // ASCII first (the case kept), then heck's word rules on it: the same words, since every
+    // letter keeps its case.
+    std::string ascii;
+    for (const char32_t c : codePoints(name)) {
+        // The songbook's own spelling, where it differs from the converter's: an apostrophe does
+        // not split a word ("ItsMyLife", not "ItSMyLife") and & is "And".
+        if (c == '\'' || c == 0x2019)
+            continue;
+        if (c == '&') {
+            ascii += " and ";
+            continue;
+        }
+        if (c < 0x80)
+            ascii += static_cast<char>(c);
+        else if (const auto spelled = asciiOf(c); !spelled.empty())
+            ascii += spelled;
+        else
+            ascii += ' '; // a letter it cannot spell ends the word, like a separator
+    }
+    std::vector<std::string> words;
+    std::string word;
+    const auto flush = [&] {
+        if (!word.empty())
+            words.push_back(std::move(word));
+        word.clear();
+    };
+    for (std::size_t i = 0; i < ascii.size(); ++i) {
+        const char c = ascii[i];
+        if (!isAlnum(c)) {
+            flush();
+            continue;
+        }
+        // An uppercase letter after a lowercase one starts a word ("fooBar"), and so does the
+        // last uppercase letter of a run before a lowercase one ("XMLHttp": XML, Http).
+        if (!word.empty() && isUpper(c) &&
+            (isLower(word.back()) ||
+             (isUpper(word.back()) && i + 1 < ascii.size() && isLower(ascii[i + 1]))))
+            flush();
+        word += c;
+    }
+    flush();
+    std::string out;
+    for (const std::string& w : words) {
+        out += static_cast<char>(std::toupper(static_cast<unsigned char>(w[0])));
+        for (std::size_t k = 1; k < w.size(); ++k)
+            out += static_cast<char>(std::tolower(static_cast<unsigned char>(w[k])));
+    }
+    return out;
+}
+
+NewSong newSong(std::string_view title, std::string_view artist, std::string_view lang) {
+    std::string text = "\\beginsong{" + songbook::escapeText(title) + "}[\n";
+    text += "    by={" + songbook::escapeText(artist) + "},\n";
+    text += lang.empty() ? std::string("    % lang={czech|english},\n")
+                         : "    lang={" + songbook::escapeText(lang) + "},\n";
+    text += "    % tem={},\n"
+            "    % met={},\n"
+            "    tun={Standard},\n"
+            "    % key={},\n"
+            "    % cap={},\n"
+            "    pap={},\n"
+            "]\n"
+            "\n"
+            "\\beginverse\n"
+            "    ";
+    const std::size_t cursor = text.size();
+    text += "\n"
+            "\\endverse\n"
+            "\n"
+            "\\endsong\n";
+    return {std::move(text), cursor};
 }
 
 } // namespace zub::songimport
