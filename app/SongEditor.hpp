@@ -18,6 +18,7 @@ class QAction;
 class QFileSystemWatcher;
 class QLabel;
 class QPlainTextEdit;
+class QTextCursor;
 class QPushButton;
 
 namespace KSyntaxHighlighting {
@@ -176,6 +177,11 @@ private:
     // renames its partner too, in the same undo step (zub::songedit::environmentLinkAt).
     void updateEnvironmentLink();
     bool editLinkedName(QKeyEvent* event);
+    // The same two rules at one of several cursors (CodeTextEdit::setCursorKeyHook): a space in
+    // a chord's name goes after the chord, and an edit of a \begin/\end name renames its partner
+    // too, unless another cursor stands in the partner (it is being edited there).
+    bool keyAtCursor(QTextCursor& cursor, QKeyEvent* event,
+                     const std::function<void(QTextCursor&)>& plainEdit);
     void syncEnvironmentName();
 
     void onFileChanged();

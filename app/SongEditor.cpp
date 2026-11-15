@@ -80,6 +80,11 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
     edit_ = codeEdit;
     codeEdit->setKeyFilter(
         [this](QKeyEvent* event) { return typeSpaceOutsideChord(event) || editLinkedName(event); });
+    codeEdit->setCursorKeyHook(
+        [this](QTextCursor& cursor, QKeyEvent* event,
+               const std::function<void(QTextCursor&)>& plainEdit) {
+            return keyAtCursor(cursor, event, plainEdit);
+        });
     layout->addWidget(edit_);
 
     const QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
@@ -881,6 +886,67 @@ void SongEditor::syncEnvironmentName() {
     partner.insertText(QString::fromStdString(name));
     syncingEnvironment_ = false;
     updateEnvironmentLink();
+}
+
+bool SongEditor::keyAtCursor(QTextCursor& cursor, QKeyEvent* event,
+                             const std::function<void(QTextCursor&)>& plainEdit) {
+    if (kind_ != Kind::Song || edit_->isReadOnly())
+        return false;
+    const auto others = event->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier);
+    // A space in a chord's name goes after the chord, in this cursor's line.
+    if (event->key() == Qt::Key_Space && others == Qt::NoModifier && !cursor.hasSelection()) {
+        const auto state = lineState(cursor);
+        const auto target = zub::songedit::spaceTarget(state.line, state.cursor);
+        if (!target)
+            return false;
+        cursor.setPosition(state.block.position() + utf16Position(state.line, *target));
+        cursor.insertText(QStringLiteral(" "));
+        return true;
+    }
+    // An edit inside a \begin/\end name: made, then the partner gets the same name.
+    const bool backspace = event->key() == Qt::Key_Backspace;
+    const bool del = event->key() == Qt::Key_Delete;
+    if (backspace || del) {
+        if (others != Qt::NoModifier)
+            return false;
+    } else if (event->text().isEmpty() || !event->text().at(0).isLetter() ||
+               others != Qt::NoModifier) {
+        return false; // only letters belong in a name
+    }
+    const QString raw = edit_->document()->toRawText();
+    std::string text = editorText();
+    const auto link = zub::songedit::environmentLinkAt(
+        text, utf16ToByteOffset(raw, cursor.position()));
+    if (!link)
+        return false;
+    const int nameBegin = utf16Position(text, link->nameBegin);
+    const int nameEnd = utf16Position(text, link->nameEnd);
+    const int begin = cursor.selectionStart(), end = cursor.selectionEnd();
+    const bool collapsed = begin == end;
+    if (begin < nameBegin || end > nameEnd || (collapsed && backspace && begin == nameBegin) ||
+        (collapsed && del && end == nameEnd))
+        return false;
+    // Another cursor in the partner is editing it already: renaming it here would do it twice.
+    const int otherBegin = utf16Position(text, link->otherBegin);
+    const int otherEnd = utf16Position(text, link->otherEnd);
+    for (const QTextCursor& other : static_cast<CodeTextEdit*>(edit_)->cursors()) {
+        if (other.position() >= otherBegin && other.position() <= otherEnd)
+            return false;
+    }
+    plainEdit(cursor);
+    text = editorText();
+    const auto after = zub::songedit::environmentLinkAt(
+        text, utf16ToByteOffset(edit_->document()->toRawText(), cursor.position()));
+    if (!after)
+        return true;
+    const std::string name = text.substr(after->nameBegin, after->nameEnd - after->nameBegin);
+    if (name != text.substr(after->otherBegin, after->otherEnd - after->otherBegin)) {
+        QTextCursor partner(edit_->document());
+        partner.setPosition(utf16Position(text, after->otherBegin));
+        partner.setPosition(utf16Position(text, after->otherEnd), QTextCursor::KeepAnchor);
+        partner.insertText(QString::fromStdString(name));
+    }
+    return true;
 }
 
 bool SongEditor::typeSpaceOutsideChord(QKeyEvent* event) {

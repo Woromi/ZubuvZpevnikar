@@ -28,6 +28,12 @@ public:
     // Sees every key press first; returning true means it was handled (e.g. the song editor's
     // space inside a chord).
     void setKeyFilter(std::function<bool(QKeyEvent*)> filter) { keyFilter_ = std::move(filter); }
+    // With several cursors, the key filter's rules per cursor: typed text, Backspace and Delete
+    // ask `hook(cursor, event, plainEdit)` at each cursor; it makes the edit there itself (and
+    // returns true, e.g. a space typed in a chord goes after it) or leaves it to `plainEdit`.
+    using CursorKeyHook = std::function<bool(QTextCursor& cursor, QKeyEvent* event,
+                                             const std::function<void(QTextCursor&)>& plainEdit)>;
+    void setCursorKeyHook(CursorKeyHook hook) { cursorKeyHook_ = std::move(hook); }
     // What a key press does without the filter (for a filter that wraps it, e.g. in an edit block).
     void processKey(QKeyEvent* event);
 
@@ -86,6 +92,7 @@ private:
     bool keepingCursors_ = false; // our own edits move the main cursor: keep the extra ones
     QTimer* occurrenceTimer_ = nullptr;
     std::function<bool(QKeyEvent*)> keyFilter_;
+    CursorKeyHook cursorKeyHook_;
     QWidget* area_ = nullptr;
     QColor background_;
     QColor number_;

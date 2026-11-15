@@ -292,7 +292,7 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
         case Qt::Key_Backspace:
         case Qt::Key_Delete: {
             const bool back = key == Qt::Key_Backspace;
-            editAtCursors([&](QTextCursor& cursor) {
+            const std::function<void(QTextCursor&)> plain = [&](QTextCursor& cursor) {
                 if (!cursor.hasSelection()) {
                     if (ctrl)
                         cursor.movePosition(back ? Move::PreviousWord : Move::NextWord,
@@ -302,6 +302,10 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
                                             QTextCursor::KeepAnchor);
                 }
                 cursor.removeSelectedText();
+            };
+            editAtCursors([&](QTextCursor& cursor) {
+                if (!cursorKeyHook_ || !cursorKeyHook_(cursor, event, plain))
+                    plain(cursor);
             });
             return true;
         }
@@ -319,7 +323,13 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
         if (!ctrl && !text.isEmpty() && std::ranges::all_of(text, [](QChar c) {
                 return c.isPrint() || c == QLatin1Char('\t');
             })) {
-            editAtCursors([&](QTextCursor& cursor) { cursor.insertText(text); });
+            const std::function<void(QTextCursor&)> plain = [&](QTextCursor& cursor) {
+                cursor.insertText(text);
+            };
+            editAtCursors([&](QTextCursor& cursor) {
+                if (!cursorKeyHook_ || !cursorKeyHook_(cursor, event, plain))
+                    plain(cursor);
+            });
             return true;
         }
     }
