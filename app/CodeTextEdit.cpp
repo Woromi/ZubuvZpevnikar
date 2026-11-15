@@ -86,6 +86,7 @@ QList<QTextCursor> CodeTextEdit::cursors() const {
 
 void CodeTextEdit::clearExtraCursors() {
     multiColumn_ = -1;
+    growth_ = 0;
     if (extraCursors_.isEmpty())
         return;
     extraCursors_.clear();
@@ -96,19 +97,26 @@ void CodeTextEdit::clearExtraCursors() {
 void CodeTextEdit::addCursorVertically(int direction) {
     if (isReadOnly())
         return;
-    const QList<QTextCursor> all = cursors();
+    // Like a code editor: the cursors grow away from the first one; the other direction takes
+    // back the last one added.
+    if (!extraCursors_.isEmpty() && direction != growth_) {
+        extraCursors_.removeLast();
+        if (extraCursors_.isEmpty())
+            growth_ = 0;
+        updateExtraSelections();
+        viewport()->update();
+        return;
+    }
     if (multiColumn_ < 0)
         multiColumn_ = textCursor().positionInBlock();
-    const QTextCursor edge =
-        *std::ranges::max_element(all, [direction](const QTextCursor& a, const QTextCursor& b) {
-            return direction < 0 ? a.position() > b.position() : a.position() < b.position();
-        });
+    const QTextCursor edge = extraCursors_.isEmpty() ? textCursor() : extraCursors_.last();
     const QTextBlock block = direction < 0 ? edge.block().previous() : edge.block().next();
     if (!block.isValid())
         return;
     QTextCursor added(document());
     added.setPosition(block.position() + std::min(multiColumn_, block.length() - 1));
     extraCursors_.append(added);
+    growth_ = direction;
     dropDuplicateCursors();
     updateExtraSelections();
     viewport()->update();

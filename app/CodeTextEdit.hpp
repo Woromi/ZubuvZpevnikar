@@ -11,7 +11,8 @@ class QTimer;
 // A QPlainTextEdit with a line-number area on the left (Qt's "Code Editor" example). The
 // numbers are the 1-based block numbers, which are the file's lines (the editor does not wrap).
 // Enter keeps the current line's indentation. Selecting text marks its other occurrences.
-// Ctrl+Shift+Up/Down add cursors on the lines above/below (like a code editor's multi-cursor):
+// Ctrl+Shift+Up/Down add cursors on the lines above/below, the other direction takes them back
+// (like a code editor's multi-cursor):
 // typing, Backspace/Delete, Enter, the arrows, Home/End (with Shift and Ctrl), copy, cut and paste
 // then act at every cursor, one undo step per key; Escape, a click or any other key leave only the
 // main cursor.
@@ -36,8 +37,9 @@ public:
     // The main cursor first, then the extra ones.
     QList<QTextCursor> cursors() const;
     int extraCursorCount() const { return static_cast<int>(extraCursors_.size()); }
-    // Adds a cursor on the line above (-1) or below (+1) the topmost/bottommost cursor, at the
-    // column the first one was in (or the line's end when shorter).
+    // Adds a cursor on the line above (-1) or below (+1) the last one added (or the main one), at
+    // the column the first one was in (or the line's end when shorter); the cursors grow in the
+    // direction of the first one added, the other direction removes the last one added.
     void addCursorVertically(int direction);
     void clearExtraCursors();
     // Runs `edit` (changes made through QTextCursors of the document) as one undo step, keeping
@@ -72,6 +74,7 @@ private:
     QList<QAction*> extraActions_;
     QList<QTextCursor> extraCursors_;
     QList<QTextEdit::ExtraSelection> occurrenceMarks_;
+    int growth_ = 0;              // -1 up, +1 down: where the extra cursors were added
     int multiColumn_ = -1;        // the column new cursors go to
     bool keepingCursors_ = false; // our own edits move the main cursor: keep the extra ones
     QTimer* occurrenceTimer_ = nullptr;
