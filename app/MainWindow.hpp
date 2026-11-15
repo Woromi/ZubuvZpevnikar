@@ -104,6 +104,8 @@ private:
     void importSong();
     std::filesystem::path findConverter() const;
     std::filesystem::path builtInConverter() const; // empty if the app was built without it
+    std::filesystem::path bundledPackage() const;   // the app's copy of the package, or empty
+    QString noPackageText() const; // why a build cannot run: no package anywhere
     void saveCurrent();
     bool closeSong();                      // false if the user cancelled
     // Back to the song list from the song page (closing the song) or the Songbooks page; the
@@ -369,5 +371,8 @@ private:
     QLabel* issuesLabel_ = nullptr;
 
     std::filesystem::path songbookRoot_;
+    // The package that builds the songs: the songbook's own (zubuvzpevnik/, a submodule), else
+    // the app's bundled copy; empty when neither is there (previews then fail with a message).
+    std::filesystem::path packageDir_;
     int issueCount_ = 0;
 };

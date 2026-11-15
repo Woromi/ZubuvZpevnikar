@@ -20,6 +20,7 @@ struct ScanOptions {
     std::optional<zub::songsuggest::Paper> paper;
     std::filesystem::path converter;
     std::filesystem::path songbookRoot;
+    std::filesystem::path packageDir; // measuring typesets with it (zub::package)
 };
 
 // What the scan found in one song, as text for the song list.

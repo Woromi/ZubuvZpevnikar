@@ -18,7 +18,11 @@ class SongbookExporter : public QObject {
 public:
     explicit SongbookExporter(QWidget* parentWindow);
 
-    void setSongbookRoot(const std::filesystem::path& root) { root_ = root; }
+    // The songbook (its songs) and the package that builds them (zub::package).
+    void setSongbookRoot(const std::filesystem::path& root, const std::filesystem::path& package) {
+        root_ = root;
+        package_ = package;
+    }
 
     // The songbook is copied: the dialogs run nested event loops, the caller's copy may change.
     // `titleOf` gives a song's title (for estimating the index length of a Tabor book).
@@ -31,6 +35,7 @@ signals:
     void finished(const QString& message);
 
 private:
+    QString noPackageText() const; // why nothing can be built without a package
     void exportTexFile(const QString& stem, const zub::songbook::Songbook& book,
                        const TitleOf& titleOf);
     void exportFolder(const QString& stem, const zub::songbook::Songbook& book,
@@ -42,4 +47,5 @@ private:
 
     QWidget* window_;
     std::filesystem::path root_;
+    std::filesystem::path package_;
 };

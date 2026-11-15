@@ -67,6 +67,18 @@ qt_add_executable(zpevnikar
 )
 target_link_libraries(zpevnikar PRIVATE Zub::core zub_warnings Qt6::Widgets Qt6::Svg Qt6::Pdf Qt6::PdfWidgets Qt6::Multimedia KF6::SyntaxHighlighting)
 
+# The LaTeX package that builds the songs (external/zubuvzpevnik-package, a git submodule), for
+# songbooks without one of their own: found in the source tree by builds that run from here, and
+# installed into share/zpevnikar/zubuvzpevnik (MainWindow::bundledPackage). Skipped (with a message)
+# without the submodule checked out.
+set(zub_package_dir ${PROJECT_SOURCE_DIR}/external/zubuvzpevnik-package)
+if(EXISTS ${zub_package_dir}/zubuvzpevnik.sty)
+    target_compile_definitions(zpevnikar PRIVATE ZUB_BUNDLED_PACKAGE_DIR="${zub_package_dir}")
+else()
+    message(STATUS "zubuvzpevnik-package: submodule not checked out "
+                   "(git submodule update --init), the app gets no copy of the package")
+endif()
+
 # UI translations (source language English). zpevnikar_cs.ts is the Czech translation,
 # zpevnikar_en.ts only holds the plural forms of the English texts ("%n song(s)"). The .qm files
 # are compiled by the normal build and embedded under ":/i18n". Target update_translations runs
@@ -103,6 +115,16 @@ qt_add_resources(zpevnikar icons
 include(GNUInstallDirs)
 install(TARGETS zpevnikar RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES zpevnikar.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+if(EXISTS ${zub_package_dir}/zubuvzpevnik.sty)
+    # The TeX side and scripts/ (build.sh, songidx.lua, checkpaper.py for the converter), not
+    # the docs or git files; the scripts stay executable. (Configure again after fetching the
+    # submodule: the EXISTS test runs at configure time.)
+    install(DIRECTORY ${zub_package_dir}/ DESTINATION ${CMAKE_INSTALL_DATADIR}/zpevnikar/zubuvzpevnik
+            USE_SOURCE_PERMISSIONS
+            PATTERN ".git*" EXCLUDE
+            PATTERN "docs" EXCLUDE
+            PATTERN "__pycache__" EXCLUDE)
+endif()
 foreach(size IN LISTS zub_icon_sizes)
     install(FILES icons/zpevnikar-${size}.png
             DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${size}x${size}/apps

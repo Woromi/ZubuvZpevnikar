@@ -27,15 +27,17 @@ tidy them, and put songbooks together for print.
   by hand), choose the book's class (A4 book, A5 book, A5 camp booklet), cover and indexes, and
   export a PDF, the LaTeX source, or a self-contained folder that builds anywhere.
 
-The app does not reimplement the songbook: songs, classes and build scripts come from a
-ZubuvZpevnik checkout, and conversions from chords_converter.
+The app does not reimplement the songbook: the songs come from a ZubuvZpevnik checkout, the
+classes and build scripts from the [zubuvzpevnik-package](https://github.com/Woromi/zubuvzpevnik-package)
+(the songbook's own `zubuvzpevnik/` submodule, else the copy bundled with the app), and
+conversions from chords_converter (0.14.0 or newer).
 
 ## Building
 
 Requirements:
 
 - CMake ≥ 3.25 and a C++23 compiler (developed with GCC 13)
-- Qt ≥ 6.5 with the Widgets, PDF and Multimedia modules
+- Qt ≥ 6.5 with the Widgets, Svg, PDF, Multimedia and Linguist tools modules
 - KF6 SyntaxHighlighting
 - Catch2 v3 (tests)
 - Rust and cargo, to build the bundled chords_converter (optional)
@@ -58,15 +60,17 @@ build/debug/app/zpevnikar
 
 Without cargo, or without the submodule (`git submodule update --init`), the converter is not
 built; the app then finds one you installed yourself, or you choose one in the import dialog.
+Without the `external/zubuvzpevnik-package` submodule the app has no package of its own and builds
+only songbooks that have theirs.
 `-DZUB_BUILD_APP=OFF` builds only the core library and its tests, without Qt.
 
-`cmake --install build/release --prefix ~/.local` installs the app with its converter, a launcher
-entry and the icon.
+`cmake --install build/release --prefix ~/.local` installs the app with its converter, its copy of
+the package (`share/zpevnikar/zubuvzpevnik`), a launcher entry and the icon.
 
 ## First start
 
-The app asks for your ZubuvZpevnik checkout (a folder with `songs/chords/` and `zubuvzpevnik/`) and
-remembers it. Songbooks you create are stored by the app, not in the checkout; exports and previews
+The app asks for your ZubuvZpevnik checkout (a folder with `songs/chords/`; clone it with
+`--recurse-submodules` so its `zubuvzpevnik/` package is there too) and remembers it. Songbooks you create are stored by the app, not in the checkout; exports and previews
 are built in the app's cache folder, never inside the checkout.
 
 ## Layout
@@ -75,6 +79,8 @@ are built in the app's cache folder, never inside the checkout.
   preparing builds, reading the converter's output). Unit tests in `tests/`.
 - `app/`: the Qt 6 Widgets user interface.
 - `external/chords_converter`: the converter, as a git submodule.
+- `external/zubuvzpevnik-package`: the LaTeX package and its build scripts, as a git submodule (the
+  copy used for songbooks without their own).
 - `docs/PLAN.md`: what is done and what is planned.
 
 ## License

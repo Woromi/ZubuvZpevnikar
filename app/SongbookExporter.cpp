@@ -176,8 +176,17 @@ QString warningsText(const std::vector<std::string>& warnings) {
 
 SongbookExporter::SongbookExporter(QWidget* parentWindow) : QObject(parentWindow), window_(parentWindow) {}
 
+QString SongbookExporter::noPackageText() const {
+    return tr("There is no package to build the songbook with: the songbook's zubuvzpevnik/ is not "
+              "checked out (git submodule update --init), and this app has no copy of its own.");
+}
+
 void SongbookExporter::exportLatex(const QString& id, zub::songbook::Songbook book,
                                    const TitleOf& titleOf) {
+    if (package_.empty()) {
+        QMessageBox::warning(window_, tr("Export LaTeX"), noPackageText());
+        return;
+    }
     const auto choice = askLatexChoice(window_, id);
     if (!choice)
         return;
@@ -221,9 +230,11 @@ void SongbookExporter::exportTexFile(const QString& stem, const zub::songbook::S
         indexArguments += "-i " + index + " ";
     const std::string header =
         "% Build it in a ZubuvZpevnik checkout, from an empty folder (it writes there):\n"
+        "%   PACKAGE=" + shellQuote(toStdString(toQString(package_))) +
+        "  # the zubuvzpevnik-package it was exported with\n"
         "%   TEXINPUTS=\".:\"" + shellQuote(d) +
-        "\":$REPO/songs/chords:$REPO/songs/tinwhistle:$REPO:$REPO/zubuvzpevnik:\" \\\n"
-        "%     bash $REPO/scripts/build.sh " + indexArguments +
+        "\":$REPO/songs/chords:$REPO/songs/tinwhistle:$REPO:$PACKAGE:\" \\\n"
+        "%     bash $PACKAGE/scripts/build.sh " + indexArguments +
         shellQuote(d + "/" + toStdString(stem) + ".tex") + "\n";
     QString error;
     if (!writeFile(texPath, header + generated.tex, &error) ||
@@ -255,7 +266,7 @@ void SongbookExporter::exportFolder(const QString& stem, const zub::songbook::So
     QSettings{}.setValue(exportDirKey, parent);
     const QString target = QDir(parent).filePath(stem);
 
-    auto plan = zub::songbook::planFolderExport(book, root_, toStdString(stem), titleOf);
+    auto plan = zub::songbook::planFolderExport(book, root_, package_, toStdString(stem), titleOf);
     if (!plan) {
         QMessageBox::warning(window_, tr("Export LaTeX"), toQString(plan.error()));
         return;
@@ -265,6 +276,7 @@ void SongbookExporter::exportFolder(const QString& stem, const zub::songbook::So
     const QFileInfo targetInfo(target);
     const QString parentCanonical = QDir(parent).canonicalPath();
     const QString rootCanonical = QDir(toQString(root_)).canonicalPath();
+    const QString packageCanonical = QDir(toQString(package_)).canonicalPath();
     const QString targetCanonical = parentCanonical + QLatin1Char('/') + stem;
     const auto inside = [](const QString& path, const QString& dir) {
         return !dir.isEmpty() && (path == dir || path.startsWith(dir + QLatin1Char('/')));
@@ -274,6 +286,14 @@ void SongbookExporter::exportFolder(const QString& stem, const zub::songbook::So
         QMessageBox::warning(window_, tr("Export LaTeX"),
                              tr("%1 is a link or not directly in the chosen folder, so it is left "
                                 "alone. Choose another file name or folder.")
+                                 .arg(target));
+        return;
+    }
+    // Nor inside the package: the next export would copy this one with it.
+    if (inside(targetCanonical, packageCanonical) || inside(packageCanonical, targetCanonical)) {
+        QMessageBox::warning(window_, tr("Export LaTeX"),
+                             tr("%1 would be inside the package the app builds with (or contain "
+                                "it). Choose another folder.")
                                  .arg(target));
         return;
     }
@@ -419,6 +439,10 @@ bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution
 
 void SongbookExporter::exportPdf(const QString& id, zub::songbook::Songbook book,
                                  const TitleOf& titleOf) {
+    if (package_.empty()) {
+        QMessageBox::warning(window_, tr("Export PDF"), noPackageText());
+        return;
+    }
     const auto resolution = zub::songbook::resolveSongs(book, root_);
     if (!confirmSafety(resolution))
         return;
@@ -458,7 +482,7 @@ void SongbookExporter::exportPdf(const QString& id, zub::songbook::Songbook book
     }
 
     const auto command =
-        zub::songbook::buildCommand(book, root_, toPath(workDir), "book", generated.indexes);
+        zub::songbook::buildCommand(book, root_, package_, toPath(workDir), "book", generated.indexes);
     QStringList arguments;
     for (const std::string& argument : command.arguments)
         arguments << toQString(argument);

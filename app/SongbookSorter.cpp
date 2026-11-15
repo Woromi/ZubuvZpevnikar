@@ -33,8 +33,8 @@ void SongbookSorter::stopRun() {
     process_ = nullptr;
 }
 
-void SongbookSorter::setTools(const std::filesystem::path& songbookRoot, const QString& texlua) {
-    root_ = songbookRoot;
+void SongbookSorter::setTools(const std::filesystem::path& packageDir, const QString& texlua) {
+    root_ = packageDir;
     texlua_ = texlua;
 }
 
@@ -114,6 +114,10 @@ void SongbookSorter::startNext() {
     };
     if (texlua_.isEmpty()) {
         failNow(tr("texlua was not found (it comes with TeX Live)."));
+        return;
+    }
+    if (root_.empty()) {
+        failNow(tr("There is no package with scripts/songidx.lua to sort the songs with."));
         return;
     }
     if (localeUnavailable_ && !localeWarned_) {

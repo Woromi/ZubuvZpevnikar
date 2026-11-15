@@ -799,6 +799,18 @@ Použijte vestavěný.</translation>
         <translation>Nelze přehrát: %1</translation>
     </message>
     <message>
+        <source>No package to build the songs with: the songbook&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
+        <translation>Písně není čím sestavit: složka zubuvzpevnik/ zpěvníku není stažená (git submodule update --init) a aplikace nemá vlastní kopii balíčku.</translation>
+    </message>
+    <message>
+        <source>The songbook has no package of its own in zubuvzpevnik/: building with the app&apos;s copy.</source>
+        <translation>Zpěvník nemá ve složce zubuvzpevnik/ vlastní balíček: sestavuje se kopií z aplikace.</translation>
+    </message>
+    <message>
+        <source>The songbook&apos;s zubuvzpevnik/ has the older layout (no scripts/ inside): building with the app&apos;s copy of the package.</source>
+        <translation>Složka zubuvzpevnik/ zpěvníku má starší uspořádání (bez scripts/): sestavuje se kopií balíčku z aplikace.</translation>
+    </message>
+    <message>
         <source>Favourite: add or remove the label &quot;fav&quot; (one undo step; save to keep it)</source>
         <translation>Oblíbená: přidá nebo odebere štítek „fav“ (jeden krok zpět; uložením se zachová)</translation>
     </message>
@@ -1965,6 +1977,10 @@ Vynecháno (neplatný název písně): %1</translation>
         <source>Export LaTeX</source>
         <translation>Exportovat LaTeX</translation>
     </message>
+    <message>
+        <source>There is no package to build the songbook with: the songbook&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
+        <translation>Zpěvník není čím sestavit: složka zubuvzpevnik/ zpěvníku není stažená (git submodule update --init) a aplikace nemá vlastní kopii balíčku.</translation>
+    </message>
     <message numerus="yes">
         <source>Replace the existing file(s)?
 %1</source>
@@ -1992,6 +2008,10 @@ Vynecháno (neplatný název písně): %1</translation>
     <message>
         <source>%1 is a link or not directly in the chosen folder, so it is left alone. Choose another file name or folder.</source>
         <translation>%1 je odkaz nebo neleží přímo ve vybrané složce, proto zůstane nedotčen. Zvolte jiný název souboru nebo složku.</translation>
+    </message>
+    <message>
+        <source>%1 would be inside the package the app builds with (or contain it). Choose another folder.</source>
+        <translation>%1 by byla uvnitř balíčku, kterým aplikace sestavuje (nebo by ho obsahovala). Zvolte jinou složku.</translation>
     </message>
     <message>
         <source>%1 would be inside the ZubuvZpevnik checkout (or contain it). Choose another folder.</source>
@@ -2218,6 +2238,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>texlua was not found (it comes with TeX Live).</source>
         <translation>texlua nebyl nalezen (je součástí TeX Live).</translation>
+    </message>
+    <message>
+        <source>There is no package with scripts/songidx.lua to sort the songs with.</source>
+        <translation>Chybí balíček se scripts/songidx.lua, kterým se písně řadí.</translation>
     </message>
     <message>
         <source>No Czech locale (cs_CZ.UTF-8) is installed: the songs are sorted in the default locale&apos;s order, which may differ from the songbook&apos;s index.</source>

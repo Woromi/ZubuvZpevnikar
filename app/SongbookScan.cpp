@@ -71,6 +71,7 @@ void SongbookScan::next() {
         ConverterRunner::CommandFactory command;
         const auto converter = options_.converter;
         const auto root = options_.songbookRoot;
+        const auto package = options_.packageDir;
         switch (step.kind) {
         case Kind::Tidy:
             what = tr("Tidy: %1").arg(name);
@@ -105,8 +106,8 @@ void SongbookScan::next() {
             }
             what = tr("Measuring: %1").arg(name);
             const auto paper = options_.paper;
-            command = [converter, paper, root](const std::filesystem::path& file) {
-                return zub::songsuggest::shrinkCommand(converter, file, paper, true, root);
+            command = [converter, paper, root, package](const std::filesystem::path& file) {
+                return zub::songsuggest::shrinkCommand(converter, file, paper, true, root, package);
             };
             break;
         }

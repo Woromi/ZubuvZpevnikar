@@ -82,6 +82,7 @@
 #include <zub/core/fretboard.hpp>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
+#include <zub/core/package.hpp>
 #include <zub/core/linediff.hpp>
 #include <zub/core/midi.hpp>
 #include <zub/core/preview.hpp>
@@ -653,9 +654,13 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
         return false;
 
     songbookRoot_ = root;
+    // The songbook's own package (what its releases are built with), else the app's copy.
+    const auto ownPackage = zub::package::ofSongbook(root);
+    packageDir_ = ownPackage ? *ownPackage : bundledPackage();
     songbooksPage_->setSongbookRoot(root);
-    songbookExporter_->setSongbookRoot(root);
-    songbookSorter_->setTools(root, QStandardPaths::findExecutable(QStringLiteral("texlua")));
+    songbookExporter_->setSongbookRoot(root, packageDir_);
+    songbookSorter_->setTools(packageDir_,
+                              QStandardPaths::findExecutable(QStringLiteral("texlua")));
     if (options.remember)
         QSettings{}.setValue(songbookPathKey, toQString(root));
 
@@ -670,10 +675,26 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
     model_->setSongs(std::move(library->songs));
     updateLanguageFilter();
     preview_->setDocumentClasses(
-        zub::preview::documentClasses(root),
+        zub::preview::documentClasses(packageDir_),
         // The main songbook's class unless another was chosen.
         QSettings{}.value(previewClassKey, QStringLiteral("velkyzpevnik")).toString());
     updateStatus();
+    // zubuvzpevnik/ with the TeX files but no scripts/: a songbook from before the package
+    // became a repository of its own.
+    const bool olderLayout = !ownPackage && std::filesystem::is_regular_file(
+                                                root / "zubuvzpevnik" / "zubuvzpevnik.sty", ec);
+    if (packageDir_.empty())
+        statusBar()->showMessage(noPackageText(), 20000);
+    else if (olderLayout)
+        statusBar()->showMessage(
+            tr("The songbook's zubuvzpevnik/ has the older layout (no scripts/ inside): building "
+               "with the app's copy of the package."),
+            15000);
+    else if (!ownPackage)
+        statusBar()->showMessage(
+            tr("The songbook has no package of its own in zubuvzpevnik/: building with the app's "
+               "copy."),
+            15000);
     listTitle_ = QApplication::applicationDisplayName() + QStringLiteral(" — ") + toQString(root);
     updateWindowTitle();
     return true;
@@ -1815,6 +1836,7 @@ void MainWindow::requestPreview(bool userAsked) {
 
     zub::preview::Request request;
     request.songbookRoot = songbookRoot_;
+    request.packageDir = packageDir_;
     request.workDir = previewWorkDir_;
     request.inputName = inputNameOf(editor);
     request.tinwhistleSong = zub::songbook::inTinwhistleTree(songbookRoot_, editor->path());
@@ -2482,7 +2504,7 @@ void MainWindow::requestScorePreview(bool userAsked) {
     // The note names follow the song's language, like the songbook's LaTeX does.
     if (const auto meta = zub::parseSong(editor_->content()))
         request.germanNames = zub::score::germanNames(meta->value("lang"));
-    request.includeDir = songbookRoot_ / "zubuvzpevnik" / "lilypond";
+    request.includeDir = packageDir_ / "lilypond";
     // The build also writes the score's MIDI file, for Play.
     zub::score::MidiOptions midi;
     midi.factor = scorePreview_->tempoFactor();
@@ -3086,16 +3108,19 @@ void MainWindow::startProposals(SongAction action) {
     case SongAction::Shrink: {
         // --measure builds the song with lualatex -shell-escape: the same rule as for a preview.
         // Declined, the proposals are still useful, just without page counts.
-        const bool measure = approveBuild(editor, content, true, nullptr, tr("Measure"),
+        // Without a package nothing can be typeset: the proposals come without page counts.
+        const bool measure = !packageDir_.empty() &&
+                             approveBuild(editor, content, true, nullptr, tr("Measure"),
                                           tr("Suggest Without Measuring"));
         measuredRun_ = measure;
         if (measure)
             requestPreview(); // approved now: the pane's "Not built automatically" message goes
         // No paper known (a class without a paper option): no --fit, the converter measures both.
         const auto paper =
-            zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
-        command = [converter, paper, measure, root](const std::filesystem::path& file) {
-            return zub::songsuggest::shrinkCommand(converter, file, paper, measure, root);
+            zub::preview::paperOf(packageDir_, toStdString(preview_->documentClass()));
+        command = [converter, paper, measure, root, package = packageDir_](
+                      const std::filesystem::path& file) {
+            return zub::songsuggest::shrinkCommand(converter, file, paper, measure, root, package);
         };
         status = tr("Looking for ways to make the song smaller…");
         break;
@@ -3108,13 +3133,17 @@ void MainWindow::startProposals(SongAction action) {
         status = tr("Checking the song…");
         break;
     case SongAction::Join:
-        // join always typesets the song: without the approval it can't run.
+        // join always typesets the song: without a package or the approval it can't run.
+        if (packageDir_.empty()) {
+            QMessageBox::information(this, name, noPackageText());
+            return;
+        }
         if (!approveBuild(editor, content, true, nullptr, tr("Build"), tr("Cancel")))
             return;
         requestPreview();
         measuredRun_ = true;
-        command = [converter, root](const std::filesystem::path& file) {
-            return zub::songsuggest::joinCommand(converter, file, root);
+        command = [converter, root, package = packageDir_](const std::filesystem::path& file) {
+            return zub::songsuggest::joinCommand(converter, file, root, package);
         };
         status = tr("Checking which lines can be joined (typesetting the song, a few seconds)…");
         break;
@@ -3382,21 +3411,23 @@ void MainWindow::onApplyFinished(const std::expected<ConverterOutput, QString>& 
 void MainWindow::startMeasure(SongEditor* editor) {
     const std::filesystem::path converter = findConverter();
     if (!editor || editor->textEdit()->isReadOnly() || converterRunner_->isRunning() ||
-        songbookRoot_.empty() || converter.empty() || !converterProblem(converter).isEmpty())
+        songbookRoot_.empty() || packageDir_.empty() || converter.empty() ||
+        !converterProblem(converter).isEmpty())
         return;
     const std::string content = editor->content();
     // Measuring builds the song: only when it is approved already, never a new question.
     if (!approveBuild(editor, content, false))
         return;
-    const auto paper = zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
+    const auto paper = zub::preview::paperOf(packageDir_, toStdString(preview_->documentClass()));
     const std::filesystem::path root = songbookRoot_;
+    const std::filesystem::path package = packageDir_;
     runKind_ = RunKind::Measure;
     runEditor_ = editor;
     runInput_ = content;
     statusBar()->showMessage(tr("Measuring…"));
     if (!converterRunner_->start(
-            [converter, paper, root](const std::filesystem::path& file) {
-                return zub::songsuggest::shrinkCommand(converter, file, paper, true, root);
+            [converter, paper, root, package](const std::filesystem::path& file) {
+                return zub::songsuggest::shrinkCommand(converter, file, paper, true, root, package);
             },
             content, toQString(editor->path().stem())))
         return;
@@ -3444,6 +3475,29 @@ std::filesystem::path MainWindow::builtInConverter() const {
     const QString path =
         QDir(QApplication::applicationDirPath()).filePath(QStringLiteral("chords_converter"));
     return usableConverter(path) ? toPath(path) : std::filesystem::path{};
+}
+
+QString MainWindow::noPackageText() const {
+    return tr("No package to build the songs with: the songbook's zubuvzpevnik/ is not checked "
+              "out (git submodule update --init), and this app has no copy of its own.");
+}
+
+std::filesystem::path MainWindow::bundledPackage() const {
+    // Installed next to the app by cmake --install (share/zpevnikar/zubuvzpevnik), else the
+    // external/zubuvzpevnik-package submodule of the source tree the app was built from.
+    const QStringList candidates{
+        QDir(QApplication::applicationDirPath())
+            .filePath(QStringLiteral("../share/zpevnikar/zubuvzpevnik")),
+#ifdef ZUB_BUNDLED_PACKAGE_DIR
+        QStringLiteral(ZUB_BUNDLED_PACKAGE_DIR),
+#endif
+    };
+    for (const QString& candidate : candidates) {
+        const auto path = toPath(QDir::cleanPath(candidate));
+        if (zub::package::isPackage(path))
+            return path;
+    }
+    return {};
 }
 
 std::filesystem::path MainWindow::findConverter() const {
@@ -3560,7 +3614,7 @@ void MainWindow::scanSongbook() {
     }
     if (!converterUsable(converter, name))
         return;
-    const auto paper = zub::preview::paperOf(songbookRoot_, toStdString(preview_->documentClass()));
+    const auto paper = zub::preview::paperOf(packageDir_, toStdString(preview_->documentClass()));
     const QString paperName = !paper                                  ? tr("its paper")
                               : *paper == zub::songsuggest::Paper::A5 ? QStringLiteral("A5")
                                                                       : QStringLiteral("A4");
@@ -3586,6 +3640,11 @@ void MainWindow::scanSongbook() {
     tidy->setChecked(settings.value(QStringLiteral("scan/tidy"), true).toBool());
     check->setChecked(settings.value(QStringLiteral("scan/check"), true).toBool());
     shrink->setChecked(settings.value(QStringLiteral("scan/shrink"), false).toBool());
+    if (packageDir_.empty()) { // measuring typesets every song
+        shrink->setChecked(false);
+        shrink->setEnabled(false);
+        shrink->setToolTip(noPackageText());
+    }
     for (QCheckBox* box : {tidy, check, shrink})
         layout->addWidget(box);
     const int shown = proxy_->rowCount();
@@ -3615,7 +3674,8 @@ void MainWindow::scanSongbook() {
         return;
     settings.setValue(QStringLiteral("scan/tidy"), tidy->isChecked());
     settings.setValue(QStringLiteral("scan/check"), check->isChecked());
-    settings.setValue(QStringLiteral("scan/shrink"), shrink->isChecked());
+    if (shrink->isEnabled()) // switched off for want of a package: the choice stays as it was
+        settings.setValue(QStringLiteral("scan/shrink"), shrink->isChecked());
 
     std::vector<SongbookScan::Song> songs;
     if (shownSongs->isChecked()) {
@@ -3636,6 +3696,7 @@ void MainWindow::scanSongbook() {
     options.paper = paper;
     options.converter = converter;
     options.songbookRoot = songbookRoot_;
+    options.packageDir = packageDir_;
 
     model_->clearScanResults();
     scanFound_ = 0;

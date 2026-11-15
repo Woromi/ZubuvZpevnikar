@@ -22,8 +22,9 @@ public:
     explicit SongbookSorter(QObject* parent = nullptr);
     ~SongbookSorter() override;
 
-    // The ZubuvZpevnik checkout and the texlua executable ("" = not found).
-    void setTools(const std::filesystem::path& songbookRoot, const QString& texlua);
+    // The package (its scripts/songidx.lua sorts) and the texlua executable ("" = not found);
+    // an empty package fails every sort with a message.
+    void setTools(const std::filesystem::path& packageDir, const QString& texlua);
 
     // `entries` runs parallel to `inputNames`. A newer request with the same `key` replaces a
     // pending or running one (its result is dropped).
@@ -49,7 +50,7 @@ private:
     void finishLocale(const QString& output, bool ran);
     void stopRun();
 
-    std::filesystem::path root_;
+    std::filesystem::path root_; // the package (zub::package)
     QString texlua_;
     bool localeDone_ = false;
     bool localeWarned_ = false;
