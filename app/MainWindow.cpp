@@ -2185,6 +2185,8 @@ void MainWindow::attachScoreEditor(int tabIndex, SongEditor* editor) {
             scorePreview_->setHighlightedNotes({});
             scorePreview_->setSelectableNotes({});
             scorePreview_->setCaretNote({});
+            scoreStops_.reset(); // the keys' stops and anchor were of the old text
+            scoreAnchor_.reset();
             scorePreviewTimer_->start();
             fretboardTimer_->start();
         }
@@ -2305,6 +2307,8 @@ void MainWindow::onTabChanged() {
     scoreLinksFresh_ = false;
     scorePreview_->setSelectableNotes({});
     scorePreview_->setCaretNote({});
+    scoreStops_.reset(); // the keys' stops and anchor belong to the tab that was shown
+    scoreAnchor_.reset();
     if (song) {
         scoreRunner_->cancel();
         if (pdfStale_ && editor_)
@@ -2797,6 +2801,8 @@ void MainWindow::scoreKey(ScorePreviewPane::KeyCommand command, bool extend, boo
     if (!editor || onSongTab())
         return;
     if (command == Key::Undo || command == Key::Redo) {
+        scoreStops_.reset(); // the text changes under the keys' stops
+        scoreAnchor_.reset();
         if (command == Key::Undo)
             editor->textEdit()->undo();
         else
@@ -2838,18 +2844,14 @@ void MainWindow::scoreKey(ScorePreviewPane::KeyCommand command, bool extend, boo
         return;
     }
 
-    // The stops the selection stands between: the keys' own when the selection is still theirs.
-    const auto spanOf = [&](std::size_t a, std::size_t b) {
-        const auto [lo, hi] = std::minmax(a, b);
-        if (lo == hi)
-            return std::make_pair(zub::scoreregion::stopOffset(events, lo),
-                                  zub::scoreregion::stopOffset(events, lo));
-        return std::make_pair(events[lo].begin, events[hi - 1].end);
-    };
+    // The stops the selection stands between: the keys' own when the selection is still theirs
+    // (stops kept from an older text with more events give no span).
     std::size_t anchorStop = zub::scoreregion::caretStop(events, low);
     std::size_t activeStop = zub::scoreregion::caretStop(events, high);
-    if (scoreStops_ &&
-        spanOf(scoreStops_->first, scoreStops_->second) == std::make_pair(low, high)) {
+    const auto kept =
+        scoreStops_ ? zub::scoreregion::stopSpan(events, scoreStops_->first, scoreStops_->second)
+                    : std::nullopt;
+    if (kept && kept->begin == low && kept->end == high) {
         anchorStop = scoreStops_->first;
         activeStop = scoreStops_->second;
     } else if (!selection) {
@@ -2884,13 +2886,15 @@ void MainWindow::scoreKey(ScorePreviewPane::KeyCommand command, bool extend, boo
     }
 
     if (extend) {
-        const auto [begin, finish] = spanOf(anchorStop, targetStop);
+        const auto span = zub::scoreregion::stopSpan(events, anchorStop, targetStop);
+        if (!span)
+            return;
         scoreStops_ = std::make_pair(anchorStop, targetStop);
         scoreAnchor_ = zub::scoreregion::stopOffset(events, anchorStop);
-        if (begin < finish)
-            editor->selectByteRange(begin, finish, false);
+        if (span->begin < span->end)
+            editor->selectByteRange(span->begin, span->end, false);
         else
-            editor->setCursorByteOffset(begin, false);
+            editor->setCursorByteOffset(span->begin, false);
     } else {
         const std::size_t offset =
             targetOffset.value_or(zub::scoreregion::stopOffset(events, targetStop));
