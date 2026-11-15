@@ -66,6 +66,9 @@ private:
     void editAtCursors(const std::function<void(QTextCursor&)>& edit);
     void dropDuplicateCursors();
     void updateExtraSelections();
+    // Hides Qt's cursor while there are extra cursors (paintEvent draws them all), shows it after.
+    void updateCursorDrawing();
+    void restartBlink();
     int areaWidth() const;
     void updateAreaWidth();
     void updateArea(const QRect& rect, int dy);
@@ -74,6 +77,9 @@ private:
     QList<QAction*> extraActions_;
     QList<QTextCursor> extraCursors_;
     QList<QTextEdit::ExtraSelection> occurrenceMarks_;
+    QTimer* blinkTimer_ = nullptr;
+    bool blinkOn_ = true;
+    int ownCursorWidth_ = -1; // Qt's cursor width while it is hidden, else -1
     int growth_ = 0;              // -1 up, +1 down: where the extra cursors were added
     int multiColumn_ = -1;        // the column new cursors go to
     bool keepingCursors_ = false; // our own edits move the main cursor: keep the extra ones

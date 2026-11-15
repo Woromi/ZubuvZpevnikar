@@ -40,6 +40,13 @@ CodeTextEdit::CodeTextEdit(QWidget* parent)
     connect(this, &QPlainTextEdit::cursorPositionChanged, this, [this] {
         if (!keepingCursors_)
             clearExtraCursors();
+        else if (!extraCursors_.isEmpty())
+            restartBlink();
+    });
+    blinkTimer_ = new QTimer(this);
+    connect(blinkTimer_, &QTimer::timeout, this, [this] {
+        blinkOn_ = !blinkOn_;
+        viewport()->update();
     });
     updateAreaWidth();
 }
@@ -91,7 +98,7 @@ void CodeTextEdit::clearExtraCursors() {
         return;
     extraCursors_.clear();
     updateExtraSelections();
-    viewport()->update();
+    updateCursorDrawing();
 }
 
 void CodeTextEdit::addCursorVertically(int direction) {
@@ -104,7 +111,7 @@ void CodeTextEdit::addCursorVertically(int direction) {
         if (extraCursors_.isEmpty())
             growth_ = 0;
         updateExtraSelections();
-        viewport()->update();
+        updateCursorDrawing();
         return;
     }
     if (multiColumn_ < 0)
@@ -119,7 +126,7 @@ void CodeTextEdit::addCursorVertically(int direction) {
     growth_ = direction;
     dropDuplicateCursors();
     updateExtraSelections();
-    viewport()->update();
+    updateCursorDrawing();
 }
 
 void CodeTextEdit::dropDuplicateCursors() {
@@ -336,14 +343,42 @@ bool CodeTextEdit::event(QEvent* event) {
 
 void CodeTextEdit::paintEvent(QPaintEvent* event) {
     QPlainTextEdit::paintEvent(event);
-    if (extraCursors_.isEmpty())
+    // With several cursors Qt's own one is hidden: all of them are drawn here, blinking together.
+    if (extraCursors_.isEmpty() || !hasFocus() || !blinkOn_)
         return;
     QPainter painter(viewport());
-    for (const QTextCursor& cursor : std::as_const(extraCursors_)) {
+    for (const QTextCursor& cursor : cursors()) {
         const QRect rect = cursorRect(cursor);
-        painter.fillRect(rect.x(), rect.y(), std::max(1, cursorWidth()), rect.height(),
+        painter.fillRect(rect.x(), rect.y(), std::max(1, ownCursorWidth_), rect.height(),
                          palette().text());
     }
+}
+
+void CodeTextEdit::updateCursorDrawing() {
+    if (!extraCursors_.isEmpty()) {
+        if (ownCursorWidth_ < 0) {
+            ownCursorWidth_ = cursorWidth();
+            setCursorWidth(0);
+        }
+        restartBlink();
+    } else if (ownCursorWidth_ >= 0) {
+        setCursorWidth(ownCursorWidth_);
+        ownCursorWidth_ = -1;
+        blinkTimer_->stop();
+        viewport()->update();
+    }
+}
+
+void CodeTextEdit::restartBlink() {
+    // Shown right after every key and move, like Qt's own cursor; no blinking when the system
+    // turns it off.
+    blinkOn_ = true;
+    const int flash = QApplication::cursorFlashTime();
+    if (flash > 0)
+        blinkTimer_->start(flash / 2);
+    else
+        blinkTimer_->stop();
+    viewport()->update();
 }
 
 void CodeTextEdit::mousePressEvent(QMouseEvent* event) {
@@ -400,8 +435,11 @@ void CodeTextEdit::keyPressEvent(QKeyEvent* event) {
         addCursorVertically(event->key() == Qt::Key_Up ? -1 : +1);
         return;
     }
-    if (!extraCursors_.isEmpty() && multiCursorKey(event))
+    if (!extraCursors_.isEmpty() && multiCursorKey(event)) {
+        if (!extraCursors_.isEmpty())
+            restartBlink();
         return;
+    }
     if (keyFilter_ && keyFilter_(event))
         return;
     processKey(event);
