@@ -15,6 +15,7 @@ struct SongEntry {
     std::string inputName;      // "Artist/Title": what a project writes into \input{}
     SongMetadata meta;
     std::vector<std::string> todos; // its TODO comments (zub::todo::notes), file order
+    std::vector<std::string> scores; // its \lilypondfile targets (songbook::referencedFiles)
 };
 
 // A file that could not be read or parsed, or that looks suspicious.

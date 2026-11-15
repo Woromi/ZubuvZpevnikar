@@ -116,3 +116,14 @@ TEST_CASE("scanLibrary reads the real songbook without issues", "[.integration]"
         }
     }
 }
+
+TEST_CASE("scanLibrary records the scores a song includes", "[library]") {
+    const auto library = zub::scanLibrary(fixtureRepo);
+    REQUIRE(library);
+    const auto* california = find(*library, "TheMamasAndThePapas/CaliforniaDreamin");
+    REQUIRE(california);
+    CHECK(california->scores == std::vector<std::string>{"TheMamasAndThePapas/CaliforniaDreamin.ly"});
+    const auto* abba = find(*library, "Abba/OurLastSummer");
+    REQUIRE(abba);
+    CHECK(abba->scores.empty());
+}
