@@ -378,6 +378,11 @@ std::vector<std::string> unknownConstructs(std::string_view songContent) {
                 }
             }
             i += 2;
+        } else if (c == '\r' && (i + 1 >= text.size() || text[i + 1] != '\n')) {
+            // A bare CR ends a TeX line, so a comment stops there and code follows. Songs are
+            // LF or CRLF files; report the rest, whatever the comment stripper made of it.
+            report("^^M");
+            ++i;
         } else {
             ++i;
         }

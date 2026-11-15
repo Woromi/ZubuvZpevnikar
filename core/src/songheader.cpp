@@ -31,7 +31,7 @@ std::string maskComments(std::string_view tex) {
         if (out[i] == '\\') {
             ++i;
         } else if (out[i] == '%') {
-            while (i < out.size() && out[i] != '\n')
+            while (i < out.size() && out[i] != '\n' && out[i] != '\r') // TeX's line ends
                 out[i++] = ' ';
         }
     }
@@ -141,7 +141,6 @@ bool restOfLineIsEmpty(std::string_view orig, std::size_t pos, std::size_t& comm
         ++p;
     return p >= orig.size() || orig[p] == '\n' || orig[p] == '\r';
 }
-
 
 } // namespace
 
@@ -320,8 +319,8 @@ std::optional<std::string> option(std::string_view songText, std::string_view ke
     return found;
 }
 
-
-std::string measuredPapers(std::string_view currentPap, const std::optional<songsuggest::Measured>& a4,
+std::string measuredPapers(std::string_view currentPap,
+                           const std::optional<songsuggest::Measured>& a4,
                            const std::optional<songsuggest::Measured>& a5) {
     std::vector<std::string> a4Entries, a5Entries, others;
     std::size_t start = 0;

@@ -19,7 +19,7 @@ std::string blankComments(std::string_view tex) {
     std::string out(tex);
     bool inComment = false;
     for (std::size_t i = 0; i < out.size(); ++i) {
-        if (out[i] == '\n') {
+        if (out[i] == '\n' || out[i] == '\r') { // TeX's line ends
             inComment = false;
         } else if (inComment) {
             out[i] = ' ';
@@ -139,7 +139,8 @@ bool isContinuation(char c) {
 }
 
 std::size_t codePoints(std::string_view s) {
-    return static_cast<std::size_t>(std::ranges::count_if(s, [](char c) { return !isContinuation(c); }));
+    return static_cast<std::size_t>(
+        std::ranges::count_if(s, [](char c) { return !isContinuation(c); }));
 }
 
 // The first `count` code points of `s` (whole UTF-8 sequences).
@@ -154,9 +155,11 @@ std::string_view firstCodePoints(std::string_view s, std::size_t count) {
 
 // Commands whose arguments are not printed text (file names, part kinds, numbers).
 bool dropsArguments(std::string_view name) {
-    static constexpr std::string_view names[] = {
-        "lilypondfile", "narrowlilypondfile", "usechords", "copychords", "setchordwidth",
-        "transpose", "capo", "memorize", "replay", "baselineadj", "addtocounter", "mbar", "role"};
+    static constexpr std::string_view names[] = {"lilypondfile", "narrowlilypondfile", "usechords",
+                                                 "copychords",   "setchordwidth",      "transpose",
+                                                 "capo",         "memorize",           "replay",
+                                                 "baselineadj",  "addtocounter",       "mbar",
+                                                 "role"};
     return std::ranges::find(names, name) != std::end(names);
 }
 
@@ -203,7 +206,8 @@ ShownLine shownLine(std::string_view line) {
                 }
             } else {
                 // options are never printed text, nor the arguments of some commands
-                while (end < line.size() && (line[end] == '[' || (dropsArguments(name) && line[end] == '{'))) {
+                while (end < line.size() &&
+                       (line[end] == '[' || (dropsArguments(name) && line[end] == '{'))) {
                     const auto close = latex::findMatching(line, end);
                     if (!close)
                         break;
@@ -212,7 +216,8 @@ ShownLine shownLine(std::string_view line) {
             }
             i = end;
         } else if (c == '\\') {
-            if (i + 1 < line.size() && std::string_view("&%#$_").find(line[i + 1]) != std::string_view::npos)
+            if (i + 1 < line.size() &&
+                std::string_view("&%#$_").find(line[i + 1]) != std::string_view::npos)
                 text += line[i + 1];
             else
                 space();
@@ -301,7 +306,7 @@ Outline outline(std::string_view songText) {
     Chords songChords = Chords::On;
     int verses = 0;
     std::optional<int> latestChorus;
-    std::map<std::string, int> seen; // name key -> how often so far
+    std::map<std::string, int> seen;                               // name key -> how often so far
     std::map<std::optional<int>, std::vector<ShownLine>> choruses; // by number, for repeats
 
     const auto chorusName = [&](std::optional<int> chorusNumber) {
@@ -397,7 +402,8 @@ Outline outline(std::string_view songText) {
                 from = next;
             }
             if (!terminated) {
-                for (auto next = nextCommand(song, after); next; next = nextCommand(song, next->end)) {
+                for (auto next = nextCommand(song, after); next;
+                     next = nextCommand(song, next->end)) {
                     if ((next->name.size() > 5 && next->name.starts_with("begin")) ||
                         next->name == "insertchorus") {
                         endAt = next->begin;
@@ -444,9 +450,8 @@ namespace {
 // By position; edits at the same position keep their order.
 std::vector<songsuggest::Edit> sortedEdits(std::span<const songsuggest::Edit> edits) {
     std::vector<songsuggest::Edit> sorted(edits.begin(), edits.end());
-    std::ranges::stable_sort(sorted, {}, [](const songsuggest::Edit& e) {
-        return std::pair{e.start, e.end};
-    });
+    std::ranges::stable_sort(sorted, {},
+                             [](const songsuggest::Edit& e) { return std::pair{e.start, e.end}; });
     return sorted;
 }
 
@@ -511,8 +516,8 @@ std::expected<Preview, std::string> preview(std::string_view before,
         std::size_t oldBegin = parts[i].begin;
         for (const auto& l : landed) {
             if (l.end <= parts[i].begin) {
-                oldBegin = static_cast<std::size_t>(static_cast<long long>(parts[i].begin) -
-                                                    l.shiftAfter);
+                oldBegin =
+                    static_cast<std::size_t>(static_cast<long long>(parts[i].begin) - l.shiftAfter);
             } else {
                 if (l.start <= parts[i].begin)
                     oldBegin = l.edit->start;

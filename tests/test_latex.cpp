@@ -8,6 +8,9 @@ TEST_CASE("stripComments removes comments but keeps escaped percent and newlines
     CHECK(stripComments("100\\% sure % really") == "100\\% sure ");
     CHECK(stripComments("% whole line\n% another\nx") == "\n\nx");
     CHECK(stripComments("no comment") == "no comment");
+    // TeX ends a line at CR too: a bare CR ends the comment, CRLF stays whole.
+    CHECK(stripComments("a % c\rb") == "a \rb");
+    CHECK(stripComments("a % c\r\nb") == "a \r\nb");
     CHECK(stripComments("trailing %") == "trailing ");
     CHECK(stripComments("ends with backslash\\") == "ends with backslash\\");
 }

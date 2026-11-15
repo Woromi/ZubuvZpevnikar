@@ -126,3 +126,9 @@ TEST_CASE("setOption pap round-trips every real song", "[.integration][songheade
     }
     CHECK(n > 150);
 }
+
+TEST_CASE("a comment ends at a bare CR, as in TeX", "[songheader]") {
+    // Before, the comment ran to the LF and swallowed the key.
+    CHECK(option(song("\\beginsong{T}[by={A}, % x\rkey={C}]\n"), "key") == "C");
+    CHECK(option(song("\\beginsong{T}[by={A}, % x\r\nkey={C}]\n"), "key") == "C");
+}

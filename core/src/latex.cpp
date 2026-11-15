@@ -96,10 +96,11 @@ std::string stripComments(std::string_view tex) {
             }
             i += 2;
         } else if (c == '%') {
-            const auto newline = tex.find('\n', i);
+            // TeX ends a line, and with it a comment, at CR as well as at LF.
+            const auto newline = tex.find_first_of("\r\n", i);
             if (newline == std::string_view::npos)
                 break;
-            i = newline; // the newline itself is copied by the next iteration
+            i = newline; // the line end itself is copied by the next iteration
         } else {
             out += c;
             ++i;

@@ -61,6 +61,8 @@ TEST_CASE("unknown constructs are reported", "[safety]") {
     CHECK(scan("\\^^64irectlua{os.execute('x')}") == Constructs{"\\^^", "^^64"});
     CHECK(scan("\\[\\^^5cdirectlua]") == Constructs{"\\^^", "^^5c"});
     CHECK(scan("\\^^M") == Constructs{"\\^^", "^^M"});
+    // A bare CR ends a TeX line: the comment stops there, and the CR itself is reported.
+    CHECK(scan("% x\r\\directlua{}") == Constructs{"^^M", "\\directlua"});
     CHECK(scan("\\beginverse \\[]\\directlua{}\\[ \\endverse") == Constructs{"\\directlua"});
     CHECK(scan("\\foo \\bar \\foo* \\foo") == Constructs{"\\foo", "\\bar"});
     CHECK(scan("100\\% \\directlua") == Constructs{"\\directlua"});
@@ -71,7 +73,8 @@ TEST_CASE("harmless text is not reported", "[safety]") {
     CHECK(scan("| ^\\[]\\[] | ^^ | ^^^ |").empty());
     CHECK(scan("\\[B&] \\[\\nochord] \\beginverse* \\endverse").empty());
     CHECK(scan("a \\\\ b \\, c \\& d \\ e").empty());
-    CHECK(scan("\\^{e} \\^e \\^ ^ ^^").empty()); // the accent, not the escape
+    CHECK(scan("\\^{e} \\^e \\^ ^ ^^").empty());  // the accent, not the escape
+    CHECK(scan("a\r\nb % c\r\n% d\r\n").empty()); // CRLF files
 }
 
 namespace {

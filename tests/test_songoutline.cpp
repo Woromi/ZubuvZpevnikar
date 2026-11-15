@@ -274,3 +274,10 @@ TEST_CASE("shown lines: no space before the cut, chords whole", "[songoutline]")
     CHECK(outline.parts[0].shown[0].text == "Our paper lantern floated down the…");
     CHECK(outline.parts[0].shown[0].chords == "D"); // D6 at 35 would cross the edge
 }
+
+TEST_CASE("outline: a comment ends at a bare CR, as in TeX", "[songoutline]") {
+    const std::string song = "\\beginsong{T}[by=X]\n"
+                             "% note\r\\beginverse\n\\[C]la\n\\endverse\n"
+                             "\\endsong\n";
+    CHECK(summary(so::outline(song)) == "Verse 1|");
+}
