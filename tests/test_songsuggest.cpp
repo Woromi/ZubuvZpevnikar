@@ -332,8 +332,8 @@ TEST_CASE("apply interprets real runs", "[songsuggest]") {
 TEST_CASE("version output is parsed", "[converter]") {
     const auto version = cv::parseVersion(slurp(converterData / "version.out"));
     REQUIRE(version);
-    CHECK(*version == cv::Version{0, 14, 0});
-    CHECK(cv::toString(*version) == "0.14.0");
+    CHECK(*version == cv::Version{0, 15, 0});
+    CHECK(cv::toString(*version) == "0.15.0");
     CHECK(*version >= cv::kRequired);
 
     CHECK(cv::parseVersion("chords_converter 0.10.3\r\nmore")->minor == 10);
