@@ -149,6 +149,11 @@ reading problems) and metadata the site provides but the parser misses (capo, me
 Decided with the user (2026-11-11): the app stores songbooks itself (`AppDataLocation/songbooks/<id>.json`); nothing in `ZubuvZpevnik/projects/` is read or written. A songbook has a class (velkyzpevnik / malyzpevnik / taborovyzpevnik), title, author, options, and one unnamed section or several named ones (`\songsection`, one `songs` environment each, one shared title + author index); songs are in title-index order within a section (the songbook's own `scripts/songidx.lua`, as `checkorder.py` runs it). Songs are picked on a Songbooks page, not in the main list (there a click opens a song). Export: PDF (built in the app's cache dir with the repo's `scripts/build.sh`, never in `ZubuvZpevnik/build/`), or LaTeX: just the `.tex` (builds inside a checkout) or a self-contained folder (songs + their `.ly`, `zubuvzpevnik/`, the build scripts, the class's image, a `build.sh` and README).
 
 - [x] core (`zub::songbook`): model + JSON, `.tex` generation per class, index-order input/output for `songidx.lua`, files a song references, folder-export plan, build command.
+- [x] **The repo's books** (decided with the user 2026-11-16; the songbook moved `projects/` to `songbooks/` and the package gained `\beginkeeporder`/`\endkeeporder`). The Songbooks page lists two virtual folders:
+  - "Songbooks": `songbooks/` with its subfolders.
+  - "External": the JSON books.
+
+  Repo books get their songs added, removed, moved and sorted byte-exactly (`zub::bookfile`: blocks by their first song; wish lines are kept, a removed input with a note is commented out). Sections and the preamble are edited in the .tex (Open Folder). Export PDF builds a copy in the cache after the book safety check (`zub::safety::unknownBookConstructs`). Later: New songbook in `songbooks/` (a .tex + build.sh), editing sections in the app, a page for wishes and imports.
 - [x] app: Songbooks page (list, settings, a tree with the songs outside sections at its root and the named sections below; a picker with Ctrl/Shift selection, Add/Remove and dragging onto the tree; drag to reorder within a section, into another section a song goes to its alphabetical place; Sort Alphabetically for the book or one section), sorting with `texlua songidx.lua`.
 - [x] app: export PDF / `.tex` / folder.
 - [x] Cover image (none by default; png/jpg/pdf), a title page per named section, the title index split into sections, the author index optional (2026-11-11). The camp booklet falls back to one title index when the split would not fit its single index page.
@@ -206,7 +211,7 @@ Asked by the user 2026-11-11. Qt Linguist translations in `app/i18n/`.
 ## Later ideas
 - Section images (asked by the user 2026-11-11): each named section can have an image on its title page (like the cover: optional, png/jpg/pdf; copied next to the generated .tex as `section<k>.<ext>`, also into the folder export). `\zubsectionpage` would take it as a third argument and place it under the title (sized to fit the page; check A5 and the malyzpevnik right-hand title page). Stored per section in the songbook JSON (`image`).
 - Songbook key (asked by the user 2026-11-11): set a songbook to a certain key and transpose every song to match it. The semitones per song come from its `key` header (and `\transpose` it already has); the generated `.tex` would put `\transpose{n}` before each `\input` (the songs package's transposition; check how it interacts with `capo`, a song's own `\transpose`, and minor keys: matching relative major/minor or the written key). Open: one key for the whole book or per section/song, and what "match" means for minor songs.
-- Import an existing project (`projects/*/*.tex`: class, title, `\input` lists, `\songsection`s) as an app songbook. Not now (decided 2026-11-11).
+- ~~Import an existing project as an app songbook~~: replaced by the repo's books on the Songbooks page (2026-11-16, below).
 
 - Run the linters (`checksongs.py`, `checkkeys.py`) from the app and show the results inline.
 - Transpose a song, and an editor for chord diagrams.

@@ -395,7 +395,12 @@ QWidget* SongbooksPage::buildPickerPane() {
     }
     connect(check_, &QPushButton::clicked, this, &SongbooksPage::checkBook);
     connect(exportPdf_, &QPushButton::clicked, this,
-            [this] { exporter_->exportPdf(id_, book_, titleLookup()); });
+            [this] {
+                if (repo_)
+                    exporter_->exportRepoPdf(repoPathOf(id_), repoText_, book_);
+                else
+                    exporter_->exportPdf(id_, book_, titleLookup());
+            });
     connect(exportLatex_, &QPushButton::clicked, this,
             [this] { exporter_->exportLatex(id_, book_, titleLookup()); });
     refreshLanguages();
@@ -958,7 +963,7 @@ void SongbooksPage::updateButtons() {
     for (const auto& section : book_.sections)
         hasSongs = hasSongs || !section.songs.empty();
     check_->setEnabled(editable_ && hasSongs);
-    exportPdf_->setEnabled(editable_ && hasSongs && !repo_);
+    exportPdf_->setEnabled(editable_ && hasSongs);
     exportLatex_->setEnabled(editable_ && hasSongs && !repo_);
     sortAll_->setEnabled(editable_ && hasSongs);
 

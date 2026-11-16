@@ -616,4 +616,32 @@ std::vector<std::filesystem::path> findBooks(const std::filesystem::path& repoRo
     return out;
 }
 
+songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
+                                    const std::filesystem::path& packageDir,
+                                    const std::filesystem::path& workDir,
+                                    const std::filesystem::path& bookDir, std::string_view bookName,
+                                    const std::vector<std::string>& indexes) {
+    const auto utf8 = [](const std::filesystem::path& p) {
+        const auto u8 = p.u8string();
+        return std::string(u8.begin(), u8.end());
+    };
+    songbook::BuildCommand command;
+    const std::string root = utf8(repoRoot);
+    command.program = "bash";
+    command.arguments = {utf8(packageDir / "scripts/build.sh")};
+    for (const auto& index : indexes) {
+        command.arguments.emplace_back("-i");
+        command.arguments.push_back(index);
+    }
+    command.arguments.push_back(utf8(workDir / (std::string(bookName) + ".tex")));
+    command.workingDirectory = workDir;
+    command.environment.emplace_back("TEXINPUTS", ".:" + utf8(workDir) + ":" + utf8(bookDir) +
+                                                      ":" + root + "/songs/chords:" + root +
+                                                      "/songs/tinwhistle:" + root + ":" +
+                                                      utf8(packageDir) + ":");
+    command.pdf = workDir / (std::string(bookName) + ".pdf");
+    command.log = workDir / (std::string(bookName) + ".log");
+    return command;
+}
+
 } // namespace zub::bookfile

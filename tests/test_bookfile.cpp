@@ -421,3 +421,17 @@ TEST_CASE("every real book parses and round-trips", "[.integration][bookfile]") 
         }
     }
 }
+
+TEST_CASE("bookfile builds a repo book from a copy in the work dir", "[bookfile]") {
+    const auto command = zub::bookfile::buildCommand("/sb", "/pkg", "/work", "/sb/songbooks/t/2025",
+                                                     "book", {"obsah", "obsahAutor"});
+    CHECK(command.program == "bash");
+    CHECK(command.arguments == std::vector<std::string>{"/pkg/scripts/build.sh", "-i", "obsah",
+                                                        "-i", "obsahAutor", "/work/book.tex"});
+    CHECK(command.workingDirectory == "/work");
+    REQUIRE(command.environment.size() == 1);
+    CHECK(command.environment[0].second ==
+          ".:/work:/sb/songbooks/t/2025:/sb/songs/chords:/sb/songs/tinwhistle:/sb:/pkg:");
+    CHECK(command.pdf == "/work/book.pdf");
+    CHECK(command.log == "/work/book.log");
+}

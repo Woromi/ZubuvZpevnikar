@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -29,6 +30,10 @@ public:
     using TitleOf = std::function<std::string(std::string_view inputName)>;
     void exportLatex(const QString& id, zub::songbook::Songbook book, const TitleOf& titleOf = {});
     void exportPdf(const QString& id, zub::songbook::Songbook book, const TitleOf& titleOf = {});
+    // A book of the songbook repo (`bookFile`, its current `text`; `book` holds its songs for the
+    // safety check), built as it is from a copy in CacheLocation/songbooks/repo-<hash>/.
+    void exportRepoPdf(const std::filesystem::path& bookFile, std::string text,
+                       zub::songbook::Songbook book);
 
 signals:
     // A short report for the status bar after a successful PDF export.
@@ -43,7 +48,12 @@ private:
     // False (after a message) if a song contains commands outside the song format or cannot be
     // read and the user does not want to build anyway. Checks the files zub::songbook::resolveSongs
     // finds.
-    bool confirmSafety(const zub::songbook::Resolution& resolution);
+    // `extra`: what the check of the book file itself found (shown first).
+    bool confirmSafety(const zub::songbook::Resolution& resolution, const QStringList& extra = {});
+    // Runs the build in a dialog showing its output and copies the PDF to `target`; on success
+    // `*message` is the report for the status bar.
+    bool runBuild(const zub::songbook::BuildCommand& command, const QString& title,
+                  const QString& target, QString* message);
 
     QWidget* window_;
     std::filesystem::path root_;

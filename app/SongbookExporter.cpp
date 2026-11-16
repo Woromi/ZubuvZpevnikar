@@ -2,6 +2,7 @@
 
 #include "convert.hpp"
 
+#include <QCryptographicHash>
 #include <QDesktopServices>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -31,6 +32,7 @@
 #include <QCoreApplication>
 #include <algorithm>
 #include <set>
+#include <zub/core/bookfile.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/textfile.hpp>
 #ifdef Q_OS_UNIX
@@ -392,9 +394,10 @@ void SongbookExporter::exportFolder(const QString& stem, const zub::songbook::So
         QDesktopServices::openUrl(QUrl::fromLocalFile(target));
 }
 
-bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution) {
-    QStringList lines;
-    int unsafeSongs = 0;
+bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution,
+                                     const QStringList& extra) {
+    QStringList lines = extra;
+    int unsafeSongs = static_cast<int>(extra.size());
     for (const auto& song : resolution.songs) {
         if (song.path.empty())
             continue;
@@ -481,6 +484,86 @@ void SongbookExporter::exportPdf(const QString& id, zub::songbook::Songbook book
 
     const auto command =
         zub::songbook::buildCommand(book, root_, package_, toPath(workDir), "book", generated.indexes);
+    QString message;
+    if (!runBuild(command, toQString(book.title), target, &message))
+        return;
+    QDesktopServices::openUrl(QUrl::fromLocalFile(target));
+    emit finished(message);
+    if (!generated.warnings.empty())
+        QMessageBox::warning(window_, tr("Export PDF"), message + warningsText(generated.warnings));
+}
+
+void SongbookExporter::exportRepoPdf(const std::filesystem::path& bookFile, std::string text,
+                                     zub::songbook::Songbook book) {
+    if (package_.empty()) {
+        QMessageBox::warning(window_, tr("Export PDF"), noPackageText());
+        return;
+    }
+    const auto parsed = zub::bookfile::parse(text);
+    if (!parsed) {
+        QMessageBox::warning(window_, tr("Export PDF"), toQString(parsed.error()));
+        return;
+    }
+    // The book file is LaTeX that runs too, and so is the chord chart a Tabor class inputs.
+    const std::filesystem::path bookDir = bookFile.parent_path();
+    QStringList bookRisks;
+    const auto addRisks = [&](const QString& name, const std::string& content) {
+        const auto unknown = zub::safety::unknownBookConstructs(content);
+        if (unknown.empty())
+            return;
+        QStringList commands;
+        for (const std::string& command : unknown)
+            commands << toQString(command);
+        bookRisks << name + QStringLiteral(": ") + commands.join(QStringLiteral(", "));
+    };
+    addRisks(toQString(bookFile.filename()), text);
+    if (const auto akordy = zub::readTextFile(bookDir / "akordy.tex"))
+        addRisks(QStringLiteral("akordy.tex"), *akordy);
+    const auto resolution = zub::songbook::resolveSongs(book, root_);
+    if (!confirmSafety(resolution, bookRisks))
+        return;
+
+    const QString stem = toQString(bookFile.stem());
+    const QString target = QFileDialog::getSaveFileName(
+        window_, tr("Export PDF"), QDir(lastExportDir()).filePath(stem + QStringLiteral(".pdf")),
+        tr("PDF (*.pdf)"));
+    if (target.isEmpty())
+        return;
+    QSettings{}.setValue(exportDirKey, QFileInfo(target).absolutePath());
+
+    // One work dir per book file: LilyPond's cache and the index files stay between builds.
+    const QString hash = QString::fromLatin1(
+        QCryptographicHash::hash(toQString(bookFile).toUtf8(), QCryptographicHash::Sha1)
+            .toHex()
+            .left(12));
+    const QString workDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
+                            QStringLiteral("/songbooks/repo-") + hash;
+    if (!QDir().mkpath(workDir)) {
+        QMessageBox::warning(window_, tr("Export PDF"), tr("Cannot create %1").arg(workDir));
+        return;
+    }
+    // A stale index from an earlier song list would be used by the build.
+    const QDir work(workDir);
+    for (const QString& name :
+         work.entryList({QStringLiteral("*.sbx"), QStringLiteral("*.sxd"), QStringLiteral("book.*")},
+                        QDir::Files))
+        QFile::remove(work.filePath(name));
+    QString error;
+    if (!writeFile(workDir + QStringLiteral("/book.tex"), text, &error)) {
+        QMessageBox::warning(window_, tr("Export PDF"), error);
+        return;
+    }
+    const auto command = zub::bookfile::buildCommand(root_, package_, toPath(workDir), bookDir,
+                                                     "book", zub::bookfile::indexFiles(*parsed));
+    QString message;
+    if (!runBuild(command, book.title.empty() ? stem : toQString(book.title), target, &message))
+        return;
+    QDesktopServices::openUrl(QUrl::fromLocalFile(target));
+    emit finished(message);
+}
+
+bool SongbookExporter::runBuild(const zub::songbook::BuildCommand& command, const QString& title,
+                                const QString& target, QString* result) {
     QStringList arguments;
     for (const std::string& argument : command.arguments)
         arguments << toQString(argument);
@@ -494,7 +577,7 @@ void SongbookExporter::exportPdf(const QString& id, zub::songbook::Songbook book
     QString message;
 
     QDialog dialog(window_);
-    dialog.setWindowTitle(tr("Building %1…").arg(toQString(book.title)));
+    dialog.setWindowTitle(tr("Building %1…").arg(title));
     dialog.resize(800, 500);
     auto* layout = new QVBoxLayout(&dialog);
     auto* status = new QLabel(tr("Building the songbook (this can take minutes)…"), &dialog);
@@ -621,11 +704,7 @@ void SongbookExporter::exportPdf(const QString& id, zub::songbook::Songbook book
     // The dialog destroys the process after the widgets the lambdas use.
     process->disconnect();
 
-    if (succeeded) {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(target));
-        emit finished(message);
-        if (!generated.warnings.empty())
-            QMessageBox::warning(window_, tr("Export PDF"),
-                                 message + warningsText(generated.warnings));
-    }
+    if (succeeded)
+        *result = message;
+    return succeeded;
 }

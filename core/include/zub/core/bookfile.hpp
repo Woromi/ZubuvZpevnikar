@@ -7,6 +7,7 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <zub/core/songbook.hpp>
 
 // Reading and editing the song lists of the hand-written LaTeX books of the songbook repo
 // (`songbooks/**.tex`). Editing is byte-exact: only the lines of a song list that change are
@@ -102,5 +103,15 @@ std::vector<std::string> indexFiles(const Book&);
 // with a \documentclass in code, relative to repoRoot, sorted. Symlinked directories are not
 // followed; unreadable files are skipped.
 std::vector<std::filesystem::path> findBooks(const std::filesystem::path& repoRoot);
+
+// The build of a book of the repo from a copy <workDir>/<bookName>.tex, with the package's
+// scripts/build.sh -i <indexes> (indexFiles), writing only to workDir. TEXINPUTS: the work dir,
+// then the book's own folder `bookDir` (a Tabor book's cover.pdf and akordy.tex), the song
+// folders, the repo root (img/), the package, and the defaults (the trailing ':').
+songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
+                                    const std::filesystem::path& packageDir,
+                                    const std::filesystem::path& workDir,
+                                    const std::filesystem::path& bookDir, std::string_view bookName,
+                                    const std::vector<std::string>& indexes);
 
 } // namespace zub::bookfile
