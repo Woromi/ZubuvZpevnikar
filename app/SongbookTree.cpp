@@ -100,7 +100,8 @@ QStringList SongbookTree::mimeTypes() const {
 }
 
 bool SongbookTree::ours(const QMimeData* mime) {
-    return mime && (mime->hasFormat(treeMimeType) || mime->hasFormat(SongPickerModel::songsMimeType()));
+    return mime &&
+           (mime->hasFormat(treeMimeType) || mime->hasFormat(SongPickerModel::songsMimeType()));
 }
 
 void SongbookTree::startDrag(Qt::DropActions) {
@@ -172,7 +173,8 @@ void SongbookTree::dropEvent(QDropEvent* event) {
         groups.push_back({uid, {name}});
     };
     if (mime->hasFormat(treeMimeType)) {
-        for (const QString& line : QString::fromUtf8(mime->data(treeMimeType)).split(QLatin1Char('\n'))) {
+        for (const QString& line :
+             QString::fromUtf8(mime->data(treeMimeType)).split(QLatin1Char('\n'))) {
             const qsizetype tab = line.indexOf(QLatin1Char('\t'));
             if (tab > 0 && tab + 1 < line.size())
                 add(line.left(tab).toULongLong(), toStdString(line.mid(tab + 1)));
@@ -211,14 +213,16 @@ void SongbookTree::showMenu(const QPoint& position) {
     if (isSection(item)) {
         connect(menu.addAction(tr("Sort This Section Alphabetically")), &QAction::triggered, this,
                 [this, uid] { emit sortSectionRequested(uid); });
-        connect(menu.addAction(tr("Rename Section…")), &QAction::triggered, this,
-                [this, uid] { emit renameSectionRequested(uid); });
-        connect(menu.addAction(tr("Remove Section")), &QAction::triggered, this,
-                [this, uid] { emit removeSectionRequested(uid); });
+        if (sectionEditing_) {
+            connect(menu.addAction(tr("Rename Section…")), &QAction::triggered, this,
+                    [this, uid] { emit renameSectionRequested(uid); });
+            connect(menu.addAction(tr("Remove Section")), &QAction::triggered, this,
+                    [this, uid] { emit removeSectionRequested(uid); });
+        }
     } else {
         if (uid == rootUid_)
-            connect(menu.addAction(tr("Sort the Songs Outside Sections")), &QAction::triggered, this,
-                    [this, uid] { emit sortSectionRequested(uid); });
+            connect(menu.addAction(tr("Sort the Songs Outside Sections")), &QAction::triggered,
+                    this, [this, uid] { emit sortSectionRequested(uid); });
         connect(menu.addAction(tr("Remove from the Songbook")), &QAction::triggered, this,
                 [this] { emit removeSelectedRequested(); });
     }

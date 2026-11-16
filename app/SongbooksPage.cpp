@@ -1,6 +1,7 @@
 #include "SongbooksPage.hpp"
 
 #include "LabelFilterBox.hpp"
+#include "PageHeader.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongPickerModel.hpp"
 #include "SongTableModel.hpp"
@@ -16,6 +17,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QCursor>
+#include <QDesktopServices>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -32,6 +34,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSaveFile>
 #include <QSettings>
 #include <QShortcut>
 #include <QSplitter>
@@ -39,14 +42,18 @@
 #include <QStyleOptionViewItem>
 #include <QTableView>
 #include <QToolBar>
+#include <QTreeWidget>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <algorithm>
 #include <map>
-#include <zub/core/latex.hpp>
 #include <set>
+#include <zub/core/latex.hpp>
+#include <zub/core/textfile.hpp>
 
 namespace {
 const QString splitterKey = QStringLiteral("songbooks/splitter");
+const QString repoPrefix = QStringLiteral("repo:");
 
 using zub::songbook::BookClass;
 
@@ -56,6 +63,13 @@ QString sectionLabel(const std::string& name) {
 
 std::set<std::string> namesOf(const zub::songbook::Section& section) {
     return {section.songs.begin(), section.songs.end()};
+}
+
+std::vector<std::string> songsOf(const zub::bookfile::Environment& environment) {
+    std::vector<std::string> songs;
+    for (const auto& unit : environment.units)
+        songs.insert(songs.end(), unit.songs.begin(), unit.songs.end());
+    return songs;
 }
 } // namespace
 
@@ -87,7 +101,10 @@ SongbooksPage::SongbooksPage(SongTableModel* model, SongbookStore* store, Songbo
 }
 
 void SongbooksPage::setSongbookRoot(const std::filesystem::path& root) {
+    if (root == root_)
+        return;
     root_ = root;
+    fillList(id_);
 }
 
 void SongbooksPage::buildUi() {
@@ -95,15 +112,7 @@ void SongbooksPage::buildUi() {
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(0);
 
-    auto* bar = new QToolBar(this);
-    bar->setMovable(false);
-    bar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    auto* heading = new QLabel(tr("Songbooks"), bar);
-    QFont font = heading->font();
-    font.setBold(true);
-    heading->setFont(font);
-    heading->setContentsMargins(12, 0, 0, 0);
-    bar->addWidget(heading);
+    auto* bar = createPageHeader(tr("Songbooks"), this);
     outer->addWidget(bar);
 
     splitter_ = new QSplitter(Qt::Horizontal, this);
@@ -123,7 +132,10 @@ void SongbooksPage::buildUi() {
 QWidget* SongbooksPage::buildListPane() {
     auto* pane = new QWidget(this);
     auto* layout = new QVBoxLayout(pane);
-    list_ = new QListWidget(pane);
+    list_ = new QTreeWidget(pane);
+    list_->setObjectName(QStringLiteral("songbookList"));
+    list_->setHeaderHidden(true);
+    list_->setColumnCount(1);
     layout->addWidget(list_, 1);
     auto* buttons = new QHBoxLayout;
     auto* add = new QPushButton(tr("New"), pane);
@@ -133,7 +145,11 @@ QWidget* SongbooksPage::buildListPane() {
     buttons->addWidget(duplicate_);
     buttons->addWidget(delete_);
     layout->addLayout(buttons);
-    connect(list_, &QListWidget::currentRowChanged, this, &SongbooksPage::onListRowChanged);
+    connect(list_, &QTreeWidget::currentItemChanged, this, [this] {
+        if (list_->currentItem() && listItemOf(id_) == list_->currentItem())
+            return; // the same book
+        onListRowChanged();
+    });
     connect(add, &QPushButton::clicked, this, &SongbooksPage::newSongbook);
     connect(duplicate_, &QPushButton::clicked, this, &SongbooksPage::duplicateSongbook);
     connect(delete_, &QPushButton::clicked, this, &SongbooksPage::deleteSongbook);
@@ -143,7 +159,26 @@ QWidget* SongbooksPage::buildListPane() {
 QWidget* SongbooksPage::buildEditPane() {
     editPane_ = new QWidget(this);
     auto* layout = new QVBoxLayout(editPane_);
-    form_ = new QFormLayout;
+    repoBox_ = new QWidget(editPane_);
+    auto* repoRow = new QHBoxLayout(repoBox_);
+    repoRow->setContentsMargins(0, 0, 0, 0);
+    repoInfo_ = new QLabel(repoBox_);
+    repoInfo_->setWordWrap(true);
+    repoInfo_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    auto* openFolder = new QPushButton(tr("Open Folder"), repoBox_);
+    openFolder->setToolTip(tr("Show the songbook's folder (edit its .tex file there)"));
+    repoRow->addWidget(repoInfo_, 1);
+    repoRow->addWidget(openFolder, 0, Qt::AlignTop);
+    connect(openFolder, &QPushButton::clicked, this, [this] {
+        if (repo_)
+            QDesktopServices::openUrl(
+                QUrl::fromLocalFile(toQString(repoPathOf(id_).parent_path())));
+    });
+    layout->addWidget(repoBox_);
+    repoBox_->hide();
+    formBox_ = new QWidget(editPane_);
+    form_ = new QFormLayout(formBox_);
+    form_->setContentsMargins(0, 0, 0, 0);
     title_ = new QLineEdit(editPane_);
     author_ = new QLineEdit(editPane_);
     class_ = new QComboBox(editPane_);
@@ -185,7 +220,7 @@ QWidget* SongbooksPage::buildEditPane() {
         updateCoverLabel();
         saveBook();
     });
-    layout->addLayout(form_);
+    layout->addWidget(formBox_);
 
     for (QLineEdit* edit : {title_, author_, campYear_})
         connect(edit, &QLineEdit::editingFinished, this, &SongbooksPage::applyForm);
@@ -206,9 +241,16 @@ QWidget* SongbooksPage::buildEditPane() {
     layout->addWidget(sorterWarning_);
     tree_ = new SongbookTree(editPane_);
     layout->addWidget(tree_, 1);
+    sectionsHint_ = new QLabel(
+        tr("The sections and everything outside the song lists are edited in the .tex file."),
+        editPane_);
+    sectionsHint_->setWordWrap(true);
+    sectionsHint_->setStyleSheet(QStringLiteral("color: gray;"));
+    sectionsHint_->hide();
+    layout->addWidget(sectionsHint_);
 
     auto* buttons = new QHBoxLayout;
-    auto* add = new QPushButton(tr("Add Section"), editPane_);
+    auto* add = addSection_ = new QPushButton(tr("Add Section"), editPane_);
     renameSection_ = new QPushButton(tr("Rename Section"), editPane_);
     removeSection_ = new QPushButton(tr("Remove Section"), editPane_);
     moveUp_ = new QPushButton(tr("Move Up"), editPane_);
@@ -307,9 +349,9 @@ QWidget* SongbooksPage::buildPickerPane() {
     pickerView_->setDragDropMode(QAbstractItemView::DragOnly);
     pickerView_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     pickerView_->verticalHeader()->hide();
-    for (const int column : {SongTableModel::Tempo, SongTableModel::Meter, SongTableModel::Capo,
-                             SongTableModel::Tabs, SongTableModel::Labels, SongTableModel::Todo,
-                             SongTableModel::Changes})
+    for (const int column :
+         {SongTableModel::Tempo, SongTableModel::Meter, SongTableModel::Capo, SongTableModel::Tabs,
+          SongTableModel::Labels, SongTableModel::Todo, SongTableModel::Changes})
         pickerView_->setColumnHidden(column, true);
     pickerView_->horizontalHeader()->setSectionResizeMode(SongTableModel::Title,
                                                           QHeaderView::Stretch);
@@ -390,52 +432,217 @@ void SongbooksPage::fillList(const QString& selectId) {
     {
         const QSignalBlocker blocker(list_);
         list_->clear();
-        for (const auto& entry : entries_) {
-            auto* item = new QListWidgetItem;
-            item->setData(Qt::UserRole, entry.id);
-            if (entry.error.isEmpty()) {
-                item->setText(toQString(entry.book.title));
-            } else {
-                item->setText(entry.id);
-                item->setForeground(Qt::red);
-                item->setToolTip(entry.error);
+        QTreeWidgetItem* selected = nullptr;
+        const auto addBook = [&](QTreeWidgetItem* parent, const QString& id, const QString& text) {
+            auto* item = new QTreeWidgetItem(parent, {text});
+            item->setData(0, Qt::UserRole, id);
+            if (id == selectId)
+                selected = item;
+            return item;
+        };
+        const auto addRoot = [&](const QString& text) {
+            auto* item = new QTreeWidgetItem(list_, {text});
+            QFont font = item->font(0);
+            font.setBold(true);
+            item->setFont(0, font);
+            item->setFlags(Qt::ItemIsEnabled);
+            item->setExpanded(true);
+            return item;
+        };
+
+        if (!root_.empty()) {
+            QTreeWidgetItem* repoRoot = addRoot(tr("Songbooks"));
+            repoRoot->setToolTip(0, tr("The songbooks of the songbook folder (songbooks/)"));
+            std::map<std::filesystem::path, QTreeWidgetItem*> folders;
+            const auto books = zub::bookfile::findBooks(root_);
+            // A folder holding nothing but its one book of the same name (velkyzpevnik/
+            // velkyzpevnik.tex) is shown as that book alone.
+            const auto aloneInFolder = [&](const std::filesystem::path& relative) {
+                const auto dir = relative.parent_path();
+                if (relative.stem() != dir.filename())
+                    return false;
+                return std::ranges::count_if(books, [&](const std::filesystem::path& other) {
+                           const auto [end, _] = std::ranges::mismatch(dir, other.parent_path());
+                           return end == dir.end();
+                       }) == 1;
+            };
+            for (const auto& relative : books) {
+                // songbooks/tabory/2025/tabor2025.tex: folders tabory, 2025 under the root
+                QTreeWidgetItem* parent = repoRoot;
+                std::filesystem::path folder;
+                auto dir = relative.parent_path();
+                if (aloneInFolder(relative))
+                    dir = dir.parent_path();
+                for (auto part = std::next(dir.begin()); part != dir.end(); ++part) {
+                    folder /= *part;
+                    auto& item = folders[folder];
+                    if (!item) {
+                        item = new QTreeWidgetItem(parent, {toQString(part->filename())});
+                        item->setFlags(Qt::ItemIsEnabled);
+                        item->setIcon(0, style()->standardIcon(QStyle::SP_DirIcon));
+                        item->setExpanded(true);
+                    }
+                    parent = item;
+                }
+                auto* item = addBook(parent, repoPrefix + toQString(relative.generic_string()),
+                                     toQString(relative.stem()));
+                item->setToolTip(0, toQString(relative.generic_string()));
             }
-            list_->addItem(item);
         }
-        int row = -1;
-        for (std::size_t i = 0; i < entries_.size(); ++i)
-            if (entries_[i].id == selectId)
-                row = static_cast<int>(i);
-        list_->setCurrentRow(row);
+        QTreeWidgetItem* external = addRoot(tr("External"));
+        external->setToolTip(0, tr("Songbooks kept by this app, outside the songbook folder"));
+        for (const auto& entry : entries_) {
+            if (entry.error.isEmpty()) {
+                addBook(external, entry.id, toQString(entry.book.title));
+            } else {
+                auto* item = addBook(external, entry.id, entry.id);
+                item->setForeground(0, Qt::red);
+                item->setToolTip(0, entry.error);
+            }
+        }
+        list_->expandAll();
+        list_->setCurrentItem(selected);
     }
     id_.clear(); // force loadBook() to read the selected entry
     onListRowChanged();
 }
 
+QTreeWidgetItem* SongbooksPage::listItemOf(const QString& id) const {
+    if (id.isEmpty())
+        return nullptr;
+    for (QTreeWidgetItemIterator it(list_); *it; ++it)
+        if ((*it)->data(0, Qt::UserRole).toString() == id)
+            return *it;
+    return nullptr;
+}
+
+bool SongbooksPage::isRepoId(const QString& id) {
+    return id.startsWith(repoPrefix);
+}
+
+std::filesystem::path SongbooksPage::repoPathOf(const QString& id) const {
+    return root_ / toPath(id.mid(repoPrefix.size()));
+}
+
 void SongbooksPage::onListRowChanged() {
-    const int row = list_->currentRow();
+    const QTreeWidgetItem* item = list_->currentItem();
     editable_ = false;
+    repo_ = false;
     id_.clear();
     book_ = {};
+    repoText_.clear();
+    repoBook_ = {};
     sectionUids_.clear();
-    if (row >= 0 && static_cast<std::size_t>(row) < entries_.size()) {
-        const auto& entry = entries_[static_cast<std::size_t>(row)];
-        id_ = entry.id;
-        if (entry.error.isEmpty()) {
-            book_ = entry.book;
-            zub::songbook::normalize(book_);
+    const QString id = item ? item->data(0, Qt::UserRole).toString() : QString();
+    if (isRepoId(id)) {
+        id_ = id;
+        repo_ = true;
+        if (loadRepoBook()) {
             resetSectionUids();
             editable_ = true;
             showWarning({});
-        } else {
-            showWarning(
-                tr("Cannot read this songbook (the file is left alone): %1").arg(entry.error));
+            for (const auto& environment : repoBook_.environments) {
+                if (!environment.readOnly.empty()) {
+                    editable_ = false;
+                    showWarning(tr("This songbook is shown read-only: %1")
+                                    .arg(toQString(environment.readOnly)));
+                    break;
+                }
+            }
+        }
+    } else if (!id.isEmpty()) {
+        for (const auto& entry : entries_) {
+            if (entry.id != id)
+                continue;
+            id_ = entry.id;
+            if (entry.error.isEmpty()) {
+                book_ = entry.book;
+                zub::songbook::normalize(book_);
+                resetSectionUids();
+                editable_ = true;
+                showWarning({});
+            } else {
+                showWarning(
+                    tr("Cannot read this songbook (the file is left alone): %1").arg(entry.error));
+            }
         }
     } else {
         showWarning({});
     }
     section_ = 0;
     loadBook();
+}
+
+bool SongbooksPage::loadRepoBook() {
+    const auto path = repoPathOf(id_);
+    auto text = zub::readTextFile(path);
+    if (!text) {
+        showWarning(tr("Cannot read %1").arg(toQString(path)));
+        return false;
+    }
+    auto parsed = zub::bookfile::parse(*text);
+    if (!parsed) {
+        showWarning(
+            tr("Cannot read the songbook %1: %2").arg(toQString(path), toQString(parsed.error())));
+        return false;
+    }
+    repoText_ = std::move(*text);
+    repoBook_ = std::move(*parsed);
+    book_ = {};
+    book_.title = zub::latex::toDisplayText(repoBook_.title);
+    book_.author = zub::latex::toDisplayText(repoBook_.author);
+    book_.bookClass = zub::songbook::bookClassFromName(repoBook_.documentClass)
+                          .value_or(zub::songbook::BookClass::Velky);
+    for (const auto& environment : repoBook_.environments) {
+        book_.sections.push_back({environment.section, songsOf(environment)});
+    }
+    return true;
+}
+
+bool SongbooksPage::saveRepoBook() {
+    const auto path = repoPathOf(id_);
+    const auto onDisk = zub::readTextFile(path);
+    if (!onDisk || *onDisk != repoText_) {
+        // Changed elsewhere (an editor, git): never overwrite it.
+        const QString id = id_;
+        fillList(id);
+        showWarning(tr("%1 was changed outside the app: it is read again, and the last change "
+                       "was not saved. Make it once more.")
+                        .arg(toQString(path.filename())));
+        return false;
+    }
+    std::string text = repoText_;
+    for (std::size_t e = 0; e < repoBook_.environments.size() && e < book_.sections.size(); ++e) {
+        const auto& songs = book_.sections[e].songs;
+        if (songs == songsOf(repoBook_.environments[e]))
+            continue;
+        auto edited = zub::bookfile::setSongs(text, e, songs);
+        if (!edited) {
+            showWarning(tr("Not saved: %1").arg(toQString(edited.error())));
+            loadRepoBook();
+            return false;
+        }
+        text = std::move(*edited);
+    }
+    if (text != repoText_) {
+        QSaveFile file(toQString(path));
+        const QByteArray bytes = QByteArray::fromStdString(text);
+        if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() ||
+            !file.commit()) {
+            showWarning(tr("Cannot write %1: %2").arg(toQString(path), file.errorString()));
+            loadRepoBook();
+            return false;
+        }
+    }
+    // What the file now says (a keep-order block keeps its order whatever was asked).
+    const auto keepUids = sectionUids_;
+    if (!loadRepoBook())
+        return false;
+    if (keepUids.size() == book_.sections.size())
+        sectionUids_ = keepUids;
+    else
+        resetSectionUids();
+    return true;
 }
 
 void SongbooksPage::newSongbook() {
@@ -454,7 +661,7 @@ void SongbooksPage::newSongbook() {
 }
 
 void SongbooksPage::duplicateSongbook() {
-    if (!editable_)
+    if (!editable_ || repo_)
         return;
     zub::songbook::Songbook copy = book_;
     copy.title += toStdString(tr(" (copy)"));
@@ -468,10 +675,10 @@ void SongbooksPage::duplicateSongbook() {
 }
 
 void SongbooksPage::deleteSongbook() {
-    if (id_.isEmpty())
+    if (id_.isEmpty() || repo_)
         return;
-    const int row = list_->currentRow();
-    const QString name = list_->item(row)->text();
+    const QTreeWidgetItem* item = listItemOf(id_);
+    const QString name = item ? item->text(0) : id_;
     if (QMessageBox::question(this, tr("Delete songbook"),
                               tr("Delete the songbook %1? This cannot be undone.").arg(name),
                               QMessageBox::Yes | QMessageBox::No,
@@ -489,7 +696,22 @@ void SongbooksPage::deleteSongbook() {
 
 void SongbooksPage::loadBook() {
     loading_ = true;
-    editPane_->setEnabled(editable_);
+    editPane_->setEnabled(editable_ || repo_);
+    formBox_->setVisible(!repo_);
+    repoBox_->setVisible(repo_);
+    sectionsHint_->setVisible(repo_);
+    tree_->setEnabled(editable_ || !repo_);
+    tree_->setSectionEditing(!repo_);
+    for (QPushButton* button : {addSection_, renameSection_, removeSection_, moveUp_, moveDown_})
+        button->setVisible(!repo_);
+    if (repo_) {
+        const QString paper = toQString(zub::songbook::paperName(book_.bookClass)).toUpper();
+        repoInfo_->setText(
+            tr("<b>%1</b><br>%2 · class %3 (%4)")
+                .arg(book_.title.empty() ? QString() : toQString(book_.title).toHtmlEscaped(),
+                     id_.mid(repoPrefix.size()).toHtmlEscaped(),
+                     toQString(repoBook_.documentClass).toHtmlEscaped(), paper));
+    }
     pickerPane_->setEnabled(editable_);
     title_->setText(toQString(book_.title));
     author_->setText(toQString(book_.author));
@@ -567,6 +789,8 @@ std::function<std::string(std::string_view)> SongbooksPage::titleLookup() const 
 bool SongbooksPage::saveBook() {
     if (!editable_ || id_.isEmpty())
         return false;
+    if (repo_)
+        return saveRepoBook();
     QString error;
     if (!store_->save(id_, book_, &error)) {
         showWarning(error);
@@ -575,8 +799,8 @@ bool SongbooksPage::saveBook() {
     for (auto& entry : entries_) {
         if (entry.id == id_) {
             entry.book = book_;
-            const int row = static_cast<int>(&entry - entries_.data());
-            list_->item(row)->setText(toQString(book_.title));
+            if (QTreeWidgetItem* item = listItemOf(id_))
+                item->setText(0, toQString(book_.title));
         }
     }
     return true;
@@ -631,12 +855,15 @@ void SongbooksPage::rebuildTree() {
     {
         const QSignalBlocker blocker(tree_);
         tree_->clear();
-        tree_->setRootUid(sectionUids_.empty() ? 0 : sectionUids_.front());
+        // A repo book may start with a named section: then every section has its header and
+        // nothing is outside them.
+        const bool rootPart = !book_.sections.empty() && book_.sections.front().name.empty();
+        tree_->setRootUid(sectionUids_.empty() || !rootPart ? 0 : sectionUids_.front());
         QTreeWidgetItem* selectedItem = nullptr;
         for (std::size_t s = 0; s < book_.sections.size() && s < sectionUids_.size(); ++s) {
             const auto& section = book_.sections[s];
             QTreeWidgetItem* header = nullptr;
-            if (s > 0) {
+            if (s > 0 || !rootPart) {
                 header = tree_->addSection(
                     sectionUids_[s],
                     toQString(section.name) + QStringLiteral(" — ") +
@@ -666,7 +893,9 @@ void SongbooksPage::rebuildTree() {
             tree_->setCurrentItem(selectedItem);
     }
     fillTargetCombo();
-    const int named = std::max(0, static_cast<int>(book_.sections.size()) - 1);
+    int named = 0;
+    for (const auto& section : book_.sections)
+        named += section.name.empty() ? 0 : 1;
     count_->setText(named == 0 ? tr("%n song(s)", nullptr, total)
                                : tr("%n song(s)", nullptr, total) + QStringLiteral(" ") +
                                      tr("in %n section(s)", nullptr, named));
@@ -723,14 +952,14 @@ void SongbooksPage::updatePicker() {
 
 void SongbooksPage::updateButtons() {
     const bool selected = !id_.isEmpty();
-    duplicate_->setEnabled(editable_);
-    delete_->setEnabled(selected);
+    duplicate_->setEnabled(editable_ && !repo_);
+    delete_->setEnabled(selected && !repo_);
     bool hasSongs = false;
     for (const auto& section : book_.sections)
         hasSongs = hasSongs || !section.songs.empty();
     check_->setEnabled(editable_ && hasSongs);
-    exportPdf_->setEnabled(editable_ && hasSongs);
-    exportLatex_->setEnabled(editable_ && hasSongs);
+    exportPdf_->setEnabled(editable_ && hasSongs && !repo_);
+    exportLatex_->setEnabled(editable_ && hasSongs && !repo_);
     sortAll_->setEnabled(editable_ && hasSongs);
 
     const int section = currentSection();
@@ -769,7 +998,7 @@ bool SongbooksPage::askSectionName(const QString& title, const QString& initial,
 
 void SongbooksPage::addSection() {
     QString name;
-    if (!editable_ || !askSectionName(tr("Add Section"), {}, -1, &name))
+    if (!editable_ || repo_ || !askSectionName(tr("Add Section"), {}, -1, &name))
         return;
     book_.sections.push_back({toStdString(name), {}});
     sectionUids_.push_back(nextUid_++);
@@ -778,7 +1007,7 @@ void SongbooksPage::addSection() {
 }
 
 void SongbooksPage::renameSection(int s) {
-    if (!editable_ || s < 1 || s >= static_cast<int>(book_.sections.size()))
+    if (!editable_ || repo_ || s < 1 || s >= static_cast<int>(book_.sections.size()))
         return;
     auto& section = book_.sections[static_cast<std::size_t>(s)];
     QString name;
@@ -790,7 +1019,7 @@ void SongbooksPage::renameSection(int s) {
 }
 
 void SongbooksPage::removeSection(int s) {
-    if (!editable_ || s < 1 || s >= static_cast<int>(book_.sections.size()))
+    if (!editable_ || repo_ || s < 1 || s >= static_cast<int>(book_.sections.size()))
         return;
     const auto& section = book_.sections[static_cast<std::size_t>(s)];
     if (!section.songs.empty() &&
@@ -810,7 +1039,7 @@ void SongbooksPage::removeSection(int s) {
 void SongbooksPage::moveSection(int delta) {
     const int from = currentSection();
     const int to = from + delta;
-    if (!editable_ || from < 1 || to < 1 || to >= static_cast<int>(book_.sections.size()))
+    if (!editable_ || repo_ || from < 1 || to < 1 || to >= static_cast<int>(book_.sections.size()))
         return;
     std::swap(book_.sections[static_cast<std::size_t>(from)],
               book_.sections[static_cast<std::size_t>(to)]);
@@ -856,9 +1085,9 @@ void SongbooksPage::checkBook() {
     const QString paper = toQString(zub::songbook::paperName(book_.bookClass)).toUpper();
     const auto unfit = zub::songbook::notMarkedFitting(book_, papOf);
     if (unfit.empty()) {
-        QMessageBox::information(this, tr("Check"),
-                                 tr("Every song of this songbook is marked as fitting %1.")
-                                     .arg(paper));
+        QMessageBox::information(
+            this, tr("Check"),
+            tr("Every song of this songbook is marked as fitting %1.").arg(paper));
         return;
     }
 
@@ -916,8 +1145,8 @@ void SongbooksPage::checkBook() {
     connect(remove, &QPushButton::clicked, &dialog, [&] {
         bool removed = false;
         for (QListWidgetItem* item : list->selectedItems())
-            removed |= zub::songbook::removeSong(book_,
-                                                 toStdString(item->data(Qt::UserRole).toString()));
+            removed |=
+                zub::songbook::removeSong(book_, toStdString(item->data(Qt::UserRole).toString()));
         if (!removed)
             return;
         commit();
@@ -1079,10 +1308,10 @@ void SongbooksPage::sortAll() {
 
 void SongbooksPage::requestSort(int sectionIndex, SortMode mode,
                                 const std::set<std::string>& pending) {
-    const auto& section = book_.sections[static_cast<std::size_t>(sectionIndex)];
+    const auto units = sortUnits(sectionIndex);
     const QString key = id_ + QLatin1Char('/') +
                         QString::number(sectionUids_[static_cast<std::size_t>(sectionIndex)]);
-    if (section.songs.size() < 2) {
+    if (units.size() < 2) {
         jobs_.erase(key);
         return;
     }
@@ -1100,7 +1329,7 @@ void SongbooksPage::requestSort(int sectionIndex, SortMode mode,
         if (const zub::SongEntry* song = model_->song(row))
             byName.emplace(song->inputName, song);
     std::vector<zub::songbook::SortEntry> entries;
-    for (const auto& name : section.songs) {
+    for (const auto& name : units) {
         zub::songbook::SortEntry entry;
         const auto it = byName.find(name);
         if (it != byName.end()) {
@@ -1112,7 +1341,22 @@ void SongbooksPage::requestSort(int sectionIndex, SortMode mode,
         }
         entries.push_back(std::move(entry));
     }
-    sorter_->sort(key, section.songs, std::move(entries));
+    sorter_->sort(key, units, std::move(entries));
+}
+
+std::vector<std::string> SongbooksPage::sortUnits(int s) const {
+    const auto index = static_cast<std::size_t>(s);
+    if (repo_ && index < repoBook_.environments.size())
+        return zub::bookfile::leaders(repoBook_.environments[index]);
+    return book_.sections[index].songs;
+}
+
+std::vector<std::string> SongbooksPage::expandSorted(int s,
+                                                     const std::vector<std::string>& order) const {
+    const auto index = static_cast<std::size_t>(s);
+    if (repo_ && index < repoBook_.environments.size())
+        return zub::bookfile::expandLeaders(repoBook_.environments[index], order);
+    return order;
 }
 
 std::vector<std::string> SongbooksPage::orderFor(const SortJob& job,
@@ -1175,27 +1419,34 @@ void SongbooksPage::onSorted(const QString& key, const std::vector<std::string>&
         int index = indexOfUid(uid);
         if (index < 0) {
             // The songbook was loaded again since the request: find the section by its songs.
-            index = sectionBySongs(book_);
+            int found = -1;
+            for (int s = 0; s < static_cast<int>(book_.sections.size()) && found != -2; ++s)
+                if (sameSongs(sortUnits(s)))
+                    found = found == -1 ? s : -2; // -2: more than one
+            index = found;
             if (index < 0)
                 return;
         }
         auto& songs = book_.sections[static_cast<std::size_t>(index)].songs;
-        if (!sameSongs(songs)) {
+        const auto units = sortUnits(index);
+        if (!sameSongs(units)) {
             // Changed meanwhile: sort again (the pending names still in the section).
             std::set<std::string> pending;
             for (const auto& name : job.pending)
-                if (std::ranges::find(songs, name) != songs.end())
+                if (std::ranges::find(units, name) != units.end())
                     pending.insert(name);
             requestSort(index, job.mode, pending);
             return;
         }
-        const auto order = orderFor(job, songs, names);
+        const auto order = expandSorted(index, orderFor(job, units, names));
         if (order == songs)
             return;
         songs = order;
         commit();
         return;
     }
+    if (isRepoId(id))
+        return; // a repo book no longer shown: sorted when it is sorted again
     // Another songbook was selected meanwhile: update it (and the page's copy) and its file.
     for (auto& entry : entries_) {
         if (entry.id != id || !entry.error.isEmpty())

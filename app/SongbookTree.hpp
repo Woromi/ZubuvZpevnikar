@@ -18,13 +18,16 @@ public:
 
     // Items are added by the page. The root part has no item of its own.
     void setRootUid(quint64 uid) { rootUid_ = uid; }
+    // False: the section menu has no Rename and Remove (a book of the songbook repo).
+    void setSectionEditing(bool on) { sectionEditing_ = on; }
     QTreeWidgetItem* addSection(quint64 uid, const QString& text);
     // `section` null: a song outside any section (top level).
     QTreeWidgetItem* addSong(QTreeWidgetItem* section, quint64 uid, const std::string& inputName,
                              const QString& text, bool missing);
 
     bool isSection(const QTreeWidgetItem* item) const;
-    static quint64 uidOf(const QTreeWidgetItem* item); // the section (of a song: the one holding it)
+    static quint64
+    uidOf(const QTreeWidgetItem* item); // the section (of a song: the one holding it)
     // The selected songs: (section uid, input name), in tree order.
     std::vector<std::pair<quint64, std::string>> selectedSongs() const;
 
@@ -56,4 +59,5 @@ private:
     void showMenu(const QPoint& position);
 
     quint64 rootUid_ = 0;
+    bool sectionEditing_ = true;
 };

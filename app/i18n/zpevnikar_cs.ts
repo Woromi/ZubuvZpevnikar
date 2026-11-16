@@ -2590,6 +2590,14 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Smazat</translation>
     </message>
     <message>
+        <source>Open Folder</source>
+        <translation>Otevřít složku</translation>
+    </message>
+    <message>
+        <source>Show the songbook&apos;s folder (edit its .tex file there)</source>
+        <translation>Ukázat složku zpěvníku (jeho soubor .tex se upravuje tam)</translation>
+    </message>
+    <message>
         <source>Velký zpěvník (A4)</source>
         <translation>Velký zpěvník (A4)</translation>
     </message>
@@ -2660,6 +2668,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Sections</source>
         <translation>Sekce</translation>
+    </message>
+    <message>
+        <source>The sections and everything outside the song lists are edited in the .tex file.</source>
+        <translation>Oddíly a vše mimo seznamy písní se upravuje v souboru .tex.</translation>
     </message>
     <message>
         <source>Add Section</source>
@@ -2746,8 +2758,44 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Všechny jazyky</translation>
     </message>
     <message>
+        <source>The songbooks of the songbook folder (songbooks/)</source>
+        <translation>Zpěvníky ze složky zpěvníku (songbooks/)</translation>
+    </message>
+    <message>
+        <source>External</source>
+        <translation>Externí</translation>
+    </message>
+    <message>
+        <source>Songbooks kept by this app, outside the songbook folder</source>
+        <translation>Zpěvníky, které si aplikace vede sama mimo složku zpěvníku</translation>
+    </message>
+    <message>
+        <source>This songbook is shown read-only: %1</source>
+        <translation>Zpěvník je jen pro čtení: %1</translation>
+    </message>
+    <message>
         <source>Cannot read this songbook (the file is left alone): %1</source>
         <translation>Tento zpěvník nelze přečíst (soubor zůstane nedotčen): %1</translation>
+    </message>
+    <message>
+        <source>Cannot read %1</source>
+        <translation>Nelze přečíst %1</translation>
+    </message>
+    <message>
+        <source>Cannot read the songbook %1: %2</source>
+        <translation>Nelze přečíst zpěvník %1: %2</translation>
+    </message>
+    <message>
+        <source>%1 was changed outside the app: it is read again, and the last change was not saved. Make it once more.</source>
+        <translation>%1 se změnil mimo aplikaci: je načten znovu a poslední změna se neuložila. Udělejte ji ještě jednou.</translation>
+    </message>
+    <message>
+        <source>Not saved: %1</source>
+        <translation>Neuloženo: %1</translation>
+    </message>
+    <message>
+        <source>Cannot write %1: %2</source>
+        <translation>Nelze zapsat %1: %2</translation>
     </message>
     <message>
         <source>New songbook</source>
@@ -2768,6 +2816,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Cannot delete the songbook file.</source>
         <translation>Soubor zpěvníku nelze smazat.</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;%1&lt;/b&gt;&lt;br&gt;%2 · class %3 (%4)</source>
+        <translation>&lt;b&gt;%1&lt;/b&gt;&lt;br&gt;%2 · třída %3 (%4)</translation>
     </message>
     <message>
         <source>%1 does not exist</source>

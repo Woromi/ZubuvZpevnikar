@@ -1,23 +1,26 @@
 #pragma once
 
+#include "SongbookStore.hpp"
+
 #include <QString>
 #include <QWidget>
 #include <filesystem>
 #include <functional>
-#include <string_view>
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
+#include <zub/core/bookfile.hpp>
 #include <zub/core/songbook.hpp>
-#include "SongbookStore.hpp"
 
 class QCheckBox;
 class QComboBox;
 class QFormLayout;
 class QLabel;
 class QLineEdit;
-class QListWidget;
+class QTreeWidget;
+class QTreeWidgetItem;
 class QPushButton;
 class QSplitter;
 class QTableView;
@@ -29,8 +32,11 @@ class SongFilterProxy;
 class SongPickerModel;
 class SongTableModel;
 
-// The songbook assembler: the songbooks the app manages (left), the selected one's settings and
-// sections (middle), and the song list to pick from (right). Edits are saved at once.
+// The songbook assembler: the songbooks (left: "Songbooks", the books of the songbook repo's
+// songbooks/ folder, and "External", the app's own JSON books), the selected one's settings and
+// sections (middle), and the song list to pick from (right). Edits are saved at once: a repo book
+// through zub::bookfile::setSongs (byte-exact, only its \input lines), never overwriting a file
+// changed on disk since it was read.
 class SongbooksPage : public QWidget {
     Q_OBJECT
 
@@ -56,6 +62,19 @@ private:
 
     void fillList(const QString& selectId);
     void onListRowChanged();
+    QTreeWidgetItem* listItemOf(const QString& id) const;
+
+    // A book of the songbook repo: id "repo:<path relative to the songbook root>".
+    static bool isRepoId(const QString& id);
+    std::filesystem::path repoPathOf(const QString& id) const;
+    // Reads and parses id_'s file into repoText_/repoBook_ and book_; false (warning shown) on
+    // failure.
+    bool loadRepoBook();
+    bool saveRepoBook();
+    // What the sorter orders in section s: its songs, or for a repo book the first song of each
+    // keep-order block and the single songs (zub::bookfile::leaders); and that order back.
+    std::vector<std::string> sortUnits(int s) const;
+    std::vector<std::string> expandSorted(int s, const std::vector<std::string>& order) const;
     void newSongbook();
     void duplicateSongbook();
     void deleteSongbook();
@@ -63,11 +82,12 @@ private:
     // The selected songbook into the form, the tree and the picker.
     void loadBook();
     bool saveBook();
-    void applyForm();               // form -> book_, saved
+    void applyForm(); // form -> book_, saved
     void updateFormVisibility();
     void updateCoverLabel();
     void chooseCover();
-    std::function<std::string(std::string_view)> titleLookup() const; // titles of the library songs, for the exporter
+    std::function<std::string(std::string_view)>
+    titleLookup() const; // titles of the library songs, for the exporter
     void rebuildTree();
     void onTreeSelectionChanged();
     int currentSection() const;
@@ -125,6 +145,9 @@ private:
     QString id_;                   // the selected songbook ("" = none)
     zub::songbook::Songbook book_; // its content (valid when editable_)
     bool editable_ = false;
+    bool repo_ = false;            // id_ is a book of the songbook repo
+    std::string repoText_;         // its file as last read or written
+    zub::bookfile::Book repoBook_; // parsed from repoText_
     int section_ = 0;
     // Identifies the sections of book_ for sort requests (parallel to book_.sections).
     std::vector<quint64> sectionUids_;
@@ -132,14 +155,19 @@ private:
     QString localeWarning_; // from the sorter, stays
     QString sortError_;     // the last "Not sorted: ..."; cleared by the next sorter result
     std::map<QString, SortJob> jobs_; // by sorter key "<songbook id>/<section uid>"
-    bool loading_ = false; // filling widgets: ignore their change signals
+    bool loading_ = false;            // filling widgets: ignore their change signals
 
     QSplitter* splitter_ = nullptr;
-    QListWidget* list_ = nullptr;
+    QTreeWidget* list_ = nullptr;
     QPushButton* duplicate_ = nullptr;
     QPushButton* delete_ = nullptr;
 
     QWidget* editPane_ = nullptr;
+    QWidget* formBox_ = nullptr; // the settings of an External book
+    QWidget* repoBox_ = nullptr; // what a repo book is, instead
+    QLabel* repoInfo_ = nullptr;
+    QLabel* sectionsHint_ = nullptr;
+    QPushButton* addSection_ = nullptr;
     QFormLayout* form_ = nullptr;
     QLineEdit* title_ = nullptr;
     QLineEdit* author_ = nullptr;
