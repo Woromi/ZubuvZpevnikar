@@ -226,8 +226,9 @@ void MainWindow::createMenus() {
     QAction* quit = file->addAction(tr("&Quit"));
     QMenu* songs = menuBar()->addMenu(tr("&Songs"));
     QAction* scan =
-        songs->addAction(QIcon::fromTheme(QStringLiteral("edit-find")), tr("&Scan Songbook…"));
-    scan->setToolTip(tr("Find the songs Tidy, Check Song or Make Smaller would change"));
+        songs->addAction(QIcon::fromTheme(QStringLiteral("edit-find")), tr("&Check Songs…"));
+    scan->setToolTip(tr("Check every song (or the ones shown): what Tidy, Check Song or Make "
+                        "Smaller would change, keys, metadata"));
     connect(scan, &QAction::triggered, this, &MainWindow::scanSongbook);
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
@@ -775,6 +776,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
     connect(edit, &QPlainTextEdit::copyAvailable, this, [this] { updateEditState(); });
 
     showView(ActivityBar::View::Song);
+    offerKey(editor); // a key the last Check Songs found for it
     syncScoreTabs();
     updateSongActions(); // after load: the editor may have made itself read-only
     updateWindowTitle();
@@ -3290,6 +3292,56 @@ void MainWindow::offerPapers(SongEditor* editor, const std::string& measuredText
         });
 }
 
+void MainWindow::offerKey(SongEditor* editor) {
+    const auto found = keyFindings_.find(editor->path());
+    if (found == keyFindings_.end() || editor->textEdit()->isReadOnly())
+        return;
+    const zub::songcheck::KeyFinding finding = found->second;
+    const std::string content = editor->content();
+    const auto meta = zub::parseSong(content);
+    const bool german = meta && zub::score::germanNames(meta->value("lang"));
+    // The per-part suggestion when checkkeys has one (already in the song's naming).
+    const std::string detected = zub::songcheck::keyValue(finding.detected, german);
+    const std::string wanted = finding.suggest.empty() ? detected : finding.suggest;
+    if (wanted.empty())
+        return;
+    const QString shown = toQString(zub::latex::toDisplayText(wanted));
+    const QString margin = QString::number(finding.margin, 'f', 1);
+    const QPointer<SongEditor> guard = editor;
+    const auto write = [this, guard, wanted] {
+        if (!guard || guard != editor_ || guard->textEdit()->isReadOnly())
+            return;
+        // setOption writes the value as given: the braces are ours, as in every song.
+        replaceSongText(zub::songheader::setOption(guard->content(), "key", "{" + wanted + "}"));
+        keyFindings_.erase(guard->path());
+        statusBar()->showMessage(tr("Key written. Save to keep it."), 8000);
+    };
+    if (finding.kind == "propose") {
+        if (zub::songheader::option(content, "key"))
+            return; // written since the check
+        editor->showSuggestion(tr("Key:"),
+                               tr("none written; the chords say %1 (margin %2).").arg(shown, margin),
+                               tr("Write %1").arg(shown), write);
+        return;
+    }
+    if (zub::songcheck::keyConfirmed(content))
+        return;
+    const auto stated = zub::songheader::option(content, "key");
+    editor->showSuggestion(
+        tr("Key:"),
+        tr("written %1, the chords say %2 (margin %3).")
+            .arg(toQString(zub::latex::toDisplayText(stated.value_or(""))), shown, margin),
+        tr("Write %1").arg(shown), write, tr("Keep the Written Key"), [this, guard] {
+            if (!guard || guard != editor_ || guard->textEdit()->isReadOnly())
+                return;
+            if (const auto confirmed = zub::songcheck::confirmKey(guard->content()))
+                replaceSongText(*confirmed);
+            keyFindings_.erase(guard->path());
+            statusBar()->showMessage(
+                tr("The written key is confirmed (% nocheck key). Save to keep it."), 8000);
+        });
+}
+
 void MainWindow::startApply(std::vector<std::string> ids, const QString& description) {
     const std::filesystem::path converter = findConverter();
     if (converter.empty() || !runEditor_) {
@@ -3641,16 +3693,8 @@ void MainWindow::newSong() {
 void MainWindow::scanSongbook() {
     if (scan_ || songbookRoot_.empty())
         return;
-    const QString name = tr("Scan Songbook");
+    const QString name = tr("Check Songs");
     const std::filesystem::path converter = findConverter();
-    if (converter.empty()) {
-        QMessageBox::warning(this, name,
-                             tr("The scan needs chords_converter, which was not found: choose it "
-                                "in Settings (Ctrl+,)."));
-        return;
-    }
-    if (!converterUsable(converter, name))
-        return;
     const auto paper = zub::preview::paperOf(packageDir_, toStdString(preview_->documentClass()));
     const QString paperName = !paper                                  ? tr("its paper")
                               : *paper == zub::songsuggest::Paper::A5 ? QStringLiteral("A5")
@@ -3661,8 +3705,9 @@ void MainWindow::scanSongbook() {
     dialog.setWindowTitle(name);
     auto* layout = new QVBoxLayout(&dialog);
     layout->addWidget(new QLabel(
-        tr("Look for songs where a song action would change something. Nothing is changed: the "
-           "songs are marked in the list (this session only), and you decide song by song."),
+        tr("Look for songs where a song action would change something, or a check finds "
+           "something. Nothing is changed: the songs are marked in the list (this session only), "
+           "and you decide song by song."),
         &dialog));
     auto* tidy =
         new QCheckBox(tr("Tidy: a chorus typed again, chords inside a syllable, spaces"), &dialog);
@@ -3677,12 +3722,32 @@ void MainWindow::scanSongbook() {
     tidy->setChecked(settings.value(QStringLiteral("scan/tidy"), true).toBool());
     check->setChecked(settings.value(QStringLiteral("scan/check"), true).toBool());
     shrink->setChecked(settings.value(QStringLiteral("scan/shrink"), false).toBool());
-    if (packageDir_.empty()) { // measuring typesets every song
-        shrink->setChecked(false);
-        shrink->setEnabled(false);
-        shrink->setToolTip(noPackageText());
+    // The package's scripts, once for the whole songbook (a second each).
+    auto* keysMissing = new QCheckBox(
+        tr("Keys: a key for the songs that have none (from their chords)"), &dialog);
+    auto* keysStated = new QCheckBox(
+        tr("Keys: written keys the chords disagree with (unless confirmed)"), &dialog);
+    auto* metadata = new QCheckBox(
+        tr("Metadata: the header's keys and values (missing tempo, meter …)"), &dialog);
+    keysMissing->setChecked(settings.value(QStringLiteral("scan/keysMissing"), true).toBool());
+    keysStated->setChecked(settings.value(QStringLiteral("scan/keysStated"), false).toBool());
+    metadata->setChecked(settings.value(QStringLiteral("scan/metadata"), false).toBool());
+    if (packageDir_.empty()) { // measuring typesets every song; the scripts are the package's
+        for (QCheckBox* box : {shrink, keysMissing, keysStated, metadata}) {
+            box->setChecked(false);
+            box->setEnabled(false);
+            box->setToolTip(noPackageText());
+        }
     }
-    for (QCheckBox* box : {tidy, check, shrink})
+    if (converter.empty()) {
+        for (QCheckBox* box : {tidy, check, shrink}) {
+            box->setChecked(false);
+            box->setEnabled(false);
+            box->setToolTip(tr("Needs chords_converter, which was not found: choose it in "
+                               "Settings (Ctrl+,)."));
+        }
+    }
+    for (QCheckBox* box : {tidy, check, shrink, keysMissing, keysStated, metadata})
         layout->addWidget(box);
     const int shown = proxy_->rowCount();
     const int all = model_->rowCount();
@@ -3694,14 +3759,15 @@ void MainWindow::scanSongbook() {
     layout->addWidget(allSongs);
     layout->addWidget(shownSongs);
     layout->addWidget(
-        new QLabel(tr("Unsaved edits are not scanned: the scan reads the files."), &dialog));
+        new QLabel(tr("Unsaved edits are not checked: the check reads the files."), &dialog));
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, &dialog);
-    QPushButton* start = buttons->addButton(tr("Scan"), QDialogButtonBox::AcceptRole);
+    QPushButton* start = buttons->addButton(tr("Check"), QDialogButtonBox::AcceptRole);
     start->setDefault(true);
+    const QList<QCheckBox*> boxes{tidy, check, shrink, keysMissing, keysStated, metadata};
     const auto updateStart = [=] {
-        start->setEnabled(tidy->isChecked() || check->isChecked() || shrink->isChecked());
+        start->setEnabled(std::ranges::any_of(boxes, [](QCheckBox* b) { return b->isChecked(); }));
     };
-    for (QCheckBox* box : {tidy, check, shrink})
+    for (QCheckBox* box : boxes)
         connect(box, &QCheckBox::toggled, &dialog, updateStart);
     updateStart();
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -3709,10 +3775,17 @@ void MainWindow::scanSongbook() {
     layout->addWidget(buttons);
     if (dialog.exec() != QDialog::Accepted)
         return;
-    settings.setValue(QStringLiteral("scan/tidy"), tidy->isChecked());
-    settings.setValue(QStringLiteral("scan/check"), check->isChecked());
-    if (shrink->isEnabled()) // switched off for want of a package: the choice stays as it was
-        settings.setValue(QStringLiteral("scan/shrink"), shrink->isChecked());
+    // A box switched off for want of a package or a converter keeps the choice as it was.
+    const std::pair<QCheckBox*, const char*> remembered[] = {
+        {tidy, "scan/tidy"},             {check, "scan/check"},
+        {shrink, "scan/shrink"},         {keysMissing, "scan/keysMissing"},
+        {keysStated, "scan/keysStated"}, {metadata, "scan/metadata"}};
+    for (const auto& [box, key] : remembered)
+        if (box->isEnabled())
+            settings.setValue(QString::fromLatin1(key), box->isChecked());
+    if ((tidy->isChecked() || check->isChecked() || shrink->isChecked()) &&
+        !converterUsable(converter, name))
+        return;
 
     std::vector<SongbookScan::Song> songs;
     if (shownSongs->isChecked()) {
@@ -3730,16 +3803,20 @@ void MainWindow::scanSongbook() {
     options.tidy = tidy->isChecked();
     options.check = check->isChecked();
     options.shrink = shrink->isChecked();
+    options.keysMissing = keysMissing->isChecked();
+    options.keysStated = keysStated->isChecked();
+    options.metadata = metadata->isChecked();
     options.paper = paper;
     options.converter = converter;
     options.songbookRoot = songbookRoot_;
     options.packageDir = packageDir_;
 
     model_->clearScanResults();
+    keyFindings_.clear();
     scanFound_ = 0;
     scan_ = new SongbookScan(options, std::move(songs), this);
     auto* progress =
-        new QProgressDialog(tr("Scanning…"), tr("Cancel"), 0, scan_->stepCount(), this);
+        new QProgressDialog(tr("Checking…"), tr("Cancel"), 0, scan_->stepCount(), this);
     progress->setWindowTitle(name);
     progress->setWindowModality(Qt::WindowModal);
     progress->setMinimumDuration(0);
@@ -3768,6 +3845,10 @@ void MainWindow::scanSongbook() {
                 if (!finding.shrink.isEmpty())
                     summary << (finding.pages.isEmpty() ? tr("Too big")
                                                         : tr("Too big (%1)").arg(finding.pages));
+                if (!finding.keys.isEmpty())
+                    summary << tr("Key");
+                if (!finding.metadata.isEmpty())
+                    summary << tr("Metadata %1").arg(finding.metadata.size());
                 if (!finding.errors.isEmpty())
                     summary << tr("Errors %1").arg(finding.errors.size());
                 section(tr("Tidy:"), finding.tidy);
@@ -3775,11 +3856,19 @@ void MainWindow::scanSongbook() {
                 section(finding.pages.isEmpty() ? tr("Make Smaller:")
                                                 : tr("Make Smaller (%1):").arg(finding.pages),
                         finding.shrink);
+                section(tr("Key:"), finding.keys);
+                section(tr("Metadata:"), finding.metadata);
                 section(tr("Problems:"), finding.errors);
                 model_->setScanResult(toPath(path), summary.join(QStringLiteral(" · ")),
                                       details.join(QLatin1Char('\n')));
                 ++scanFound_;
             });
+    connect(scan_, &SongbookScan::keyFound, this,
+            [this](const QString& path, const zub::songcheck::KeyFinding& finding) {
+                keyFindings_[toPath(path)] = finding;
+            });
+    connect(scan_, &SongbookScan::problem, this,
+            [this](const QString& message) { statusBar()->showMessage(message, 15000); });
     connect(scan_, &SongbookScan::finished, this, [this, progress](bool cancelled) {
         progress->reset();
         progress->deleteLater();
@@ -3788,11 +3877,12 @@ void MainWindow::scanSongbook() {
         // Shown alone only when there is something to show: with nothing found, the filter
         // would hide every song and the list would look empty.
         listPage_->showScanResults(scanFound_ > 0);
+        if (editor_)
+            offerKey(editor_); // the open song may have a key to offer now
         statusBar()->showMessage(
-            (cancelled ? tr("Scan cancelled. ") : QString()) +
-                tr("%n song(s) with possible changes: open one and use Tidy, Check Song or Make "
-                   "Smaller to decide.",
-                   nullptr, scanFound_),
+            (cancelled ? tr("Check cancelled. ") : QString()) +
+                tr("%n song(s) with possible changes: open one to see them and decide.", nullptr,
+                   scanFound_),
             15000);
     });
     scan_->start();

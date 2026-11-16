@@ -53,10 +53,10 @@
         </translation>
     </message>
     <message numerus="yes">
-        <source>%n song(s) with possible changes: open one and use Tidy, Check Song or Make Smaller to decide.</source>
+        <source>%n song(s) with possible changes: open one to see them and decide.</source>
         <translation>
-            <numerusform>%n song with possible changes: open one and use Tidy, Check Song or Make Smaller to decide.</numerusform>
-            <numerusform>%n songs with possible changes: open one and use Tidy, Check Song or Make Smaller to decide.</numerusform>
+            <numerusform>%n song with possible changes: open it to see them and decide.</numerusform>
+            <numerusform>%n songs with possible changes: open one to see them and decide.</numerusform>
         </translation>
     </message>
 </context>

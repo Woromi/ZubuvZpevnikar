@@ -3,7 +3,10 @@
 #include "ConverterRunner.hpp"
 #include "convert.hpp"
 
+#include <QProcess>
 #include <QTimer>
+#include <zub/core/score.hpp>
+#include <zub/core/song.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/songbook.hpp>
 #include <zub/core/songtidy.hpp>
@@ -11,7 +14,16 @@
 
 SongbookScan::SongbookScan(ScanOptions options, std::vector<Song> songs, QObject* parent)
     : QObject(parent), options_(std::move(options)), songs_(std::move(songs)),
-      runner_(new ConverterRunner(this)) {
+      runner_(new ConverterRunner(this)), process_(new QProcess(this)) {
+    if (options_.keysMissing || options_.keysStated)
+        scripts_.push_back(Script::Keys);
+    if (options_.metadata)
+        scripts_.push_back(Script::Metadata);
+    connect(process_, &QProcess::finished, this, &SongbookScan::onScriptFinished);
+    connect(process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart)
+            onScriptFinished();
+    });
     for (std::size_t i = 0; i < songs_.size(); ++i) {
         if (options_.tidy)
             steps_.push_back({i, Kind::Tidy});
@@ -31,8 +43,115 @@ SongbookScan::SongbookScan(ScanOptions options, std::vector<Song> songs, QObject
 
 void SongbookScan::start() {
     current_ = 0;
+    scriptAt_ = 0;
     // From the event loop: the caller connects first.
-    QTimer::singleShot(0, this, &SongbookScan::next);
+    QTimer::singleShot(0, this, &SongbookScan::nextScript);
+}
+
+void SongbookScan::nextScript() {
+    if (cancelled_)
+        return;
+    if (scriptAt_ >= scripts_.size()) {
+        next();
+        return;
+    }
+    const Script script = scripts_[scriptAt_];
+    emit progress(static_cast<int>(scriptAt_), stepCount(),
+                  script == Script::Keys ? tr("Keys of all songs (checkkeys.py)")
+                                         : tr("Metadata of all songs (checksongs.py)"));
+    const auto command =
+        script == Script::Keys
+            ? zub::songcheck::scriptCommand(options_.packageDir, "checkkeys.py",
+                                            options_.songbookRoot, {"--all"})
+            : zub::songcheck::scriptCommand(options_.packageDir, "checksongs.py",
+                                            options_.songbookRoot, {"--no-orphans"});
+    QStringList arguments;
+    for (const auto& argument : command.arguments)
+        arguments << toQString(argument);
+    process_->start(toQString(command.program), arguments);
+}
+
+void SongbookScan::onScriptFinished() {
+    if (cancelled_)
+        return;
+    const Script script = scripts_[scriptAt_++];
+    const QString name = script == Script::Keys ? QStringLiteral("checkkeys.py")
+                                                : QStringLiteral("checksongs.py");
+    const std::string out = process_->readAllStandardOutput().toStdString();
+    const QString err = QString::fromUtf8(process_->readAllStandardError()).trimmed();
+    if (process_->error() == QProcess::FailedToStart) {
+        emit problem(tr("%1 could not run: python3 was not found.").arg(name));
+        QTimer::singleShot(0, this, &SongbookScan::nextScript);
+        return;
+    }
+    // The songs of this check, by path.
+    std::map<std::string, std::size_t> wanted;
+    for (std::size_t i = 0; i < songs_.size(); ++i)
+        wanted.emplace(songs_[i].path.lexically_normal().string(), i);
+    const auto songOf = [&](const std::string& file) -> const Song* {
+        const auto it =
+            wanted.find((options_.songbookRoot / toPath(toQString(file))).lexically_normal().string());
+        return it == wanted.end() ? nullptr : &songs_[it->second];
+    };
+    if (script == Script::Keys) {
+        const auto findings = zub::songcheck::parseCheckKeys(out);
+        if (!findings) {
+            emit problem(tr("%1 failed: %2")
+                             .arg(name, err.isEmpty() ? toQString(findings.error()) : err));
+        } else {
+            for (const auto& finding : *findings) {
+                const Song* song = songOf(finding.file);
+                const bool missing = finding.kind == "propose" && options_.keysMissing;
+                const bool differs = finding.kind == "mismatch" && options_.keysStated;
+                if (!song || (!missing && !differs))
+                    continue;
+                const auto content = zub::readTextFile(song->path);
+                if (!content || (differs && zub::songcheck::keyConfirmed(*content)))
+                    continue; // confirmed by hand: % nocheck key
+                const auto meta = zub::parseSong(*content);
+                const bool german = meta && zub::score::germanNames(meta->value("lang"));
+                const QString detected =
+                    toQString(zub::songcheck::keyValue(finding.detected, german));
+                const QString margin = QString::number(finding.margin, 'f', 1);
+                ScanFinding& found = scriptFindings_[song->path.lexically_normal().string()];
+                found.keys << (missing ? tr("none written, the chords say %1 (margin %2)")
+                                             .arg(detected, margin)
+                                       : tr("written %1, the chords say %2 (margin %3)")
+                                             .arg(toQString(zub::songcheck::keyValue(
+                                                      finding.stated, german)),
+                                                  detected, margin));
+                emit keyFound(toQString(song->path), finding);
+            }
+        }
+    } else {
+        const auto issues = zub::songcheck::parseCheckSongs(out);
+        if (!issues) {
+            emit problem(
+                tr("%1 failed: %2").arg(name, err.isEmpty() ? toQString(issues.error()) : err));
+        } else {
+            for (const auto& [file, list] : *issues) {
+                const Song* song = songOf(file);
+                if (!song)
+                    continue;
+                ScanFinding& found = scriptFindings_[song->path.lexically_normal().string()];
+                for (const auto& issue : list)
+                    found.metadata << (issue.line ? tr("line %1: %2")
+                                                        .arg(*issue.line)
+                                                        .arg(toQString(issue.message))
+                                                  : toQString(issue.message));
+            }
+        }
+    }
+    QTimer::singleShot(0, this, &SongbookScan::nextScript);
+}
+
+void SongbookScan::takeScriptFindings(std::size_t song) {
+    const auto it = scriptFindings_.find(songs_[song].path.lexically_normal().string());
+    if (it == scriptFindings_.end())
+        return;
+    finding_.keys = it->second.keys;
+    finding_.metadata = it->second.metadata;
+    scriptFindings_.erase(it);
 }
 
 void SongbookScan::cancel() {
@@ -40,12 +159,22 @@ void SongbookScan::cancel() {
         return;
     cancelled_ = true;
     runner_->cancel();
+    if (process_->state() != QProcess::NotRunning)
+        process_->kill();
     QTimer::singleShot(0, this, [this] { emit finished(true); });
 }
 
 void SongbookScan::next() {
     while (!cancelled_) {
         if (current_ >= steps_.size()) {
+            // The songs only the scripts found something in.
+            for (std::size_t i = 0; i < songs_.size() && !scriptFindings_.empty(); ++i) {
+                finding_ = {};
+                takeScriptFindings(i);
+                if (finding_.any())
+                    emit songScanned(toQString(songs_[i].path), finding_);
+            }
+            finding_ = {};
             emit finished(false);
             return;
         }
@@ -112,7 +241,7 @@ void SongbookScan::next() {
             break;
         }
         }
-        emit progress(static_cast<int>(current_), static_cast<int>(steps_.size()), what);
+        emit progress(static_cast<int>(scripts_.size() + current_), stepCount(), what);
         if (runner_->start(command, content_, toQString(song.path.stem())))
             return; // onRunFinished goes on
         finding_.errors << tr("the converter could not start");
@@ -185,6 +314,7 @@ void SongbookScan::onRunFinished(const QString& error, int exitCode, const std::
 }
 
 void SongbookScan::endSong(std::size_t song) {
+    takeScriptFindings(song);
     if (finding_.any())
         emit songScanned(toQString(songs_[song].path), finding_);
     finding_ = {};

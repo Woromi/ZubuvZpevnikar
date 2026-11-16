@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <zub/core/scoreregion.hpp>
+#include <zub/core/songcheck.hpp>
 #include <zub/core/songedit.hpp>
 #include <zub/core/songsuggest.hpp>
 #include <zub/core/songtidy.hpp>
@@ -208,7 +209,10 @@ private:
     void updateMarkChecked(); // enabled while the editor text has the "not checked yet" line
     // Songs → Scan Songbook…: runs tidy/check/shrink on many songs and marks the ones with
     // possible changes in the list (this session only); changes nothing.
-    void scanSongbook();
+    void scanSongbook(); // Songs → Check Songs…
+    // The bar above the song with a key the last Check Songs found for it (to write, or to
+    // confirm the written one with % nocheck key).
+    void offerKey(SongEditor* editor);
     void showSongbooks(); // the songbook assembler page
     // Tidy (chords_converter tidy on the open song, one undo step) and the Changes view
     void startTidy(const QString& note = {});
@@ -348,6 +352,8 @@ private:
     QAction* markCheckedAction_ = nullptr; // removes the import's "not checked yet" TODO line
     SongbookScan* scan_ = nullptr;         // while a songbook scan runs
     int scanFound_ = 0;                    // songs it marked so far
+    // Keys the last Check Songs found, by song path (this session; dropped when acted on).
+    std::map<std::filesystem::path, zub::songcheck::KeyFinding> keyFindings_;
     QAction* joinLinesAction_ = nullptr;
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any

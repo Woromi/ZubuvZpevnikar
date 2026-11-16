@@ -87,7 +87,7 @@ SongListPage::SongListPage(SongTableModel* model, SongFilterProxy* proxy, QWidge
     columns->setSectionResizeMode(SongTableModel::Favourite, QHeaderView::ResizeToContents);
     columns->setSectionResizeMode(SongTableModel::Tabs, QHeaderView::ResizeToContents);
     columns->setMinimumSectionSize(28); // the ★ and Tabs columns stay narrow
-    table_->setColumnHidden(SongTableModel::Changes, true); // until a songbook scan
+    table_->setColumnHidden(SongTableModel::Changes, true); // until Check Songs
     // Click the ★ to toggle the favourite; right-click for the labels.
     connect(table_, &QAbstractItemView::clicked, this, [this](const QModelIndex& index) {
         if (index.column() != SongTableModel::Favourite)
@@ -139,7 +139,7 @@ void SongListPage::showScanResults(bool found) {
     if (show_->findData(Show::Changes) < 0) {
         show_->addItem(tr("With possible changes"), Show::Changes);
         show_->setItemData(show_->count() - 1,
-                           tr("Songs the last Scan Songbook found changes in (this session)"),
+                           tr("Songs the last Check Songs found something in (this session)"),
                            Qt::ToolTipRole);
     }
     if (found)

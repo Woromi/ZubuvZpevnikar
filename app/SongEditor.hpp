@@ -93,8 +93,10 @@ public:
     // change as `detail` and a button): `action` runs on a click of `button`, then the bar
     // closes. It never makes the editor read-only. It closes by itself when the text changes
     // (also through the action), by its x, or by hideSuggestion().
+    // An optional second button (`otherButton`, `otherAction`) offers another way.
     void showSuggestion(const QString& message, const QString& detail, const QString& button,
-                        std::function<void()> action);
+                        std::function<void()> action, const QString& otherButton = {},
+                        std::function<void()> otherAction = {});
     void hideSuggestion();
     bool suggestionShown() const;
 
@@ -206,7 +208,9 @@ private:
     QWidget* suggestionBar_ = nullptr;
     QLabel* suggestionLabel_ = nullptr;
     QPushButton* suggestionButton_ = nullptr;
+    QPushButton* suggestionOtherButton_ = nullptr;
     std::function<void()> suggestionAction_;
+    std::function<void()> suggestionOtherAction_;
     struct EnvironmentLink {
         int nameBegin, nameEnd; // document positions of the name at the cursor
     };

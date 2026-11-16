@@ -61,6 +61,9 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
     barLayout->addWidget(suggestionLabel_, 1);
     suggestionButton_ = new QPushButton(suggestionBar_);
     barLayout->addWidget(suggestionButton_);
+    suggestionOtherButton_ = new QPushButton(suggestionBar_);
+    suggestionOtherButton_->setObjectName(QStringLiteral("suggestionOther"));
+    barLayout->addWidget(suggestionOtherButton_);
     auto* closeButton = new QToolButton(suggestionBar_);
     closeButton->setText(QStringLiteral("\u00d7"));
     closeButton->setAutoRaise(true);
@@ -71,6 +74,12 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
     connect(closeButton, &QToolButton::clicked, this, &SongEditor::hideSuggestion);
     connect(suggestionButton_, &QPushButton::clicked, this, [this] {
         const auto action = std::move(suggestionAction_);
+        hideSuggestion();
+        if (action)
+            action();
+    });
+    connect(suggestionOtherButton_, &QPushButton::clicked, this, [this] {
+        const auto action = std::move(suggestionOtherAction_);
         hideSuggestion();
         if (action)
             action();
@@ -247,15 +256,20 @@ void SongEditor::checkLossless(const std::string& bytes) {
 }
 
 void SongEditor::showSuggestion(const QString& message, const QString& detail,
-                                const QString& button, std::function<void()> action) {
+                                const QString& button, std::function<void()> action,
+                                const QString& otherButton, std::function<void()> otherAction) {
     suggestionLabel_->setText(detail.isEmpty() ? message : message + QLatin1Char(' ') + detail);
     suggestionButton_->setText(button);
     suggestionAction_ = std::move(action);
+    suggestionOtherButton_->setText(otherButton);
+    suggestionOtherButton_->setVisible(!otherButton.isEmpty());
+    suggestionOtherAction_ = std::move(otherAction);
     suggestionBar_->show();
 }
 
 void SongEditor::hideSuggestion() {
     suggestionAction_ = nullptr;
+    suggestionOtherAction_ = nullptr;
     suggestionBar_->hide();
 }
 
