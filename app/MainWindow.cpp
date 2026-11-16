@@ -243,10 +243,11 @@ void MainWindow::createMenus() {
         QAction* action = view->addAction(text);
         action->setShortcuts(keys);
         connect(action, &QAction::triggered, this, [this, target] { showView(target); });
+        return action;
     };
     addView(tr("&Songs"), {QKeySequence(QStringLiteral("Ctrl+1"))}, ActivityBar::View::Songs);
-    addView(tr("The Open S&ong"), {QKeySequence(QStringLiteral("Ctrl+2"))},
-            ActivityBar::View::Song);
+    songViewAction_ = addView(tr("The Open S&ong"), {QKeySequence(QStringLiteral("Ctrl+2"))},
+                              ActivityBar::View::Song);
     addView(tr("Song&books"),
             {QKeySequence(QStringLiteral("Ctrl+3")), QKeySequence(QStringLiteral("Ctrl+B"))},
             ActivityBar::View::Songbooks);
@@ -1270,6 +1271,7 @@ void MainWindow::updateSongActions() {
     const bool songTab = onSongTab();
     closeSongAction_->setEnabled(open);
     activityBar_->setSongEnabled(open);
+    songViewAction_->setEnabled(open); // like the bar's button
     saveAction_->setEnabled(current && current->isModified());
     saveAction_->setText(current && !songTab ? tr("&Save Score") : tr("&Save Song"));
     const bool modified = open && editor_->isModified();

@@ -9,6 +9,7 @@ qt_add_executable(zpevnikar
     SettingsDialog.hpp
     SettingsDialog.cpp
     SongListPage.hpp
+    PageHeader.cpp
     SongListPage.cpp
     ImportDialog.hpp
     ImportDialog.cpp

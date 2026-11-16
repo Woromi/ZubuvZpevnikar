@@ -361,6 +361,7 @@ private:
     std::vector<QAction*> editActions_;     // Edit menu: enabled while the text can be edited
     std::vector<QAction*> songEditActions_; // ... and only those of the song (chords, parts)
     QAction* closeSongAction_ = nullptr;
+    QAction* songViewAction_ = nullptr; // View > The Open Song: only with a song open
     QAction* saveAction_ = nullptr;
     QAction* undoAction_ = nullptr;
     QAction* redoAction_ = nullptr;

@@ -1,6 +1,7 @@
 #include "SongListPage.hpp"
 
 #include "LabelFilterBox.hpp"
+#include "PageHeader.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongTableModel.hpp"
 
@@ -22,18 +23,7 @@ SongListPage::SongListPage(SongTableModel* model, SongFilterProxy* proxy, QWidge
     layout->setSpacing(0);
 
     // The heading and the actions on songs.
-    header_ = new QToolBar(tr("Songs"), this);
-    header_->setMovable(false);
-    header_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    auto* heading = new QLabel(tr("Songs"), header_);
-    QFont font = heading->font();
-    font.setBold(true);
-    font.setPointSizeF(font.pointSizeF() * 1.15);
-    heading->setFont(font);
-    heading->setContentsMargins(4, 0, 12, 0);
-    header_->addWidget(heading);
-    header_->layout()->setSpacing(6);
-    header_->setContentsMargins(6, 4, 6, 0);
+    header_ = createPageHeader(tr("Songs"), this);
 
     // The filters.
     auto* filters = new QToolBar(tr("Filter"), this);
@@ -86,7 +76,7 @@ SongListPage::SongListPage(SongTableModel* model, SongFilterProxy* proxy, QWidge
     columns->setSectionResizeMode(SongTableModel::Changes, QHeaderView::Stretch);
     columns->setSectionResizeMode(SongTableModel::Favourite, QHeaderView::ResizeToContents);
     columns->setSectionResizeMode(SongTableModel::Tabs, QHeaderView::ResizeToContents);
-    columns->setMinimumSectionSize(28); // the ★ and Tabs columns stay narrow
+    columns->setMinimumSectionSize(28);                     // the ★ and Tabs columns stay narrow
     table_->setColumnHidden(SongTableModel::Changes, true); // until Check Songs
     // Click the ★ to toggle the favourite; right-click for the labels.
     connect(table_, &QAbstractItemView::clicked, this, [this](const QModelIndex& index) {
