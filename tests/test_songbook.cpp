@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <map>
 #include <unistd.h>
 
 using namespace zub::songbook;
@@ -768,4 +769,34 @@ TEST_CASE("planFolderExport takes the TeX side of the package and four of its sc
                                          "zubuvzpevnik/img/kane.jpg",
                                          "zubuvzpevnik/velkyzpevnik.cls",
                                          "zubuvzpevnik/zubuvzpevnik.sty"});
+}
+
+TEST_CASE("notMarkedFitting lists a book's songs not marked for its paper", "[songbook]") {
+    Songbook b;
+    b.sections = {{"", {"A/Fits", "A/Spread", "A/BigOnly", "A/Nothing"}},
+                  {"S", {"A/Fits", "A/Unknown", "A/Upper", "A/Spaced"}}};
+    const std::map<std::string, std::string> pap{
+        {"A/Fits", "a4,a5"},  {"A/Spread", "a4,a5x2"}, {"A/BigOnly", "a4"},
+        {"A/Nothing", ""},    {"A/Upper", "A5"},       {"A/Spaced", "a4, a5"}};
+    const auto papOf = [&](std::string_view name) -> std::optional<std::string> {
+        const auto it = pap.find(std::string(name));
+        if (it == pap.end())
+            return std::nullopt;
+        return it->second;
+    };
+    b.bookClass = BookClass::Maly; // A5
+    CHECK(paperName(b.bookClass) == "a5");
+    CHECK(notMarkedFitting(b, papOf) == std::vector<std::string>{"A/BigOnly", "A/Nothing"});
+    b.bookClass = BookClass::Velky; // A4: only the ones without a4
+    CHECK(paperName(b.bookClass) == "a4");
+    CHECK(notMarkedFitting(b, papOf) == std::vector<std::string>{"A/Nothing", "A/Upper"});
+}
+
+TEST_CASE("removeSong takes a song out of every section", "[songbook]") {
+    Songbook b;
+    b.sections = {{"", {"A/X", "A/Y"}}, {"S", {"A/X"}}};
+    CHECK(removeSong(b, "A/X"));
+    CHECK(b.sections[0].songs == std::vector<std::string>{"A/Y"});
+    CHECK(b.sections[1].songs.empty());
+    CHECK_FALSE(removeSong(b, "A/X"));
 }

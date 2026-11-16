@@ -24,6 +24,7 @@ enum class BookClass {
 
 std::string_view className(BookClass); // "velkyzpevnik", "malyzpevnik", "taborovyzpevnik"
 std::optional<BookClass> bookClassFromName(std::string_view);
+std::string_view paperName(BookClass); // the paper it typesets: "a4" (velkyzpevnik) or "a5"
 
 struct Section {
     std::string name;               // "" = unnamed (no \songsection)
@@ -187,5 +188,17 @@ BuildCommand buildCommand(const Songbook&, const std::filesystem::path& repoRoot
 // Number of "Package zubuvzpevnik Warning"s about "not marked as fitting" (a warning wrapped at
 // max_print_line counts once).
 int paperWarnings(std::string_view log);
+
+// ---- Checks of a book ----
+
+// The songs of `book` (book order, once each) not marked as fitting its paper, as checkpaper.py
+// checks a project: their `pap` (comma-separated, as `papOf` gives it) names neither the paper
+// nor <paper>x2 (two facing pages). Songs `papOf` does not know (nullopt) are left out.
+std::vector<std::string>
+notMarkedFitting(const Songbook& book,
+                 const std::function<std::optional<std::string>(std::string_view)>& papOf);
+
+// Removes `inputName` from every section of `book`; false if it was in none.
+bool removeSong(Songbook& book, std::string_view inputName);
 
 } // namespace zub::songbook

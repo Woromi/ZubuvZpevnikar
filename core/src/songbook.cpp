@@ -953,4 +953,50 @@ int paperWarnings(std::string_view log) {
     return count;
 }
 
+std::string_view paperName(BookClass bookClass) {
+    return bookClass == BookClass::Velky ? "a4" : "a5";
+}
+
+std::vector<std::string>
+notMarkedFitting(const Songbook& book,
+                 const std::function<std::optional<std::string>(std::string_view)>& papOf) {
+    const std::string paper(paperName(book.bookClass));
+    std::vector<std::string> out;
+    std::set<std::string> seen;
+    for (const Section& section : book.sections) {
+        for (const std::string& name : section.songs) {
+            if (!seen.insert(name).second)
+                continue;
+            const auto pap = papOf(name);
+            if (!pap)
+                continue;
+            bool marked = false;
+            std::string_view rest = *pap;
+            while (!rest.empty() && !marked) {
+                const std::size_t comma = rest.find(',');
+                std::string_view entry = rest.substr(0, comma);
+                rest = comma == std::string_view::npos ? std::string_view() : rest.substr(comma + 1);
+                while (!entry.empty() && (entry.front() == ' ' || entry.front() == '\t'))
+                    entry.remove_prefix(1);
+                while (!entry.empty() && (entry.back() == ' ' || entry.back() == '\t'))
+                    entry.remove_suffix(1);
+                std::string lower;
+                for (const char c : entry)
+                    lower += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                marked = lower == paper || lower == paper + "x2";
+            }
+            if (!marked)
+                out.push_back(name);
+        }
+    }
+    return out;
+}
+
+bool removeSong(Songbook& book, std::string_view inputName) {
+    bool removed = false;
+    for (Section& section : book.sections)
+        removed |= std::erase(section.songs, std::string(inputName)) > 0;
+    return removed;
+}
+
 } // namespace zub::songbook
