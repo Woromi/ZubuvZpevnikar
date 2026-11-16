@@ -6,6 +6,7 @@
 #include <optional>
 #include <zub/core/latex.hpp>
 #include <zub/core/song.hpp>
+#include <zub/core/songbook.hpp>
 
 namespace zub::safety {
 
@@ -422,6 +423,29 @@ std::optional<std::string_view> braceArgument(std::string_view text, std::size_t
     return text.substr(open + 1, *close - open - 1);
 }
 
+// The argument of the bracket group starting at `open` (nullopt: none, or unbalanced).
+std::optional<std::pair<std::string_view, std::size_t>> bracketArgument(std::string_view text,
+                                                                        std::size_t open) {
+    while (open < text.size() && (text[open] == ' ' || text[open] == '\t'))
+        ++open;
+    if (open >= text.size() || text[open] != '[')
+        return std::nullopt;
+    const auto close = text.find(']', open);
+    if (close == std::string_view::npos)
+        return std::nullopt;
+    return std::pair{text.substr(open + 1, close - open - 1), close + 1};
+}
+
+// An image path under the build's folders: relative, plain characters, no "..".
+bool plainFilePath(std::string_view path) {
+    if (path.empty() || path.front() == '/' || path.find("..") != std::string_view::npos)
+        return false;
+    return std::ranges::all_of(path, [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+               c == '_' || c == '-' || c == '/' || c == '.';
+    });
+}
+
 bool plainName(std::string_view name) {
     return !name.empty() && std::ranges::all_of(name, [](char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || isDigit(c) || c == '_' ||
@@ -461,19 +485,65 @@ std::vector<std::string> unknownBookConstructs(std::string_view bookContent) {
             const auto argument = braceArgument(text, end);
             if (!argument || invalidInputName(*argument))
                 report(argument ? "\\input{" + std::string(*argument) + "}" : "\\input");
+        } else if (name == "documentclass") {
+            // One of the package's classes, found in the package (a class runs anything).
+            std::size_t argAt = end;
+            if (const auto options = bracketArgument(text, argAt))
+                argAt = options->second;
+            const auto argument = braceArgument(text, argAt);
+            if (!argument || !songbook::bookClassFromName(*argument))
+                report("\\documentclass" +
+                       (argument ? "{" + std::string(*argument) + "}" : std::string()));
+        } else if (name == "makefrontcover" || name == "maketitlepage") {
+            // An image file name: \includegraphics with -shell-escape may convert it by a
+            // command line made from the name.
+            std::size_t argAt = end;
+            std::optional<std::string_view> file;
+            if (const auto optional = bracketArgument(text, argAt)) {
+                file = optional->first;
+                argAt = optional->second;
+            }
+            if (const auto required = braceArgument(text, argAt);
+                required && name == "makefrontcover" && !file)
+                file = *required;
+            if (file && !file->empty() && !plainFilePath(*file))
+                report("\\" + std::string(name) + "{" + std::string(*file) + "}");
         } else if (name == "begin" || name == "end") {
             const auto argument = braceArgument(text, end);
             if (!argument ||
-                (*argument != "document" && *argument != "songs" && *argument != "center"))
+                (*argument != "document" && *argument != "songs" && *argument != "center")) {
                 report("\\" + std::string(name) +
                        (argument ? "{" + std::string(*argument) + "}" : std::string()));
+            } else if (name == "begin" && *argument == "songs") {
+                // The index names become file names (build.sh -i, songidx.lua).
+                const auto close =
+                    static_cast<std::size_t>(argument->data() - text.data()) + argument->size();
+                const auto indexes = braceArgument(text, close + 1);
+                bool plain = indexes.has_value();
+                if (indexes) {
+                    std::string_view rest = *indexes;
+                    while (plain && !rest.empty()) {
+                        const auto comma = rest.find(',');
+                        std::string_view one = rest.substr(0, comma);
+                        while (!one.empty() && (one.front() == ' ' || one.front() == '\t'))
+                            one.remove_prefix(1);
+                        while (!one.empty() && (one.back() == ' ' || one.back() == '\t'))
+                            one.remove_suffix(1);
+                        plain = plainName(one) && one.front() != '-';
+                        rest = comma == std::string_view::npos ? std::string_view()
+                                                               : rest.substr(comma + 1);
+                    }
+                }
+                if (!plain)
+                    report("\\begin{songs}{" + std::string(indexes ? *indexes : "") + "}");
+            }
         } else if (name == "newindex") {
             const auto id = braceArgument(text, end);
             const auto file =
                 id ? braceArgument(text, static_cast<std::size_t>(id->data() - text.data()) +
                                              id->size() + 1)
                    : std::nullopt;
-            if (!file || !plainName(*file))
+            if (!file || !plainName(*file) || file->front() == '-')
                 report(file ? "\\newindex{..}{" + std::string(*file) + "}" : "\\newindex");
         }
     }

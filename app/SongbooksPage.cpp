@@ -34,7 +34,6 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QSaveFile>
 #include <QSettings>
 #include <QShortcut>
 #include <QSplitter>
@@ -394,13 +393,12 @@ QWidget* SongbooksPage::buildPickerPane() {
         connect(enter, &QShortcut::activated, this, &SongbooksPage::addPicked);
     }
     connect(check_, &QPushButton::clicked, this, &SongbooksPage::checkBook);
-    connect(exportPdf_, &QPushButton::clicked, this,
-            [this] {
-                if (repo_)
-                    exporter_->exportRepoPdf(repoPathOf(id_), repoText_, book_);
-                else
-                    exporter_->exportPdf(id_, book_, titleLookup());
-            });
+    connect(exportPdf_, &QPushButton::clicked, this, [this] {
+        if (repo_)
+            exporter_->exportRepoPdf(repoPathOf(id_), repoText_, book_);
+        else
+            exporter_->exportPdf(id_, book_, titleLookup());
+    });
     connect(exportLatex_, &QPushButton::clicked, this,
             [this] { exporter_->exportLatex(id_, book_, titleLookup()); });
     refreshLanguages();
@@ -630,11 +628,8 @@ bool SongbooksPage::saveRepoBook() {
         text = std::move(*edited);
     }
     if (text != repoText_) {
-        QSaveFile file(toQString(path));
-        const QByteArray bytes = QByteArray::fromStdString(text);
-        if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() ||
-            !file.commit()) {
-            showWarning(tr("Cannot write %1: %2").arg(toQString(path), file.errorString()));
+        if (const auto written = zub::writeTextFileAtomic(path, text); !written) {
+            showWarning(tr("Not saved: %1").arg(toQString(written.error())));
             loadRepoBook();
             return false;
         }
@@ -705,7 +700,7 @@ void SongbooksPage::loadBook() {
     formBox_->setVisible(!repo_);
     repoBox_->setVisible(repo_);
     sectionsHint_->setVisible(repo_);
-    tree_->setEnabled(editable_ || !repo_);
+    tree_->setEnabled(true); // a read-only repo book can still be browsed (edits check editable_)
     tree_->setSectionEditing(!repo_);
     for (QPushButton* button : {addSection_, renameSection_, removeSection_, moveUp_, moveDown_})
         button->setVisible(!repo_);
@@ -717,7 +712,7 @@ void SongbooksPage::loadBook() {
                      id_.mid(repoPrefix.size()).toHtmlEscaped(),
                      toQString(repoBook_.documentClass).toHtmlEscaped(), paper));
     }
-    pickerPane_->setEnabled(editable_);
+    pickerPane_->setEnabled(editable_ || repo_); // Check and Export PDF of a read-only repo book
     title_->setText(toQString(book_.title));
     author_->setText(toQString(book_.author));
     class_->setCurrentIndex(class_->findData(static_cast<int>(book_.bookClass)));
@@ -843,10 +838,11 @@ int SongbooksPage::indexOfUid(quint64 uid) const {
     return it == sectionUids_.end() ? -1 : static_cast<int>(it - sectionUids_.begin());
 }
 
-void SongbooksPage::commit() {
-    saveBook();
+bool SongbooksPage::commit() {
+    const bool saved = saveBook();
     rebuildTree();
     updatePicker();
+    return saved;
 }
 
 void SongbooksPage::rebuildTree() {
@@ -871,7 +867,7 @@ void SongbooksPage::rebuildTree() {
             if (s > 0 || !rootPart) {
                 header = tree_->addSection(
                     sectionUids_[s],
-                    toQString(section.name) + QStringLiteral(" — ") +
+                    sectionLabel(section.name) + QStringLiteral(" — ") +
                         tr("%n song(s)", nullptr, static_cast<int>(section.songs.size())));
                 if (static_cast<int>(s) == selectedSection)
                     selectedItem = header;
@@ -962,8 +958,10 @@ void SongbooksPage::updateButtons() {
     bool hasSongs = false;
     for (const auto& section : book_.sections)
         hasSongs = hasSongs || !section.songs.empty();
-    check_->setEnabled(editable_ && hasSongs);
-    exportPdf_->setEnabled(editable_ && hasSongs);
+    // A read-only repo book is still checked and built as it is.
+    const bool readable = editable_ || (repo_ && !book_.sections.empty());
+    check_->setEnabled(readable && hasSongs);
+    exportPdf_->setEnabled(readable && hasSongs);
     exportLatex_->setEnabled(editable_ && hasSongs && !repo_);
     sortAll_->setEnabled(editable_ && hasSongs);
 
@@ -1074,7 +1072,7 @@ void SongbooksPage::removeSelectedSongs() {
 }
 
 void SongbooksPage::checkBook() {
-    if (!editable_)
+    if (!editable_ && !repo_)
         return;
     // The songs of the library by input name: their pap and file.
     std::map<std::string, const zub::SongEntry*> byName;
@@ -1134,9 +1132,9 @@ void SongbooksPage::checkBook() {
         buttons->addButton(tr("Remove from the Songbook"), QDialogButtonBox::ActionRole);
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    connect(list, &QListWidget::itemSelectionChanged, &dialog, [=] {
+    connect(list, &QListWidget::itemSelectionChanged, &dialog, [=, this] {
         open->setEnabled(list->selectedItems().size() == 1);
-        remove->setEnabled(!list->selectedItems().isEmpty());
+        remove->setEnabled(editable_ && !list->selectedItems().isEmpty());
     });
     connect(open, &QPushButton::clicked, &dialog, [&] {
         const auto items = list->selectedItems();
@@ -1261,8 +1259,8 @@ void SongbooksPage::addSongs(int target, const std::vector<std::string>& names, 
     if (!changed)
         return;
     section_ = target;
-    commit();
-    if (!added.empty())
+    // Not saved (a repo book changed on disk is read again): nothing to sort.
+    if (commit() && !added.empty())
         requestSort(target, SortMode::Merge, added);
 }
 
@@ -1313,6 +1311,9 @@ void SongbooksPage::sortAll() {
 
 void SongbooksPage::requestSort(int sectionIndex, SortMode mode,
                                 const std::set<std::string>& pending) {
+    if (sectionIndex < 0 || sectionIndex >= static_cast<int>(book_.sections.size()) ||
+        sectionIndex >= static_cast<int>(sectionUids_.size()))
+        return;
     const auto units = sortUnits(sectionIndex);
     const QString key = id_ + QLatin1Char('/') +
                         QString::number(sectionUids_[static_cast<std::size_t>(sectionIndex)]);

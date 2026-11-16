@@ -912,7 +912,7 @@ BuildCommand buildCommand(const Songbook&, const std::filesystem::path& repoRoot
     command.workingDirectory = workDir;
     command.environment.emplace_back(
         "TEXINPUTS", ".:" + utf8(workDir) + ":" + root + "/songs/chords:" + root +
-                         "/songs/tinwhistle:" + root + ":" + utf8(packageDir) + ":");
+                         "/songs/tinwhistle:" + utf8(packageDir) + ":" + root + ":");
     command.pdf = workDir / (std::string(bookName) + ".pdf");
     command.log = workDir / (std::string(bookName) + ".log");
     return command;

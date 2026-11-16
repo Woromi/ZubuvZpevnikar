@@ -5,6 +5,7 @@
 #include <set>
 #include <system_error>
 #include <unordered_map>
+#include <utility>
 #include <zub/core/bookfile.hpp>
 #include <zub/core/latex.hpp>
 #include <zub/core/song.hpp>
@@ -222,6 +223,12 @@ void buildUnits(EnvDetail& d, const string& notClean) {
     }
     if (!notClean.empty() && env.readOnly.empty())
         env.readOnly = notClean;
+    // A song listed twice: which of its lines would an edit move or remove?
+    std::set<string> seen;
+    for (const auto& u : env.units)
+        for (const auto& name : u.songs)
+            if (!seen.insert(name).second && env.readOnly.empty())
+                env.readOnly = "\\input{" + name + "} is in this list twice";
 }
 
 std::expected<std::vector<EnvDetail>, std::string> scan(string_view text) {
@@ -231,6 +238,7 @@ std::expected<std::vector<EnvDetail>, std::string> scan(string_view text) {
     bool inBody = false;
     EnvDetail cur;
     size_t beginLine = 0;
+    string beginProblem;
     for (size_t i = 0; i < raw.size(); ++i) {
         const auto content = text.substr(raw[i].begin, raw[i].contentEnd - raw[i].begin);
         const auto code = latex::stripComments(content);
@@ -249,6 +257,12 @@ std::expected<std::vector<EnvDetail>, std::string> scan(string_view text) {
             if (code.find("\\begin{songs}", arg->end) != npos)
                 return std::unexpected("line " + std::to_string(i + 1) + ": nested \\begin{songs}");
             cur = EnvDetail{};
+            // Code after the index list on the same line (\newpage) stays there; a song there
+            // would be in no unit.
+            const string after(code.substr(arg->end));
+            if (after.find("\\input") != npos || after.find("keeporder") != npos)
+                beginProblem =
+                    "line " + std::to_string(i + 1) + ": an \\input on the \\begin{songs} line";
             cur.env.section = section;
             cur.env.indexes = splitNames(arg->value);
             cur.env.bodyBegin = raw[i].end;
@@ -260,8 +274,8 @@ std::expected<std::vector<EnvDetail>, std::string> scan(string_view text) {
             return std::unexpected("line " + std::to_string(i + 1) + ": nested \\begin{songs}");
         if (code.find("\\end{songs}") != npos) {
             cur.env.bodyEnd = raw[i].begin;
-            string notClean;
-            if (trim(code) != "\\end{songs}")
+            string notClean = std::exchange(beginProblem, string());
+            if (notClean.empty() && trim(code) != "\\end{songs}")
                 notClean =
                     "line " + std::to_string(i + 1) + ": \\end{songs} is not alone on its line";
             buildUnits(cur, notClean);
@@ -408,18 +422,25 @@ std::expected<string, string> setSongs(string_view text, size_t environment,
         std::vector<std::pair<size_t, size_t>> erases; // ascending
         std::set<string> done;
         bool inBlock = false;
+        // Uncommented, a line takes the plain lines above it into its unit: only where those
+        // are no wish or other note (which belongs to the song below it), i.e. right after a
+        // unit, the body's start or another commented input. Elsewhere a new line is added.
+        bool afterNote = false;
         for (const auto& l : d.lines) {
-            if (l.kind == Kind::Begin)
+            const auto content = string_view(work).substr(l.begin, l.contentEnd - l.begin);
+            if (l.kind == Kind::Begin) {
                 inBlock = true;
-            else if (l.kind == Kind::End)
+            } else if (l.kind == Kind::End) {
                 inBlock = false;
-            else if (l.kind == Kind::Plain && !inBlock) {
-                const auto c =
-                    commentedInput(string_view(work).substr(l.begin, l.contentEnd - l.begin));
-                if (c && nameSet.contains(c->name) && !existing.contains(c->name) &&
-                    done.insert(c->name).second)
+            } else if (l.kind == Kind::Plain) {
+                const auto c = commentedInput(content);
+                if (c && !inBlock && !afterNote && nameSet.contains(c->name) &&
+                    !existing.contains(c->name) && done.insert(c->name).second)
                     erases.emplace_back(l.begin + c->eraseBegin, l.begin + c->eraseEnd);
+                afterNote = !c;
+                continue;
             }
+            afterNote = false;
         }
         for (const auto& [b, e] : erases | std::views::reverse)
             work.erase(b, e - b);
@@ -601,10 +622,12 @@ std::vector<std::filesystem::path> findBooks(const std::filesystem::path& repoRo
             return {};
     }
     std::vector<fs::path> out;
-    fs::recursive_directory_iterator it(dir, ec), end;
+    fs::recursive_directory_iterator it(dir, fs::directory_options::skip_permission_denied, ec),
+        end;
     for (; !ec && it != end; it.increment(ec)) {
         std::error_code e2;
-        if (it->path().extension() != ".tex" || !it->is_regular_file(e2))
+        // A link could point anywhere: only real files of the tree are books.
+        if (it->path().extension() != ".tex" || it->is_symlink(e2) || !it->is_regular_file(e2))
             continue;
         const auto text = readTextFile(it->path());
         if (!text)
@@ -614,6 +637,18 @@ std::vector<std::filesystem::path> findBooks(const std::filesystem::path& repoRo
     }
     std::ranges::sort(out);
     return out;
+}
+
+std::vector<std::string> inputs(std::string_view text) {
+    const string code = latex::stripComments(text);
+    std::vector<string> names;
+    for (auto p = findCommand(code, "input"); p != npos; p = findCommand(code, "input", p + 6)) {
+        const auto arg = braceArg(code, p + 6);
+        const string name = arg ? string(trim(arg->value)) : string();
+        if (std::ranges::find(names, name) == names.end())
+            names.push_back(name);
+    }
+    return names;
 }
 
 songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
@@ -635,10 +670,12 @@ songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
     }
     command.arguments.push_back(utf8(workDir / (std::string(bookName) + ".tex")));
     command.workingDirectory = workDir;
-    command.environment.emplace_back("TEXINPUTS", ".:" + utf8(workDir) + ":" + utf8(bookDir) +
-                                                      ":" + root + "/songs/chords:" + root +
-                                                      "/songs/tinwhistle:" + root + ":" +
-                                                      utf8(packageDir) + ":");
+    // The songs and the package first: nothing in the book's folder or the repo root can stand
+    // in for a checked song or a package file (class, .sty, .cfg, Lua).
+    command.environment.emplace_back("TEXINPUTS", ".:" + utf8(workDir) + ":" + root +
+                                                      "/songs/chords:" + root +
+                                                      "/songs/tinwhistle:" + utf8(packageDir) +
+                                                      ":" + utf8(bookDir) + ":" + root + ":");
     command.pdf = workDir / (std::string(bookName) + ".pdf");
     command.log = workDir / (std::string(bookName) + ".log");
     return command;

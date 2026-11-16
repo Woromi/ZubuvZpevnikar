@@ -102,7 +102,7 @@ private:
     void removeSection(int index);
     void moveSection(int delta);
     void removeSelectedSongs();
-    void commit(); // save, then show the changes
+    bool commit(); // save, then show the changes; false if nothing was saved
     bool askSectionName(const QString& title, const QString& initial, int ignoreSection,
                         QString* name);
 

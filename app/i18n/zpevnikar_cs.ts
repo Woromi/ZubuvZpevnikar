@@ -2351,6 +2351,14 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>PDF (*.pdf)</translation>
     </message>
     <message>
+        <source>\input{%1}: not a song of the songbook</source>
+        <translation>\input{%1}: není píseň zpěvníku</translation>
+    </message>
+    <message>
+        <source>%1: an index file the build would read</source>
+        <translation>%1: soubor rejstříku, který by sestavení načetlo</translation>
+    </message>
+    <message>
         <source>Building %1…</source>
         <translation>Sestavuji %1…</translation>
     </message>
@@ -2792,10 +2800,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Not saved: %1</source>
         <translation>Neuloženo: %1</translation>
-    </message>
-    <message>
-        <source>Cannot write %1: %2</source>
-        <translation>Nelze zapsat %1: %2</translation>
     </message>
     <message>
         <source>New songbook</source>

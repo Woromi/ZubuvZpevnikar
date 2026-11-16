@@ -609,7 +609,7 @@ TEST_CASE("buildCommand", "[songbook]") {
     REQUIRE(c.environment.size() == 1);
     CHECK(c.environment[0].first == "TEXINPUTS");
     CHECK(c.environment[0].second ==
-          ".:/w:/r/songs/chords:/r/songs/tinwhistle:/r:/p:");
+          ".:/w:/r/songs/chords:/r/songs/tinwhistle:/p:/r:");
     CHECK(c.pdf == "/w/book.pdf");
     CHECK(c.log == "/w/book.log");
 

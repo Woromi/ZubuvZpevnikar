@@ -34,6 +34,7 @@
 #include <set>
 #include <zub/core/bookfile.hpp>
 #include <zub/core/safety.hpp>
+#include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
 #ifdef Q_OS_UNIX
 #include <signal.h>
@@ -517,9 +518,34 @@ void SongbookExporter::exportRepoPdf(const std::filesystem::path& bookFile, std:
         bookRisks << name + QStringLiteral(": ") + commands.join(QStringLiteral(", "));
     };
     addRisks(toQString(bookFile.filename()), text);
-    if (const auto akordy = zub::readTextFile(bookDir / "akordy.tex"))
+    std::vector<std::string> inputs = zub::bookfile::inputs(text);
+    if (const auto akordy = zub::readTextFile(bookDir / "akordy.tex")) {
         addRisks(QStringLiteral("akordy.tex"), *akordy);
-    const auto resolution = zub::songbook::resolveSongs(book, root_);
+        for (std::string& name : zub::bookfile::inputs(*akordy))
+            if (std::ranges::find(inputs, name) == inputs.end())
+                inputs.push_back(std::move(name));
+    }
+    // Every \input of the book, wherever it is, must be a song of the songbook (the build finds
+    // the song folders first): those are what the song check below reads.
+    zub::songbook::Songbook all;
+    all.sections.push_back({});
+    for (const std::string& name : inputs) {
+        const bool song = !name.empty() && !zub::invalidInputName(name) &&
+                          (std::filesystem::is_regular_file(root_ / "songs/chords" / (name + ".tex")) ||
+                           std::filesystem::is_regular_file(root_ / "songs/tinwhistle" / (name + ".tex")));
+        if (song)
+            all.sections.front().songs.push_back(name);
+        else
+            bookRisks << tr("\\input{%1}: not a song of the songbook").arg(toQString(name));
+    }
+    // An index file lying in the book's folder or the repo root would be read by the first run.
+    for (const auto& dir : {bookDir, root_}) {
+        const QDir folder(toQString(dir));
+        for (const QString& name :
+             folder.entryList({QStringLiteral("*.sbx"), QStringLiteral("*.sxd")}, QDir::Files))
+            bookRisks << tr("%1: an index file the build would read").arg(folder.filePath(name));
+    }
+    const auto resolution = zub::songbook::resolveSongs(all, root_);
     if (!confirmSafety(resolution, bookRisks))
         return;
 

@@ -104,10 +104,14 @@ std::vector<std::string> indexFiles(const Book&);
 // followed; unreadable files are skipped.
 std::vector<std::filesystem::path> findBooks(const std::filesystem::path& repoRoot);
 
+// Every \input{name} of `text` (comments ignored, anywhere, trimmed, once each, in order); "" for
+// an \input without a brace argument.
+std::vector<std::string> inputs(std::string_view text);
+
 // The build of a book of the repo from a copy <workDir>/<bookName>.tex, with the package's
 // scripts/build.sh -i <indexes> (indexFiles), writing only to workDir. TEXINPUTS: the work dir,
-// then the book's own folder `bookDir` (a Tabor book's cover.pdf and akordy.tex), the song
-// folders, the repo root (img/), the package, and the defaults (the trailing ':').
+// the song folders, the package, then the book's own folder `bookDir` (a Tabor book's cover.pdf
+// and akordy.tex), the repo root (img/), and the defaults (the trailing ':').
 songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& packageDir,
                                     const std::filesystem::path& workDir,

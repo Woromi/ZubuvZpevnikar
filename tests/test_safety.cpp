@@ -188,3 +188,23 @@ TEST_CASE("every real book passes the book check", "[.integration][safety][book]
     }
     CHECK(count > 5);
 }
+
+TEST_CASE("books: class, index and cover names are checked", "[safety][book]") {
+    const auto book = [](std::string_view s) { return zub::safety::unknownBookConstructs(s); };
+    CHECK(book("\\documentclass[chorded]{taborovyzpevnik}").empty());
+    CHECK(book("\\documentclass{evil}") == Constructs{"\\documentclass{evil}"});
+    CHECK(book("\\documentclass{../../velkyzpevnik}") ==
+          Constructs{"\\documentclass{../../velkyzpevnik}"});
+    CHECK(book("\\begin{songs}{obsah, obsahAutor}\\end{songs}").empty());
+    CHECK(book("\\begin{songs}{../../x}") == Constructs{"\\begin{songs}{../../x}"});
+    CHECK(book("\\begin{songs}{-foo}") == Constructs{"\\begin{songs}{-foo}"});
+    CHECK(book("\\begin{songs}") == Constructs{"\\begin{songs}{}"});
+    CHECK(book("\\newindex{i}{-x}") == Constructs{"\\newindex{..}{-x}"});
+    CHECK(book("\\makefrontcover{img/zubuvzpevnik}\\maketitlepage[img/maly]"
+               "\\makefrontcover[cover.pdf]\\makebackcover[]\\makefrontcover")
+              .empty());
+    CHECK(book("\\makefrontcover{x;touch y.eps}") == Constructs{"\\makefrontcover{x;touch y.eps}"});
+    CHECK(book("\\maketitlepage[/etc/x.png]") == Constructs{"\\maketitlepage{/etc/x.png}"});
+    // A Tabor book's back cover takes text.
+    CHECK(book("\\makebackcover[Find more at \\texttt{a.cz}]").empty());
+}

@@ -431,7 +431,53 @@ TEST_CASE("bookfile builds a repo book from a copy in the work dir", "[bookfile]
     CHECK(command.workingDirectory == "/work");
     REQUIRE(command.environment.size() == 1);
     CHECK(command.environment[0].second ==
-          ".:/work:/sb/songbooks/t/2025:/sb/songs/chords:/sb/songs/tinwhistle:/sb:/pkg:");
+          ".:/work:/sb/songs/chords:/sb/songs/tinwhistle:/pkg:/sb/songbooks/t/2025:/sb:");
     CHECK(command.pdf == "/work/book.pdf");
     CHECK(command.log == "/work/book.log");
+}
+
+TEST_CASE("bookfile: review findings", "[bookfile]") {
+    namespace bf = zub::bookfile;
+    const std::string head = "\\documentclass{velkyzpevnik}\n\\begin{document}\n";
+    const std::string tail = "\\end{songs}\n\\end{document}\n";
+    // A song listed twice: no edit can tell its lines apart.
+    const auto twice = bf::parse(head +
+                                 "\\begin{songs}{obsah}\n\\input{A/a}\n\\input{B/b}\n"
+                                 "\\input{A/a}\n" +
+                                 tail);
+    REQUIRE(twice);
+    CHECK(twice->environments[0].readOnly.find("twice") != std::string::npos);
+    // A song on the \begin{songs} line is in no unit: read-only; \newpage there is fine.
+    const auto onBegin =
+        bf::parse(head + "\\begin{songs}{obsah}\\input{Z/z}\n\\input{A/a}\n" + tail);
+    REQUIRE(onBegin);
+    CHECK_FALSE(onBegin->environments[0].readOnly.empty());
+    const auto newpage = bf::parse(head + "\\begin{songs}{obsah}\\newpage\n\\input{A/a}\n" + tail);
+    REQUIRE(newpage);
+    CHECK(newpage->environments[0].readOnly.empty());
+    // A commented input right under a wish stays: the wish belongs to the song below it.
+    const std::string wished = head +
+                               "\\begin{songs}{obsah}\n    \\input{A/a}\n"
+                               "    % TODO: wish for C\n    % \\input{X/x}\n"
+                               "    \\input{C/c}\n" +
+                               tail;
+    const auto added = bf::setSongs(wished, 0, {"A/a", "C/c", "X/x"});
+    REQUIRE(added);
+    CHECK(*added == head +
+                        "\\begin{songs}{obsah}\n    \\input{A/a}\n    % TODO: wish for C\n"
+                        "    % \\input{X/x}\n    \\input{C/c}\n    \\input{X/x}\n" +
+                        tail);
+    // ... but one in a parked list, or right after a song, is uncommented.
+    const std::string parked = head +
+                               "\\begin{songs}{obsah}\n    \\input{A/a}\n"
+                               "    % \\input{W/w}\n    % \\input{X/x}\n"
+                               "    \\input{C/c}\n" +
+                               tail;
+    const auto uncommented = bf::setSongs(parked, 0, {"A/a", "C/c", "X/x"});
+    REQUIRE(uncommented);
+    CHECK(uncommented->find("    % \\input{W/w}\n    \\input{X/x}\n") != std::string::npos);
+    // Every \input, wherever it is.
+    CHECK(bf::inputs("\\renewcommand{\\campyear}{\\input{A/x}}\n% \\input{No/no}\n"
+                     "\\begin{songs}{o}\\input{ B/b }\n\\input{A/x}\\input foo\n") ==
+          std::vector<std::string>{"A/x", "B/b", ""});
 }

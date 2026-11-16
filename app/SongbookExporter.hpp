@@ -30,8 +30,10 @@ public:
     using TitleOf = std::function<std::string(std::string_view inputName)>;
     void exportLatex(const QString& id, zub::songbook::Songbook book, const TitleOf& titleOf = {});
     void exportPdf(const QString& id, zub::songbook::Songbook book, const TitleOf& titleOf = {});
-    // A book of the songbook repo (`bookFile`, its current `text`; `book` holds its songs for the
-    // safety check), built as it is from a copy in CacheLocation/songbooks/repo-<hash>/.
+    // A book of the songbook repo (`bookFile`, its current `text`; `book` gives the title), built
+    // as it is from a copy in CacheLocation/songbooks/repo-<hash>/ after checking the book file,
+    // a Tabor book's akordy.tex, every \input (a song of the songbook, then the song itself) and
+    // stray index files next to it.
     void exportRepoPdf(const std::filesystem::path& bookFile, std::string text,
                        zub::songbook::Songbook book);
 
