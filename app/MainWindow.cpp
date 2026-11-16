@@ -56,6 +56,7 @@
 #include <QMouseEvent>
 #include <QPlainTextEdit>
 #include <QPointer>
+#include <QProcess>
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QRadioButton>
@@ -68,6 +69,7 @@
 #include <QTabBar>
 #include <QTabWidget>
 #include <QTableView>
+#include <QTemporaryDir>
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
@@ -1177,9 +1179,7 @@ void MainWindow::createEditMenu() {
     add(tr("Move Chord to Next Word"), {QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Right)},
         [this] { moveChord(+1, Step::Word); });
     edit->addSeparator();
-    add(tr("Insert Part…"),
-        {QKeySequence(Qt::CTRL | Qt::Key_Return), QKeySequence(Qt::CTRL | Qt::Key_Enter)},
-        [this] { showPartMenu(); });
+    add(tr("Insert Part…"), {QKeySequence(Qt::CTRL | Qt::Key_P)}, [this] { showPartMenu(); });
     edit->addSeparator();
     add(tr("New Score…"), {}, [this] { newScore(); });
 }
@@ -3131,6 +3131,27 @@ void MainWindow::onSuggestFinished(const std::expected<ConverterOutput, QString>
     const zub::songsuggest::Suggestions& suggestions = *result;
     if (action != SongAction::Check)
         offerPapers(editor, input, suggestions);
+    if (action == SongAction::Check) {
+        // The song's key too (the package's checkkeys.py, as Check Songs runs it): its finding
+        // goes to the bar above the song, and "No mistakes" is only said when there is none.
+        const bool none = suggestions.proposals.empty();
+        checkKey(editor, input,
+                 [this, editor, input, none, name](std::optional<zub::songcheck::KeyFinding> key) {
+                     if (!editor)
+                         return;
+                     if (key)
+                         offerKey(editor);
+                     if (none)
+                         QMessageBox::information(
+                             this, name,
+                             key ? keyFindingText(*key, input) + QStringLiteral("\n\n") +
+                                       tr("Nothing else found. Write or keep the key in the bar "
+                                          "above the song.")
+                                 : tr("No mistakes found."));
+                 });
+        if (none)
+            return;
+    }
     if (suggestions.proposals.empty()) {
         const QString summary = ShrinkDialog::summary(suggestions);
         QString text;
@@ -3292,6 +3313,69 @@ void MainWindow::offerPapers(SongEditor* editor, const std::string& measuredText
             replaceSongText(zub::songheader::setPap(guard->content(), wanted));
             statusBar()->showMessage(tr("Paper marks updated. Save to keep them."), 8000);
         });
+}
+
+void MainWindow::checkKey(SongEditor* editor, const std::string& content,
+                          std::function<void(std::optional<zub::songcheck::KeyFinding>)> done) {
+    auto dir = std::make_shared<QTemporaryDir>();
+    const std::filesystem::path file = toPath(dir->filePath(QStringLiteral("song.tex")));
+    if (packageDir_.empty() || songbookRoot_.empty() || !dir->isValid() ||
+        !zub::writeTextFileAtomic(file, content)) {
+        done(std::nullopt);
+        return;
+    }
+    const auto command = zub::songcheck::scriptCommand(packageDir_, "checkkeys.py", songbookRoot_,
+                                                       {"--all", toStdString(toQString(file))});
+    auto* process = new QProcess(this);
+    const QPointer<SongEditor> guard = editor;
+    const std::filesystem::path songPath = editor->path();
+    auto finish = [this, process, dir, guard, songPath, content,
+                   done = std::move(done)](bool ran) mutable {
+        std::optional<zub::songcheck::KeyFinding> found;
+        if (ran) {
+            const auto findings =
+                zub::songcheck::parseCheckKeys(process->readAllStandardOutput().toStdString());
+            if (findings) {
+                for (const auto& finding : *findings) {
+                    const bool missing = finding.kind == "propose";
+                    const bool differs = finding.kind == "mismatch" &&
+                                         !zub::songcheck::keyConfirmed(content);
+                    if (missing || differs)
+                        found = finding;
+                }
+                // Fresh from this check: it replaces what Check Songs found.
+                if (found)
+                    keyFindings_[songPath] = *found;
+                else
+                    keyFindings_.erase(songPath);
+            }
+        }
+        process->deleteLater();
+        dir.reset();
+        done(guard ? found : std::nullopt);
+    };
+    connect(process, &QProcess::finished, this, [finish]() mutable { finish(true); });
+    connect(process, &QProcess::errorOccurred, this, [finish](QProcess::ProcessError error) mutable {
+        if (error == QProcess::FailedToStart)
+            finish(false);
+    });
+    QStringList arguments;
+    for (const auto& argument : command.arguments)
+        arguments << toQString(argument);
+    process->start(toQString(command.program), arguments);
+}
+
+QString MainWindow::keyFindingText(const zub::songcheck::KeyFinding& finding,
+                                   const std::string& content) const {
+    const auto meta = zub::parseSong(content);
+    const bool german = meta && zub::score::germanNames(meta->value("lang"));
+    const QString detected =
+        toQString(zub::latex::toDisplayText(zub::songcheck::keyValue(finding.detected, german)));
+    if (finding.kind == "propose")
+        return tr("Key: none written; the chords say %1.").arg(detected);
+    const auto stated = zub::songheader::option(content, "key");
+    return tr("Key: written %1, the chords say %2.")
+        .arg(toQString(zub::latex::toDisplayText(stated.value_or(""))), detected);
 }
 
 void MainWindow::offerKey(SongEditor* editor) {

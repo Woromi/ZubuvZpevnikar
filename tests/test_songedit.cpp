@@ -371,6 +371,7 @@ TEST_CASE("environmentLinkAt finds the partner of a begin or end command", "[son
     auto link = environmentLinkAt(text, at("\\beginverse", 7)); // inside "verse"
     REQUIRE(link);
     CHECK(name(link->nameBegin, link->nameEnd) == "verse"); // the * is not part of the name
+    CHECK(link->sameName);
     CHECK(link->otherBegin == at("\\endverse\n\\begin", 4)); // not the one in the comment
     CHECK(name(link->otherBegin, link->otherEnd) == "verse");
 
@@ -402,6 +403,7 @@ TEST_CASE("environmentLinkAt pairs by nesting, so half-typed names still link", 
     auto link = environmentLinkAt(text, 8); // at the end of "ch"
     REQUIRE(link);
     CHECK(text.substr(link->otherBegin, link->otherEnd - link->otherBegin) == "verse");
+    CHECK_FALSE(link->sameName); // so the editor does not rename \endverse along
     // An empty name ("\begin") still has a partner.
     link = environmentLinkAt(text, text.find("\\begin\n") + 6);
     REQUIRE(link);
@@ -409,6 +411,16 @@ TEST_CASE("environmentLinkAt pairs by nesting, so half-typed names still link", 
     CHECK(text.substr(link->otherBegin, link->otherEnd - link->otherBegin) == "chorus");
     // An end without a begin: none.
     CHECK_FALSE(environmentLinkAt(text, text.find("\\endsong") + 5));
+}
+
+TEST_CASE("a \\begin typed above \\endsong is not linked to it", "[songedit]") {
+    // Typing a new part: "\beginv" pairs with \endsong by nesting, but the names differ, so the
+    // editor leaves \endsong alone (it renames only pairs whose names agree).
+    const std::string text = "\\beginsong{X}\n\\beginverse\nA\n\\endverse\n\\beginv\n\\endsong\n";
+    const auto link = zub::songedit::environmentLinkAt(text, text.find("\\beginv\n") + 7);
+    REQUIRE(link);
+    CHECK(text.substr(link->otherBegin, link->otherEnd - link->otherBegin) == "song");
+    CHECK_FALSE(link->sameName);
 }
 
 TEST_CASE("toggleLineComments comments and uncomments whole lines", "[songedit]") {

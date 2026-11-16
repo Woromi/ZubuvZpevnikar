@@ -847,7 +847,8 @@ void SongEditor::updateEnvironmentLink() {
         return;
     const std::string text = editorText();
     const auto link = zub::songedit::environmentLinkAt(text, cursorByteOffset());
-    if (link)
+    // A pair is renamed together only while its names agree (not a \begin being typed).
+    if (link && link->sameName)
         environmentLink_ = EnvironmentLink{utf16Position(text, link->nameBegin),
                                            utf16Position(text, link->nameEnd)};
 }
@@ -931,7 +932,7 @@ bool SongEditor::keyAtCursor(QTextCursor& cursor, QKeyEvent* event,
     std::string text = editorText();
     const auto link = zub::songedit::environmentLinkAt(
         text, utf16ToByteOffset(raw, cursor.position()));
-    if (!link)
+    if (!link || !link->sameName)
         return false;
     const int nameBegin = utf16Position(text, link->nameBegin);
     const int nameEnd = utf16Position(text, link->nameEnd);

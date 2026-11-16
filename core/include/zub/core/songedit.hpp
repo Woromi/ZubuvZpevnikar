@@ -67,6 +67,9 @@ std::optional<std::size_t> spaceTarget(std::string_view line, std::size_t cursor
 struct EnvironmentLink {
     std::size_t nameBegin, nameEnd;   // the name at the cursor (may be empty)
     std::size_t otherBegin, otherEnd; // its partner's name
+    // The two names are the same. Only such a pair is renamed together: a \begin being typed
+    // pairs by nesting with an unrelated end further on (\endsong), which must not follow it.
+    bool sameName = false;
 };
 std::optional<EnvironmentLink> environmentLinkAt(std::string_view text, std::size_t cursor);
 

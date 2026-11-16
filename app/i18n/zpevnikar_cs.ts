@@ -717,6 +717,10 @@ Použijte vestavěný.</translation>
         <translation>Použijte jen písmena, číslice a mezery.</translation>
     </message>
     <message>
+        <source>Nothing else found. Write or keep the key in the bar above the song.</source>
+        <translation>Nic dalšího se nenašlo. Tóninu zapište nebo ponechte v liště nad písní.</translation>
+    </message>
+    <message>
         <source>No lines can be joined: the parts of a kind need the same number of lines, and the joined lines must still fit the column on A4 and A5.</source>
         <translation>Žádné řádky nelze spojit: části jednoho druhu potřebují stejný počet řádků a spojené řádky se musí vejít do sloupce na A4 i A5.</translation>
     </message>
@@ -1143,6 +1147,14 @@ Použijte vestavěný.</translation>
     <message>
         <source>Paper marks updated. Save to keep them.</source>
         <translation>Značky papíru změněny. Uložte, aby se zachovaly.</translation>
+    </message>
+    <message>
+        <source>Key: none written; the chords say %1.</source>
+        <translation>Tónina: nezapsaná; akordy říkají %1.</translation>
+    </message>
+    <message>
+        <source>Key: written %1, the chords say %2.</source>
+        <translation>Tónina: zapsaná %1, akordy říkají %2.</translation>
     </message>
     <message>
         <source>Key written. Save to keep it.</source>

@@ -212,6 +212,14 @@ private:
     // The bar above the song with a key the last Check Songs found for it (to write, or to
     // confirm the written one with % nocheck key).
     void offerKey(SongEditor* editor);
+    // checkkeys.py on `content` (the song's current text, in a temporary copy), in the
+    // background: keyFindings_ follows (a missing key or one the chords disagree with, unless
+    // confirmed with % nocheck key), then `done` gets the finding (nullopt: none, or the check
+    // could not run).
+    void checkKey(SongEditor* editor, const std::string& content,
+                  std::function<void(std::optional<zub::songcheck::KeyFinding>)> done);
+    QString keyFindingText(const zub::songcheck::KeyFinding& finding,
+                           const std::string& content) const;
     void showSongbooks(); // the songbook assembler page
     // Tidy (chords_converter tidy on the open song, one undo step) and the Changes view
     void startTidy(const QString& note = {});

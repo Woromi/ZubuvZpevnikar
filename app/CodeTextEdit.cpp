@@ -186,6 +186,28 @@ void insertLineBreak(QTextCursor& cursor) {
     cursor.insertText(line.left(indent));
 }
 
+// A new empty line below (Shift+Enter) or above (Ctrl+Enter) the cursor's line, indented like
+// it, the cursor on it; the line itself is not split.
+void openLine(QTextCursor& cursor, bool above) {
+    const QString line = cursor.block().text();
+    int indent = 0;
+    while (indent < line.size() &&
+           (line[indent] == QLatin1Char(' ') || line[indent] == QLatin1Char('\t')))
+        ++indent;
+    cursor.clearSelection();
+    if (above) {
+        cursor.movePosition(QTextCursor::StartOfBlock);
+        cursor.insertText(line.left(indent));
+        const int end = cursor.position();
+        cursor.insertBlock();
+        cursor.setPosition(end);
+    } else {
+        cursor.movePosition(QTextCursor::EndOfBlock);
+        cursor.insertBlock();
+        cursor.insertText(line.left(indent));
+    }
+}
+
 } // namespace
 
 bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
@@ -311,6 +333,14 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
         }
         case Qt::Key_Return:
         case Qt::Key_Enter:
+            if (ctrl && !shift) {
+                editAtCursors([](QTextCursor& cursor) { openLine(cursor, true); });
+                return true;
+            }
+            if (shift && !ctrl) {
+                editAtCursors([](QTextCursor& cursor) { openLine(cursor, false); });
+                return true;
+            }
             if (!ctrl) {
                 editAtCursors(insertLineBreak);
                 return true;
@@ -457,8 +487,19 @@ void CodeTextEdit::keyPressEvent(QKeyEvent* event) {
 
 void CodeTextEdit::processKey(QKeyEvent* event) {
     const bool enter = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter;
-    const auto others = event->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier);
-    if (!enter || others != Qt::NoModifier || isReadOnly()) {
+    const auto modifiers = event->modifiers() & ~Qt::KeypadModifier;
+    // Shift+Enter: a new line below this one; Ctrl+Enter: a new line above it.
+    if (enter && !isReadOnly() &&
+        (modifiers == Qt::ShiftModifier || modifiers == Qt::ControlModifier)) {
+        QTextCursor cursor = textCursor();
+        cursor.beginEditBlock();
+        openLine(cursor, modifiers == Qt::ControlModifier);
+        cursor.endEditBlock();
+        setTextCursor(cursor);
+        ensureCursorVisible();
+        return;
+    }
+    if (!enter || modifiers != Qt::NoModifier || isReadOnly()) {
         QPlainTextEdit::keyPressEvent(event);
         return;
     }

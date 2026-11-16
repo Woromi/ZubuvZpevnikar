@@ -384,7 +384,10 @@ std::optional<EnvironmentLink> environmentLinkAt(std::string_view text, std::siz
         if (cursor <= command.start || cursor > command.nameEnd || partner[i] == commands.size())
             continue;
         const auto& other = commands[partner[i]];
-        return EnvironmentLink{command.nameBegin, command.nameEnd, other.nameBegin, other.nameEnd};
+        return EnvironmentLink{
+            command.nameBegin, command.nameEnd, other.nameBegin, other.nameEnd,
+            text.substr(command.nameBegin, command.nameEnd - command.nameBegin) ==
+                text.substr(other.nameBegin, other.nameEnd - other.nameBegin)};
     }
     return std::nullopt;
 }
