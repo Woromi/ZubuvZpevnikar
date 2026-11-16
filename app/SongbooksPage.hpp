@@ -114,6 +114,8 @@ private:
     void saveLatex();
     void revertLatex();
     bool latexModified() const;
+    // The LaTeX tab (unless it holds unsaved edits) and the preview's status from text_.
+    void refreshFileViews();
     void updateLatexState();
     std::function<std::string(std::string_view)>
     titleLookup() const; // titles of the library songs, for the exporter

@@ -43,6 +43,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QScrollBar>
 #include <QSettings>
 #include <QShortcut>
 #include <QSplitter>
@@ -57,6 +58,7 @@
 #include <algorithm>
 #include <map>
 #include <set>
+#include <utility>
 #include <zub/core/latex.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -1036,15 +1038,8 @@ void SongbooksPage::loadBook() {
                                : QString());
     }
     lockBar_->setVisible(shown && settings_.locked);
-    // The LaTeX tab follows the file unless it holds unsaved edits.
-    if (!latexModified()) {
-        QString text = QString::fromStdString(text_);
-        text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
-        latexBase_ = toStdString(text);
-        latex_->setPlainText(text);
-    }
     loading_ = false;
-    preview_->setBook(id_, shown ? pathOf(id_) : std::filesystem::path(), text_, book_);
+    refreshFileViews();
     updateCoverLabel();
     updateFormVisibility();
     updateLatexState();
@@ -1117,6 +1112,29 @@ bool SongbooksPage::saveBook() {
 }
 
 // ---- The LaTeX tab ----
+
+void SongbooksPage::refreshFileViews() {
+    // The LaTeX tab follows the file unless it holds unsaved edits.
+    if (!latexModified()) {
+        QString text = QString::fromStdString(text_);
+        text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+        if (toStdString(text) != latexBase_ || latex_->toPlainText() != text) {
+            const bool wasLoading = std::exchange(loading_, true);
+            latexBase_ = toStdString(text);
+            // Keep the place in the text: a song added in the Songbook tab moves little.
+            const int position = latex_->textCursor().position();
+            const int scroll = latex_->verticalScrollBar()->value();
+            latex_->setPlainText(text);
+            QTextCursor cursor = latex_->textCursor();
+            cursor.setPosition(std::min(position, static_cast<int>(text.size())));
+            latex_->setTextCursor(cursor);
+            latex_->verticalScrollBar()->setValue(scroll);
+            loading_ = wasLoading;
+        }
+    }
+    const bool shown = !id_.isEmpty() && !text_.empty();
+    preview_->setBook(id_, shown ? pathOf(id_) : std::filesystem::path(), text_, book_);
+}
 
 bool SongbooksPage::latexModified() const {
     return latex_ && !id_.isEmpty() && !text_.empty() &&
@@ -1201,6 +1219,7 @@ int SongbooksPage::indexOfUid(quint64 uid) const {
 
 bool SongbooksPage::commit() {
     const bool saved = saveBook();
+    refreshFileViews(); // the song lists changed the file
     rebuildTree();
     updatePicker();
     return saved;
