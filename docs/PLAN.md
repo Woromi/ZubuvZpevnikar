@@ -156,6 +156,11 @@ Decided with the user (2026-11-11): the app stores songbooks itself (`AppDataLoc
   Repo books get their songs added, removed, moved and sorted byte-exactly (`zub::bookfile`: blocks by their first song; wish lines are kept, a removed input with a note is commented out). Sections and the preamble are edited in the .tex (Open Folder). Export PDF builds a copy in the cache after the book safety check (`zub::safety::unknownBookConstructs`). Later: New songbook in `songbooks/` (a .tex + build.sh), editing sections in the app, a page for wishes and imports.
 - [x] app: Songbooks page (list, settings, a tree with the songs outside sections at its root and the named sections below; a picker with Ctrl/Shift selection, Add/Remove and dragging onto the tree; drag to reorder within a section, into another section a song goes to its alphabetical place; Sort Alphabetically for the book or one section), sorting with `texlua songidx.lua`.
 - [x] app: export PDF / `.tex` / folder.
+- [x] **LaTeX only** (decided with the user 2026-11-16): the JSON books, the generator and the LaTeX/folder export are gone; the books are the repo's `songbooks/**.tex`.
+  - The Songbook tab edits the settings (`zub::bookfile::setSetting`), the sections and the songs; the LaTeX tab edits the whole file.
+  - New Songbook… writes a .tex and a build.sh (`newBook`); Duplicate… copies a book under a new name (unlocked).
+  - Lock/Unlock (`% zpevnikar: locked`) keeps released books from changing.
+- [ ] Songbook preview: a Preview tab beside Add Songs, built on a button (the PDF in the cache, "out of date" after changes); Export PDF reuses it.
 - [x] Cover image (none by default; png/jpg/pdf), a title page per named section, the title index split into sections, the author index optional (2026-11-11). The camp booklet falls back to one title index when the split would not fit its single index page.
 
 ## 8. Scores (LilyPond)

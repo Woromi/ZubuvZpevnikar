@@ -1,12 +1,12 @@
 #pragma once
 
-#include "SongbookStore.hpp"
-
 #include <QString>
 #include <QWidget>
+#include <expected>
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -14,7 +14,12 @@
 #include <zub/core/bookfile.hpp>
 #include <zub/core/songbook.hpp>
 
+namespace KSyntaxHighlighting {
+class Repository;
+}
+class CodeTextEdit;
 class QAction;
+class QTabWidget;
 class QCheckBox;
 class QComboBox;
 class QFormLayout;
@@ -33,20 +38,21 @@ class SongFilterProxy;
 class SongPickerModel;
 class SongTableModel;
 
-// The songbook assembler: the songbooks (left: "Songbooks", the books of the songbook repo's
-// songbooks/ folder, and "External", the app's own JSON books), the selected one's settings and
-// sections (middle), and the song list to pick from (right). Edits are saved at once: a repo book
-// through zub::bookfile::setSongs (byte-exact, only its \input lines), never overwriting a file
-// changed on disk since it was read.
+// The songbook assembler for the LaTeX books of the songbook repo (songbooks/**.tex): the books
+// in their folders (left); the selected one's settings, sections and songs, or its whole LaTeX
+// (middle tabs); the songs to pick from and the book's preview (right tabs). Edits through the
+// form, the sections and the songs are saved at once with zub::bookfile's byte-exact edits; the
+// LaTeX tab has its own Save. A file changed on disk since it was read is never overwritten, and a
+// locked book (zub::bookfile::lockMark) is not changed at all until it is unlocked.
 class SongbooksPage : public QWidget {
     Q_OBJECT
 
 public:
-    SongbooksPage(SongTableModel* model, SongbookStore* store, SongbookSorter* sorter,
-                  SongbookExporter* exporter, QWidget* parent = nullptr);
+    SongbooksPage(SongTableModel* model, SongbookSorter* sorter, SongbookExporter* exporter,
+                  KSyntaxHighlighting::Repository& repository, QWidget* parent = nullptr);
 
     void setSongbookRoot(const std::filesystem::path& root);
-    // Reads the songbooks from the store again, keeping the selection where possible.
+    // Lists the books again and reads the selected one (kept where possible) from disk.
     void reloadList();
 
 signals:
@@ -60,33 +66,52 @@ private:
     QWidget* buildListPane();
     QWidget* buildEditPane();
     QWidget* buildPickerPane();
+    QWidget* buildLatexPane();
 
     void fillList(const QString& selectId);
     void onListRowChanged();
     QTreeWidgetItem* listItemOf(const QString& id) const;
 
-    // A book of the songbook repo: id "repo:<path relative to the songbook root>".
-    static bool isRepoId(const QString& id);
-    std::filesystem::path repoPathOf(const QString& id) const;
-    // Reads and parses id_'s file into repoText_/repoBook_ and book_; false (warning shown) on
-    // failure.
-    bool loadRepoBook();
-    bool saveRepoBook();
+    // id: the book's path relative to the songbook root ('/'-separated).
+    std::filesystem::path pathOf(const QString& id) const;
+    // Reads and parses id_'s file into text_, file_, settings_ and book_; false (warning shown)
+    // on failure.
+    bool loadFile();
+    // Writes `text` as the book (unless the file changed on disk since it was read: then it is
+    // read again and the change dropped, with a warning) and reads it back. False if not written.
+    bool writeFile(const std::string& text);
+    // The song lists of book_ into the file (setSongs per changed section).
+    bool saveSongs();
+    // A bookfile edit of text_ (setSetting, addSection, ...): written, or its error shown.
+    bool applyEdit(const std::expected<std::string, std::string>& edited);
+    bool canEdit() const; // a book is shown, it can be edited and it is not locked
+    void toggleLock();
     // What the sorter orders in section s: its songs, or for a repo book the first song of each
     // keep-order block and the single songs (zub::bookfile::leaders); and that order back.
     std::vector<std::string> sortUnits(int s) const;
     std::vector<std::string> expandSorted(int s, const std::vector<std::string>& order) const;
     void newSongbook();
     void duplicateSongbook();
-    void deleteSongbook();
+    // How a book in `bookDir` names the cover `file`: its path from the book's folder or the
+    // repo root, or, from elsewhere, "cover.<ext>" after copying it there. nullopt: copy failed.
+    std::optional<std::string> coverReference(const std::filesystem::path& file,
+                                              const std::filesystem::path& bookDir);
+    // Writes <dir>/<stem>.tex and, unless the folder has one, an executable build.sh.
+    bool writeNewBook(const std::filesystem::path& dir, const QString& stem, const std::string& tex,
+                      const std::string& buildSh);
 
-    // The selected songbook into the form, the tree and the picker.
+    // The selected songbook into the form, the tree, the LaTeX tab and the picker.
     void loadBook();
     bool saveBook();
-    void applyForm(); // form -> book_, saved
+    void applyField(zub::bookfile::Field field, const std::string& value);
     void updateFormVisibility();
     void updateCoverLabel();
     void chooseCover();
+    // The LaTeX tab.
+    void saveLatex();
+    void revertLatex();
+    bool latexModified() const;
+    void updateLatexState();
     std::function<std::string(std::string_view)>
     titleLookup() const; // titles of the library songs, for the exporter
     void rebuildTree();
@@ -137,18 +162,17 @@ private:
     void resetSectionUids();
 
     SongTableModel* model_;
-    SongbookStore* store_;
     SongbookSorter* sorter_;
     SongbookExporter* exporter_;
     std::filesystem::path root_;
 
-    std::vector<SongbookStore::Entry> entries_;
-    QString id_;                   // the selected songbook ("" = none)
-    zub::songbook::Songbook book_; // its content (valid when editable_)
-    bool editable_ = false;
-    bool repo_ = false;            // id_ is a book of the songbook repo
-    std::string repoText_;         // its file as last read or written
-    zub::bookfile::Book repoBook_; // parsed from repoText_
+    QString id_;                       // the selected songbook ("" = none)
+    std::string text_;                 // its file as last read or written
+    zub::bookfile::Book file_;         // parsed from text_
+    zub::bookfile::Settings settings_; // read from text_
+    zub::songbook::Songbook book_;     // its title, class and song lists (from file_)
+    bool editable_ = false;            // read and parsed, no section read-only
+    std::string latexBase_;            // the LaTeX tab's text when it was filled
     int section_ = 0;
     // Identifies the sections of book_ for sort requests (parallel to book_.sections).
     std::vector<quint64> sectionUids_;
@@ -161,15 +185,18 @@ private:
     QSplitter* splitter_ = nullptr;
     QTreeWidget* list_ = nullptr;
     QAction* duplicate_ = nullptr;
-    QAction* delete_ = nullptr;
+    QAction* lock_ = nullptr;
 
+    QTabWidget* bookTabs_ = nullptr; // Songbook | LaTeX
     QWidget* editPane_ = nullptr;
-    QWidget* formBox_ = nullptr; // the settings of an External book
-    QWidget* repoBox_ = nullptr; // what a repo book is, instead
-    QLabel* repoInfo_ = nullptr;
-    QLabel* sectionsHint_ = nullptr;
+    QLabel* pathLabel_ = nullptr;
+    QLabel* lockBar_ = nullptr;
     QPushButton* addSection_ = nullptr;
     QFormLayout* form_ = nullptr;
+    CodeTextEdit* latex_ = nullptr;
+    QPushButton* latexSave_ = nullptr;
+    QPushButton* latexRevert_ = nullptr;
+    QLabel* latexState_ = nullptr;
     QLineEdit* title_ = nullptr;
     QLineEdit* author_ = nullptr;
     QComboBox* class_ = nullptr;
@@ -177,12 +204,10 @@ private:
     QCheckBox* twoColumns_ = nullptr;
     QCheckBox* shading_ = nullptr;
     QCheckBox* chordChart_ = nullptr;
-    QCheckBox* printReady_ = nullptr;
     QLineEdit* campYear_ = nullptr;
     QLabel* coverName_ = nullptr;
     QPushButton* coverChoose_ = nullptr;
     QPushButton* coverClear_ = nullptr;
-    QCheckBox* authorIndex_ = nullptr;
     QLabel* warning_ = nullptr;
     QLabel* sorterWarning_ = nullptr;
     SongbookTree* tree_ = nullptr;
@@ -194,6 +219,7 @@ private:
     QPushButton* sortAll_ = nullptr;
     QLabel* count_ = nullptr;
 
+    QTabWidget* rightTabs_ = nullptr; // Add Songs | Preview
     QWidget* pickerPane_ = nullptr;
     QLabel* pickerHeader_ = nullptr;
     QComboBox* target_ = nullptr;
@@ -209,5 +235,4 @@ private:
     QTableView* pickerView_ = nullptr;
     QAction* check_ = nullptr;
     QAction* exportPdf_ = nullptr;
-    QAction* exportLatex_ = nullptr;
 };

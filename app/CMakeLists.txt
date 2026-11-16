@@ -44,8 +44,6 @@ qt_add_executable(zpevnikar
     ShrinkDialog.hpp
     ShrinkDialog.cpp
     SongbookScan.cpp
-    SongbookStore.hpp
-    SongbookStore.cpp
     SongbookSorter.hpp
     SongbookSorter.cpp
     SongbookExporter.hpp

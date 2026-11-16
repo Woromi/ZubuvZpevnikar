@@ -118,26 +118,6 @@
 <context>
     <name>SongbookExporter</name>
     <message numerus="yes">
-        <source>Replace the existing file(s)?
-%1</source>
-        <translation>
-            <numerusform>Replace the existing file?
-%1</numerusform>
-            <numerusform>Replace the existing files?
-%1</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>Exported to %1
-%n song(s)</source>
-        <translation>
-            <numerusform>Exported to %1
-%n song</numerusform>
-            <numerusform>Exported to %1
-%n songs</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
         <source>… and %n more</source>
         <translation>
             <numerusform>… and %n more</numerusform>

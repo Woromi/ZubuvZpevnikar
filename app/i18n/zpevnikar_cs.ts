@@ -1488,48 +1488,12 @@ Použijte vestavěný.</translation>
 <context>
     <name>QObject</name>
     <message>
-        <source>Cannot create %1</source>
-        <translation>Nelze vytvořit %1</translation>
-    </message>
-    <message>
         <source>Cannot write %1: %2</source>
         <translation>Nelze zapsat %1: %2</translation>
     </message>
     <message>
         <source>Cannot create the folder of %1</source>
         <translation>Nelze vytvořit složku pro %1</translation>
-    </message>
-    <message>
-        <source>Export LaTeX</source>
-        <translation>Exportovat LaTeX</translation>
-    </message>
-    <message>
-        <source>Just the .tex file (builds inside a ZubuvZpevnik checkout)</source>
-        <translation>Jen soubor .tex (sestaví se uvnitř kopie repozitáře ZubuvZpevnik)</translation>
-    </message>
-    <message>
-        <source>A folder with everything it needs (builds anywhere with LuaLaTeX and LilyPond)</source>
-        <translation>Složka se vším potřebným (sestaví se kdekoli, kde je LuaLaTeX a LilyPond)</translation>
-    </message>
-    <message>
-        <source>File name (without .tex):</source>
-        <translation>Název souboru (bez .tex):</translation>
-    </message>
-    <message>
-        <source>
-
-Skipped (not found in the songbook): %1</source>
-        <translation>
-
-Vynecháno (není ve zpěvníku): %1</translation>
-    </message>
-    <message>
-        <source>
-
-Skipped (not a valid song name): %1</source>
-        <translation>
-
-Vynecháno (neplatný název písně): %1</translation>
     </message>
     <message>
         <source>Songbook (no section)</source>
@@ -2219,96 +2183,12 @@ Vynecháno (neplatný název písně): %1</translation>
 <context>
     <name>SongbookExporter</name>
     <message>
-        <source>Export LaTeX to</source>
-        <translation>Exportovat LaTeX do</translation>
-    </message>
-    <message>
-        <source>Export LaTeX</source>
-        <translation>Exportovat LaTeX</translation>
-    </message>
-    <message>
         <source>There is no package to build the songbook with: the songbook&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
         <translation>Zpěvník není čím sestavit: složka zubuvzpevnik/ zpěvníku není stažená (git submodule update --init) a aplikace nemá vlastní kopii balíčku.</translation>
-    </message>
-    <message numerus="yes">
-        <source>Replace the existing file(s)?
-%1</source>
-        <translation>
-            <numerusform>Nahradit existující soubor?
-%1</numerusform>
-            <numerusform>Nahradit existující soubory?
-%1</numerusform>
-            <numerusform>Nahradit existující soubory?
-%1</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>Cannot copy the cover image to %1</source>
-        <translation>Obrázek obálky nelze zkopírovat do %1</translation>
-    </message>
-    <message>
-        <source>Written %1</source>
-        <translation>Zapsáno: %1</translation>
-    </message>
-    <message>
-        <source>Create the folder %1 in</source>
-        <translation>Vytvořit složku %1 v</translation>
-    </message>
-    <message>
-        <source>%1 is a link or not directly in the chosen folder, so it is left alone. Choose another file name or folder.</source>
-        <translation>%1 je odkaz nebo neleží přímo ve vybrané složce, proto zůstane nedotčen. Zvolte jiný název souboru nebo složku.</translation>
-    </message>
-    <message>
-        <source>%1 would be inside the package the app builds with (or contain it). Choose another folder.</source>
-        <translation>%1 by byla uvnitř balíčku, kterým aplikace sestavuje (nebo by ho obsahovala). Zvolte jinou složku.</translation>
-    </message>
-    <message>
-        <source>%1 would be inside the ZubuvZpevnik checkout (or contain it). Choose another folder.</source>
-        <translation>%1 by ležel uvnitř kopie repozitáře ZubuvZpevnik (nebo by ji obsahoval). Zvolte jinou složku.</translation>
-    </message>
-    <message>
-        <source>%1 is not empty and was not made by an earlier export, so it is left alone. Choose another file name or folder.</source>
-        <translation>Složka %1 není prázdná a nevytvořil ji dřívější export, proto zůstane nedotčena. Zvolte jiný název souboru nebo složku.</translation>
-    </message>
-    <message>
-        <source>Everything inside %1 will be deleted and written again.</source>
-        <translation>Vše uvnitř %1 se smaže a zapíše znovu.</translation>
-    </message>
-    <message>
-        <source>Cannot remove %1</source>
-        <translation>Nelze odstranit %1</translation>
     </message>
     <message>
         <source>Cannot create %1</source>
         <translation>Nelze vytvořit %1</translation>
-    </message>
-    <message>
-        <source>Cannot copy %1 to %2</source>
-        <translation>Nelze zkopírovat %1 do %2</translation>
-    </message>
-    <message numerus="yes">
-        <source>Exported to %1
-%n song(s)</source>
-        <translation>
-            <numerusform>Exportováno do %1
-%n píseň</numerusform>
-            <numerusform>Exportováno do %1
-%n písně</numerusform>
-            <numerusform>Exportováno do %1
-%n písní</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>
-
-Missing files (not copied): %1</source>
-        <translation>
-
-Chybějící soubory (nezkopírovány): %1</translation>
-    </message>
-    <message>
-        <source>Open Folder</source>
-        <translation>Otevřít složku</translation>
     </message>
     <message>
         <source>cannot read the file</source>
@@ -2546,13 +2426,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     </message>
 </context>
 <context>
-    <name>SongbookStore</name>
-    <message>
-        <source>Invalid file name</source>
-        <translation>Neplatný název souboru</translation>
-    </message>
-</context>
-<context>
     <name>SongbookTree</name>
     <message>
         <source>Sort This Section Alphabetically</source>
@@ -2590,16 +2463,8 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Duplikovat</translation>
     </message>
     <message>
-        <source>Delete</source>
-        <translation>Smazat</translation>
-    </message>
-    <message>
         <source>Open Folder</source>
         <translation>Otevřít složku</translation>
-    </message>
-    <message>
-        <source>Show the songbook&apos;s folder (edit its .tex file there)</source>
-        <translation>Ukázat složku zpěvníku (jeho soubor .tex se upravuje tam)</translation>
     </message>
     <message>
         <source>Velký zpěvník (A4)</source>
@@ -2630,10 +2495,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Tabulka akordů na konci</translation>
     </message>
     <message>
-        <source>Ready for binding (blank leaves, pages to a multiple of 4)</source>
-        <translation>Připraveno k vazbě (prázdné listy, počet stran doplněn na násobek 4)</translation>
-    </message>
-    <message>
         <source>this year</source>
         <translation>letošní rok</translation>
     </message>
@@ -2648,10 +2509,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Class</source>
         <translation>Třída</translation>
-    </message>
-    <message>
-        <source>Author index</source>
-        <translation>Rejstřík interpretů</translation>
     </message>
     <message>
         <source>Choose…</source>
@@ -2672,10 +2529,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Sections</source>
         <translation>Sekce</translation>
-    </message>
-    <message>
-        <source>The sections and everything outside the song lists are edited in the .tex file.</source>
-        <translation>Oddíly a vše mimo seznamy písní se upravuje v souboru .tex.</translation>
     </message>
     <message>
         <source>Add Section</source>
@@ -2708,6 +2561,18 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Remove Songs</source>
         <translation>Odebrat písně</translation>
+    </message>
+    <message>
+        <source>The whole songbook file, for anything the Songbook tab has no setting for. Save writes it; until then the other edits wait.</source>
+        <translation>Celý soubor zpěvníku, pro vše, na co karta Zpěvník nemá nastavení. Uložit ho zapíše; do té doby ostatní úpravy čekají.</translation>
+    </message>
+    <message>
+        <source>Revert</source>
+        <translation>Vrátit</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>Uložit</translation>
     </message>
     <message>
         <source>Select songs (Ctrl/Shift for several), then Add — or drag them onto the songbook.</source>
@@ -2750,10 +2615,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Nový zpěvník…</translation>
     </message>
     <message>
-        <source>A new songbook kept by this app (External)</source>
-        <translation>Nový zpěvník, který si aplikace vede sama (Externí)</translation>
-    </message>
-    <message>
         <source>Songs of this songbook not marked as fitting its paper (their pap)</source>
         <translation>Písně tohoto zpěvníku, které nemají označeno, že se vejdou na jeho papír (jejich pap)</translation>
     </message>
@@ -2762,32 +2623,12 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Exportovat PDF…</translation>
     </message>
     <message>
-        <source>Export LaTeX…</source>
-        <translation>Exportovat LaTeX…</translation>
-    </message>
-    <message>
         <source>All languages</source>
         <translation>Všechny jazyky</translation>
     </message>
     <message>
-        <source>The songbooks of the songbook folder (songbooks/)</source>
-        <translation>Zpěvníky ze složky zpěvníku (songbooks/)</translation>
-    </message>
-    <message>
-        <source>External</source>
-        <translation>Externí</translation>
-    </message>
-    <message>
-        <source>Songbooks kept by this app, outside the songbook folder</source>
-        <translation>Zpěvníky, které si aplikace vede sama mimo složku zpěvníku</translation>
-    </message>
-    <message>
         <source>This songbook is shown read-only: %1</source>
         <translation>Zpěvník je jen pro čtení: %1</translation>
-    </message>
-    <message>
-        <source>Cannot read this songbook (the file is left alone): %1</source>
-        <translation>Tento zpěvník nelze přečíst (soubor zůstane nedotčen): %1</translation>
     </message>
     <message>
         <source>Cannot read %1</source>
@@ -2804,34 +2645,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Not saved: %1</source>
         <translation>Neuloženo: %1</translation>
-    </message>
-    <message>
-        <source>New songbook</source>
-        <translation>Nový zpěvník</translation>
-    </message>
-    <message>
-        <source> (copy)</source>
-        <translation> (kopie)</translation>
-    </message>
-    <message>
-        <source>Delete songbook</source>
-        <translation>Smazat zpěvník</translation>
-    </message>
-    <message>
-        <source>Delete the songbook %1? This cannot be undone.</source>
-        <translation>Smazat zpěvník %1? Tuto akci nelze vrátit.</translation>
-    </message>
-    <message>
-        <source>Cannot delete the songbook file.</source>
-        <translation>Soubor zpěvníku nelze smazat.</translation>
-    </message>
-    <message>
-        <source>&lt;b&gt;%1&lt;/b&gt;&lt;br&gt;%2 · class %3 (%4)</source>
-        <translation>&lt;b&gt;%1&lt;/b&gt;&lt;br&gt;%2 · třída %3 (%4)</translation>
-    </message>
-    <message>
-        <source>%1 does not exist</source>
-        <translation>%1 neexistuje</translation>
     </message>
     <message>
         <source>Images (*.png *.jpg *.jpeg *.pdf)</source>
@@ -2896,6 +2709,126 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>none</source>
         <translation>žádný</translation>
+    </message>
+    <message>
+        <source>A new songbook in the songbook folder (songbooks/)</source>
+        <translation>Nový zpěvník ve složce zpěvníku (songbooks/)</translation>
+    </message>
+    <message>
+        <source>Duplicate…</source>
+        <translation>Duplikovat…</translation>
+    </message>
+    <message>
+        <source>A copy of this songbook under another name, e.g. next year&apos;s camp</source>
+        <translation>Kopie tohoto zpěvníku pod jiným jménem, např. na příští tábor</translation>
+    </message>
+    <message>
+        <source>Lock</source>
+        <translation>Zamknout</translation>
+    </message>
+    <message>
+        <source>A released or printed songbook: lock it so that nothing changes it</source>
+        <translation>Vydaný nebo vytištěný zpěvník: zamkněte ho, aby ho nic nezměnilo</translation>
+    </message>
+    <message>
+        <source>Songbook</source>
+        <translation>Zpěvník</translation>
+    </message>
+    <message>
+        <source>LaTeX</source>
+        <translation>LaTeX</translation>
+    </message>
+    <message>
+        <source>Add Songs</source>
+        <translation>Přidat písně</translation>
+    </message>
+    <message>
+        <source>The LaTeX of %1 is not saved. Save it?</source>
+        <translation>LaTeX zpěvníku %1 není uložený. Uložit?</translation>
+    </message>
+    <message>
+        <source>Show the songbook&apos;s folder</source>
+        <translation>Ukázat složku zpěvníku</translation>
+    </message>
+    <message>
+        <source>🔒 Released: this songbook is locked, nothing changes it. Unlock it to make changes.</source>
+        <translation>🔒 Vydáno: zpěvník je zamčený, nic ho nezmění. Pro změny ho odemkněte.</translation>
+    </message>
+    <message>
+        <source>LaTeX: write \&amp; for &amp;, \# for #</source>
+        <translation>LaTeX: místo &amp; pište \&amp;, místo # \#</translation>
+    </message>
+    <message>
+        <source>Unlock</source>
+        <translation>Odemknout</translation>
+    </message>
+    <message>
+        <source>Unlock %1? It was locked as released or printed; changes make it differ from that edition.</source>
+        <translation>Odemknout %1? Byl zamčen jako vydaný nebo vytištěný; změny ho od toho vydání odliší.</translation>
+    </message>
+    <message>
+        <source>New Songbook</source>
+        <translation>Nový zpěvník</translation>
+    </message>
+    <message>
+        <source>e.g. tabory/2027 or interpreti/kabat</source>
+        <translation>např. tabory/2027 nebo interpreti/kabat</translation>
+    </message>
+    <message>
+        <source>letters, digits, - and _</source>
+        <translation>písmena, číslice, - a _</translation>
+    </message>
+    <message>
+        <source>Folder in songbooks/</source>
+        <translation>Složka v songbooks/</translation>
+    </message>
+    <message>
+        <source>File name</source>
+        <translation>Název souboru</translation>
+    </message>
+    <message>
+        <source>Writes &lt;file&gt;.tex and a build.sh into the folder. To build it in the songbook&apos;s CI as well, add it to .github/workflows.</source>
+        <translation>Zapíše do složky &lt;soubor&gt;.tex a build.sh. Aby se sestavoval i v CI zpěvníku, přidejte ho do .github/workflows.</translation>
+    </message>
+    <message>
+        <source>The folder and the file name may only use letters, digits, - and _ (folders separated by /).</source>
+        <translation>Složka a název souboru smí obsahovat jen písmena, číslice, - a _ (složky oddělené /).</translation>
+    </message>
+    <message>
+        <source>There is a songbook of this name in that folder already.</source>
+        <translation>V té složce už zpěvník tohoto jména je.</translation>
+    </message>
+    <message>
+        <source>Cannot create %1: %2</source>
+        <translation>Nelze vytvořit %1: %2</translation>
+    </message>
+    <message>
+        <source>Cannot copy the cover image into %1.</source>
+        <translation>Obrázek obálky nelze zkopírovat do %1.</translation>
+    </message>
+    <message>
+        <source>The copy&apos;s folder and file name under songbooks/ (e.g. tabory/2027/tabor2027):</source>
+        <translation>Složka a název kopie v songbooks/ (např. tabory/2027/tabor2027):</translation>
+    </message>
+    <message>
+        <source>Written in a form the form cannot change: edit it in the LaTeX tab</source>
+        <translation>Zapsáno tak, že to formulář nezmění: upravte to na kartě LaTeX</translation>
+    </message>
+    <message>
+        <source>Not found beside the songbook or in the repo</source>
+        <translation>Nenalezeno vedle zpěvníku ani v repozitáři</translation>
+    </message>
+    <message>
+        <source>Not saved: the Songbook tab and Add Songs wait until it is saved or reverted.</source>
+        <translation>Neuloženo: karta Zpěvník a Přidat písně čekají, dokud se neuloží nebo nevrátí.</translation>
+    </message>
+    <message>
+        <source>LaTeX ●</source>
+        <translation>LaTeX ●</translation>
+    </message>
+    <message>
+        <source>%1 was changed outside the app since it was read. Your text is kept here; Revert shows the file as it is now.</source>
+        <translation>%1 se od načtení změnil mimo aplikaci. Váš text zůstává zde; Vrátit ukáže soubor, jak je teď.</translation>
     </message>
     <message numerus="yes">
         <source>%n song(s) of this songbook not marked as fitting %1: nobody has checked them at that size. Open one to measure it (Make Smaller offers its pap), or take it out of the songbook.</source>

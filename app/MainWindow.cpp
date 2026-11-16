@@ -25,7 +25,6 @@
 #include "SongbookExporter.hpp"
 #include "SongbookScan.hpp"
 #include "SongbookSorter.hpp"
-#include "SongbookStore.hpp"
 #include "SongbooksPage.hpp"
 #include "SoundTools.hpp"
 #include "convert.hpp"
@@ -510,11 +509,10 @@ void MainWindow::createCentralWidget() {
     songSplitter_->setSizes({1, 1});
     songLayout->addWidget(songSplitter_);
 
-    songbookStore_ = new SongbookStore({}, this);
     songbookSorter_ = new SongbookSorter(this);
     songbookExporter_ = new SongbookExporter(this);
     songbooksPage_ =
-        new SongbooksPage(model_, songbookStore_, songbookSorter_, songbookExporter_, pages_);
+        new SongbooksPage(model_, songbookSorter_, songbookExporter_, *repository_, pages_);
     connect(songbooksPage_, &SongbooksPage::openSongRequested, this,
             [this](const std::filesystem::path& path) { openExistingSong(path); });
     connect(songbookExporter_, &SongbookExporter::finished, this,

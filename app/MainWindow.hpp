@@ -56,7 +56,6 @@ class SongEditor;
 class SongbookExporter;
 class SongbookScan;
 class SongbookSorter;
-class SongbookStore;
 class SongbooksPage;
 class SongFilterProxy;
 class SongTableModel;
@@ -275,7 +274,6 @@ private:
     ActivityBar* activityBar_ = nullptr;
     QWidget* songPage_ = nullptr;
     SongbooksPage* songbooksPage_ = nullptr; // the songbook assembler
-    SongbookStore* songbookStore_ = nullptr;
     SongbookSorter* songbookSorter_ = nullptr;
     SongbookExporter* songbookExporter_ = nullptr;
     QToolBar* songToolBar_ = nullptr;

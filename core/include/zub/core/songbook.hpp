@@ -11,9 +11,9 @@
 #include <vector>
 #include <zub/core/converter.hpp>
 
-// The songbook assembler: a songbook the app manages (a JSON file), the LaTeX document generated
-// from it, the title index order (the package's scripts/songidx.lua does the sorting), the
-// plan for exporting a self-contained folder and the command that builds the PDF.
+// Songbooks (the LaTeX books of the songbook repo, read and edited by zub::bookfile): the book
+// classes, finding a book's songs and the scores they build, the title index order (the
+// package's scripts/songidx.lua does the sorting), the build's report and the checks of a book.
 namespace zub::songbook {
 
 enum class BookClass {
@@ -32,25 +32,14 @@ struct Section {
     bool operator==(const Section&) const = default;
 };
 
+// What the Songbooks page shows of a book (zub::bookfile reads it from the .tex): its title,
+// class and the song lists of its sections (one per songs environment, in file order).
 struct Songbook {
     std::string title, author;
     BookClass bookClass = BookClass::Velky;
-    bool chorded = true;           // class option chorded (else lyric)
-    bool twoColumns = false;       // twosongcolumns (else onesongcolumn)
-    bool shading = false;          // false -> noshading
-    bool chordChart = true;        // \insertallchords (Velky, Maly)
-    bool printReady = false;       // Maly only: binding leaves, imprint, \padbookpages
-    std::string campYear;          // Tabor only: \renewcommand{\campyear}{...}; "" = class default
-    std::string coverImage;        // absolute path of a png/jpg/jpeg/pdf cover; "" = none
-    bool authorIndex = true;       // one author index for the whole book (never in Tabor)
-    std::vector<Section> sections; // after fromJson / normalize: sections[0] is the unnamed part
+    std::vector<Section> sections;
     bool operator==(const Songbook&) const = default;
 };
-
-// Makes sections[0] the unnamed part (name "", possibly empty): the songs of any other unnamed
-// sections are appended to it (no duplicates within it) and those sections are removed; with none,
-// an empty one is inserted at index 0. Named sections keep their order.
-void normalize(Songbook&);
 
 // Where the songs `added` go in the manual order `current` (which does not hold them): each one
 // right after the nearest name before it in `sortedAll` (the index order of current + added) that
@@ -60,33 +49,9 @@ std::vector<std::string> mergeIntoOrder(const std::vector<std::string>& current,
                                         const std::vector<std::string>& sortedAll,
                                         const std::vector<std::string>& added);
 
-// Pretty JSON (2-space indent), keys in a fixed order, "version": 1, trailing newline.
-std::string toJson(const Songbook&);
-// Missing optional keys give the defaults; wrong types, an unknown class, a missing or unknown
-// version and a non-object document are errors. The result is normalized.
-std::expected<Songbook, std::string> fromJson(std::string_view);
-
 // For \title, \author, section names and the camp year: LaTeX special characters escaped,
 // newlines turned into spaces, UTF-8 untouched.
 std::string escapeText(std::string_view);
-
-struct Generated {
-    std::string tex;                   // the songbook document
-    std::optional<std::string> akordy; // Tabor only: content of akordy.tex
-    std::vector<std::string> skipped;  // input names left out because `exists` said no or invalid
-    // The build.sh -i list, in order: "obsah" (songs outside sections), "idxs1".. (one per
-    // non-empty named section), "obsahAutor" (author index).
-    std::vector<std::string> indexes;
-    // The cover file to copy as `coverName` next to the document (nullopt: no cover).
-    std::optional<std::filesystem::path> coverSource;
-    std::string coverName; // "cover.<lowercase extension>", "" without a cover
-    std::vector<std::string> warnings;
-};
-// Names failing zub::invalidInputName are always left out (never written into the document).
-// `titleOf` gives a song's title for estimating the Tabor index length; without it every song
-// is assumed to have its own initial (the worst case).
-Generated generate(const Songbook&, const std::function<bool(std::string_view inputName)>& exists,
-                   const std::function<std::string(std::string_view inputName)>& titleOf = {});
 
 // ---- Finding the songs ----
 
@@ -118,7 +83,7 @@ converter::Command sortCommand(const std::filesystem::path& texlua,
                                const std::filesystem::path& songidxLua, std::string_view locale,
                                const std::filesystem::path& sxd, const std::filesystem::path& sbx);
 
-// ---- Folder export ----
+// ---- Scores ----
 
 // The targets of \lilypondfile / \narrowlilypondfile in a song (comments ignored), in order,
 // without duplicates.
@@ -148,26 +113,6 @@ bool inTinwhistleTree(const std::filesystem::path& repoRoot, const std::filesyst
 std::filesystem::path findScoreFile(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& songPath, std::string_view name);
 
-struct FileCopy {
-    std::filesystem::path from;
-    std::filesystem::path to; // relative to the export folder
-};
-struct FolderExport {
-    std::vector<FileCopy> copies;
-    std::vector<std::pair<std::filesystem::path, std::string>> written; // relative path -> content
-    std::vector<std::string> skipped;                                   // songs not found
-    std::vector<std::string> invalid;                                   // not valid song names
-    std::vector<std::string> warnings;                                  // from generate()
-};
-// `bookName` is a file stem: non-empty, only [A-Za-z0-9_-]. The folder gets the TeX side of the
-// package at `packageDir` (zub::package; not its scripts/, docs/ or git files) as zubuvzpevnik/
-// and four of its scripts as scripts/; those are listed even when missing (the caller reports
-// that).
-std::expected<FolderExport, std::string>
-planFolderExport(const Songbook&, const std::filesystem::path& repoRoot,
-                 const std::filesystem::path& packageDir, std::string_view bookName,
-                 const std::function<std::string(std::string_view inputName)>& titleOf = {});
-
 // ---- PDF build ----
 
 struct BuildCommand {
@@ -177,14 +122,6 @@ struct BuildCommand {
     std::vector<std::pair<std::string, std::string>> environment;
     std::filesystem::path pdf, log;
 };
-// The build of a generated songbook in `workDir` (already holding only <bookName>.tex, the cover
-// and akordy.tex for Tabor); `indexes` is Generated::indexes, built with the package's
-// scripts/build.sh. TEXINPUTS ends with ':' to keep the defaults; the song folders come before the
-// repo root so a name cannot find another file, the package after it.
-BuildCommand buildCommand(const Songbook&, const std::filesystem::path& repoRoot,
-                          const std::filesystem::path& packageDir,
-                          const std::filesystem::path& workDir, std::string_view bookName,
-                          const std::vector<std::string>& indexes);
 // Number of "Package zubuvzpevnik Warning"s about "not marked as fitting" (a warning wrapped at
 // max_print_line counts once).
 int paperWarnings(std::string_view log);

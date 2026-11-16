@@ -11,8 +11,8 @@
 
 class QWidget;
 
-// Exports a songbook: as LaTeX (a .tex file or a self-contained folder) or as a PDF built with
-// lualatex (in a dialog that shows the output). Dialogs are modal to the parent widget.
+// Builds a songbook of the songbook repo as a PDF with lualatex (in a dialog that shows the
+// output), after the safety checks. Dialogs are modal to the parent widget.
 class SongbookExporter : public QObject {
     Q_OBJECT
 
@@ -25,11 +25,6 @@ public:
         package_ = package;
     }
 
-    // The songbook is copied: the dialogs run nested event loops, the caller's copy may change.
-    // `titleOf` gives a song's title (for estimating the index length of a Tabor book).
-    using TitleOf = std::function<std::string(std::string_view inputName)>;
-    void exportLatex(const QString& id, zub::songbook::Songbook book, const TitleOf& titleOf = {});
-    void exportPdf(const QString& id, zub::songbook::Songbook book, const TitleOf& titleOf = {});
     // A book of the songbook repo (`bookFile`, its current `text`; `book` gives the title), built
     // as it is from a copy in CacheLocation/songbooks/repo-<hash>/ after checking the book file,
     // a Tabor book's akordy.tex, every \input (a song of the songbook, then the song itself) and
@@ -43,10 +38,6 @@ signals:
 
 private:
     QString noPackageText() const; // why nothing can be built without a package
-    void exportTexFile(const QString& stem, const zub::songbook::Songbook& book,
-                       const TitleOf& titleOf);
-    void exportFolder(const QString& stem, const zub::songbook::Songbook& book,
-                      const TitleOf& titleOf);
     // False (after a message) if a song contains commands outside the song format or cannot be
     // read and the user does not want to build anyway. Checks the files zub::songbook::resolveSongs
     // finds.
