@@ -1,10 +1,8 @@
 #include "MainWindow.hpp"
 
 #include <QApplication>
-#include <QDir>
 #include <QIcon>
 #include <QSettings>
-#include <QStandardPaths>
 #include <QByteArrayView>
 #include <QCommandLineParser>
 #include <QLibraryInfo>
@@ -15,30 +13,6 @@
 #include <zub/core/version.hpp>
 
 namespace {
-
-// Until 2026-11 the app was called ZubuvZpevnikUi, and its settings, songbooks and caches live
-// under that name. Moved once to the current name (the old settings file is copied and kept).
-void migrateFromOldName() {
-    const QString oldName = QStringLiteral("ZubuvZpevnikUi");
-    QSettings current;
-    if (current.allKeys().isEmpty()) {
-        const QSettings old(QSettings::NativeFormat, QSettings::UserScope,
-                            QApplication::organizationName(), oldName);
-        for (const QString& key : old.allKeys())
-            current.setValue(key, old.value(key));
-        current.sync();
-    }
-    for (const auto location : {QStandardPaths::AppDataLocation, QStandardPaths::CacheLocation}) {
-        const QString now = QStandardPaths::writableLocation(location);
-        if (now.isEmpty() || QDir(now).exists())
-            continue;
-        // Cleaned first: "<new>/../<old>" does not resolve while <new> does not exist.
-        const QString before =
-            QDir::cleanPath(QDir(now).absoluteFilePath(QStringLiteral("../") + oldName));
-        if (QDir(before).exists())
-            QDir().rename(before, now);
-    }
-}
 
 // ui/language: "" or missing = the system language, else "cs" or "en". The translators are
 // installed on the application, so they must outlive it: the caller owns them.
@@ -86,7 +60,6 @@ int main(int argc, char* argv[]) {
                                             QStringLiteral("dir"));
     parser.addOption(songbookOption);
     parser.process(app);
-    migrateFromOldName();
     QTranslator appTranslator;
     QTranslator qtTranslator;
     installTranslators(app, appTranslator, qtTranslator);

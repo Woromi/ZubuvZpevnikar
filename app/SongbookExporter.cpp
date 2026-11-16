@@ -101,8 +101,6 @@ std::string shellQuote(std::string text) {
 }
 
 const QString exportMarker = QStringLiteral(".zubuvzpevnikar-export");
-// Folders exported before the app was renamed (2026-11) carry this marker instead.
-const QString oldExportMarker = QStringLiteral(".zubuvzpevnikui-export");
 
 QString lastExportDir() {
     const QString dir = QSettings{}.value(exportDirKey).toString();
@@ -313,7 +311,7 @@ void SongbookExporter::exportFolder(const QString& stem, const zub::songbook::So
             const QFileInfo marker(targetDir.filePath(name));
             return marker.isFile() && !marker.isSymLink();
         };
-        if (!isMarker(exportMarker) && !isMarker(oldExportMarker)) {
+        if (!isMarker(exportMarker)) {
             QMessageBox::warning(window_, tr("Export LaTeX"),
                                  tr("%1 is not empty and was not made by an earlier export, so it "
                                     "is left alone. Choose another file name or folder.")

@@ -193,7 +193,7 @@ Decided with the user 2026-11-15: the LaTeX package and its scripts are their ow
 
 ## Name
 
-- [x] Renamed to **ZubuvZpevnikar** (decided by the user 2026-11-11; display name "Zpěvníkář", executable `zpevnikar`): CMake project, executable, window title, application name, generated file headers, folder-export marker (the old `.zubuvzpevnikui-export` is still accepted). On its first start the app copies the settings from `ZubuvZpevnikUi.conf` (kept) and moves the data and cache folders to the new name (`main.cpp`, `migrateFromOldName`).
+- [x] Renamed to **ZubuvZpevnikar** (decided by the user 2026-11-11; display name "Zpěvníkář", executable `zpevnikar`): CMake project, executable, window title, application name, generated file headers, folder-export marker. Nothing of the old name is read any more (decided by the user 2026-11-16: only we used it, a clean install is fine): no settings migration, no old export marker.
 - [ ] The user: the GitHub repo `ZubuvZpevnikar`, and renaming the folder `../ZubuvZpevnikUi` (Claude Code keeps its project memory per folder path: move `~/.claude/projects/-home-modrozoubek-data-git-ZubuvZpevnikUi` to the new path's name too).
 
 ## Czech UI
