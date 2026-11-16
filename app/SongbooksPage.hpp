@@ -14,6 +14,7 @@
 #include <zub/core/bookfile.hpp>
 #include <zub/core/songbook.hpp>
 
+class QAction;
 class QCheckBox;
 class QComboBox;
 class QFormLayout;
@@ -159,8 +160,8 @@ private:
 
     QSplitter* splitter_ = nullptr;
     QTreeWidget* list_ = nullptr;
-    QPushButton* duplicate_ = nullptr;
-    QPushButton* delete_ = nullptr;
+    QAction* duplicate_ = nullptr;
+    QAction* delete_ = nullptr;
 
     QWidget* editPane_ = nullptr;
     QWidget* formBox_ = nullptr; // the settings of an External book
@@ -206,7 +207,7 @@ private:
     SongFilterProxy* pickerFilter_ = nullptr;
     SongPickerModel* picker_ = nullptr;
     QTableView* pickerView_ = nullptr;
-    QPushButton* check_ = nullptr;
-    QPushButton* exportPdf_ = nullptr;
-    QPushButton* exportLatex_ = nullptr;
+    QAction* check_ = nullptr;
+    QAction* exportPdf_ = nullptr;
+    QAction* exportLatex_ = nullptr;
 };

@@ -2586,10 +2586,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Zpěvníky</translation>
     </message>
     <message>
-        <source>New</source>
-        <translation>Nový</translation>
-    </message>
-    <message>
         <source>Duplicate</source>
         <translation>Duplikovat</translation>
     </message>
@@ -2748,6 +2744,14 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Check…</source>
         <translation>Zkontrolovat…</translation>
+    </message>
+    <message>
+        <source>New Songbook…</source>
+        <translation>Nový zpěvník…</translation>
+    </message>
+    <message>
+        <source>A new songbook kept by this app (External)</source>
+        <translation>Nový zpěvník, který si aplikace vede sama (Externí)</translation>
     </message>
     <message>
         <source>Songs of this songbook not marked as fitting its paper (their pap)</source>

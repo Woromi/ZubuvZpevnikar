@@ -111,8 +111,34 @@ void SongbooksPage::buildUi() {
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(0);
 
+    // Like the Songs page: the page's name, then its actions on songbooks.
     auto* bar = createPageHeader(tr("Songbooks"), this);
+    QAction* add =
+        bar->addAction(QIcon::fromTheme(QStringLiteral("document-new")), tr("New Songbook…"));
+    add->setToolTip(tr("A new songbook kept by this app (External)"));
+    duplicate_ = bar->addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), tr("Duplicate"));
+    delete_ = bar->addAction(QIcon::fromTheme(QStringLiteral("edit-delete")), tr("Delete"));
+    bar->addSeparator();
+    check_ = bar->addAction(QIcon::fromTheme(QStringLiteral("tools-check-spelling")), tr("Check…"));
+    check_->setObjectName(QStringLiteral("songbookCheck"));
+    check_->setToolTip(tr("Songs of this songbook not marked as fitting its paper (their pap)"));
+    exportPdf_ =
+        bar->addAction(QIcon::fromTheme(QStringLiteral("application-pdf")), tr("Export PDF…"));
+    exportLatex_ =
+        bar->addAction(QIcon::fromTheme(QStringLiteral("text-x-tex")), tr("Export LaTeX…"));
     outer->addWidget(bar);
+    connect(add, &QAction::triggered, this, &SongbooksPage::newSongbook);
+    connect(duplicate_, &QAction::triggered, this, &SongbooksPage::duplicateSongbook);
+    connect(delete_, &QAction::triggered, this, &SongbooksPage::deleteSongbook);
+    connect(check_, &QAction::triggered, this, &SongbooksPage::checkBook);
+    connect(exportPdf_, &QAction::triggered, this, [this] {
+        if (repo_)
+            exporter_->exportRepoPdf(repoPathOf(id_), repoText_, book_);
+        else
+            exporter_->exportPdf(id_, book_, titleLookup());
+    });
+    connect(exportLatex_, &QAction::triggered, this,
+            [this] { exporter_->exportLatex(id_, book_, titleLookup()); });
 
     splitter_ = new QSplitter(Qt::Horizontal, this);
     splitter_->addWidget(buildListPane());
@@ -131,33 +157,24 @@ void SongbooksPage::buildUi() {
 QWidget* SongbooksPage::buildListPane() {
     auto* pane = new QWidget(this);
     auto* layout = new QVBoxLayout(pane);
+    layout->setContentsMargins(6, 6, 6, 6); // the Songs page's spacing
     list_ = new QTreeWidget(pane);
     list_->setObjectName(QStringLiteral("songbookList"));
     list_->setHeaderHidden(true);
     list_->setColumnCount(1);
     layout->addWidget(list_, 1);
-    auto* buttons = new QHBoxLayout;
-    auto* add = new QPushButton(tr("New"), pane);
-    duplicate_ = new QPushButton(tr("Duplicate"), pane);
-    delete_ = new QPushButton(tr("Delete"), pane);
-    buttons->addWidget(add);
-    buttons->addWidget(duplicate_);
-    buttons->addWidget(delete_);
-    layout->addLayout(buttons);
     connect(list_, &QTreeWidget::currentItemChanged, this, [this] {
         if (list_->currentItem() && listItemOf(id_) == list_->currentItem())
             return; // the same book
         onListRowChanged();
     });
-    connect(add, &QPushButton::clicked, this, &SongbooksPage::newSongbook);
-    connect(duplicate_, &QPushButton::clicked, this, &SongbooksPage::duplicateSongbook);
-    connect(delete_, &QPushButton::clicked, this, &SongbooksPage::deleteSongbook);
     return pane;
 }
 
 QWidget* SongbooksPage::buildEditPane() {
     editPane_ = new QWidget(this);
     auto* layout = new QVBoxLayout(editPane_);
+    layout->setContentsMargins(6, 6, 6, 6);
     repoBox_ = new QWidget(editPane_);
     auto* repoRow = new QHBoxLayout(repoBox_);
     repoRow->setContentsMargins(0, 0, 0, 0);
@@ -300,6 +317,7 @@ QWidget* SongbooksPage::buildEditPane() {
 QWidget* SongbooksPage::buildPickerPane() {
     pickerPane_ = new QWidget(this);
     auto* layout = new QVBoxLayout(pickerPane_);
+    layout->setContentsMargins(6, 6, 6, 6);
     pickerHeader_ = new QLabel(pickerPane_);
     pickerHeader_->setWordWrap(true);
     pickerHeader_->setText(
@@ -358,18 +376,6 @@ QWidget* SongbooksPage::buildPickerPane() {
                                                           QHeaderView::Stretch);
     layout->addWidget(pickerView_, 1);
 
-    auto* buttons = new QHBoxLayout;
-    buttons->addStretch(1);
-    check_ = new QPushButton(tr("Check…"), pickerPane_);
-    check_->setObjectName(QStringLiteral("songbookCheck"));
-    check_->setToolTip(tr("Songs of this songbook not marked as fitting its paper (their pap)"));
-    exportPdf_ = new QPushButton(tr("Export PDF…"), pickerPane_);
-    exportLatex_ = new QPushButton(tr("Export LaTeX…"), pickerPane_);
-    buttons->addWidget(check_);
-    buttons->addWidget(exportPdf_);
-    buttons->addWidget(exportLatex_);
-    layout->addLayout(buttons);
-
     connect(search_, &QLineEdit::textChanged, pickerFilter_, &SongFilterProxy::setSearchText);
     connect(language_, &QComboBox::currentIndexChanged, this,
             [this] { pickerFilter_->setLanguage(language_->currentData().toString()); });
@@ -392,15 +398,6 @@ QWidget* SongbooksPage::buildPickerPane() {
             new QShortcut(QKeySequence(key), pickerView_, nullptr, nullptr, Qt::WidgetShortcut);
         connect(enter, &QShortcut::activated, this, &SongbooksPage::addPicked);
     }
-    connect(check_, &QPushButton::clicked, this, &SongbooksPage::checkBook);
-    connect(exportPdf_, &QPushButton::clicked, this, [this] {
-        if (repo_)
-            exporter_->exportRepoPdf(repoPathOf(id_), repoText_, book_);
-        else
-            exporter_->exportPdf(id_, book_, titleLookup());
-    });
-    connect(exportLatex_, &QPushButton::clicked, this,
-            [this] { exporter_->exportLatex(id_, book_, titleLookup()); });
     refreshLanguages();
     return pickerPane_;
 }
@@ -712,7 +709,7 @@ void SongbooksPage::loadBook() {
                      id_.mid(repoPrefix.size()).toHtmlEscaped(),
                      toQString(repoBook_.documentClass).toHtmlEscaped(), paper));
     }
-    pickerPane_->setEnabled(editable_ || repo_); // Check and Export PDF of a read-only repo book
+    pickerPane_->setEnabled(editable_);
     title_->setText(toQString(book_.title));
     author_->setText(toQString(book_.author));
     class_->setCurrentIndex(class_->findData(static_cast<int>(book_.bookClass)));
