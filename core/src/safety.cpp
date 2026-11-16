@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <functional>
+#include <optional>
 #include <zub/core/latex.hpp>
+#include <zub/core/song.hpp>
 
 namespace zub::safety {
 
@@ -327,8 +329,26 @@ std::span<const std::string_view> knownSongCommands() {
     return kKnown;
 }
 
-std::vector<std::string> unknownConstructs(std::string_view songContent) {
-    const auto text = latex::stripComments(songContent);
+namespace {
+
+// Commands a hand-written book of the songbook repo (songbooks/**.tex) uses besides the song
+// commands: the class's title pages and indexes, page layout, the keep-order block, and what a
+// Tabor book's akordy.tex uses. Sorted. \input and \newindex open files by name and \begin
+// starts any environment (luacode runs Lua): unknownBookConstructs checks their arguments.
+constexpr std::array kBookKnown = std::to_array<std::string_view>({
+    "author",          "begin",         "begingroup",  "beginkeeporder", "bindingleaf",
+    "campyear",        "centering",     "clearpage",   "documentclass",  "end",
+    "endgroup",        "endkeeporder",  "hfill",       "indexsongsas",   "input",
+    "insertallchords", "insertindex",   "large",       "makebackcover",  "makefrontcover",
+    "makeimprint",     "maketitlepage", "newindex",    "newpage",        "padbookletpages",
+    "padbookpages",    "pagebreak",     "pagestyle",   "renewcommand",   "section",
+    "setcounter",      "showindex",     "songsection", "subsection",     "texttt",
+    "thepage",         "title",         "url",
+});
+
+std::vector<std::string> scanConstructs(std::string_view content,
+                                        const std::function<bool(std::string_view)>& known) {
+    const auto text = latex::stripComments(content);
     std::vector<std::string> found;
     const auto report = [&found](std::string construct) {
         if (std::ranges::find(found, construct) == found.end())
@@ -355,7 +375,7 @@ std::vector<std::string> unknownConstructs(std::string_view songContent) {
             while (end < text.size() && isLetter(text[end]))
                 ++end;
             const std::string_view name(text.data() + i + 1, end - i - 1);
-            if (!std::ranges::binary_search(kKnown, name)) {
+            if (!known(name)) {
                 // Digits are shown too (\write18), they are not part of the name for TeX.
                 auto shown = end;
                 while (shown < text.size() && isDigit(text[shown]))
@@ -385,6 +405,76 @@ std::vector<std::string> unknownConstructs(std::string_view songContent) {
             ++i;
         } else {
             ++i;
+        }
+    }
+    return found;
+}
+
+// The argument of the brace group starting at `open` (nullopt: none, or unbalanced).
+std::optional<std::string_view> braceArgument(std::string_view text, std::size_t open) {
+    while (open < text.size() && (text[open] == ' ' || text[open] == '\t'))
+        ++open;
+    if (open >= text.size() || text[open] != '{')
+        return std::nullopt;
+    const auto close = latex::findMatching(text, open);
+    if (!close)
+        return std::nullopt;
+    return text.substr(open + 1, *close - open - 1);
+}
+
+bool plainName(std::string_view name) {
+    return !name.empty() && std::ranges::all_of(name, [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || isDigit(c) || c == '_' ||
+               c == '-';
+    });
+}
+
+} // namespace
+
+std::vector<std::string> unknownConstructs(std::string_view songContent) {
+    return scanConstructs(songContent, [](std::string_view name) {
+        return std::ranges::binary_search(kKnown, name);
+    });
+}
+
+std::span<const std::string_view> knownBookCommands() {
+    return kBookKnown;
+}
+
+std::vector<std::string> unknownBookConstructs(std::string_view bookContent) {
+    auto found = scanConstructs(bookContent, [](std::string_view name) {
+        return std::ranges::binary_search(kKnown, name) ||
+               std::ranges::binary_search(kBookKnown, name);
+    });
+    const auto report = [&found](std::string construct) {
+        if (std::ranges::find(found, construct) == found.end())
+            found.push_back(std::move(construct));
+    };
+    // The file names: an \input is a song (Artist/Title), an index file a plain name.
+    const std::string text = latex::stripComments(bookContent);
+    for (std::size_t at = 0; (at = text.find('\\', at)) != std::string::npos; ++at) {
+        std::size_t end = at + 1;
+        while (end < text.size() && isLetter(text[end]))
+            ++end;
+        const std::string_view name(text.data() + at + 1, end - at - 1);
+        if (name == "input") {
+            const auto argument = braceArgument(text, end);
+            if (!argument || invalidInputName(*argument))
+                report(argument ? "\\input{" + std::string(*argument) + "}" : "\\input");
+        } else if (name == "begin" || name == "end") {
+            const auto argument = braceArgument(text, end);
+            if (!argument ||
+                (*argument != "document" && *argument != "songs" && *argument != "center"))
+                report("\\" + std::string(name) +
+                       (argument ? "{" + std::string(*argument) + "}" : std::string()));
+        } else if (name == "newindex") {
+            const auto id = braceArgument(text, end);
+            const auto file =
+                id ? braceArgument(text, static_cast<std::size_t>(id->data() - text.data()) +
+                                             id->size() + 1)
+                   : std::nullopt;
+            if (!file || !plainName(*file))
+                report(file ? "\\newindex{..}{" + std::string(*file) + "}" : "\\newindex");
         }
     }
     return found;

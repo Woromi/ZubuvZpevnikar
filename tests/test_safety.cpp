@@ -148,3 +148,43 @@ TEST_CASE("every real score passes the lilypond check", "[.integration][safety][
     }
     CHECK(count > 0);
 }
+
+TEST_CASE("books: their own commands are allowed, file names are checked", "[safety][book]") {
+    const auto known = zub::safety::knownBookCommands();
+    CHECK(std::ranges::is_sorted(known));
+    const auto book = [](std::string_view s) { return zub::safety::unknownBookConstructs(s); };
+    CHECK(book("\\documentclass[chorded]{velkyzpevnik}\n\\title{T}\n\\newindex{indexA}{A}\n"
+               "\\begin{document}\\makefrontcover{img/x}\\insertindex\n"
+               "\\songsection{S}\\begin{songs}{indexA}\\newpage\n"
+               "\\beginkeeporder\n\\input{A/B}\n\\input{ A/C }\n\\endkeeporder\n"
+               "\\end{songs}\\end{document}\n") == Constructs{});
+    // Song commands are fine in a book too, and comments are ignored.
+    CHECK(book("\\beginsong{T}\\endsong % \\directlua").empty());
+    CHECK(book("\\directlua{os.execute('x')}") == Constructs{"\\directlua"});
+    CHECK(book("\\input{/etc/passwd}") == Constructs{"\\input{/etc/passwd}"});
+    CHECK(book("\\input{../../secret/X}") == Constructs{"\\input{../../secret/X}"});
+    CHECK(book("\\input foo") == Constructs{"\\input"});
+    CHECK(book("\\newindex{i}{../../.bashrc}") == Constructs{"\\newindex{..}{../../.bashrc}"});
+    CHECK(book("\\newindex{i}") == Constructs{"\\newindex"});
+    CHECK(book("\\newindex{i}{01011001}").empty());
+    CHECK(book("\\begin{luacode}os.execute('x')\\end{luacode}") ==
+          Constructs{"\\begin{luacode}", "\\end{luacode}"});
+    CHECK(book("\\begin{center}\\section*{A}\\gtab{C}{X32010}\\end{center}").empty());
+    // Songs still may not open files.
+    CHECK(scan("\\newindex{i}{x}") == Constructs{"\\newindex"});
+}
+
+TEST_CASE("every real book passes the book check", "[.integration][safety][book]") {
+    const fs::path books = fs::path(ZUB_REAL_SONGBOOK_DIR) / "songbooks";
+    int count = 0;
+    for (const auto& entry : fs::recursive_directory_iterator(books)) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".tex")
+            continue;
+        const auto content = zub::readTextFile(entry.path());
+        REQUIRE(content);
+        INFO(entry.path().string());
+        CHECK(zub::safety::unknownBookConstructs(*content) == Constructs{});
+        ++count;
+    }
+    CHECK(count > 5);
+}

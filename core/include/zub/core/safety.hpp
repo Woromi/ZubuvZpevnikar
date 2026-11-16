@@ -20,6 +20,18 @@ std::span<const std::string_view> knownSongCommands();
 // character escapes (reported as written, e.g. "^^5c"). Empty means nothing suspicious.
 std::vector<std::string> unknownConstructs(std::string_view songContent);
 
+// The commands a book of the songbook repo (songbooks/**.tex) may use besides the song commands
+// (title pages, indexes, page layout, keep-order blocks). Sorted.
+std::span<const std::string_view> knownBookCommands();
+
+// A book is built with lualatex -shell-escape too. Like unknownConstructs, with the book
+// commands allowed as well, plus the file names it opens: "\input{name}" for an \input that is
+// not a song name (zub::invalidInputName), "\newindex{..}{name}" for an index file that is not a
+// plain name ([A-Za-z0-9_-]), "\begin{name}"/"\end{name}" for an environment other than document,
+// songs and center. The songs it inputs are checked on their own. Also for the files the class
+// inputs from the book's folder (a Tabor book's akordy.tex).
+std::vector<std::string> unknownBookConstructs(std::string_view bookContent);
+
 // LilyPond scores (.ly) are code too: lyluatex and the score preview run lilypond, whose Scheme
 // can run anything (#(system "...")). Distinct constructs in `ly` that can run code, in order of
 // first appearance, % comments and strings ignored:
