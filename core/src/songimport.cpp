@@ -1,5 +1,6 @@
 #include "zub/core/songimport.hpp"
 
+#include "zub/core/library.hpp"
 #include "zub/core/song.hpp"
 #include "zub/core/songbook.hpp"
 #include "zub/core/textfile.hpp"
@@ -270,8 +271,9 @@ std::expected<Imported, Failure> interpret(int exitCode, std::string_view standa
                      warnings));
 }
 
-Destination destination(const fs::path& songbookRoot, std::string_view inputName) {
-    const auto chords = songbookRoot / "songs" / "chords";
+Destination destination(const fs::path& songbookRoot, std::string_view inputName,
+                        std::string_view collection) {
+    const auto chords = songbookRoot / "songs" / fromUtf8(std::string(collection));
     const auto parts = split(inputName, '/');
     std::string name(inputName);
     if (parts.size() == 2 && !parts[0].empty()) {
@@ -297,24 +299,25 @@ std::optional<fs::path> existingSong(const fs::path& songbookRoot, std::string_v
     }
     const auto artist = asciiLower(parts[0]);
     const auto title = asciiLower(parts[1]);
-    const auto chords = songbookRoot / "songs" / "chords";
-
-    std::error_code ec;
-    for (fs::directory_iterator artists(chords, ec), end; !ec && artists != end;
-         artists.increment(ec)) {
-        std::error_code entryEc;
-        if (!artists->is_directory(entryEc) ||
-            asciiLower(utf8(artists->path().filename())) != artist) {
-            continue;
-        }
-        std::error_code songsEc;
-        for (fs::directory_iterator songs(artists->path(), songsEc), songsEnd;
-             !songsEc && songs != songsEnd; songs.increment(songsEc)) {
-            std::error_code fileEc;
-            const auto& path = songs->path();
-            if (songs->is_regular_file(fileEc) && path.extension() == ".tex" &&
-                asciiLower(utf8(path.stem())) == title) {
-                return path;
+    for (const std::string& collection : collections(songbookRoot)) {
+        const auto chords = songbookRoot / "songs" / fromUtf8(collection);
+        std::error_code ec;
+        for (fs::directory_iterator artists(chords, ec), end; !ec && artists != end;
+             artists.increment(ec)) {
+            std::error_code entryEc;
+            if (!artists->is_directory(entryEc) ||
+                asciiLower(utf8(artists->path().filename())) != artist) {
+                continue;
+            }
+            std::error_code songsEc;
+            for (fs::directory_iterator songs(artists->path(), songsEc), songsEnd;
+                 !songsEc && songs != songsEnd; songs.increment(songsEc)) {
+                std::error_code fileEc;
+                const auto& path = songs->path();
+                if (songs->is_regular_file(fileEc) && path.extension() == ".tex" &&
+                    asciiLower(utf8(path.stem())) == title) {
+                    return path;
+                }
             }
         }
     }
@@ -326,18 +329,19 @@ namespace {
 // ASCII for the Latin-1 and Latin Extended-A letters (deunicode's spelling), keeping the case.
 std::string_view asciiOf(char32_t c) {
     static const std::pair<char32_t, std::string_view> table[] = {
-        {0xC0, "A"},  {0xC1, "A"},  {0xC2, "A"},  {0xC3, "A"},  {0xC4, "A"},  {0xC5, "A"},
-        {0xC6, "AE"}, {0xC7, "C"},  {0xC8, "E"},  {0xC9, "E"},  {0xCA, "E"},  {0xCB, "E"},
-        {0xCC, "I"},  {0xCD, "I"},  {0xCE, "I"},  {0xCF, "I"},  {0xD0, "D"},  {0xD1, "N"},
-        {0xD2, "O"},  {0xD3, "O"},  {0xD4, "O"},  {0xD5, "O"},  {0xD6, "O"},  {0xD8, "O"},
-        {0xD9, "U"},  {0xDA, "U"},  {0xDB, "U"},  {0xDC, "U"},  {0xDD, "Y"},  {0xDE, "Th"},
-        {0xDF, "ss"}, {0xE0, "a"},  {0xE1, "a"},  {0xE2, "a"},  {0xE3, "a"},  {0xE4, "a"},
-        {0xE5, "a"},  {0xE6, "ae"}, {0xE7, "c"},  {0xE8, "e"},  {0xE9, "e"},  {0xEA, "e"},
-        {0xEB, "e"},  {0xEC, "i"},  {0xED, "i"},  {0xEE, "i"},  {0xEF, "i"},  {0xF0, "d"},
-        {0xF1, "n"},  {0xF2, "o"},  {0xF3, "o"},  {0xF4, "o"},  {0xF5, "o"},  {0xF6, "o"},
-        {0xF8, "o"},  {0xF9, "u"},  {0xFA, "u"},  {0xFB, "u"},  {0xFC, "u"},  {0xFD, "y"},
-        {0xFE, "th"}, {0xFF, "y"},  {0x152, "OE"}, {0x153, "oe"}, {0x141, "L"}, {0x142, "l"},
-        {0x132, "IJ"}, {0x133, "ij"}, {0x110, "D"}, {0x111, "d"}, {0x131, "i"}, {0x138, "q"}, {0x149, "n"}, {0x17F, "s"},
+        {0xC0, "A"},   {0xC1, "A"},   {0xC2, "A"},   {0xC3, "A"},   {0xC4, "A"},  {0xC5, "A"},
+        {0xC6, "AE"},  {0xC7, "C"},   {0xC8, "E"},   {0xC9, "E"},   {0xCA, "E"},  {0xCB, "E"},
+        {0xCC, "I"},   {0xCD, "I"},   {0xCE, "I"},   {0xCF, "I"},   {0xD0, "D"},  {0xD1, "N"},
+        {0xD2, "O"},   {0xD3, "O"},   {0xD4, "O"},   {0xD5, "O"},   {0xD6, "O"},  {0xD8, "O"},
+        {0xD9, "U"},   {0xDA, "U"},   {0xDB, "U"},   {0xDC, "U"},   {0xDD, "Y"},  {0xDE, "Th"},
+        {0xDF, "ss"},  {0xE0, "a"},   {0xE1, "a"},   {0xE2, "a"},   {0xE3, "a"},  {0xE4, "a"},
+        {0xE5, "a"},   {0xE6, "ae"},  {0xE7, "c"},   {0xE8, "e"},   {0xE9, "e"},  {0xEA, "e"},
+        {0xEB, "e"},   {0xEC, "i"},   {0xED, "i"},   {0xEE, "i"},   {0xEF, "i"},  {0xF0, "d"},
+        {0xF1, "n"},   {0xF2, "o"},   {0xF3, "o"},   {0xF4, "o"},   {0xF5, "o"},  {0xF6, "o"},
+        {0xF8, "o"},   {0xF9, "u"},   {0xFA, "u"},   {0xFB, "u"},   {0xFC, "u"},  {0xFD, "y"},
+        {0xFE, "th"},  {0xFF, "y"},   {0x152, "OE"}, {0x153, "oe"}, {0x141, "L"}, {0x142, "l"},
+        {0x132, "IJ"}, {0x133, "ij"}, {0x110, "D"},  {0x111, "d"},  {0x131, "i"}, {0x138, "q"},
+        {0x149, "n"},  {0x17F, "s"},
     };
     for (const auto& [code, ascii] : table)
         if (code == c)
@@ -359,14 +363,19 @@ std::u32string codePoints(std::string_view text) {
     std::u32string out;
     for (std::size_t i = 0; i < text.size();) {
         const auto b = static_cast<unsigned char>(text[i]);
-        const int length = b < 0x80 ? 1 : (b >> 5) == 6 ? 2 : (b >> 4) == 14 ? 3 : (b >> 3) == 30 ? 4 : 0;
+        const int length = b < 0x80         ? 1
+                           : (b >> 5) == 6  ? 2
+                           : (b >> 4) == 14 ? 3
+                           : (b >> 3) == 30 ? 4
+                                            : 0;
         if (length == 0 || i + static_cast<std::size_t>(length) > text.size()) {
             ++i;
             continue;
         }
         char32_t c = length == 1 ? b : b & (0x7F >> length);
         for (int k = 1; k < length; ++k)
-            c = (c << 6) | (static_cast<unsigned char>(text[i + static_cast<std::size_t>(k)]) & 0x3F);
+            c = (c << 6) |
+                (static_cast<unsigned char>(text[i + static_cast<std::size_t>(k)]) & 0x3F);
         out += c;
         i += static_cast<std::size_t>(length);
     }

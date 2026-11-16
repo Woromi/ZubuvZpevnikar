@@ -7,6 +7,7 @@
 #include <system_error>
 #include <zub/core/json.hpp>
 #include <zub/core/latex.hpp>
+#include <zub/core/library.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/songbook.hpp>
@@ -218,16 +219,20 @@ std::optional<std::string> resolveScoreReference(std::string_view target) {
 
 bool inTinwhistleTree(const std::filesystem::path& repoRoot,
                       const std::filesystem::path& songPath) {
-    return songPath.native().starts_with((repoRoot / "songs/tinwhistle" / "").native());
+    return collectionOf(repoRoot, songPath) == "tinwhistle";
 }
 
 std::filesystem::path findScoreFile(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& songPath, std::string_view name) {
-    const bool tinwhistle = inTinwhistleTree(repoRoot, songPath);
+    auto names = collections(repoRoot);
+    if (const auto own = collectionOf(repoRoot, songPath)) {
+        if (const auto it = std::ranges::find(names, *own); it != names.end())
+            std::rotate(names.begin(), it, it + 1);
+    }
     std::error_code ec;
-    for (const char* dir : tinwhistle ? std::array{"songs/tinwhistle", "songs/chords"}
-                                      : std::array{"songs/chords", "songs/tinwhistle"}) {
-        std::filesystem::path candidate = repoRoot / dir / fromUtf8(name);
+    for (const std::string& collection : names) {
+        std::filesystem::path candidate =
+            repoRoot / "songs" / fromUtf8(collection) / fromUtf8(name);
         if (std::filesystem::is_regular_file(candidate, ec))
             return candidate;
     }
@@ -299,6 +304,7 @@ Resolution resolveSongs(const Songbook& book, const std::filesystem::path& repoR
     namespace fs = std::filesystem;
     Resolution result;
     std::set<std::string> seen;
+    const auto collectionNames = collections(repoRoot);
     for (const Section& section : book.sections) {
         for (const auto& name : section.songs) {
             if (!seen.insert(name).second)
@@ -309,8 +315,9 @@ Resolution resolveSongs(const Songbook& book, const std::filesystem::path& repoR
             }
             ResolvedSong song{name, {}};
             std::error_code ec;
-            for (const char* dir : {"songs/chords", "songs/tinwhistle"}) {
-                const fs::path candidate = repoRoot / dir / (fromUtf8(name) += ".tex");
+            for (const std::string& collection : collectionNames) {
+                const fs::path candidate =
+                    repoRoot / "songs" / fromUtf8(collection) / (fromUtf8(name) += ".tex");
                 if (fs::is_regular_file(candidate, ec)) {
                     song.path = candidate;
                     break;

@@ -253,9 +253,9 @@ TEST_CASE("interpret ignores a dumped page on stdout when no parser exists", "[s
 }
 
 TEST_CASE("interpret rejects unexpected output paths", "[songimport]") {
-    for (const char* path :
-         {"out/latex/MartaVymyslena.tex", "out/latex/a/b/c.tex", "/etc/passwd", "out/latex/../x/y.tex",
-          "out/latex/A/B.txt", "out/pdf/A/B.tex", "out/latex/A/.tex", "out/latex//B.tex"}) {
+    for (const char* path : {"out/latex/MartaVymyslena.tex", "out/latex/a/b/c.tex", "/etc/passwd",
+                             "out/latex/../x/y.tex", "out/latex/A/B.txt", "out/pdf/A/B.tex",
+                             "out/latex/A/.tex", "out/latex//B.tex"}) {
         CAPTURE(path);
         const auto result =
             si::interpret(0, std::string("Saving output to: ") + path + "\n", "", successWorkDir);
@@ -409,23 +409,22 @@ TEST_CASE("fileNameOf names files like chords_converter", "[songimport]") {
 
 TEST_CASE("newSong is a draft like the converter's, the cursor in its verse", "[songimport]") {
     const auto song = zub::songimport::newSong("100% Tvůj", "A & B");
-    CHECK(song.text ==
-          "\\beginsong{100\\% Tvůj}[\n"
-          "    by={A \\& B},\n"
-          "    % lang={},\n"
-          "    % tem={},\n"
-          "    % met={},\n"
-          "    tun={Standard},\n"
-          "    % key={},\n"
-          "    % cap={},\n"
-          "    pap={},\n"
-          "]\n"
-          "\n"
-          "\\beginverse\n"
-          "    \n"
-          "\\endverse\n"
-          "\n"
-          "\\endsong\n");
+    CHECK(song.text == "\\beginsong{100\\% Tvůj}[\n"
+                       "    by={A \\& B},\n"
+                       "    % lang={},\n"
+                       "    % tem={},\n"
+                       "    % met={},\n"
+                       "    tun={Standard},\n"
+                       "    % key={},\n"
+                       "    % cap={},\n"
+                       "    pap={},\n"
+                       "]\n"
+                       "\n"
+                       "\\beginverse\n"
+                       "    \n"
+                       "\\endverse\n"
+                       "\n"
+                       "\\endsong\n");
     CHECK(song.text.substr(song.cursor, 12) == "\n\\endverse\n\n");
     const auto meta = zub::parseSong(song.text);
     REQUIRE(meta);
@@ -450,8 +449,8 @@ TEST_CASE("fileNameOf agrees with the real songbook's file names", "[.integratio
         if (!meta)
             continue;
         ++total;
-        const std::string expected = entry.path().parent_path().filename().string() + "/" +
-                                     entry.path().stem().string();
+        const std::string expected =
+            entry.path().parent_path().filename().string() + "/" + entry.path().stem().string();
         const std::string got =
             zub::songimport::fileNameOf(zub::latex::toDisplayText(meta->value("by"))) + "/" +
             zub::songimport::fileNameOf(zub::latex::toDisplayText(meta->title));
@@ -462,4 +461,17 @@ TEST_CASE("fileNameOf agrees with the real songbook's file names", "[.integratio
     }
     WARN(same << " of " << total << " real song files are named as fileNameOf names them");
     CHECK(same * 10 >= total * 7);
+}
+
+TEST_CASE("a song goes into its collection, and a name is found in any collection",
+          "[songimport]") {
+    const auto root = std::filesystem::path(ZUB_TEST_DATA_DIR) / "songbook";
+    const auto dest = zub::songimport::destination(root, "Imaginary/New", "whistle2");
+    CHECK(dest.path == root / "songs/whistle2/Imaginary/New.tex");
+    CHECK(dest.inputName == "Imaginary/New");
+    CHECK(zub::songimport::destination(root, "X/Y").path == root / "songs/chords/X/Y.tex");
+    // The whistle2 fixture song: its name is taken in every collection.
+    const auto existing = zub::songimport::existingSong(root, "imaginary/hum");
+    REQUIRE(existing);
+    CHECK(*existing == root / "songs/whistle2/Imaginary/Hum.tex");
 }

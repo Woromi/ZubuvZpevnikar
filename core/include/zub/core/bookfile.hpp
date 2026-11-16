@@ -116,11 +116,10 @@ std::vector<std::string> inputs(std::string_view text);
 // scripts/build.sh -i <indexes> (indexFiles), writing only to workDir. TEXINPUTS: the work dir,
 // the song folders, the package, then the book's own folder `bookDir` (a Tabor book's cover.pdf
 // and akordy.tex), the repo root (img/), and the defaults (the trailing ':').
-songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
-                                    const std::filesystem::path& packageDir,
-                                    const std::filesystem::path& workDir,
-                                    const std::filesystem::path& bookDir, std::string_view bookName,
-                                    const std::vector<std::string>& indexes);
+songbook::BuildCommand
+buildCommand(const std::filesystem::path& repoRoot, const std::filesystem::path& packageDir,
+             const std::filesystem::path& workDir, const std::filesystem::path& bookDir,
+             std::string_view bookName, const std::vector<std::string>& indexes);
 
 // ---- The settings of a book (the header and the cover/chart commands) ----
 //
@@ -207,11 +206,17 @@ struct NewBook {
 // A new book in the style of the repo's own: `name` is the file stem ([A-Za-z0-9_-]+), used in
 // build.sh. Settings::locked and notEditable are ignored. A velkyzpevnik without a cover has no
 // \makefrontcover line; a malyzpevnik always has \maketitlepage (its only cover).
-std::expected<NewBook, std::string> newBook(const Settings&, std::string_view name);
+// build.sh's TEXINPUTS lists $REPO_ROOT/songs/<c> for each of `collections` (zub::collections
+// of the repo), in order.
+std::expected<NewBook, std::string> newBook(const Settings&, std::string_view name,
+                                            const std::vector<std::string>& collections = {
+                                                "chords", "tinwhistle"});
 
 // The build.sh newBook writes, for a book <name>.tex of that class with these build.sh -i
 // indexes (indexFiles): for a copy of a book under a new name.
 std::string buildScriptFor(std::string_view name, songbook::BookClass bookClass,
-                           const std::vector<std::string>& indexes);
+                           const std::vector<std::string>& indexes,
+                           const std::vector<std::string>& collections = {"chords",
+                                                                          "tinwhistle"});
 
 } // namespace zub::bookfile

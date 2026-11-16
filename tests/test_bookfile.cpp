@@ -432,9 +432,24 @@ TEST_CASE("bookfile builds a repo book from a copy in the work dir", "[bookfile]
     CHECK(command.workingDirectory == "/work");
     REQUIRE(command.environment.size() == 1);
     CHECK(command.environment[0].second ==
-          ".:/work:/sb/songs/chords:/sb/songs/tinwhistle:/pkg:/sb/songbooks/t/2025:/sb:");
+          ".:/work:/pkg:/sb/songbooks/t/2025:/sb:"); // /sb has no songs/ folders here
     CHECK(command.pdf == "/work/book.pdf");
     CHECK(command.log == "/work/book.log");
+}
+
+TEST_CASE("bookfile build TEXINPUTS lists every collection", "[bookfile]") {
+    const auto repo = fs::path{ZUB_TEST_DATA_DIR} / "songbook";
+    const auto command = zub::bookfile::buildCommand(repo, "/pkg", "/work", "/bd", "book", {});
+    const auto root = repo.generic_string();
+    CHECK(command.environment[0].second ==
+          ".:/work:" + root + "/songs/chords:" + root + "/songs/whistle2:/pkg:/bd:" + root + ":");
+
+    const auto script = zub::bookfile::buildScriptFor("b", zub::songbook::BookClass::Velky, {},
+                                                      {"chords", "tinwhistle", "whistle2"});
+    CHECK(script.contains("$REPO_ROOT/songs/chords:$REPO_ROOT/songs/tinwhistle:"
+                          "$REPO_ROOT/songs/whistle2:${TEXINPUTS:-}"));
+    CHECK(zub::bookfile::buildScriptFor("b", zub::songbook::BookClass::Velky, {})
+              .contains("$REPO_ROOT/songs/chords:$REPO_ROOT/songs/tinwhistle:${TEXINPUTS:-}"));
 }
 
 TEST_CASE("bookfile: review findings", "[bookfile]") {

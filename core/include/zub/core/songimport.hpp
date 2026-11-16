@@ -63,13 +63,16 @@ struct Destination {
     std::string inputName;
 };
 
-// Where an imported song belongs: <songbookRoot>/songs/chords/<inputName>.tex. Reuses an
-// existing artist folder whose name matches case-insensitively (ASCII), so "AcDc/X" goes into
-// an existing "ACDC/" folder as "ACDC/X"; the title keeps the converter's spelling.
-Destination destination(const std::filesystem::path& songbookRoot, std::string_view inputName);
+// Where an imported (or new) song belongs: <songbookRoot>/songs/<collection>/<inputName>.tex.
+// Reuses an existing artist folder of that collection whose name matches case-insensitively
+// (ASCII), so "AcDc/X" goes into an existing "ACDC/" folder as "ACDC/X"; the title keeps the
+// converter's spelling.
+Destination destination(const std::filesystem::path& songbookRoot, std::string_view inputName,
+                        std::string_view collection = "chords");
 
-// An existing song file with the same Artist/Title, compared case-insensitively (ASCII),
-// e.g. "AcDc/HighwayToHell" finds songs/chords/ACDC/HighwayToHell.tex.
+// An existing song file with the same Artist/Title in any collection (zub::collections: a book's
+// \input finds one name only), compared case-insensitively (ASCII), e.g. "AcDc/HighwayToHell"
+// finds songs/chords/ACDC/HighwayToHell.tex.
 std::optional<std::filesystem::path> existingSong(const std::filesystem::path& songbookRoot,
                                                   std::string_view inputName);
 

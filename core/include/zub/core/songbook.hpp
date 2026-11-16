@@ -63,7 +63,8 @@ struct Resolution {
     std::vector<ResolvedSong> songs;  // deduplicated, in book order
     std::vector<std::string> invalid; // names failing zub::invalidInputName (never given a path)
 };
-// <repoRoot>/songs/chords/<name>.tex, else songs/tinwhistle/<name>.tex (regular files).
+// <repoRoot>/songs/<collection>/<name>.tex in the first collection (zub::collections: chords
+// first) that has it (regular files).
 Resolution resolveSongs(const Songbook&, const std::filesystem::path& repoRoot);
 
 // ---- Index order (scripts/songidx.lua) ----
@@ -104,12 +105,13 @@ std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& songPath,
                                     std::string_view songText);
 
-// True when `songPath` is inside <repoRoot>/songs/tinwhistle.
+// True when `songPath` is inside <repoRoot>/songs/tinwhistle (collectionOf == "tinwhistle").
 bool inTinwhistleTree(const std::filesystem::path& repoRoot, const std::filesystem::path& songPath);
 
-// The score file `name` (a resolved reference) as the build finds it: <repoRoot>/songs/chords,
-// then songs/tinwhistle, except that a tinwhistle song looks in its own tree first (the order of
-// the preview's TEXINPUTS). Empty when there is no such regular file.
+// The score file `name` (a resolved reference) as the build finds it: in the song's own
+// collection (zub::collectionOf) first, then in the others of <repoRoot>/songs in
+// zub::collections order (the order of the preview's TEXINPUTS). Empty when there is no such
+// regular file.
 std::filesystem::path findScoreFile(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& songPath, std::string_view name);
 

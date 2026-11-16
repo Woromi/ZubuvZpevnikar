@@ -18,12 +18,15 @@ struct Request {
     std::filesystem::path packageDir;   // the package that builds them (zub::package)
     std::filesystem::path workDir;      // reused between builds: keeps LilyPond's tmp-ly cache
     std::string inputName;              // "Artist/Title", as in \input{}
-    bool tinwhistleSong = false;        // the song is in songs/tinwhistle: that tree comes first
-    std::string songContent;            // the song text to build (e.g. unsaved editor content)
-    std::string documentClass;          // "velkyzpevnik", "malyzpevnik", ...
+    // The song's collection (zub::collectionOf): that tree comes first on TEXINPUTS. Empty: the
+    // chords order, unless tinwhistleSong (kept for older callers: it means "tinwhistle").
+    std::string collection;
+    bool tinwhistleSong = false; // the song is in songs/tinwhistle: that tree comes first
+    std::string songContent;     // the song text to build (e.g. unsaved editor content)
+    std::string documentClass;   // "velkyzpevnik", "malyzpevnik", ...
     // (relative path, content) of score files (.ly) to build instead of the real ones, e.g. the
     // unsaved text of score editors. Written next to the song copy in override/, which comes
-    // before songs/chords on TEXINPUTS, so \lilypondfile finds them first.
+    // before the songs/ trees on TEXINPUTS, so \lilypondfile finds them first.
     std::vector<std::pair<std::string, std::string>> fileOverrides;
 };
 

@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
+#include <fstream>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/safety.hpp>
@@ -31,11 +32,74 @@ TEST_CASE("validateSongbookRepo", "[library]") {
     CHECK_FALSE(zub::validateSongbookRepo(fixtureRepo / "does-not-exist"));
 }
 
+TEST_CASE("collections lists the folders under songs/", "[library]") {
+    CHECK(zub::collections(fixtureRepo) == std::vector<std::string>{"chords", "whistle2"});
+    CHECK(zub::collections(fixtureRepo / "does-not-exist").empty());
+
+    const auto root = fs::temp_directory_path() / "zub-collections-test";
+    fs::remove_all(root);
+    for (const char* d : {"tinwhistle", "chords", "banjo", ".hidden", "alto"})
+        fs::create_directories(root / "songs" / d);
+    std::ofstream(root / "songs" / "file.txt") << "x";
+    CHECK(zub::collections(root) ==
+          std::vector<std::string>{"chords", "alto", "banjo", "tinwhistle"});
+    // chords need not exist for the list
+    fs::remove_all(root / "songs" / "chords");
+    CHECK(zub::collections(root) == std::vector<std::string>{"alto", "banjo", "tinwhistle"});
+    fs::remove_all(root);
+}
+
+TEST_CASE("collectionOf", "[library]") {
+    const fs::path root = "/sb";
+    CHECK(zub::collectionOf(root, "/sb/songs/chords/A/B.tex") == "chords");
+    CHECK(zub::collectionOf(root, "/sb/songs/whistle2/A/B.tex") == "whistle2");
+    CHECK_FALSE(zub::collectionOf(root, "/sb/songs/B.tex"));
+    CHECK_FALSE(zub::collectionOf(root, "/sb/songs/"));
+    CHECK_FALSE(zub::collectionOf(root, "/sb/songbooks/x/B.tex"));
+    CHECK_FALSE(zub::collectionOf(root, "/other/songs/chords/A/B.tex"));
+}
+
+TEST_CASE("scanLibrary reads every collection", "[library]") {
+    const auto library = zub::scanLibrary(fixtureRepo);
+    REQUIRE(library);
+    const auto* hum = find(*library, "Imaginary/Hum");
+    REQUIRE(hum);
+    CHECK(hum->collection == "whistle2");
+    CHECK(hum->path == fixtureRepo / "songs/whistle2/Imaginary/Hum.tex");
+    CHECK(hum->scores == std::vector<std::string>{"Imaginary/HumMelody.ly"});
+    const auto* emc2 = find(*library, "Ayreon/EMc2");
+    REQUIRE(emc2);
+    CHECK(emc2->collection == "chords");
+}
+
+TEST_CASE("scanLibrary reports a name in two collections", "[library]") {
+    const auto root = fs::temp_directory_path() / "zub-dupcollections-test";
+    fs::remove_all(root);
+    const char* song = "\\beginsong{Same}[by={X}]\n\\endsong\n";
+    for (const char* c : {"chords", "tinwhistle", "zither"}) {
+        fs::create_directories(root / "songs" / c / "Art");
+        std::ofstream(root / "songs" / c / "Art" / "Same.tex") << song;
+    }
+    const auto library = zub::scanLibrary(root);
+    REQUIRE(library);
+    REQUIRE(library->songs.size() == 3);
+    CHECK(library->songs[0].collection == "chords");
+    CHECK(library->songs[1].collection == "tinwhistle");
+    CHECK(library->songs[2].collection == "zither");
+    REQUIRE(library->issues.size() == 2);
+    CHECK(library->issues[0].path == root / "songs/tinwhistle/Art/Same.tex");
+    CHECK(library->issues[0].message ==
+          "the same name as songs/chords/Art/Same.tex: a songbook's \\input{Art/Same} gets that "
+          "one");
+    CHECK(library->issues[1].path == root / "songs/zither/Art/Same.tex");
+    fs::remove_all(root);
+}
+
 TEST_CASE("scanLibrary reads the fixture songbook", "[library]") {
     const auto library = zub::scanLibrary(fixtureRepo);
     REQUIRE(library);
 
-    CHECK(library->songs.size() == 7);
+    CHECK(library->songs.size() == 8); // 7 chords songs and one in songs/whistle2
     CHECK(std::ranges::is_sorted(library->songs, {}, &zub::SongEntry::inputName));
 
     const auto* emc2 = find(*library, "Ayreon/EMc2");
@@ -96,8 +160,17 @@ TEST_CASE("scanLibrary reads the real songbook without issues", "[.integration]"
         UNSCOPED_INFO(issue.path << ": " << issue.message);
     CHECK(library->issues.empty());
     CHECK(library->songs.size() >= 200);
+    // every folder under songs/ is read, each song knows its collection
+    for (const auto& collection : zub::collections(realRepo)) {
+        INFO(collection);
+        CHECK(std::ranges::any_of(library->songs,
+                                  [&](const auto& s) { return s.collection == collection; }));
+    }
+    for (const auto& song : library->songs)
+        CHECK(zub::collectionOf(realRepo, song.path) == song.collection);
     // "% TODO: Solo" and the like (8 songs on 2026-11-08)
-    CHECK(std::ranges::count_if(library->songs, [](const auto& s) { return !s.todos.empty(); }) >= 8);
+    CHECK(std::ranges::count_if(library->songs, [](const auto& s) { return !s.todos.empty(); }) >=
+          8);
     for (const auto& song : library->songs) {
         INFO(song.inputName);
         CHECK_FALSE(song.meta.title.empty());
@@ -122,7 +195,8 @@ TEST_CASE("scanLibrary records the scores a song includes", "[library]") {
     REQUIRE(library);
     const auto* california = find(*library, "TheMamasAndThePapas/CaliforniaDreamin");
     REQUIRE(california);
-    CHECK(california->scores == std::vector<std::string>{"TheMamasAndThePapas/CaliforniaDreamin.ly"});
+    CHECK(california->scores ==
+          std::vector<std::string>{"TheMamasAndThePapas/CaliforniaDreamin.ly"});
     const auto* abba = find(*library, "Abba/OurLastSummer");
     REQUIRE(abba);
     CHECK(abba->scores.empty());

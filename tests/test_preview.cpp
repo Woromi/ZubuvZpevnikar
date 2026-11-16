@@ -110,8 +110,7 @@ TEST_CASE("prepare writes the wrapper, the song copy and the command", "[preview
     const std::string root = g(fixtureRepo);
     const std::string expected = std::string(".") + sep + g(work / "override") + sep + root + sep +
                                  g(fixtureRepo / "zubuvzpevnik") + sep + root + "/songs/chords" +
-                                 sep +
-                                 root + "/songs/tinwhistle" + sep;
+                                 sep + root + "/songs/whistle2" + sep;
     REQUIRE(cmd->environment.size() == 4);
     CHECK(cmd->environment[0].first == "TEXINPUTS");
     CHECK(cmd->environment[0].second == expected);
@@ -123,6 +122,10 @@ TEST_CASE("prepare writes the wrapper, the song copy and the command", "[preview
 TEST_CASE("prepare puts a tinwhistle song's tree first on TEXINPUTS", "[preview]") {
     TempDir dir;
     auto request = requestIn(dir);
+    // the fixture has no songs/tinwhistle: a songbook with the three trees
+    request.songbookRoot = dir.path / "songbook";
+    for (const char* c : {"chords", "tinwhistle", "whistle2"})
+        fs::create_directories(request.songbookRoot / "songs" / c);
     request.tinwhistleSong = true;
     const auto cmd = zub::preview::prepare(request);
     REQUIRE(cmd);
@@ -132,6 +135,24 @@ TEST_CASE("prepare puts a tinwhistle song's tree first on TEXINPUTS", "[preview]
     REQUIRE(chords != std::string::npos);
     REQUIRE(tin != std::string::npos);
     CHECK(tin < chords);
+}
+
+TEST_CASE("prepare puts the song's own collection first on TEXINPUTS", "[preview]") {
+    TempDir dir;
+    auto request = requestIn(dir);
+    request.songbookRoot = dir.path / "songbook";
+    for (const char* c : {"chords", "tinwhistle", "whistle2"})
+        fs::create_directories(request.songbookRoot / "songs" / c);
+    request.collection = "whistle2";
+    const auto cmd = zub::preview::prepare(request);
+    REQUIRE(cmd);
+    const auto& texinputs = cmd->environment[0].second;
+    const auto chords = texinputs.find("/songs/chords");
+    const auto tin = texinputs.find("/songs/tinwhistle");
+    const auto w2 = texinputs.find("/songs/whistle2");
+    REQUIRE(w2 != std::string::npos);
+    CHECK(w2 < chords);
+    CHECK(chords < tin);
 }
 
 TEST_CASE("prepare writes file overrides next to the song copy", "[preview]") {

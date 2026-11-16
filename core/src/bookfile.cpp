@@ -8,6 +8,7 @@
 #include <utility>
 #include <zub/core/bookfile.hpp>
 #include <zub/core/latex.hpp>
+#include <zub/core/library.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -693,10 +694,11 @@ songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
     command.workingDirectory = workDir;
     // The songs and the package first: nothing in the book's folder or the repo root can stand
     // in for a checked song or a package file (class, .sty, .cfg, Lua).
-    command.environment.emplace_back("TEXINPUTS", ".:" + utf8(workDir) + ":" + root +
-                                                      "/songs/chords:" + root +
-                                                      "/songs/tinwhistle:" + utf8(packageDir) +
-                                                      ":" + utf8(bookDir) + ":" + root + ":");
+    std::string texinputs = ".:" + utf8(workDir) + ":";
+    for (const auto& collection : collections(repoRoot))
+        texinputs += root + "/songs/" + collection + ":";
+    texinputs += utf8(packageDir) + ":" + utf8(bookDir) + ":" + root + ":";
+    command.environment.emplace_back("TEXINPUTS", std::move(texinputs));
     command.pdf = workDir / (std::string(bookName) + ".pdf");
     command.log = workDir / (std::string(bookName) + ".log");
     return command;
@@ -1359,7 +1361,11 @@ string optionList(const Settings& s) {
     return out;
 }
 
-string buildScript(string_view name, songbook::BookClass cls, const std::vector<string>& indexes) {
+string buildScript(string_view name, songbook::BookClass cls, const std::vector<string>& indexes,
+                   const std::vector<string>& collections) {
+    string songTrees;
+    for (const auto& c : collections)
+        songTrees += "$REPO_ROOT/songs/" + c + ":";
     string indexArgs;
     for (const auto& i : indexes)
         indexArgs += " -i " + i;
@@ -1384,8 +1390,9 @@ string buildScript(string_view name, songbook::BookClass cls, const std::vector<
         "done\n"
         "\n"
         "# $REPO_ROOT is on the path for img/: \\graphicspath is relative to the cwd.\n"
-        "export TEXINPUTS=\".:$SCRIPT_DIR:$REPO_ROOT:$REPO_ROOT/zubuvzpevnik:"
-        "$REPO_ROOT/songs/chords:$REPO_ROOT/songs/tinwhistle:${TEXINPUTS:-}\"\n"
+        "export TEXINPUTS=\".:$SCRIPT_DIR:$REPO_ROOT:$REPO_ROOT/zubuvzpevnik:" +
+        songTrees +
+        "${TEXINPUTS:-}\"\n"
         "\n"
         "# Output goes to build/ at the repo root: zubuvzpevnik/scripts/build.sh writes to\n"
         "# the working directory.\n"
@@ -1424,7 +1431,8 @@ string buildScript(string_view name, songbook::BookClass cls, const std::vector<
 
 } // namespace
 
-std::expected<NewBook, string> newBook(const Settings& s, string_view name) {
+std::expected<NewBook, string> newBook(const Settings& s, string_view name,
+                                       const std::vector<string>& collections) {
     const auto cls = songbook::bookClassFromName(s.bookClass);
     if (!cls)
         return std::unexpected("not a songbook class: " + s.bookClass);
@@ -1472,12 +1480,13 @@ std::expected<NewBook, string> newBook(const Settings& s, string_view name) {
     const auto book = parse(tex);
     if (!book)
         return std::unexpected(book.error());
-    return NewBook{tex, buildScript(name, *cls, indexFiles(*book))};
+    return NewBook{tex, buildScript(name, *cls, indexFiles(*book), collections)};
 }
 
 std::string buildScriptFor(std::string_view name, songbook::BookClass bookClass,
-                           const std::vector<std::string>& indexes) {
-    return buildScript(name, bookClass, indexes);
+                           const std::vector<std::string>& indexes,
+                           const std::vector<std::string>& collections) {
+    return buildScript(name, bookClass, indexes, collections);
 }
 
 } // namespace zub::bookfile

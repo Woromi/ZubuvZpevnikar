@@ -4,6 +4,7 @@
 #include <map>
 #include <unistd.h>
 #include <zub/core/json.hpp>
+#include <zub/core/library.hpp>
 #include <zub/core/songbook.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -48,6 +49,42 @@ TEST_CASE("resolveSongs", "[songbook]") {
     CHECK(r.songs[1].inputName == "Abba/Nope");
     CHECK(r.songs[1].path.empty());
     CHECK(r.invalid == std::vector<std::string>{"../x", "/abs", "a}b"});
+}
+
+TEST_CASE("resolveSongs and findScoreFile use every collection", "[songbook]") {
+    namespace fs = std::filesystem;
+    const auto root = dataDir / "songbook";
+    Songbook b;
+    b.sections = {{"", {"Imaginary/Hum"}}};
+    const auto r = resolveSongs(b, root);
+    REQUIRE(r.songs.size() == 1);
+    CHECK(r.songs[0].path == root / "songs/whistle2/Imaginary/Hum.tex");
+    CHECK(zub::songbook::findScoreFile(root, r.songs[0].path, "Imaginary/HumMelody.ly") ==
+          root / "songs/whistle2/Imaginary/HumMelody.ly");
+
+    // the song's own collection first, then the others in collections() order
+    const auto tmp = fs::temp_directory_path() / "zub-findscore-test";
+    fs::remove_all(tmp);
+    for (const char* c : {"chords", "tinwhistle", "zither"}) {
+        fs::create_directories(tmp / "songs" / c / "A");
+        std::ofstream(tmp / "songs" / c / "A" / "S.ly") << "{ c4 }\n";
+        std::ofstream(tmp / "songs" / c / "A" / "S.tex") << "x\n";
+    }
+    CHECK(zub::songbook::findScoreFile(tmp, tmp / "songs/zither/A/S.tex", "A/S.ly") ==
+          tmp / "songs/zither/A/S.ly");
+    CHECK(zub::songbook::findScoreFile(tmp, tmp / "songs/chords/A/S.tex", "A/S.ly") ==
+          tmp / "songs/chords/A/S.ly");
+    fs::remove(tmp / "songs/chords/A/S.ly");
+    CHECK(zub::songbook::findScoreFile(tmp, tmp / "songs/zither/A/S.tex", "A/S.ly") ==
+          tmp / "songs/zither/A/S.ly");
+    CHECK(zub::songbook::findScoreFile(tmp, tmp / "songs/chords/A/S.tex", "A/S.ly") ==
+          tmp / "songs/tinwhistle/A/S.ly");
+    Songbook b2;
+    b2.sections = {{"", {"A/S"}}};
+    CHECK(resolveSongs(b2, tmp).songs[0].path == tmp / "songs/chords/A/S.tex");
+    fs::remove(tmp / "songs/chords/A/S.tex");
+    CHECK(resolveSongs(b2, tmp).songs[0].path == tmp / "songs/tinwhistle/A/S.tex");
+    fs::remove_all(tmp);
 }
 
 TEST_CASE("index order against the songidx capture", "[songbook]") {

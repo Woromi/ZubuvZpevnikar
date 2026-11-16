@@ -4,6 +4,7 @@
 #include <cctype>
 #include <charconv>
 #include <system_error>
+#include <zub/core/library.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -244,12 +245,18 @@ std::expected<Command, std::string> prepare(const Request& request) {
     cmd.songCopy = songCopy;
 
     const std::string root = utf8(request.songbookRoot);
-    // Scores are found in the song's own tree first (see songbook::findScoreFile).
-    const std::string trees[2] = {root + "/songs/chords", root + "/songs/tinwhistle"};
-    const std::string texinputs = std::string(".") + kSep + utf8(overrideDir) + kSep + root + kSep +
-                                  utf8(request.packageDir) + kSep +
-                                  trees[request.tinwhistleSong ? 1 : 0] + kSep +
-                                  trees[request.tinwhistleSong ? 0 : 1] + kSep;
+    // Scores are found in the song's own tree first (see songbook::findScoreFile), then in the
+    // other collections in zub::collections order.
+    auto names = collections(request.songbookRoot);
+    const std::string own = !request.collection.empty() ? request.collection
+                            : request.tinwhistleSong    ? "tinwhistle"
+                                                        : "";
+    if (const auto it = std::ranges::find(names, own); it != names.end())
+        std::rotate(names.begin(), it, it + 1);
+    std::string texinputs = std::string(".") + kSep + utf8(overrideDir) + kSep + root + kSep +
+                            utf8(request.packageDir) + kSep;
+    for (const auto& name : names)
+        texinputs += root + "/songs/" + name + kSep;
     cmd.environment = {{"TEXINPUTS", texinputs},
                        {"max_print_line", "1000"},
                        {"error_line", "254"},
