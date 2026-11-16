@@ -138,8 +138,7 @@ bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution
 }
 
 std::optional<zub::songbook::BuildCommand>
-SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const std::string& text,
-                                   const zub::songbook::Songbook& book) {
+SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const std::string& text) {
     if (package_.empty()) {
         QMessageBox::warning(window_, tr("Export PDF"), noPackageText());
         return std::nullopt;
@@ -192,7 +191,6 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
     const auto resolution = zub::songbook::resolveSongs(all, root_);
     if (!confirmSafety(resolution, bookRisks))
         return std::nullopt;
-    (void)book;
 
     // One work dir per book file: LilyPond's cache and the index files stay between builds.
     const QString hash = QString::fromLatin1(

@@ -152,3 +152,10 @@ TEST_CASE("a comment ends at a bare CR, as in TeX", "[songheader]") {
     CHECK(option(song("\\beginsong{T}[by={A}, % x\rkey={C}]\n"), "key") == "C");
     CHECK(option(song("\\beginsong{T}[by={A}, % x\r\nkey={C}]\n"), "key") == "C");
 }
+
+TEST_CASE("only the converter's placeholder form is replaced, not a remark", "[songheader]") {
+    using zub::songheader::setOption;
+    const auto remark = song("\\beginsong{T}[\n    by={X},\n    % key=C was wrong, it is D\n]\n");
+    CHECK(setOption(remark, "key", "{D}") ==
+          song("\\beginsong{T}[\n    by={X},\n    key={D},\n    % key=C was wrong, it is D\n]\n"));
+}

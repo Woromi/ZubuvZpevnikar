@@ -1012,7 +1012,8 @@ TEST_CASE("every real book keeps its bytes under identity edits", "[.integration
         same(Field::Cover, s.cover);
         same(Field::ChordChart, s.chordChart ? "1" : "0");
         CHECK(bf::setLocked(*text, s.locked) == *text);
-        CHECK(bf::setLocked(*text, false) == *text);
+        // Locking and unlocking again gives the file back (some real books are locked).
+        CHECK(bf::setLocked(bf::setLocked(*text, !s.locked), s.locked) == *text);
 
         const auto book = bf::parse(*text);
         REQUIRE(book);
@@ -1025,4 +1026,25 @@ TEST_CASE("every real book keeps its bytes under identity edits", "[.integration
             CHECK(*up == *text);
         }
     }
+}
+
+TEST_CASE("a new section shares the book's indexes, not an album's own", "[bookfile]") {
+    namespace bf = zub::bookfile;
+    const std::string book = "\\documentclass{velkyzpevnik}\n\\newindex{indexA}{A}\n"
+                             "\\begin{document}\n\\songsection{Album}\n\\begin{songs}{indexA}\n"
+                             "\\end{songs}\n\\end{document}\n";
+    const auto added = bf::addSection(book, "New", std::string::npos);
+    REQUIRE(added);
+    CHECK(added->find("\\songsection{New}\n\\begin{songs}{obsah}\n") != std::string::npos);
+    const std::string mixed = "\\documentclass{velkyzpevnik}\n\\newindex{indexA}{A}\n"
+                              "\\begin{document}\n\\begin{songs}{indexA, obsahAutor}\n"
+                              "\\end{songs}\n\\end{document}\n";
+    const auto kept = bf::addSection(mixed, "New", std::string::npos);
+    REQUIRE(kept);
+    CHECK(kept->find("\\begin{songs}{obsahAutor}\n") != std::string::npos);
+}
+
+TEST_CASE("booksFolder is songbooks, or projects in an older checkout", "[bookfile]") {
+    const auto root = std::filesystem::path(ZUB_TEST_DATA_DIR) / "songbook";
+    CHECK(zub::bookfile::booksFolder(root) == "songbooks");
 }

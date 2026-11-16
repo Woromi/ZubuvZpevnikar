@@ -25,12 +25,11 @@ class BookPreview : public QWidget {
     Q_OBJECT
 
 public:
-    BookPreview(SongbookExporter* exporter, QWidget* parent = nullptr);
+    explicit BookPreview(SongbookExporter* exporter, QWidget* parent = nullptr);
     ~BookPreview() override;
 
     // The book shown: its id (relative path), file, current text and title.
-    void setBook(const QString& id, const std::filesystem::path& file, const std::string& text,
-                 const zub::songbook::Songbook& book);
+    void setBook(const QString& id, const std::filesystem::path& file, const std::string& text);
 
     // A build of the shown book (after the safety checks); false if it did not start.
     bool build();
@@ -49,16 +48,16 @@ private:
         QByteArray pdf;
         std::string text; // what it was built from
         QString report;
-        QString log; // the build's output, when it failed
+        QString log;            // the build's output, when it failed
+        bool cancelled = false; // the last build was cancelled (nothing failed)
     };
-    void show(); // the shown book's result into the widgets
+    void updateView(); // the shown book's result into the widgets
     void onFinished(int exitCode, bool crashed);
 
     SongbookExporter* exporter_;
     QString id_;
     std::filesystem::path file_;
     std::string text_;
-    zub::songbook::Songbook book_;
     std::map<QString, Result> results_;
 
     QProcess* process_ = nullptr; // the running build
@@ -66,6 +65,7 @@ private:
     std::string buildingText_;
     std::filesystem::path buildingPdf_, buildingLog_;
     QByteArray output_;
+    bool cancelled_ = false; // the running build was stopped by Cancel
 
     QLabel* status_ = nullptr;
     QPushButton* build_ = nullptr;

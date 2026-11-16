@@ -180,7 +180,17 @@ placeholderLines(std::string_view orig, std::size_t from, std::size_t to, std::s
         line.remove_prefix(key.size());
         while (!line.empty() && isBlank(line.front()))
             line.remove_prefix(1);
-        if (line.starts_with('='))
+        // Only the placeholder form "% key={...}," (a remark such as "% key=C was wrong" stays).
+        if (!line.starts_with('='))
+            continue;
+        line.remove_prefix(1);
+        while (!line.empty() && isBlank(line.front()))
+            line.remove_prefix(1);
+        while (!line.empty() && (isBlank(line.back()) || line.back() == '\r'))
+            line.remove_suffix(1);
+        if (line.ends_with(','))
+            line.remove_suffix(1);
+        if (line.starts_with('{') && line.ends_with('}') && line.find('}') == line.size() - 1)
             lines.emplace_back(ls, nl + 1);
     }
     return lines;

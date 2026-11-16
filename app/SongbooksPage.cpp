@@ -4,6 +4,7 @@
 #include "CodeTextEdit.hpp"
 #include "LabelFilterBox.hpp"
 #include "PageHeader.hpp"
+#include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongPickerModel.hpp"
 #include "SongTableModel.hpp"
@@ -63,6 +64,13 @@
 #include <zub/core/textfile.hpp>
 
 namespace {
+// The editor's text as bytes: raw (toPlainText would turn U+00A0 into a space), LF.
+std::string rawText(const QPlainTextEdit* edit) {
+    QString text = edit->document()->toRawText();
+    text.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+    return toStdString(text);
+}
+
 const QString splitterKey = QStringLiteral("songbooks/splitter");
 
 using zub::songbook::BookClass;
@@ -135,7 +143,7 @@ void SongbooksPage::buildUi() {
 
     // Like the Songs page: the page's name, then its actions on songbooks.
     auto* bar = createPageHeader(tr("Songbooks"), this);
-    QAction* add =
+    QAction* add = newBook_ =
         bar->addAction(QIcon::fromTheme(QStringLiteral("document-new")), tr("New Songbook…"));
     add->setToolTip(tr("A new songbook in the songbook folder (songbooks/)"));
     duplicate_ = bar->addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), tr("Duplicate…"));
@@ -165,7 +173,8 @@ void SongbooksPage::buildUi() {
     preview_ = new BookPreview(exporter_, this);
     rightTabs_->addTab(preview_, tr("Preview"));
     connect(preview_, &BookPreview::built, this, [this](const QString& id, bool ok) {
-        const bool exporting = ok && id == pendingExport_ && id == id_;
+        // Only a PDF of the book as it is now (it may have changed during the build).
+        const bool exporting = ok && id == pendingExport_ && id == id_ && preview_->upToDate();
         pendingExport_.clear();
         if (exporting)
             exporter_->savePdf(preview_->pdf(), toQString(pathOf(id_).stem()), preview_->report());
@@ -560,8 +569,11 @@ void SongbooksPage::fillList(const QString& selectId) {
         list_->expandAll();
         list_->setCurrentItem(selected);
     }
+    // Unsaved LaTeX of the book shown again stays (the list is filled whenever the page is shown).
+    latexKeepFor_ = latexModified() ? id_ : QString();
     id_.clear(); // force loadBook() to read the selected book
     onListRowChanged();
+    latexKeepFor_.clear();
 }
 
 QTreeWidgetItem* SongbooksPage::listItemOf(const QString& id) const {
@@ -594,11 +606,13 @@ void SongbooksPage::onListRowChanged() {
             resetSectionUids();
     }
     section_ = 0;
-    // The LaTeX tab shows the new book.
-    loading_ = true;
-    latexBase_.clear();
-    latex_->clear();
-    loading_ = false;
+    // The LaTeX tab shows the new book (or keeps the unsaved text of the same one).
+    if (id_.isEmpty() || id_ != latexKeepFor_) {
+        loading_ = true;
+        latexBase_.clear();
+        latex_->clear();
+        loading_ = false;
+    }
     loadBook();
 }
 
@@ -703,7 +717,7 @@ bool SongbooksPage::saveSongs() {
 }
 
 void SongbooksPage::toggleLock() {
-    if (id_.isEmpty() || !editable_ || latexModified())
+    if (id_.isEmpty() || text_.empty() || latexModified() || (!editable_ && !settings_.locked))
         return;
     if (settings_.locked &&
         QMessageBox::question(
@@ -759,7 +773,7 @@ bool validFolder(const QString& folder) {
 } // namespace
 
 void SongbooksPage::newSongbook() {
-    if (root_.empty())
+    if (root_.empty() || latexModified())
         return;
     QDialog dialog(this);
     dialog.setWindowTitle(tr("New Songbook"));
@@ -850,8 +864,9 @@ void SongbooksPage::newSongbook() {
                                         "digits, - and _ (folders separated by /)."));
             return;
         }
-        if (QFileInfo::exists(toQString(root_ / "songbooks" / toPath(folderName) /
-                                        toPath(stemName + QStringLiteral(".tex"))))) {
+        if (QFileInfo::exists(
+                toQString(root_ / zub::bookfile::booksFolder(root_) / toPath(folderName) /
+                          toPath(stemName + QStringLiteral(".tex"))))) {
             QMessageBox::information(
                 &dialog, tr("New Songbook"),
                 tr("There is a songbook of this name in that folder already."));
@@ -865,7 +880,8 @@ void SongbooksPage::newSongbook() {
 
     const QString folderName = folder->currentText().trimmed();
     const QString stemName = stem->text().trimmed();
-    const std::filesystem::path dir = root_ / "songbooks" / toPath(folderName);
+    const std::filesystem::path dir =
+        root_ / zub::bookfile::booksFolder(root_) / toPath(folderName);
     zub::bookfile::Settings settings;
     settings.bookClass = toStdString(bookClass->currentData().toString());
     settings.title = zub::songbook::escapeText(toStdString(title->text().trimmed()));
@@ -885,7 +901,7 @@ void SongbooksPage::newSongbook() {
         return;
     }
     if (const QString chosen = cover->text().trimmed(); !chosen.isEmpty()) {
-        const auto coverPath = coverReference(toPath(chosen), dir);
+        const auto coverPath = coverReference(toPath(chosen), dir, toStdString(stemName));
         if (!coverPath) {
             QMessageBox::warning(this, tr("New Songbook"),
                                  tr("Cannot copy the cover image into %1.").arg(toQString(dir)));
@@ -900,13 +916,30 @@ void SongbooksPage::newSongbook() {
     }
     if (!writeNewBook(dir, stemName, made->tex, made->buildSh))
         return;
-    fillList(toQString((std::filesystem::path("songbooks") / toPath(folderName) /
+    // A camp booklet's back cover inputs akordy.tex (the chord chart) from the book's folder:
+    // the newest one of the other camps, else an empty one to fill in.
+    if (settings.bookClass == "taborovyzpevnik" && !std::filesystem::exists(dir / "akordy.tex")) {
+        std::filesystem::path newest;
+        for (const auto& book : zub::bookfile::findBooks(root_))
+            if (const auto chart = root_ / book.parent_path() / "akordy.tex";
+                chart.parent_path() != dir && std::filesystem::is_regular_file(chart))
+                newest = std::max(newest, chart);
+        std::error_code copyError;
+        if (!newest.empty())
+            std::filesystem::copy_file(newest, dir / "akordy.tex", copyError);
+        if (newest.empty() || copyError)
+            (void)zub::writeTextFileAtomic(
+                dir / "akordy.tex", "% The chord chart of the booklet's back cover: \\gtab{...} "
+                                    "lines in a center environment, as in the other camps.\n");
+    }
+    fillList(toQString((zub::bookfile::booksFolder(root_) / toPath(folderName) /
                         toPath(stemName + QStringLiteral(".tex")))
                            .generic_string()));
 }
 
 std::optional<std::string> SongbooksPage::coverReference(const std::filesystem::path& file,
-                                                         const std::filesystem::path& bookDir) {
+                                                         const std::filesystem::path& bookDir,
+                                                         const std::string& stem) {
     // Inside the book's folder: its own name there; inside the repo: from the repo root (both on
     // TEXINPUTS); anywhere else: copied into the book's folder as cover.<ext>.
     const auto absolute = std::filesystem::weakly_canonical(file);
@@ -920,10 +953,13 @@ std::optional<std::string> SongbooksPage::coverReference(const std::filesystem::
         return own;
     if (const auto repo = inside(root_))
         return repo;
-    const std::string name = "cover" + absolute.extension().string();
+    // <stem>-cover.<ext>, never replacing a file there (another book's cover, cover.pdf).
+    std::string name = stem + "-cover" + absolute.extension().string();
+    for (int n = 2; std::filesystem::exists(bookDir / name); ++n)
+        name = stem + "-cover-" + std::to_string(n) + absolute.extension().string();
     std::error_code error;
-    std::filesystem::copy_file(absolute, bookDir / name,
-                               std::filesystem::copy_options::overwrite_existing, error);
+    std::filesystem::copy_file(absolute, bookDir / name, std::filesystem::copy_options::none,
+                               error);
     if (error)
         return std::nullopt;
     return name;
@@ -957,7 +993,10 @@ void SongbooksPage::duplicateSongbook() {
     if (id_.isEmpty() || text_.empty() || latexModified())
         return;
     bool ok = false;
-    const QString current = id_.section(QLatin1Char('/'), 1, -2); // the folder under songbooks/
+    // The folder under songbooks/ (a book right in it has its own, named like it).
+    QString current = id_.section(QLatin1Char('/'), 1, -2);
+    if (current.isEmpty())
+        current = toQString(pathOf(id_).stem()) + QStringLiteral("-copy");
     const QString target =
         QInputDialog::getText(
             this, tr("Duplicate"),
@@ -976,7 +1015,8 @@ void SongbooksPage::duplicateSongbook() {
                                     "- and _ (folders separated by /)."));
         return;
     }
-    const std::filesystem::path dir = root_ / "songbooks" / toPath(folderName);
+    const std::filesystem::path dir =
+        root_ / zub::bookfile::booksFolder(root_) / toPath(folderName);
     if (std::filesystem::exists(dir / toPath(stemName + QStringLiteral(".tex")))) {
         QMessageBox::information(this, tr("Duplicate"),
                                  tr("There is a songbook of this name in that folder already."));
@@ -984,7 +1024,14 @@ void SongbooksPage::duplicateSongbook() {
     }
     std::error_code error;
     std::filesystem::create_directories(dir, error);
-    // The copy is a new edition: not locked. A cover beside the original is copied along.
+    if (error) {
+        QMessageBox::warning(this, tr("Duplicate"),
+                             tr("Cannot create %1: %2")
+                                 .arg(toQString(dir), QString::fromStdString(error.message())));
+        return;
+    }
+    // The copy is a new edition: not locked. A cover and a camp's akordy.tex beside the original
+    // are copied along.
     const std::string copy = zub::bookfile::setLocked(text_, false);
     const auto parsed = zub::bookfile::parse(copy);
     const auto script = zub::bookfile::buildScriptFor(
@@ -997,10 +1044,17 @@ void SongbooksPage::duplicateSongbook() {
         !std::filesystem::exists(dir / settings_.cover)) {
         std::filesystem::create_directories((dir / settings_.cover).parent_path(), error);
         std::filesystem::copy_file(sourceDir / settings_.cover, dir / settings_.cover, error);
+        if (error)
+            showWarning(
+                tr("The cover %1 was not copied: %2")
+                    .arg(toQString(settings_.cover), QString::fromStdString(error.message())));
     }
+    if (std::filesystem::is_regular_file(sourceDir / "akordy.tex") &&
+        !std::filesystem::exists(dir / "akordy.tex"))
+        std::filesystem::copy_file(sourceDir / "akordy.tex", dir / "akordy.tex", error);
     if (!writeNewBook(dir, stemName, copy, script))
         return;
-    fillList(toQString((std::filesystem::path("songbooks") / toPath(folderName) /
+    fillList(toQString((zub::bookfile::booksFolder(root_) / toPath(folderName) /
                         toPath(stemName + QStringLiteral(".tex")))
                            .generic_string()));
 }
@@ -1025,11 +1079,11 @@ void SongbooksPage::loadBook() {
     shading_->setChecked(settings_.shading);
     chordChart_->setChecked(settings_.chordChart);
     const std::pair<QWidget*, Field> fields[] = {
-        {title_, Field::Title},       {author_, Field::Author},
-        {campYear_, Field::CampYear}, {class_, Field::Class},
-        {chorded_, Field::Chorded},   {twoColumns_, Field::TwoColumns},
-        {shading_, Field::Shading},   {chordChart_, Field::ChordChart},
-        {coverChoose_, Field::Cover}, {coverClear_, Field::Cover}};
+        {title_, Field::Title},           {author_, Field::Author},
+        {campYear_, Field::CampYear},     {chorded_, Field::Chorded},
+        {twoColumns_, Field::TwoColumns}, {shading_, Field::Shading},
+        {chordChart_, Field::ChordChart}, {coverChoose_, Field::Cover},
+        {coverClear_, Field::Cover}};
     for (const auto& [widget, field] : fields) {
         widget->setEnabled(editableField(field));
         widget->setToolTip(settings_.notEditable.contains(field)
@@ -1037,6 +1091,11 @@ void SongbooksPage::loadBook() {
                                     "LaTeX tab")
                                : QString());
     }
+    // The class is chosen when a songbook is made: the classes take different title pages and
+    // covers, so a switch here would leave a book that does not build.
+    class_->setEnabled(false);
+    class_->setToolTip(tr("Chosen when the songbook is made (New Songbook…); to change it, edit "
+                          "the LaTeX tab, including the cover and title page commands"));
     lockBar_->setVisible(shown && settings_.locked);
     loading_ = false;
     refreshFileViews();
@@ -1080,7 +1139,8 @@ void SongbooksPage::chooseCover() {
                                                       tr("Images (*.png *.jpg *.jpeg *.pdf)"));
     if (file.isEmpty())
         return;
-    const auto reference = coverReference(toPath(file), dir);
+    const auto reference =
+        coverReference(toPath(file), dir, toStdString(toQString(pathOf(id_).stem())));
     if (!reference) {
         showWarning(tr("Cannot copy the cover image into %1.").arg(toQString(dir)));
         return;
@@ -1094,17 +1154,6 @@ void SongbooksPage::applyField(zub::bookfile::Field field, const std::string& va
     applyEdit(zub::bookfile::setSetting(text_, field, value));
 }
 
-std::function<std::string(std::string_view)> SongbooksPage::titleLookup() const {
-    std::map<std::string, std::string, std::less<>> titles;
-    for (int row = 0; row < model_->rowCount(); ++row)
-        if (const zub::SongEntry* song = model_->song(row))
-            titles.emplace(song->inputName, song->meta.title);
-    return [titles = std::move(titles)](std::string_view name) {
-        const auto it = titles.find(name);
-        return it == titles.end() ? std::string() : it->second;
-    };
-}
-
 bool SongbooksPage::saveBook() {
     if (!canEdit())
         return false;
@@ -1113,12 +1162,27 @@ bool SongbooksPage::saveBook() {
 
 // ---- The LaTeX tab ----
 
+bool SongbooksPage::confirmClose() {
+    if (!latexModified())
+        return true;
+    const auto answer = QMessageBox::question(
+        this, tr("Songbooks"), tr("The LaTeX of %1 is not saved. Save it?").arg(id_),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
+    if (answer == QMessageBox::Cancel)
+        return false;
+    if (answer == QMessageBox::Save) {
+        saveLatex();
+        return !latexModified();
+    }
+    return true;
+}
+
 void SongbooksPage::refreshFileViews() {
     // The LaTeX tab follows the file unless it holds unsaved edits.
     if (!latexModified()) {
         QString text = QString::fromStdString(text_);
         text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
-        if (toStdString(text) != latexBase_ || latex_->toPlainText() != text) {
+        if (toStdString(text) != latexBase_ || rawText(latex_) != toStdString(text)) {
             const bool wasLoading = std::exchange(loading_, true);
             latexBase_ = toStdString(text);
             // Keep the place in the text: a song added in the Songbook tab moves little.
@@ -1133,18 +1197,19 @@ void SongbooksPage::refreshFileViews() {
         }
     }
     const bool shown = !id_.isEmpty() && !text_.empty();
-    preview_->setBook(id_, shown ? pathOf(id_) : std::filesystem::path(), text_, book_);
+    preview_->setBook(id_, shown ? pathOf(id_) : std::filesystem::path(), text_);
 }
 
 bool SongbooksPage::latexModified() const {
-    return latex_ && !id_.isEmpty() && !text_.empty() &&
-           toStdString(latex_->toPlainText()) != latexBase_;
+    return latex_ && !id_.isEmpty() && !text_.empty() && rawText(latex_) != latexBase_;
 }
 
 void SongbooksPage::updateLatexState() {
     const bool modified = latexModified();
     const bool shown = !id_.isEmpty() && !text_.empty();
-    latex_->setReadOnly(!shown || settings_.locked);
+    // A file the editor would not give back byte for byte (mixed line ends, invalid UTF-8)
+    // is only shown.
+    latex_->setReadOnly(!shown || settings_.locked || !SongEditor::roundTrips(text_));
     latexSave_->setEnabled(modified);
     latexRevert_->setEnabled(modified);
     latexState_->setText(modified ? tr("Not saved: the Songbook tab and Add Songs wait until it "
@@ -1161,7 +1226,7 @@ void SongbooksPage::updateLatexState() {
 void SongbooksPage::saveLatex() {
     if (!latexModified() || settings_.locked)
         return;
-    std::string text = toStdString(latex_->toPlainText());
+    std::string text = rawText(latex_);
     if (text_.find("\r\n") != std::string::npos) { // the file's line ends
         std::string crlf;
         for (const char c : text) {
@@ -1177,26 +1242,32 @@ void SongbooksPage::saveLatex() {
                              tr("%1 was changed outside the app since it was read. Your text is "
                                 "kept here; Revert shows the file as it is now.")
                                  .arg(toQString(pathOf(id_).filename())));
+        // Read it again (all of it: songs, settings, lock), keeping the typed text: Revert
+        // shows the file as it is now, and a Save works from it.
         if (onDisk) {
-            text_ = *onDisk; // Revert and the next Save work from it
+            loadFile();
+            resetSectionUids();
+            updateLatexState();
         }
         return;
     }
     const std::string base = latexBase_;
-    latexBase_ = toStdString(latex_->toPlainText()); // what is being saved
-    if (!writeFile(text)) {
+    latexBase_ = rawText(latex_); // what is being saved
+    // Written but not readable as a songbook (a LaTeX mistake) is still saved: the tab says so.
+    if (!writeFile(text) && text_ != text) {
         latexBase_ = base; // still not saved
         updateLatexState();
         return;
     }
     resetSectionUids();
-    latexBase_ = toStdString(latex_->toPlainText()); // saved: the file says the same now
+    latexBase_ = rawText(latex_); // saved: the file says the same now
     loadBook();
     if (!editable_ || text_.empty())
         bookTabs_->setCurrentIndex(1); // keep showing what needs fixing
 }
 
 void SongbooksPage::revertLatex() {
+    loadFile(); // the file as it is now
     loading_ = true;
     QString text = QString::fromStdString(text_);
     text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
@@ -1335,7 +1406,8 @@ void SongbooksPage::updateButtons() {
     const bool shown = !id_.isEmpty() && !text_.empty();
     const bool can = canEdit();
     duplicate_->setEnabled(shown && !latexModified());
-    lock_->setEnabled(shown && editable_ && !latexModified());
+    newBook_->setEnabled(!root_.empty() && !latexModified());
+    lock_->setEnabled(shown && (editable_ || settings_.locked) && !latexModified());
     lock_->setText(settings_.locked ? tr("Unlock") : tr("Lock"));
     bool hasSongs = false;
     for (const auto& section : book_.sections)
@@ -1547,7 +1619,11 @@ void SongbooksPage::checkBook() {
         dialog.accept();
         emit openSongRequested(path);
     });
+    open->setEnabled(list->selectedItems().size() == 1);
+    remove->setEnabled(canEdit() && !list->selectedItems().isEmpty());
     connect(remove, &QPushButton::clicked, &dialog, [&] {
+        if (!canEdit())
+            return; // locked, or the LaTeX tab holds unsaved text
         bool removed = false;
         for (QListWidgetItem* item : list->selectedItems())
             removed |=

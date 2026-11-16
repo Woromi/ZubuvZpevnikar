@@ -628,15 +628,20 @@ std::vector<string> indexFiles(const Book& book) {
     return out;
 }
 
+std::filesystem::path booksFolder(const std::filesystem::path& repoRoot) {
+    std::error_code ec;
+    if (!std::filesystem::is_directory(repoRoot / "songbooks", ec) &&
+        std::filesystem::is_directory(repoRoot / "projects", ec))
+        return "projects";
+    return "songbooks";
+}
+
 std::vector<std::filesystem::path> findBooks(const std::filesystem::path& repoRoot) {
     namespace fs = std::filesystem;
     std::error_code ec;
-    fs::path dir = repoRoot / "songbooks";
-    if (!fs::is_directory(dir, ec)) {
-        dir = repoRoot / "projects";
-        if (!fs::is_directory(dir, ec))
-            return {};
-    }
+    const fs::path dir = repoRoot / booksFolder(repoRoot);
+    if (!fs::is_directory(dir, ec))
+        return {};
     std::vector<fs::path> out;
     fs::recursive_directory_iterator it(dir, fs::directory_options::skip_permission_denied, ec),
         end;
@@ -1248,9 +1253,27 @@ std::expected<string, string> addSection(string_view text, string_view name,
     if (!scanned)
         return std::unexpected(scanned.error());
     const auto eol = eolOf(text);
+    // The book-wide indexes of the first section: an index of its own (\newindex, an album's
+    // in ayreon.tex) is not the new section's; "obsah" when nothing else is left.
+    string indexes = "obsah";
+    if (!scanned->empty()) {
+        const auto book = parse(text);
+        std::vector<string> kept;
+        for (const auto& index : scanned->front().env.indexes)
+            if (!book || std::ranges::none_of(book->indexes, [&](const auto& declared) {
+                    return declared.first == index;
+                }))
+                kept.push_back(index);
+        if (kept.size() == scanned->front().env.indexes.size())
+            indexes = scanned->front().indexText; // as written
+        else if (!kept.empty()) {
+            indexes.clear();
+            for (const auto& index : kept)
+                indexes += (indexes.empty() ? "" : ",") + index;
+        }
+    }
     const string block = eol + "\\songsection{" + string(name) + "}" + eol + "\\begin{songs}{" +
-                         (scanned->empty() ? string("obsah") : scanned->front().indexText) + "}" +
-                         eol + "\\end{songs}" + eol;
+                         indexes + "}" + eol + "\\end{songs}" + eol;
     string out(text);
     if (scanned->empty()) {
         const auto masked = maskComments(text);

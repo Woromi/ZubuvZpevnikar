@@ -55,6 +55,10 @@
         <translation>Sestavení selhalo; jeho výstup je níže.</translation>
     </message>
     <message>
+        <source>The build was cancelled.</source>
+        <translation>Sestavení bylo zrušeno.</translation>
+    </message>
+    <message>
         <source>Not built yet: Build Preview typesets the whole songbook.</source>
         <translation>Ještě nesestaveno: Sestavit náhled vysází celý zpěvník.</translation>
     </message>
@@ -2838,8 +2842,16 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Složka a název kopie v songbooks/ (např. tabory/2027/tabor2027):</translation>
     </message>
     <message>
+        <source>The cover %1 was not copied: %2</source>
+        <translation>Obálka %1 se nezkopírovala: %2</translation>
+    </message>
+    <message>
         <source>Written in a form the form cannot change: edit it in the LaTeX tab</source>
         <translation>Zapsáno tak, že to formulář nezmění: upravte to na kartě LaTeX</translation>
+    </message>
+    <message>
+        <source>Chosen when the songbook is made (New Songbook…); to change it, edit the LaTeX tab, including the cover and title page commands</source>
+        <translation>Volí se při vytvoření zpěvníku (Nový zpěvník…); pro změnu upravte kartu LaTeX, včetně příkazů obálky a titulní strany</translation>
     </message>
     <message>
         <source>Not found beside the songbook or in the repo</source>

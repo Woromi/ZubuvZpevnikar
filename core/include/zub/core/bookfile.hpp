@@ -104,6 +104,9 @@ std::vector<std::string> indexFiles(const Book&);
 // with a \documentclass in code, relative to repoRoot, sorted. Symlinked directories are not
 // followed; unreadable files are skipped.
 std::vector<std::filesystem::path> findBooks(const std::filesystem::path& repoRoot);
+// The folder of the books, relative to the repo root: "songbooks", or "projects" in an older
+// checkout that has only that (where new books go too).
+std::filesystem::path booksFolder(const std::filesystem::path& repoRoot);
 
 // Every \input{name} of `text` (comments ignored, anywhere, trimmed, once each, in order); "" for
 // an \input without a brace argument.

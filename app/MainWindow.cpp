@@ -587,7 +587,7 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
         }
         return false;
     }
-    if (options.closeEditors && !closeSong())
+    if (options.closeEditors && (!closeSong() || !songbooksPage_->confirmClose()))
         return false;
 
     songbookRoot_ = root;
@@ -971,7 +971,7 @@ bool MainWindow::closeSong() {
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
-    if (!confirmCloseAll()) {
+    if (!songbooksPage_->confirmClose() || !confirmCloseAll()) {
         event->ignore();
         return;
     }
@@ -3359,6 +3359,9 @@ void MainWindow::checkKey(SongEditor* editor, const std::string& content,
         if (error == QProcess::FailedToStart)
             finish(false);
     });
+    // It takes a fraction of a second; a hung one is stopped (finish then reports nothing).
+    QTimer::singleShot(15000, process, [process] { process->kill(); });
+    connect(qApp, &QCoreApplication::aboutToQuit, process, [process] { process->kill(); });
     QStringList arguments;
     for (const auto& argument : command.arguments)
         arguments << toQString(argument);

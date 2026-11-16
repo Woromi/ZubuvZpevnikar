@@ -53,6 +53,8 @@ public:
                   KSyntaxHighlighting::Repository& repository, QWidget* parent = nullptr);
 
     void setSongbookRoot(const std::filesystem::path& root);
+    // Before the app closes: asks to save unsaved LaTeX; false to keep the app open.
+    bool confirmClose();
     // Lists the books again and reads the selected one (kept where possible) from disk.
     void reloadList();
 
@@ -95,10 +97,12 @@ private:
     std::vector<std::string> expandSorted(int s, const std::vector<std::string>& order) const;
     void newSongbook();
     void duplicateSongbook();
-    // How a book in `bookDir` names the cover `file`: its path from the book's folder or the
-    // repo root, or, from elsewhere, "cover.<ext>" after copying it there. nullopt: copy failed.
+    // How a book <stem> in `bookDir` names the cover `file`: its path from the book's folder or
+    // the repo root, or, from elsewhere, "<stem>-cover.<ext>" (a free name) after copying it
+    // there. nullopt: the copy failed.
     std::optional<std::string> coverReference(const std::filesystem::path& file,
-                                              const std::filesystem::path& bookDir);
+                                              const std::filesystem::path& bookDir,
+                                              const std::string& stem);
     // Writes <dir>/<stem>.tex and, unless the folder has one, an executable build.sh.
     bool writeNewBook(const std::filesystem::path& dir, const QString& stem, const std::string& tex,
                       const std::string& buildSh);
@@ -117,8 +121,6 @@ private:
     // The LaTeX tab (unless it holds unsaved edits) and the preview's status from text_.
     void refreshFileViews();
     void updateLatexState();
-    std::function<std::string(std::string_view)>
-    titleLookup() const; // titles of the library songs, for the exporter
     void rebuildTree();
     void onTreeSelectionChanged();
     int currentSection() const;
@@ -178,6 +180,7 @@ private:
     zub::songbook::Songbook book_;     // its title, class and song lists (from file_)
     bool editable_ = false;            // read and parsed, no section read-only
     std::string latexBase_;            // the LaTeX tab's text when it was filled
+    QString latexKeepFor_;             // fillList: the book whose unsaved LaTeX is kept
     int section_ = 0;
     // Identifies the sections of book_ for sort requests (parallel to book_.sections).
     std::vector<quint64> sectionUids_;
@@ -189,6 +192,7 @@ private:
 
     QSplitter* splitter_ = nullptr;
     QTreeWidget* list_ = nullptr;
+    QAction* newBook_ = nullptr;
     QAction* duplicate_ = nullptr;
     QAction* lock_ = nullptr;
 

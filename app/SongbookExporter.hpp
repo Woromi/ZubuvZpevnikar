@@ -34,8 +34,7 @@ public:
     // unknown), then the work dir CacheLocation/songbooks/repo-<hash>/ with the text as book.tex.
     // nullopt (after a message) when it is not to be built.
     std::optional<zub::songbook::BuildCommand> prepareRepoBuild(
-        const std::filesystem::path& bookFile, const std::string& text,
-        const zub::songbook::Songbook& book);
+        const std::filesystem::path& bookFile, const std::string& text);
     // A process for `command` (environment, working dir, its own process group, stopped when the
     // app quits); startBuild runs it, stopBuild stops it and what it started.
     static QProcess* createBuildProcess(const zub::songbook::BuildCommand& command,

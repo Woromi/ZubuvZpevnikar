@@ -44,10 +44,12 @@ BookPreview::BookPreview(SongbookExporter* exporter, QWidget* parent)
     layout->addWidget(log_, 1);
     connect(build_, &QPushButton::clicked, this, [this] { build(); });
     connect(cancel_, &QPushButton::clicked, this, [this] {
-        if (process_)
+        if (process_) {
+            cancelled_ = true;
             SongbookExporter::stopBuild(process_);
+        }
     });
-    show();
+    updateView();
 }
 
 BookPreview::~BookPreview() {
@@ -58,12 +60,11 @@ BookPreview::~BookPreview() {
 }
 
 void BookPreview::setBook(const QString& id, const std::filesystem::path& file,
-                          const std::string& text, const zub::songbook::Songbook& book) {
+                          const std::string& text) {
     id_ = id;
     file_ = file;
     text_ = text;
-    book_ = book;
-    show(); // the same PDF stays loaded (and scrolled): only the status line changes
+    updateView(); // the same PDF stays loaded (and scrolled): only the status line changes
 }
 
 bool BookPreview::building() const {
@@ -88,7 +89,7 @@ QString BookPreview::report() const {
 bool BookPreview::build() {
     if (process_ || id_.isEmpty() || text_.empty())
         return false;
-    const auto command = exporter_->prepareRepoBuild(file_, text_, book_);
+    const auto command = exporter_->prepareRepoBuild(file_, text_);
     if (!command)
         return false;
     buildingId_ = id_;
@@ -96,6 +97,7 @@ bool BookPreview::build() {
     buildingPdf_ = command->pdf;
     buildingLog_ = command->log;
     output_.clear();
+    cancelled_ = false;
     log_->clear();
     process_ = SongbookExporter::createBuildProcess(*command, this);
     connect(process_, &QProcess::readyRead, this, [this] {
@@ -115,7 +117,7 @@ bool BookPreview::build() {
             onFinished(-1, true);
     });
     SongbookExporter::startBuild(process_, *command);
-    show();
+    updateView();
     return true;
 }
 
@@ -126,6 +128,7 @@ void BookPreview::onFinished(int exitCode, bool crashed) {
     process_->deleteLater();
     process_ = nullptr;
     Result& result = results_[buildingId_];
+    result.cancelled = cancelled_;
     QFile pdf(toQString(buildingPdf_));
     const bool ok = !crashed && exitCode == 0 && pdf.open(QIODevice::ReadOnly);
     if (ok) {
@@ -133,6 +136,8 @@ void BookPreview::onFinished(int exitCode, bool crashed) {
         result.text = buildingText_;
         result.log.clear();
         result.report = SongbookExporter::buildReport(output_, buildingLog_);
+    } else if (cancelled_) {
+        result.log.clear(); // nothing failed
     } else {
         // The last good PDF stays (marked out of date by its text); the log says why.
         result.log = QString::fromUtf8(output_);
@@ -141,17 +146,18 @@ void BookPreview::onFinished(int exitCode, bool crashed) {
     }
     const QString id = buildingId_;
     buildingId_.clear();
-    show();
+    updateView();
     emit built(id, ok && !result.pdf.isEmpty());
 }
 
-void BookPreview::show() {
+void BookPreview::updateView() {
     const bool shown = !id_.isEmpty() && !text_.empty();
     const bool here = process_ && buildingId_ == id_;
-    build_->setEnabled(shown && !process_);
-    build_->setText(results_.contains(id_) ? tr("Rebuild Preview") : tr("Build Preview"));
-    cancel_->setVisible(here);
     const auto it = results_.find(id_);
+    build_->setEnabled(shown && !process_);
+    build_->setText(it != results_.end() && !it->second.pdf.isEmpty() ? tr("Rebuild Preview")
+                                                                      : tr("Build Preview"));
+    cancel_->setVisible(here);
     const QByteArray pdf = it == results_.end() ? QByteArray() : it->second.pdf;
     // The document reads from a buffer: the next build may replace the file.
     if (!buffer_ || buffer_->data() != pdf) {
@@ -167,7 +173,9 @@ void BookPreview::show() {
     }
     const bool failed = it != results_.end() && !it->second.log.isEmpty();
     log_->setVisible(here || failed);
-    if (!here && failed)
+    if (here)
+        log_->setPlainText(QString::fromUtf8(output_)); // this build's output only
+    else if (failed)
         log_->setPlainText(it->second.log);
     view_->setVisible(!pdf.isEmpty() && !here);
     QString status;
@@ -179,6 +187,8 @@ void BookPreview::show() {
         status = tr("Another songbook is being built.");
     else if (failed)
         status = tr("The build failed; its output is below.");
+    else if (it != results_.end() && it->second.cancelled && it->second.pdf.isEmpty())
+        status = tr("The build was cancelled.");
     else if (pdf.isEmpty())
         status = tr("Not built yet: Build Preview typesets the whole songbook.");
     else if (it->second.text != text_)
