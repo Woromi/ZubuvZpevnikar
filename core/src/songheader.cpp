@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <ranges>
 #include <vector>
 
 namespace zub::songheader {
@@ -144,6 +145,49 @@ bool restOfLineIsEmpty(std::string_view orig, std::size_t pos, std::size_t& comm
 
 } // namespace
 
+namespace {
+
+// The order of the header's options, as the converter writes them and the songs have them (tags
+// right after by); an option is added at its place in it.
+constexpr std::string_view optionOrder[] = {"by",  "tags", "lang", "tem", "met",
+                                            "tun", "key",  "cap",  "src", "pap"};
+
+std::size_t orderOf(std::string_view name) {
+    const auto it = std::ranges::find(optionOrder, name);
+    return static_cast<std::size_t>(it - std::begin(optionOrder));
+}
+
+// The header's commented-out placeholders of `key` ("    % key={},", as the converter writes
+// what it does not know), between `from` and `to`: {line start, next line start} of each line
+// holding nothing else.
+std::vector<std::pair<std::size_t, std::size_t>>
+placeholderLines(std::string_view orig, std::size_t from, std::size_t to, std::string_view key) {
+    std::vector<std::pair<std::size_t, std::size_t>> lines;
+    for (std::size_t ls = nextLineStart(orig, from); ls < to; ls = nextLineStart(orig, ls)) {
+        const auto nl = orig.find('\n', ls);
+        if (nl == npos || nl >= to)
+            break;
+        std::string_view line = orig.substr(ls, nl - ls);
+        while (!line.empty() && (isBlank(line.front()) || line.front() == '\r'))
+            line.remove_prefix(1);
+        if (!line.starts_with('%'))
+            continue;
+        line.remove_prefix(1);
+        while (!line.empty() && isBlank(line.front()))
+            line.remove_prefix(1);
+        if (!line.starts_with(key))
+            continue;
+        line.remove_prefix(key.size());
+        while (!line.empty() && isBlank(line.front()))
+            line.remove_prefix(1);
+        if (line.starts_with('='))
+            lines.emplace_back(ls, nl + 1);
+    }
+    return lines;
+}
+
+} // namespace
+
 std::string setOption(std::string_view songText, std::string_view key,
                       std::optional<std::string_view> value, bool dropEmptyHeader) {
     const bool remove = !value || value->empty();
@@ -186,6 +230,17 @@ std::string setOption(std::string_view songText, std::string_view key,
     }
 
     const auto entries = entriesOf(m, open + 1, *close);
+    const auto placeholders = remove ? std::vector<std::pair<std::size_t, std::size_t>>()
+                                     : placeholderLines(orig, open, *close, key);
+    const bool present =
+        std::ranges::any_of(entries, [&](const Entry& e) { return e.name == key; });
+    if (present && !placeholders.empty()) {
+        // A value is written: the commented-out placeholders of the key go.
+        std::string stripped{orig};
+        for (const auto& [from, to] : placeholders | std::views::reverse)
+            stripped.erase(from, to - from);
+        return setOption(stripped, key, value, dropEmptyHeader);
+    }
     const auto last = [&](std::string_view name) -> const Entry* {
         const Entry* found = nullptr;
         for (const Entry& e : entries)
@@ -272,6 +327,59 @@ std::string setOption(std::string_view songText, std::string_view key,
         return std::string{orig.substr(ls, p - ls)};
     };
 
+    // In the place of the converter's commented-out placeholder ("% key={},"), the others of it
+    // removed.
+    if (!placeholders.empty()) {
+        const auto [from, to] = placeholders.front();
+        const Entry* prev = nullptr;
+        for (const Entry& e : entries)
+            if (e.valEnd <= from)
+                prev = &e;
+        std::string indent{orig.substr(from, orig.find('%', from) - from)};
+        std::string out{orig.substr(0, prev && !commaAfter(*prev) ? prev->valEnd : from)};
+        if (prev && !commaAfter(*prev)) {
+            out += ',';
+            out += orig.substr(prev->valEnd, from - prev->valEnd);
+        }
+        out += indent + newOption + "," + eol;
+        std::size_t at = to;
+        for (std::size_t i = 1; i < placeholders.size(); ++i) {
+            out += orig.substr(at, placeholders[i].first - at);
+            at = placeholders[i].second;
+        }
+        out += orig.substr(at);
+        return out;
+    }
+    // Where the converter's order puts it: after the nearest option before it, else before the
+    // nearest one after it (each on a line of its own).
+    if (const std::size_t rank = orderOf(key); rank < std::size(optionOrder)) {
+        const auto ownLine = [&](const Entry& e) {
+            std::size_t commaEnd = 0;
+            return onlyBlanks(orig, lineStart(m, e.nameBegin), e.nameBegin) &&
+                   restOfLineIsEmpty(m, e.valEnd, commaEnd);
+        };
+        const Entry* before = nullptr;
+        const Entry* after = nullptr;
+        for (const Entry& e : entries) {
+            const std::size_t r = orderOf(e.name);
+            if (r < rank && (!before || orderOf(before->name) <= r))
+                before = &e;
+            if (r > rank && r < std::size(optionOrder) && (!after || orderOf(after->name) > r))
+                after = &e;
+        }
+        if (before && ownLine(*before)) {
+            const auto next = nextLineStart(orig, before->valEnd);
+            if (next <= *close)
+                return insertLine(next, before, indentOf(before->nameBegin));
+        }
+        if (after && ownLine(*after)) {
+            const Entry* prev = nullptr;
+            for (const Entry& e : entries)
+                if (e.valEnd <= after->nameBegin)
+                    prev = &e;
+            return insertLine(lineStart(m, after->nameBegin), prev, indentOf(after->nameBegin));
+        }
+    }
     if (const Entry* by = last("by")) {
         const auto ls = lineStart(m, by->nameBegin);
         std::size_t commaEnd = 0;

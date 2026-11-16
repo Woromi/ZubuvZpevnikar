@@ -29,10 +29,10 @@ TEST_CASE("setPap replaces in place", "[songheader]") {
     CHECK(option(in, "pap") == "a4");
 }
 
-TEST_CASE("setPap adds to a multi-line header after by", "[songheader]") {
+TEST_CASE("setPap adds to a multi-line header in the converter's order", "[songheader]") {
     const auto in = song("\\beginsong{T}[\n  by={X},\n  lang={czech},\n]\n");
     CHECK(setPap(in, "a5") ==
-          song("\\beginsong{T}[\n  by={X},\n  pap={a5},\n  lang={czech},\n]\n"));
+          song("\\beginsong{T}[\n  by={X},\n  lang={czech},\n  pap={a5},\n]\n"));
     const auto noBy = song("\\beginsong{T}[\n    lang={czech}\n]\n");
     CHECK(setPap(noBy, "a5") == song("\\beginsong{T}[\n    lang={czech},\n    pap={a5},\n]\n"));
 }
@@ -71,18 +71,38 @@ TEST_CASE("setPap keeps CRLF and other keys", "[songheader]") {
         "\\endverse\r\n\\endsong\r\n";
     const auto out = setPap(in, "a4,a5");
     CHECK(out ==
-          "\\beginsong{T}[\r\n    by={X},\r\n    pap={a4,a5},\r\n    tags={fav},\r\n]\r\n"
+          "\\beginsong{T}[\r\n    by={X},\r\n    tags={fav},\r\n    pap={a4,a5},\r\n]\r\n"
           "\\beginverse\r\nLa\r\n\\endverse\r\n\\endsong\r\n");
     CHECK(setPap(out, "") ==
-          "\\beginsong{T}[\r\n    by={X},\r\n    pap={},\r\n    tags={fav},\r\n]\r\n"
+          "\\beginsong{T}[\r\n    by={X},\r\n    tags={fav},\r\n    pap={},\r\n]\r\n"
           "\\beginverse\r\nLa\r\n\\endverse\r\n\\endsong\r\n");
 }
 
-TEST_CASE("setPap ignores commented-out options", "[songheader]") {
+TEST_CASE("a written option takes the place of its commented-out placeholder", "[songheader]") {
     const auto in = song("\\beginsong{T}[\n    by={X},\n    % pap={a4},\n]\n");
-    CHECK(option(in, "pap") == std::nullopt);
-    CHECK(setPap(in, "a5") ==
-          song("\\beginsong{T}[\n    by={X},\n    pap={a5},\n    % pap={a4},\n]\n"));
+    CHECK(option(in, "pap") == std::nullopt); // a comment is no value
+    CHECK(setPap(in, "a5") == song("\\beginsong{T}[\n    by={X},\n    pap={a5},\n]\n"));
+    // The converter's header: the key goes where its "% key={}," was.
+    const auto imported = song("\\beginsong{T}[\n    by={X},\n    % lang={czech|english},\n"
+                               "    % tem={},\n    tun={Standard},\n    % key={},\n"
+                               "    % cap={},\n    src={u},\n    pap={},\n]\n");
+    CHECK(setOption(imported, "key", "{Am}") ==
+          song("\\beginsong{T}[\n    by={X},\n    % lang={czech|english},\n    % tem={},\n"
+               "    tun={Standard},\n    key={Am},\n    % cap={},\n    src={u},\n    pap={},\n]\n"));
+    // A value already there: a leftover placeholder goes.
+    const auto both = song("\\beginsong{T}[\n    by={X},\n    key={C},\n    % key={},\n]\n");
+    CHECK(setOption(both, "key", "{D}") == song("\\beginsong{T}[\n    by={X},\n    key={D},\n]\n"));
+    // Without a placeholder, in the converter's order: key after tun, before cap.
+    const auto plain = song("\\beginsong{T}[\n    by={X},\n    tun={Standard},\n    cap={2},\n]\n");
+    CHECK(setOption(plain, "key", "{G}") ==
+          song("\\beginsong{T}[\n    by={X},\n    tun={Standard},\n    key={G},\n    cap={2},\n]\n"));
+    const auto first = song("\\beginsong{T}[\n    cap={2},\n]\n");
+    CHECK(setOption(first, "key", "{G}") ==
+          song("\\beginsong{T}[\n    key={G},\n    cap={2},\n]\n"));
+    // A last option without its comma gets one.
+    const auto noComma = song("\\beginsong{T}[\n    by={X}\n    % key={}\n]\n");
+    CHECK(setOption(noComma, "key", "{G}") ==
+          song("\\beginsong{T}[\n    by={X},\n    key={G},\n]\n"));
 }
 
 TEST_CASE("measuredPapers", "[songheader]") {

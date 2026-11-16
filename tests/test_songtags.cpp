@@ -52,12 +52,11 @@ TEST_CASE("setTags adds a comma to a by line without one", "[tags]") {
     CHECK(setTags(in, {"a"}) == song("\\beginsong{T}[\n    by={X},\n    tags={a},\n]\n"));
 }
 
-TEST_CASE("setTags inserts before the closing bracket without a by line", "[tags]") {
+TEST_CASE("setTags goes before lang without a by line", "[tags]") {
     const auto in = song("\\beginsong{T}[\n    lang={czech},\n]\n");
-    CHECK(setTags(in, {"a"}) == song("\\beginsong{T}[\n    lang={czech},\n    tags={a},\n]\n"));
+    CHECK(setTags(in, {"a"}) == song("\\beginsong{T}[\n    tags={a},\n    lang={czech},\n]\n"));
     const auto noComma = song("\\beginsong{T}[\n    lang={czech}\n]\n");
-    CHECK(setTags(noComma, {"a"}) ==
-          song("\\beginsong{T}[\n    lang={czech},\n    tags={a},\n]\n"));
+    CHECK(setTags(noComma, {"a"}) == song("\\beginsong{T}[\n    tags={a},\n    lang={czech}\n]\n"));
     CHECK(setTags(song("\\beginsong{T}[\n]\n"), {"a"}) ==
           song("\\beginsong{T}[\n    tags={a},\n]\n"));
 }
@@ -89,11 +88,14 @@ TEST_CASE("setTags in a one-line header", "[tags]") {
 }
 
 TEST_CASE("setTags ignores comments and keeps them", "[tags]") {
-    const auto in = song("\\beginsong{T}[\n    % tags={old},\n    by={X}, % the artist, really\n"
+    const auto in = song("\\beginsong{T}[\n    by={X}, % the artist, really\n"
                          "    lang={czech},\n]\n");
     const auto out = setTags(in, {"a"});
-    CHECK(out == song("\\beginsong{T}[\n    % tags={old},\n    by={X}, % the artist, really\n"
+    CHECK(out == song("\\beginsong{T}[\n    by={X}, % the artist, really\n"
                       "    tags={a},\n    lang={czech},\n]\n"));
+    // A commented-out tags line is a placeholder: written tags take its place.
+    CHECK(setTags(song("\\beginsong{T}[\n    % tags={old},\n    by={X},\n]\n"), {"a"}) ==
+          song("\\beginsong{T}[\n    tags={a},\n    by={X},\n]\n"));
     CHECK(zub::parseSong(out)->value("tags") == "a");
     // A tags option that has a comment after it keeps the comment when removed.
     const auto withComment = song("\\beginsong{T}[\n    tags={a}, % mine\n    by={X},\n]\n");
