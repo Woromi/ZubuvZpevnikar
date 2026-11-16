@@ -6,6 +6,7 @@
 #include <sstream>
 #include <unistd.h>
 #include <zub/core/bookfile.hpp>
+#include <zub/core/safety.hpp>
 #include <zub/core/textfile.hpp>
 
 namespace fs = std::filesystem;
@@ -480,4 +481,548 @@ TEST_CASE("bookfile: review findings", "[bookfile]") {
     CHECK(bf::inputs("\\renewcommand{\\campyear}{\\input{A/x}}\n% \\input{No/no}\n"
                      "\\begin{songs}{o}\\input{ B/b }\n\\input{A/x}\\input foo\n") ==
           std::vector<std::string>{"A/x", "B/b", ""});
+}
+
+// ---- Settings, lock, sections, new books ----
+
+namespace {
+
+namespace bf = zub::bookfile;
+
+std::string setting(const std::string& text, bf::Field f, const std::string& value) {
+    auto r = bf::setSetting(text, f, value);
+    INFO((r ? "" : r.error()));
+    REQUIRE(r);
+    return *r;
+}
+
+std::string crlf(std::string s) {
+    std::string out;
+    for (const char c : s) {
+        if (c == '\n')
+            out += '\r';
+        out += c;
+    }
+    return out;
+}
+
+const std::string velky = "\\documentclass[chorded, onesongcolumn, noshading]{velkyzpevnik}\n"
+                          "\n\\title{T}\n\\author{A}\n\n\\begin{document}\n\n"
+                          "\\makefrontcover{img/x}\n\\insertindex\n\n"
+                          "\\begin{songs}{obsah,obsahAutor}\n\n\\end{songs}\n\n\\end{document}\n";
+
+} // namespace
+
+TEST_CASE("readSettings reads the fixtures", "[bookfile]") {
+    const auto big = bf::readSettings(fixture("songbooks/big/big.tex"));
+    CHECK(big.bookClass == "velkyzpevnik");
+    CHECK(big.chorded);
+    CHECK_FALSE(big.twoColumns);
+    CHECK(big.shading);
+    CHECK(big.title == "Big Test Book");
+    CHECK(big.author == "Tester");
+    CHECK(big.campYear.empty());
+    CHECK(big.cover.empty());
+    CHECK_FALSE(big.chordChart);
+    CHECK_FALSE(big.locked);
+    CHECK(big.notEditable.empty());
+
+    const auto camp = bf::readSettings(fixture("songbooks/camps/2025/camp2025.tex"));
+    CHECK(camp.bookClass == "taborovyzpevnik");
+    CHECK(camp.campYear == "2025");
+    CHECK(camp.cover.empty());
+    CHECK(camp.notEditable.empty());
+
+    const auto one = bf::readSettings(fixture("songbooks/bands/one/one.tex"));
+    CHECK(one.title == "One Band");
+    CHECK(one.notEditable.empty());
+}
+
+TEST_CASE("readSettings on inline books", "[bookfile]") {
+    const auto s = bf::readSettings(
+        "\\documentclass[lyric, twosongcolumns, noshading, foo]{malyzpevnik}\n"
+        "% \\title{commented}\n\\title{T}\n\\begin{document}\n\\bindingleaf\n"
+        "\\maketitlepage[img/m]\n\\insertallchords\n% zpevnikar: locked\n\\end{document}\n");
+    CHECK(s.bookClass == "malyzpevnik");
+    CHECK_FALSE(s.chorded);
+    CHECK(s.twoColumns);
+    CHECK_FALSE(s.shading);
+    CHECK(s.title == "T");
+    CHECK(s.cover == "img/m");
+    CHECK(s.chordChart);
+    CHECK(s.locked);
+    CHECK(s.notEditable.empty());
+    // a bare \makefrontcover (taborovyzpevnik) has no cover
+    const auto t = bf::readSettings("\\documentclass{taborovyzpevnik}\n\\begin{document}\n"
+                                    "\\makefrontcover\n\n\\end{document}\n");
+    CHECK(t.cover.empty());
+    CHECK(t.notEditable.empty());
+}
+
+TEST_CASE("setSetting: class and options", "[bookfile]") {
+    using bf::Field;
+    CHECK(setting(velky, Field::Class, "malyzpevnik")
+              .starts_with("\\documentclass[chorded, onesongcolumn, noshading]{malyzpevnik}\n"));
+    CHECK_FALSE(bf::setSetting(velky, Field::Class, "article"));
+    CHECK(setting(velky, Field::Chorded, "0")
+              .starts_with("\\documentclass[lyric, onesongcolumn, noshading]{velkyzpevnik}\n"));
+    CHECK(setting(velky, Field::TwoColumns, "1")
+              .starts_with("\\documentclass[chorded, twosongcolumns, noshading]{velkyzpevnik}\n"));
+    CHECK(setting(velky, Field::Shading, "1")
+              .starts_with("\\documentclass[chorded, onesongcolumn]{velkyzpevnik}\n"));
+    // the first or the only option goes with its comma
+    CHECK(setting("\\documentclass[noshading, foo]{velkyzpevnik}\n", Field::Shading, "1") ==
+          "\\documentclass[foo]{velkyzpevnik}\n");
+    CHECK(setting("\\documentclass[ noshading ]{velkyzpevnik}\n", Field::Shading, "1") ==
+          "\\documentclass{velkyzpevnik}\n");
+    // added: at the end, in new brackets, in empty ones; unknown options stay
+    CHECK(setting("\\documentclass[foo,bar ]{velkyzpevnik}\n", Field::Shading, "0") ==
+          "\\documentclass[foo,bar, noshading ]{velkyzpevnik}\n");
+    CHECK(setting("\\documentclass{velkyzpevnik}\n", Field::Chorded, "0") ==
+          "\\documentclass[lyric]{velkyzpevnik}\n");
+    CHECK(setting("\\documentclass[]{velkyzpevnik}\n", Field::TwoColumns, "1") ==
+          "\\documentclass[twosongcolumns]{velkyzpevnik}\n");
+    CHECK(setting("\\documentclass[lyric]{velkyzpevnik}\n", Field::Chorded, "1") ==
+          "\\documentclass[chorded]{velkyzpevnik}\n");
+    // defaults: nothing to add
+    const std::string plain = "\\documentclass[foo]{velkyzpevnik}\n";
+    CHECK(setting(plain, Field::Chorded, "1") == plain);
+    CHECK(setting(plain, Field::TwoColumns, "0") == plain);
+    CHECK(setting(plain, Field::Shading, "1") == plain);
+    CHECK_FALSE(bf::setSetting(plain, Field::Shading, "yes"));
+    // a comment is not code
+    CHECK(setting("\\documentclass[foo]{velkyzpevnik} % [noshading]\n", Field::Shading, "0") ==
+          "\\documentclass[foo, noshading]{velkyzpevnik} % [noshading]\n");
+}
+
+TEST_CASE("setSetting: title, author, campyear", "[bookfile]") {
+    using bf::Field;
+    CHECK(setting(velky, Field::Title, "New \\& {x}").find("\\title{New \\& {x}}\n\\author{A}") !=
+          std::string::npos);
+    CHECK(setting(velky, Field::Author, "").find("\\author{}\n") != std::string::npos);
+    CHECK_FALSE(bf::setSetting(velky, Field::Title, "a\nb"));
+    CHECK_FALSE(bf::setSetting(velky, Field::Title, "a}"));
+    CHECK_FALSE(bf::setSetting(velky, Field::Title, "{a"));
+    CHECK_FALSE(bf::setSetting(velky, Field::Author, "50% off"));
+    const std::string bare =
+        "\\documentclass{velkyzpevnik}\n\n\\begin{document}\n\\end{document}\n";
+    // missing: the title after \documentclass, the author after the title
+    const auto t = setting(bare, Field::Title, "T");
+    CHECK(t == "\\documentclass{velkyzpevnik}\n\\title{T}\n\n\\begin{document}\n\\end{document}\n");
+    CHECK(setting(t, Field::Author, "A") ==
+          "\\documentclass{velkyzpevnik}\n\\title{T}\n\\author{A}\n\n\\begin{document}\n"
+          "\\end{document}\n");
+    CHECK(setting(bare, Field::Author, "A") ==
+          "\\documentclass{velkyzpevnik}\n\\author{A}\n\n\\begin{document}\n\\end{document}\n");
+    // CRLF
+    CHECK(setting(crlf(bare), Field::Title, "T") ==
+          crlf("\\documentclass{velkyzpevnik}\n\\title{T}\n\n\\begin{document}\n"
+               "\\end{document}\n"));
+
+    const std::string camp = "\\documentclass{taborovyzpevnik}\n\n\\title{T}\n\\author{A}\n\n"
+                             "\\renewcommand{\\campyear}{2025}\n\n\\begin{document}\n";
+    CHECK(setting(camp, Field::CampYear, "2026").find("{\\campyear}{2026}\n") != std::string::npos);
+    CHECK(setting(camp, Field::CampYear, "") ==
+          "\\documentclass{taborovyzpevnik}\n\n\\title{T}\n\\author{A}\n\n\n\\begin{document}\n");
+    const auto added = setting("\\documentclass{taborovyzpevnik}\n\n\\title{T}\n\\author{A}\n\n"
+                               "\\begin{document}\n",
+                               Field::CampYear, "2027");
+    CHECK(added == "\\documentclass{taborovyzpevnik}\n\n\\title{T}\n\\author{A}\n"
+                   "\\renewcommand{\\campyear}{2027}\n\n\\begin{document}\n");
+    CHECK(setting(added, Field::CampYear, "") ==
+          "\\documentclass{taborovyzpevnik}\n\n\\title{T}\n\\author{A}\n\n\\begin{document}\n");
+}
+
+TEST_CASE("setSetting: cover by class", "[bookfile]") {
+    using bf::Field;
+    // velkyzpevnik: \makefrontcover{F}, required
+    CHECK(setting(velky, Field::Cover, "img/y").find("\\makefrontcover{img/y}\n") !=
+          std::string::npos);
+    const auto empty = bf::setSetting(velky, Field::Cover, "");
+    REQUIRE_FALSE(empty);
+    CHECK(empty.error() == "velkyzpevnik needs a cover image");
+    const std::string none = "\\documentclass{velkyzpevnik}\n\\begin{document}\n\\insertindex\n"
+                             "\\end{document}\n";
+    CHECK(setting(none, Field::Cover, "img/a") ==
+          "\\documentclass{velkyzpevnik}\n\\begin{document}\n\\makefrontcover{img/a}\n"
+          "\\insertindex\n\\end{document}\n");
+    CHECK(setting(none, Field::Cover, "") == none);
+    CHECK_FALSE(bf::setSetting(velky, Field::Cover, "a]b"));
+    CHECK_FALSE(bf::setSetting(velky, Field::Cover, "a\nb"));
+
+    // malyzpevnik: \maketitlepage[F]
+    const std::string maly = "\\documentclass{malyzpevnik}\n\\begin{document}\n"
+                             "\\maketitlepage[img/m]\n\\end{document}\n";
+    CHECK(setting(maly, Field::Cover, "img/n") ==
+          "\\documentclass{malyzpevnik}\n\\begin{document}\n\\maketitlepage[img/n]\n"
+          "\\end{document}\n");
+    const auto bareMaly = setting(maly, Field::Cover, "");
+    CHECK(bareMaly == "\\documentclass{malyzpevnik}\n\\begin{document}\n\\maketitlepage\n"
+                      "\\end{document}\n");
+    CHECK(setting(bareMaly, Field::Cover, "img/m") == maly);
+    CHECK(setting(bareMaly, Field::Cover, "") == bareMaly);
+
+    // taborovyzpevnik: \makefrontcover[F]
+    const std::string tabor = "\\documentclass{taborovyzpevnik}\n\\begin{document}\n"
+                              "\\makefrontcover[]\n\\end{document}\n";
+    CHECK(setting(tabor, Field::Cover, "") == tabor); // current value: untouched
+    CHECK(setting(tabor, Field::Cover, "c.pdf") ==
+          "\\documentclass{taborovyzpevnik}\n\\begin{document}\n\\makefrontcover[c.pdf]\n"
+          "\\end{document}\n");
+    CHECK(setting("\\documentclass{taborovyzpevnik}\n\\begin{document}\n\\end{document}\n",
+                  Field::Cover, "c.pdf") ==
+          "\\documentclass{taborovyzpevnik}\n\\begin{document}\n\\makefrontcover[c.pdf]\n"
+          "\\end{document}\n");
+
+    // unknown forms
+    CHECK(bf::readSettings("\\documentclass{velkyzpevnik}\n\\begin{document}\n\\makefrontcover\n")
+              .notEditable.contains(Field::Cover));
+    CHECK(bf::readSettings("\\documentclass{taborovyzpevnik}\n\\makefrontcover{x}\n")
+              .notEditable.contains(Field::Cover));
+    CHECK(bf::readSettings("\\documentclass{taborovyzpevnik}\n\\makefrontcover[a]\n"
+                           "\\makefrontcover[b]\n")
+              .notEditable.contains(Field::Cover));
+    CHECK(bf::readSettings("\\documentclass{taborovyzpevnik}\n\\makefrontcover[a\nb]\n")
+              .notEditable.contains(Field::Cover));
+    CHECK_FALSE(bf::setSetting("\\documentclass{taborovyzpevnik}\n\\makefrontcover{x}\n",
+                               Field::Cover, "y"));
+}
+
+TEST_CASE("setSetting: chord chart", "[bookfile]") {
+    using bf::Field;
+    const auto on = setting(velky, Field::ChordChart, "1");
+    CHECK(on == "\\documentclass[chorded, onesongcolumn, noshading]{velkyzpevnik}\n"
+                "\n\\title{T}\n\\author{A}\n\n\\begin{document}\n\n"
+                "\\makefrontcover{img/x}\n\\insertindex\n\n"
+                "\\begin{songs}{obsah,obsahAutor}\n\n\\end{songs}\n\\insertallchords\n\n"
+                "\\end{document}\n");
+    CHECK(setting(on, Field::ChordChart, "1") == on);
+    CHECK(setting(on, Field::ChordChart, "0") == velky);
+    CHECK(setting(velky, Field::ChordChart, "0") == velky);
+    // the indentation of the \end{songs} line; CRLF
+    CHECK(setting("\\documentclass{velkyzpevnik}\n  \\end{songs}\n", Field::ChordChart, "1") ==
+          "\\documentclass{velkyzpevnik}\n  \\end{songs}\n  \\insertallchords\n");
+    CHECK(setting(crlf(velky), Field::ChordChart, "1") == crlf(on));
+    // after the last one; commented ones do not count; lines with a comment go whole
+    const auto twice = setting("\\documentclass{x}\n\\end{songs}\n\\end{songs}\n\\end{document}\n",
+                               Field::ChordChart, "1");
+    CHECK(twice == "\\documentclass{x}\n\\end{songs}\n\\end{songs}\n\\insertallchords\n"
+                   "\\end{document}\n");
+    CHECK_FALSE(bf::readSettings("\\documentclass{x}\n%\\insertallchords\n").chordChart);
+    CHECK(setting("\\documentclass{x}\n\\insertallchords % why\n\\insertallchords\nz\n",
+                  Field::ChordChart, "0") == "\\documentclass{x}\nz\n");
+    // without \end{songs}: before \end{document}
+    CHECK(setting("\\documentclass{x}\n\\end{document}\n", Field::ChordChart, "1") ==
+          "\\documentclass{x}\n\\insertallchords\n\\end{document}\n");
+    // sharing a line with code
+    const std::string shared = "\\documentclass{x}\n\\insertallchords \\newpage\n";
+    CHECK(bf::readSettings(shared).notEditable.contains(Field::ChordChart));
+    CHECK_FALSE(bf::setSetting(shared, Field::ChordChart, "0"));
+}
+
+TEST_CASE("setSetting: refusals and identity", "[bookfile]") {
+    using bf::Field;
+    CHECK_FALSE(bf::setSetting("\\title{T}\n", Field::Title, "x"));
+    const std::string two = "\\documentclass{velkyzpevnik}\n\\title{A}\n\\title{B}\n"
+                            "\\author{a\nb}\n";
+    const auto s = bf::readSettings(two);
+    CHECK(s.notEditable.contains(Field::Title));
+    CHECK(s.notEditable.contains(Field::Author));
+    CHECK_FALSE(s.notEditable.contains(Field::Class));
+    CHECK_FALSE(bf::setSetting(two, Field::Title, "x"));
+    CHECK(setting(two, Field::Class, "malyzpevnik").find("{malyzpevnik}") != std::string::npos);
+    // every field set to its current value: unchanged, in LF and CRLF
+    for (const auto& text : {velky, crlf(velky)}) {
+        const auto cur = bf::readSettings(text);
+        CHECK(setting(text, Field::Class, cur.bookClass) == text);
+        CHECK(setting(text, Field::Chorded, cur.chorded ? "1" : "0") == text);
+        CHECK(setting(text, Field::TwoColumns, cur.twoColumns ? "1" : "0") == text);
+        CHECK(setting(text, Field::Shading, cur.shading ? "1" : "0") == text);
+        CHECK(setting(text, Field::Title, cur.title) == text);
+        CHECK(setting(text, Field::Author, cur.author) == text);
+        CHECK(setting(text, Field::CampYear, cur.campYear) == text);
+        CHECK(setting(text, Field::Cover, cur.cover) == text);
+        CHECK(setting(text, Field::ChordChart, cur.chordChart ? "1" : "0") == text);
+    }
+    // toggling and back
+    CHECK(setting(setting(velky, Field::Shading, "1"), Field::Shading, "0") == velky);
+    CHECK(setting(setting(velky, Field::Chorded, "0"), Field::Chorded, "1") == velky);
+}
+
+TEST_CASE("the lock mark", "[bookfile]") {
+    CHECK(bf::lockMark() == "% zpevnikar: locked");
+    const auto locked = bf::setLocked(velky, true);
+    CHECK(locked == "% zpevnikar: locked\n" + velky);
+    CHECK(bf::readSettings(locked).locked);
+    CHECK(bf::setLocked(locked, true) == locked);
+    CHECK(bf::setLocked(locked, false) == velky);
+    CHECK(bf::setLocked(velky, false) == velky);
+    CHECK(bf::setLocked(crlf(velky), true) == "% zpevnikar: locked\r\n" + crlf(velky));
+    CHECK(bf::setLocked(bf::setLocked(crlf(velky), true), false) == crlf(velky));
+    // anywhere, every one; the other comments stay
+    CHECK(bf::setLocked("a\n  % zpevnikar: locked  \n%% zpevnikar: locked\n% zpevnikar: locked\nb",
+                        false) == "a\n%% zpevnikar: locked\nb");
+    CHECK(bf::setLocked("", true) == "% zpevnikar: locked\n");
+}
+
+namespace {
+
+const std::string sections =
+    "\\documentclass{velkyzpevnik}\n\\begin{document}\n\n"
+    "\\songsection{First}\n\\begin{songs}{obsah, obsahAutor}\n    \\input{A/a}\n\\end{songs}\n\n"
+    "\\songsection{Second}\n\\pagebreak\n\\begin{songs}{obsah}\n    \\input{B/b}\n\\end{songs}\n\n"
+    "\\begin{songs}{obsah}\n    \\input{C/c}\n\\end{songs}\n\n\\end{document}\n";
+
+std::string section(const std::string& text, std::size_t i, int delta) {
+    auto r = bf::moveSection(text, i, delta);
+    INFO((r ? "" : r.error()));
+    REQUIRE(r);
+    return *r;
+}
+
+} // namespace
+
+constexpr auto npos = std::string::npos;
+
+TEST_CASE("addSection and removeSection", "[bookfile]") {
+    const auto at = [&](std::size_t after) {
+        auto r = bf::addSection(sections, "Third {x}", after);
+        INFO((r ? "" : r.error()));
+        REQUIRE(r);
+        return *r;
+    };
+    const std::string block = "\n\\songsection{Third {x}}\n\\begin{songs}{obsah, obsahAutor}\n"
+                              "\\end{songs}\n";
+    const auto last = at(npos);
+    CHECK(last ==
+          sections.substr(0, sections.find("\n\\end{document}")) + block + "\n\\end{document}\n");
+    CHECK(at(2) == last);
+    const auto first = at(0);
+    const auto cut = sections.find("\n\\songsection{Second}");
+    CHECK(first == sections.substr(0, cut) + block + sections.substr(cut));
+    CHECK(bf::parse(first)->environments.size() == 4);
+    CHECK(bf::parse(first)->environments[1].section == "Third {x}");
+    CHECK(bf::parse(first)->environments[2].section == "Second");
+    // round trips
+    for (const std::size_t after : {std::size_t{0}, std::size_t{1}, std::size_t{2}, npos}) {
+        const auto added = at(after);
+        const auto index = after == npos ? std::size_t{3} : after + 1;
+        const auto removed = bf::removeSection(added, index);
+        REQUIRE(removed);
+        CHECK(*removed == sections);
+    }
+    // CRLF
+    const auto crlfAdded = bf::addSection(crlf(sections), "N", npos);
+    REQUIRE(crlfAdded);
+    CHECK(crlfAdded->find("\r\n\\songsection{N}\r\n\\begin{songs}{obsah, obsahAutor}\r\n"
+                          "\\end{songs}\r\n") != std::string::npos);
+    CHECK(*bf::removeSection(*crlfAdded, 3) == crlf(sections));
+    // refused
+    CHECK_FALSE(bf::addSection(sections, "", npos));
+    CHECK_FALSE(bf::addSection(sections, "a\nb", npos));
+    CHECK_FALSE(bf::addSection(sections, "{a", npos));
+    CHECK_FALSE(bf::addSection(sections, "a", 7));
+    // no environment: before \end{document}, "obsah"
+    const auto empty = bf::addSection("\\documentclass{velkyzpevnik}\n\\begin{document}\n\n"
+                                      "\\end{document}\n",
+                                      "S", npos);
+    REQUIRE(empty);
+    CHECK(*empty == "\\documentclass{velkyzpevnik}\n\\begin{document}\n\n\n\\songsection{S}\n"
+                    "\\begin{songs}{obsah}\n\\end{songs}\n\\end{document}\n");
+    CHECK(*bf::removeSection(*empty, 0) ==
+          "\\documentclass{velkyzpevnik}\n\\begin{document}\n\n\\end{document}\n");
+    // removal takes the \pagebreak with the section, the section without songsection too
+    const auto no2 = bf::removeSection(sections, 1);
+    REQUIRE(no2);
+    CHECK(no2->find("pagebreak") == std::string::npos);
+    CHECK(no2->find("B/b") == std::string::npos);
+    CHECK(no2->find("\\songsection{First}") != std::string::npos);
+    const auto no3 = bf::removeSection(sections, 2);
+    REQUIRE(no3);
+    CHECK(*no3 == sections.substr(0, sections.find("\n\\begin{songs}{obsah}\n    \\input{C/c}")) +
+                      "\n\\end{document}\n");
+    CHECK_FALSE(bf::removeSection(sections, 3));
+}
+
+TEST_CASE("renameSection", "[bookfile]") {
+    const auto r = bf::renameSection(sections, 1, "Zweite \\& dritte");
+    REQUIRE(r);
+    CHECK(r->find("\\songsection{Zweite \\& dritte}\n\\pagebreak\n") != std::string::npos);
+    CHECK(bf::parse(*r)->environments[1].section == "Zweite \\& dritte");
+    CHECK(*bf::renameSection(sections, 0, "First") == sections);
+    CHECK_FALSE(bf::renameSection(sections, 2, "x")); // none of its own
+    CHECK_FALSE(bf::renameSection(sections, 0, ""));
+    CHECK_FALSE(bf::renameSection(sections, 0, "a}"));
+    CHECK_FALSE(bf::renameSection(sections, 5, "a"));
+    // on the line of \begin{songs}, CRLF
+    const auto same =
+        bf::renameSection("\\songsection{A}\\begin{songs}{o}\r\n\\end{songs}\r\n", 0, "B");
+    REQUIRE(same);
+    CHECK(*same == "\\songsection{B}\\begin{songs}{o}\r\n\\end{songs}\r\n");
+}
+
+TEST_CASE("moveSection", "[bookfile]") {
+    const auto down = section(sections, 0, 1);
+    CHECK(down == "\\documentclass{velkyzpevnik}\n\\begin{document}\n\n"
+                  "\\songsection{Second}\n\\pagebreak\n\\begin{songs}{obsah}\n    \\input{B/b}\n"
+                  "\\end{songs}\n\n"
+                  "\\songsection{First}\n\\begin{songs}{obsah, obsahAutor}\n    \\input{A/a}\n"
+                  "\\end{songs}\n\n"
+                  "\\begin{songs}{obsah}\n    \\input{C/c}\n\\end{songs}\n\n\\end{document}\n");
+    CHECK(section(down, 1, -1) == sections);
+    // the section without a songsection moves alone
+    const auto last = section(sections, 1, 1);
+    const auto book = bf::parse(last);
+    REQUIRE(book);
+    CHECK(book->environments[1].section.empty());
+    CHECK(book->environments[1].songs() == Strings{"C/c"});
+    CHECK(book->environments[2].section == "Second");
+    CHECK(book->environments[2].songs() == Strings{"B/b"});
+    CHECK(book->environments[2].units.size() == 1);
+    CHECK(last.find("\\songsection{Second}\n\\pagebreak\n\\begin{songs}") != std::string::npos);
+    CHECK(section(last, 2, -1) == sections);
+    CHECK(section(crlf(sections), 0, 1) == crlf(section(sections, 0, 1)));
+    CHECK_FALSE(bf::moveSection(sections, 0, -1));
+    CHECK_FALSE(bf::moveSection(sections, 2, 1));
+    CHECK_FALSE(bf::moveSection(sections, 0, 2));
+    // the fixture: sections and \pagebreak
+    const auto one = fixture("songbooks/bands/one/one.tex");
+    for (std::size_t i = 0; i + 1 < 3; ++i)
+        CHECK(section(section(one, i, 1), i + 1, -1) == one);
+}
+
+TEST_CASE("newBook writes the books of the three classes", "[bookfile]") {
+    using bf::Field;
+    for (const std::string cls : {"velkyzpevnik", "malyzpevnik", "taborovyzpevnik"}) {
+        INFO(cls);
+        bf::Settings s;
+        s.bookClass = cls;
+        s.chorded = false;
+        s.twoColumns = true;
+        s.shading = false;
+        s.title = "Moje \\& {písně}";
+        s.author = "Já";
+        s.campYear = cls == "taborovyzpevnik" ? "2027" : "";
+        s.cover = "img/cover";
+        s.chordChart = true;
+        const auto book = bf::newBook(s, "my-book_1");
+        REQUIRE(book);
+        const auto parsedBook = bf::parse(book->tex);
+        REQUIRE(parsedBook);
+        CHECK(parsedBook->documentClass == cls);
+        CHECK(parsedBook->title == s.title);
+        CHECK(parsedBook->environments.size() == 1);
+        CHECK(parsedBook->environments[0].readOnly.empty());
+        const auto back = bf::readSettings(book->tex);
+        CHECK(back.bookClass == s.bookClass);
+        CHECK(back.chorded == s.chorded);
+        CHECK(back.twoColumns == s.twoColumns);
+        CHECK(back.shading == s.shading);
+        CHECK(back.title == s.title);
+        CHECK(back.author == s.author);
+        CHECK(back.campYear == s.campYear);
+        CHECK(back.cover == s.cover);
+        CHECK(back.chordChart);
+        CHECK_FALSE(back.locked);
+        CHECK(back.notEditable.empty());
+        CHECK(zub::safety::unknownBookConstructs(book->tex).empty());
+
+        const auto indexes = bf::indexFiles(*parsedBook);
+        CHECK(book->buildSh.starts_with("#!/bin/bash\n"));
+        CHECK(book->buildSh.find("my-book_1.tex") != std::string::npos);
+        CHECK(book->buildSh.find("songs/chords") != std::string::npos);
+        for (const auto& i : indexes)
+            CHECK(book->buildSh.find(" -i " + i) != std::string::npos);
+        CHECK(indexes ==
+              (cls == "taborovyzpevnik" ? Strings{"obsah"} : Strings{"obsah", "obsahAutor"}));
+        CHECK(book->buildSh.find(cls == "malyzpevnik" ? "makebook.sh"
+                                 : cls == "taborovyzpevnik"
+                                     ? "makebooklet.sh"
+                                     : "scripts/build.sh") != std::string::npos);
+
+        // defaults, no cover
+        bf::Settings plain;
+        plain.bookClass = cls;
+        const auto bare = bf::newBook(plain, "b");
+        REQUIRE(bare);
+        const auto bareBack = bf::readSettings(bare->tex);
+        CHECK(bareBack.cover.empty());
+        CHECK(bareBack.chorded);
+        CHECK_FALSE(bareBack.twoColumns);
+        CHECK(bareBack.shading);
+        CHECK_FALSE(bareBack.chordChart);
+        CHECK(bareBack.notEditable.empty());
+        CHECK(zub::safety::unknownBookConstructs(bare->tex).empty());
+        // the settings stay editable on the result
+        CHECK(setting(bare->tex, Field::Shading, "0") != bare->tex);
+    }
+    // the exact velkyzpevnik
+    bf::Settings v;
+    v.bookClass = "velkyzpevnik";
+    v.shading = false;
+    v.twoColumns = false;
+    v.title = "T";
+    v.author = "A";
+    v.cover = "img/x";
+    v.chordChart = true;
+    CHECK(bf::newBook(v, "x")->tex ==
+          "\\documentclass[chorded, onesongcolumn, noshading]{velkyzpevnik}\n\n\\title{T}\n"
+          "\\author{A}\n\n\\begin{document}\n\n\\makefrontcover{img/x}\n\\insertindex\n\n"
+          "\\begin{songs}{obsah,obsahAutor}\n\n\\end{songs}\n\n\\insertallchords\n\n"
+          "\\end{document}\n");
+    CHECK_FALSE(bf::newBook(v, "a b"));
+    CHECK_FALSE(bf::newBook(v, ""));
+    CHECK_FALSE(bf::newBook(v, "../x"));
+    v.bookClass = "article";
+    CHECK_FALSE(bf::newBook(v, "x"));
+    v.bookClass = "velkyzpevnik";
+    v.title = "a}";
+    CHECK_FALSE(bf::newBook(v, "x"));
+}
+
+// Hidden: runs against the real ../ZubuvZpevnik checkout, which changes on its own.
+TEST_CASE("every real book keeps its bytes under identity edits", "[.integration][bookfile]") {
+    using bf::Field;
+    const fs::path repo{ZUB_REAL_SONGBOOK_DIR};
+    const auto books = findBooks(repo);
+    if (books.empty())
+        SKIP("no songbook checkout at " << repo);
+    for (const auto& rel : books) {
+        INFO(rel.string());
+        const auto text = zub::readTextFile(repo / rel);
+        REQUIRE(text);
+        const auto s = bf::readSettings(*text);
+        CHECK_FALSE(s.bookClass.empty());
+        const auto same = [&](Field f, const std::string& value) {
+            if (s.notEditable.contains(f))
+                return;
+            const auto r = bf::setSetting(*text, f, value);
+            INFO("field " << static_cast<int>(f));
+            INFO((r ? "" : r.error()));
+            REQUIRE(r);
+            CHECK(*r == *text);
+        };
+        same(Field::Class, s.bookClass);
+        same(Field::Chorded, s.chorded ? "1" : "0");
+        same(Field::TwoColumns, s.twoColumns ? "1" : "0");
+        same(Field::Shading, s.shading ? "1" : "0");
+        same(Field::Title, s.title);
+        same(Field::Author, s.author);
+        same(Field::CampYear, s.campYear);
+        same(Field::Cover, s.cover);
+        same(Field::ChordChart, s.chordChart ? "1" : "0");
+        CHECK(bf::setLocked(*text, s.locked) == *text);
+        CHECK(bf::setLocked(*text, false) == *text);
+
+        const auto book = bf::parse(*text);
+        REQUIRE(book);
+        for (std::size_t i = 0; i + 1 < book->environments.size(); ++i) {
+            INFO("sections " << i);
+            const auto down = bf::moveSection(*text, i, 1);
+            REQUIRE(down);
+            const auto up = bf::moveSection(*down, i + 1, -1);
+            REQUIRE(up);
+            CHECK(*up == *text);
+        }
+    }
 }

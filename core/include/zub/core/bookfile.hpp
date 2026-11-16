@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <expected>
 #include <filesystem>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -117,5 +118,97 @@ songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& workDir,
                                     const std::filesystem::path& bookDir, std::string_view bookName,
                                     const std::vector<std::string>& indexes);
+
+// ---- The settings of a book (the header and the cover/chart commands) ----
+//
+// All edits are byte-exact: only the construct being changed is touched, new lines get the file's
+// line break, setting the current value returns the text unchanged. Constructs are found in code
+// (comments ignored), except the lock mark, which is a comment.
+
+enum class Field {
+    Class,
+    Chorded,
+    TwoColumns,
+    Shading,
+    Title,
+    Author,
+    CampYear,
+    Cover,
+    ChordChart
+};
+
+struct Settings {
+    std::string
+        bookClass;       // raw name from \documentclass: velkyzpevnik, malyzpevnik, taborovyzpevnik
+    bool chorded = true; // option `lyric` -> false
+    bool twoColumns = false;   // `twosongcolumns` -> true (`onesongcolumn` or absent -> false)
+    bool shading = true;       // `noshading` -> false
+    std::string title, author; // raw LaTeX arguments
+    std::string campYear;      // \renewcommand{\campyear}{X} -> X, "" none
+    // The file of the cover command of the class: \makefrontcover{F} (velkyzpevnik),
+    // \maketitlepage[F] (malyzpevnik), \makefrontcover[F] (taborovyzpevnik); "" none/bare.
+    std::string cover;
+    bool chordChart = false; // an \insertallchords in code
+    bool locked = false;     // a line that is the lock mark (lockMark()) anywhere in the file
+    // Fields present in a form the app cannot edit safely (two \title, an argument over several
+    // lines, a cover command in an unknown form, \insertallchords sharing its line with code).
+    // Unknown \documentclass options are fine: they stay untouched.
+    std::set<Field> notEditable;
+};
+
+Settings readSettings(std::string_view text);
+
+// Sets one field; `value` of the bool fields is "1" or "0". Errors (English): the file has no
+// \documentclass, the field is in notEditable, an invalid value (a class that is not one of the
+// three, a text with a newline, an unescaped % or unbalanced braces, a cover file with braces or
+// brackets, an empty cover of velkyzpevnik whose \makefrontcover exists: it has no coverless form).
+// Where a setting is missing the command is added: \title / \author after \documentclass (the
+// author after the title), \campyear after the author line, a cover command after \begin{document},
+// \insertallchords after the last \end{songs} line (before \end{document} without one).
+// Turning shading on removes `noshading` with its comma; an empty campYear removes its line; an
+// empty cover of the optional-argument forms removes the bracket group. Turning the chart off
+// removes every line that is \insertallchords.
+std::expected<std::string, std::string> setSetting(std::string_view text, Field field,
+                                                   std::string_view value);
+
+// "% zpevnikar: locked"
+std::string_view lockMark();
+// Adds the mark as the first line (with the file's line break), or removes every line that is the
+// mark; unchanged when already so.
+std::string setLocked(std::string_view text, bool locked);
+
+// ---- Sections (a \songsection, the \begin{songs} ... \end{songs} that follows) ----
+// `environment` is the index in parse(). The block of a section runs from the line of its
+// \songsection (else of its \begin{songs}) through its \end{songs} line, everything between
+// included (a \pagebreak between them is the section's).
+
+// Inserts, after the \end{songs} line of `afterEnvironment` (npos: the last), a blank line and
+// \songsection{name}, \begin{songs}{<indexes>}, \end{songs} lines. <indexes> is the argument of the
+// first environment as written ("obsah" without one). Without any environment it goes before the
+// \end{document} line. `name` is raw LaTeX (nonempty, no newline, no unescaped %, balanced braces).
+std::expected<std::string, std::string> addSection(std::string_view text, std::string_view name,
+                                                   std::size_t afterEnvironment);
+// Replaces the argument of the environment's \songsection (error without one).
+std::expected<std::string, std::string>
+renameSection(std::string_view text, std::size_t environment, std::string_view name);
+// Deletes the block and one blank line directly above it (so add + remove is the identity).
+std::expected<std::string, std::string> removeSection(std::string_view text,
+                                                      std::size_t environment);
+// Swaps the block with that of the neighbour (delta -1 or +1); the text between them stays.
+std::expected<std::string, std::string> moveSection(std::string_view text, std::size_t environment,
+                                                    int delta);
+
+struct NewBook {
+    std::string tex, buildSh;
+};
+// A new book in the style of the repo's own: `name` is the file stem ([A-Za-z0-9_-]+), used in
+// build.sh. Settings::locked and notEditable are ignored. A velkyzpevnik without a cover has no
+// \makefrontcover line; a malyzpevnik always has \maketitlepage (its only cover).
+std::expected<NewBook, std::string> newBook(const Settings&, std::string_view name);
+
+// The build.sh newBook writes, for a book <name>.tex of that class with these build.sh -i
+// indexes (indexFiles): for a copy of a book under a new name.
+std::string buildScriptFor(std::string_view name, songbook::BookClass bookClass,
+                           const std::vector<std::string>& indexes);
 
 } // namespace zub::bookfile
