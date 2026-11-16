@@ -16,6 +16,8 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QCursor>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -40,6 +42,7 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <map>
+#include <zub/core/latex.hpp>
 #include <set>
 
 namespace {
@@ -316,8 +319,12 @@ QWidget* SongbooksPage::buildPickerPane() {
 
     auto* buttons = new QHBoxLayout;
     buttons->addStretch(1);
+    check_ = new QPushButton(tr("Check…"), pickerPane_);
+    check_->setObjectName(QStringLiteral("songbookCheck"));
+    check_->setToolTip(tr("Songs of this songbook not marked as fitting its paper (their pap)"));
     exportPdf_ = new QPushButton(tr("Export PDF…"), pickerPane_);
     exportLatex_ = new QPushButton(tr("Export LaTeX…"), pickerPane_);
+    buttons->addWidget(check_);
     buttons->addWidget(exportPdf_);
     buttons->addWidget(exportLatex_);
     layout->addLayout(buttons);
@@ -344,6 +351,7 @@ QWidget* SongbooksPage::buildPickerPane() {
             new QShortcut(QKeySequence(key), pickerView_, nullptr, nullptr, Qt::WidgetShortcut);
         connect(enter, &QShortcut::activated, this, &SongbooksPage::addPicked);
     }
+    connect(check_, &QPushButton::clicked, this, &SongbooksPage::checkBook);
     connect(exportPdf_, &QPushButton::clicked, this,
             [this] { exporter_->exportPdf(id_, book_, titleLookup()); });
     connect(exportLatex_, &QPushButton::clicked, this,
@@ -720,6 +728,7 @@ void SongbooksPage::updateButtons() {
     bool hasSongs = false;
     for (const auto& section : book_.sections)
         hasSongs = hasSongs || !section.songs.empty();
+    check_->setEnabled(editable_ && hasSongs);
     exportPdf_->setEnabled(editable_ && hasSongs);
     exportLatex_->setEnabled(editable_ && hasSongs);
     sortAll_->setEnabled(editable_ && hasSongs);
@@ -828,6 +837,97 @@ void SongbooksPage::removeSelectedSongs() {
     }
     if (changed)
         commit();
+}
+
+void SongbooksPage::checkBook() {
+    if (!editable_)
+        return;
+    // The songs of the library by input name: their pap and file.
+    std::map<std::string, const zub::SongEntry*> byName;
+    for (int row = 0; row < model_->rowCount(); ++row)
+        if (const auto* song = model_->song(row))
+            byName.emplace(song->inputName, song);
+    const auto papOf = [&](std::string_view name) -> std::optional<std::string> {
+        const auto it = byName.find(std::string(name));
+        if (it == byName.end())
+            return std::nullopt;
+        return it->second->meta.value("pap");
+    };
+    const QString paper = toQString(zub::songbook::paperName(book_.bookClass)).toUpper();
+    const auto unfit = zub::songbook::notMarkedFitting(book_, papOf);
+    if (unfit.empty()) {
+        QMessageBox::information(this, tr("Check"),
+                                 tr("Every song of this songbook is marked as fitting %1.")
+                                     .arg(paper));
+        return;
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Check: %1").arg(toQString(book_.title)));
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* label = new QLabel(&dialog);
+    label->setWordWrap(true);
+    layout->addWidget(label);
+    auto* list = new QListWidget(&dialog);
+    list->setObjectName(QStringLiteral("songbookCheckList"));
+    list->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    const auto fill = [&] {
+        list->clear();
+        const auto now = zub::songbook::notMarkedFitting(book_, papOf);
+        for (const std::string& name : now) {
+            const auto* song = byName.at(name);
+            const QString pap = toQString(song->meta.value("pap"));
+            auto* item = new QListWidgetItem(
+                tr("%1 — %2  (pap: %3)")
+                    .arg(toQString(zub::latex::toDisplayText(song->meta.title)),
+                         toQString(zub::latex::toDisplayText(song->meta.value("by"))),
+                         pap.isEmpty() ? tr("none") : pap),
+                list);
+            item->setData(Qt::UserRole, toQString(name));
+        }
+        label->setText(tr("%n song(s) of this songbook not marked as fitting %1: nobody has "
+                          "checked them at that size. Open one to measure it (Make Smaller "
+                          "offers its pap), or take it out of the songbook.",
+                          nullptr, static_cast<int>(now.size()))
+                           .arg(paper));
+        list->setCurrentRow(0);
+    };
+    fill();
+    layout->addWidget(list, 1);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+    QPushButton* open = buttons->addButton(tr("Open Song"), QDialogButtonBox::ActionRole);
+    QPushButton* remove =
+        buttons->addButton(tr("Remove from the Songbook"), QDialogButtonBox::ActionRole);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(list, &QListWidget::itemSelectionChanged, &dialog, [=] {
+        open->setEnabled(list->selectedItems().size() == 1);
+        remove->setEnabled(!list->selectedItems().isEmpty());
+    });
+    connect(open, &QPushButton::clicked, &dialog, [&] {
+        const auto items = list->selectedItems();
+        if (items.size() != 1)
+            return;
+        const auto* song = byName.at(toStdString(items.front()->data(Qt::UserRole).toString()));
+        const std::filesystem::path path = song->path;
+        dialog.accept();
+        emit openSongRequested(path);
+    });
+    connect(remove, &QPushButton::clicked, &dialog, [&] {
+        bool removed = false;
+        for (QListWidgetItem* item : list->selectedItems())
+            removed |= zub::songbook::removeSong(book_,
+                                                 toStdString(item->data(Qt::UserRole).toString()));
+        if (!removed)
+            return;
+        commit();
+        if (zub::songbook::notMarkedFitting(book_, papOf).empty())
+            dialog.accept();
+        else
+            fill();
+    });
+    dialog.resize(560, 360);
+    dialog.exec();
 }
 
 // ---- The picker ----

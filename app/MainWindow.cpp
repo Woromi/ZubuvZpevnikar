@@ -514,6 +514,8 @@ void MainWindow::createCentralWidget() {
     songbookExporter_ = new SongbookExporter(this);
     songbooksPage_ =
         new SongbooksPage(model_, songbookStore_, songbookSorter_, songbookExporter_, pages_);
+    connect(songbooksPage_, &SongbooksPage::openSongRequested, this,
+            [this](const std::filesystem::path& path) { openExistingSong(path); });
     connect(songbookExporter_, &SongbookExporter::finished, this,
             [this](const QString& message) { statusBar()->showMessage(message, 15000); });
 

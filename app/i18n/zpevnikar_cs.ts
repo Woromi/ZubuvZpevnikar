@@ -2726,6 +2726,14 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Písně označené ★</translation>
     </message>
     <message>
+        <source>Check…</source>
+        <translation>Zkontrolovat…</translation>
+    </message>
+    <message>
+        <source>Songs of this songbook not marked as fitting its paper (their pap)</source>
+        <translation>Písně tohoto zpěvníku, které nemají označeno, že se vejdou na jeho papír (jejich pap)</translation>
+    </message>
+    <message>
         <source>Export PDF…</source>
         <translation>Exportovat PDF…</translation>
     </message>
@@ -2808,6 +2816,42 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
             <numerusform>Odebrat ze zpěvníku sekci %1 a její %n písně?</numerusform>
             <numerusform>Odebrat ze zpěvníku sekci %1 a jejích %n písní?</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>Check</source>
+        <translation>Kontrola</translation>
+    </message>
+    <message>
+        <source>Every song of this songbook is marked as fitting %1.</source>
+        <translation>Všechny písně tohoto zpěvníku mají označeno, že se vejdou na %1.</translation>
+    </message>
+    <message>
+        <source>Check: %1</source>
+        <translation>Kontrola: %1</translation>
+    </message>
+    <message>
+        <source>%1 — %2  (pap: %3)</source>
+        <translation>%1 — %2  (pap: %3)</translation>
+    </message>
+    <message>
+        <source>none</source>
+        <translation>žádný</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n song(s) of this songbook not marked as fitting %1: nobody has checked them at that size. Open one to measure it (Make Smaller offers its pap), or take it out of the songbook.</source>
+        <translation>
+            <numerusform>%n píseň tohoto zpěvníku nemá označeno, že se vejde na %1: na tomto rozměru ji nikdo nezkontroloval. Otevřete ji a změřte (Zmenšit nabídne její pap), nebo ji ze zpěvníku odeberte.</numerusform>
+            <numerusform>%n písně tohoto zpěvníku nemají označeno, že se vejdou na %1: na tomto rozměru je nikdo nezkontroloval. Otevřete některou a změřte ji (Zmenšit nabídne její pap), nebo je ze zpěvníku odeberte.</numerusform>
+            <numerusform>%n písní tohoto zpěvníku nemá označeno, že se vejdou na %1: na tomto rozměru je nikdo nezkontroloval. Otevřete některou a změřte ji (Zmenšit nabídne její pap), nebo je ze zpěvníku odeberte.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Open Song</source>
+        <translation>Otevřít píseň</translation>
+    </message>
+    <message>
+        <source>Remove from the Songbook</source>
+        <translation>Odebrat ze zpěvníku</translation>
     </message>
 </context>
 <context>

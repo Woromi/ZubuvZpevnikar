@@ -192,5 +192,12 @@
             <numerusform>Remove the section %1 and its %n songs from the songbook?</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%n song(s) of this songbook not marked as fitting %1: nobody has checked them at that size. Open one to measure it (Make Smaller offers its pap), or take it out of the songbook.</source>
+        <translation>
+            <numerusform>%n song of this songbook not marked as fitting %1: nobody has checked it at that size. Open it to measure it (Make Smaller offers its pap), or take it out of the songbook.</numerusform>
+            <numerusform>%n songs of this songbook not marked as fitting %1: nobody has checked them at that size. Open one to measure it (Make Smaller offers its pap), or take it out of the songbook.</numerusform>
+        </translation>
+    </message>
 </context>
 </TS>

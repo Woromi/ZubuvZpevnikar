@@ -42,8 +42,14 @@ public:
     // Reads the songbooks from the store again, keeping the selection where possible.
     void reloadList();
 
+signals:
+    // The book check's Open Song: show that song (MainWindow opens it).
+    void openSongRequested(const std::filesystem::path& path);
+
 private:
     void buildUi();
+    // Check…: the book's songs not marked as fitting its paper, with Open Song and Remove.
+    void checkBook();
     QWidget* buildListPane();
     QWidget* buildEditPane();
     QWidget* buildPickerPane();
@@ -172,6 +178,7 @@ private:
     SongFilterProxy* pickerFilter_ = nullptr;
     SongPickerModel* picker_ = nullptr;
     QTableView* pickerView_ = nullptr;
+    QPushButton* check_ = nullptr;
     QPushButton* exportPdf_ = nullptr;
     QPushButton* exportLatex_ = nullptr;
 };
