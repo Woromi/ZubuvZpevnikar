@@ -246,6 +246,8 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
         return row.searchText;
     case InputNameRole:
         return toQString(row.entry.inputName);
+    case CollectionRole:
+        return toQString(row.entry.collection);
     default:
         return {};
     }

@@ -2,9 +2,12 @@
 
 #include <QWidget>
 #include <filesystem>
+#include <string>
+#include <vector>
 
 class LabelFilterBox;
 class QAction;
+class CollectionTabs;
 class QComboBox;
 class QLineEdit;
 class QModelIndex;
@@ -31,6 +34,8 @@ public:
     void showScanResults(bool found);
     // Selects and shows the song stored at `path` (e.g. the one that was just open).
     void selectSong(const std::filesystem::path& path);
+    // The song collections (folders under songs/) as tabs over the list; hidden with one.
+    void setCollections(const std::vector<std::string>& collections);
 
 signals:
     void songActivated(const QModelIndex& proxyIndex);         // double-click or Enter
@@ -44,6 +49,7 @@ private:
     SongTableModel* model_;
     SongFilterProxy* proxy_;
     QToolBar* header_ = nullptr;
+    CollectionTabs* collections_ = nullptr;
     QLineEdit* search_ = nullptr;
     QComboBox* language_ = nullptr;
     LabelFilterBox* labelFilter_ = nullptr;

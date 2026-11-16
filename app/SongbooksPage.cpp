@@ -2,6 +2,7 @@
 
 #include "BookPreview.hpp"
 #include "CodeTextEdit.hpp"
+#include "CollectionTabs.hpp"
 #include "LabelFilterBox.hpp"
 #include "PageHeader.hpp"
 #include "SongEditor.hpp"
@@ -61,6 +62,7 @@
 #include <set>
 #include <utility>
 #include <zub/core/latex.hpp>
+#include <zub/core/library.hpp>
 #include <zub/core/textfile.hpp>
 
 namespace {
@@ -133,6 +135,7 @@ void SongbooksPage::setSongbookRoot(const std::filesystem::path& root) {
     if (root == root_)
         return;
     root_ = root;
+    pickerCollections_->setCollections(zub::collections(root_));
     fillList(id_);
 }
 
@@ -443,6 +446,13 @@ QWidget* SongbooksPage::buildPickerPane() {
 
     pickerFilter_ = new SongFilterProxy(this);
     pickerFilter_->setSourceModel(model_);
+    // The collections (Chords, Tin whistle, …) to pick from.
+    pickerCollections_ =
+        new CollectionTabs(QStringLiteral("songbooks/pickerCollection"), pickerPane_);
+    pickerCollections_->setObjectName(QStringLiteral("pickerCollections"));
+    connect(pickerCollections_, &CollectionTabs::collectionChanged, pickerFilter_,
+            &SongFilterProxy::setCollection);
+    layout->addWidget(pickerCollections_);
     picker_ = new SongPickerModel(this);
     picker_->setSourceModel(pickerFilter_);
     pickerView_ = new QTableView(pickerPane_);
@@ -909,7 +919,8 @@ void SongbooksPage::newSongbook() {
         }
         settings.cover = *coverPath;
     }
-    const auto made = zub::bookfile::newBook(settings, toStdString(stemName));
+    const auto made =
+        zub::bookfile::newBook(settings, toStdString(stemName), zub::collections(root_));
     if (!made) {
         QMessageBox::warning(this, tr("New Songbook"), toQString(made.error()));
         return;
@@ -1038,7 +1049,8 @@ void SongbooksPage::duplicateSongbook() {
         toStdString(stemName),
         zub::songbook::bookClassFromName(zub::bookfile::readSettings(copy).bookClass)
             .value_or(BookClass::Velky),
-        parsed ? zub::bookfile::indexFiles(*parsed) : std::vector<std::string>{"obsah"});
+        parsed ? zub::bookfile::indexFiles(*parsed) : std::vector<std::string>{"obsah"},
+        zub::collections(root_));
     const auto sourceDir = pathOf(id_).parent_path();
     if (!settings_.cover.empty() && std::filesystem::is_regular_file(sourceDir / settings_.cover) &&
         !std::filesystem::exists(dir / settings_.cover)) {

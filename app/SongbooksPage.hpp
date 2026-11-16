@@ -19,6 +19,7 @@ class Repository;
 }
 class BookPreview;
 class CodeTextEdit;
+class CollectionTabs;
 class QAction;
 class QTabWidget;
 class QCheckBox;
@@ -242,6 +243,7 @@ private:
     LabelFilterBox* labelFilter_ = nullptr;
     QCheckBox* onlyInSection_ = nullptr;
     SongFilterProxy* pickerFilter_ = nullptr;
+    CollectionTabs* pickerCollections_ = nullptr;
     SongPickerModel* picker_ = nullptr;
     QTableView* pickerView_ = nullptr;
     QAction* check_ = nullptr;

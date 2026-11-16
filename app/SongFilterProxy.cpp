@@ -50,6 +50,12 @@ void SongFilterProxy::setLabel(const QString& label) {
     endFilterChange(QSortFilterProxyModel::Direction::Rows);
 }
 
+void SongFilterProxy::setCollection(const QString& collection) {
+    beginFilterChange();
+    collection_ = collection;
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+}
+
 void SongFilterProxy::setOnlyNames(std::optional<std::set<std::string>> names) {
     beginFilterChange();
     onlyNames_ = std::move(names);
@@ -68,6 +74,9 @@ bool SongFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceP
     if (favouritesOnly_ && !index.data(SongTableModel::FavouriteRole).toBool())
         return false;
     if (tabsOnly_ && !index.data(SongTableModel::HasTabsRole).toBool())
+        return false;
+    if (!collection_.isEmpty() &&
+        index.data(SongTableModel::CollectionRole).toString() != collection_)
         return false;
     if (!label_.isEmpty() &&
         !index.data(SongTableModel::LabelsRole).toStringList().contains(label_))

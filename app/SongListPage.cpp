@@ -1,5 +1,6 @@
 #include "SongListPage.hpp"
 
+#include "CollectionTabs.hpp"
 #include "LabelFilterBox.hpp"
 #include "PageHeader.hpp"
 #include "SongFilterProxy.hpp"
@@ -7,6 +8,7 @@
 
 #include <QAction>
 #include <QComboBox>
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLayout>
@@ -91,9 +93,23 @@ SongListPage::SongListPage(SongTableModel* model, SongFilterProxy* proxy, QWidge
     connect(table_, &QAbstractItemView::activated, this, &SongListPage::songActivated);
 
     layout->addWidget(header_);
+    // The collections (Chords, Tin whistle, …): the list shows one of them, or all.
+    collections_ = new CollectionTabs(QStringLiteral("songList/collection"), this);
+    collections_->setObjectName(QStringLiteral("songListCollections"));
+    connect(collections_, &CollectionTabs::collectionChanged, proxy_,
+            &SongFilterProxy::setCollection);
+    auto* tabsRow = new QHBoxLayout;
+    tabsRow->setContentsMargins(6, 4, 6, 0);
+    tabsRow->addWidget(collections_);
+    tabsRow->addStretch(1);
+    layout->addLayout(tabsRow);
     layout->addWidget(filters);
     layout->addWidget(table_);
     updateLanguages();
+}
+
+void SongListPage::setCollections(const std::vector<std::string>& collections) {
+    collections_->setCollections(collections);
 }
 
 void SongListPage::addHeaderAction(QAction* action) {

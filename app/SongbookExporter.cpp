@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <set>
 #include <zub/core/bookfile.hpp>
+#include <zub/core/library.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
@@ -173,9 +174,12 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
     zub::songbook::Songbook all;
     all.sections.push_back({});
     for (const std::string& name : inputs) {
+        const auto inCollection = [&](const std::string& collection) {
+            return std::filesystem::is_regular_file(root_ / "songs" / collection / (name + ".tex"));
+        };
+        const auto songCollections = zub::collections(root_);
         const bool song = !name.empty() && !zub::invalidInputName(name) &&
-                          (std::filesystem::is_regular_file(root_ / "songs/chords" / (name + ".tex")) ||
-                           std::filesystem::is_regular_file(root_ / "songs/tinwhistle" / (name + ".tex")));
+                          std::ranges::any_of(songCollections, inCollection);
         if (song)
             all.sections.front().songs.push_back(name);
         else

@@ -20,8 +20,9 @@ public:
     void setTodoOnly(bool todoOnly);           // only songs with TODO comments
     void setChangesOnly(bool changesOnly);     // only songs a scan found changes in
     void setFavouritesOnly(bool favouritesOnly);
-    void setTabsOnly(bool tabsOnly); // only songs that include a score
-    void setLabel(const QString& label); // empty = any label
+    void setTabsOnly(bool tabsOnly);               // only songs that include a score
+    void setLabel(const QString& label);           // empty = any label
+    void setCollection(const QString& collection); // the folder under songs/; empty = all
     // Only the songs with these input names ("Artist/Title"); nullopt = no such filter.
     void setOnlyNames(std::optional<std::set<std::string>> names);
 
@@ -36,5 +37,6 @@ private:
     bool favouritesOnly_ = false;
     bool tabsOnly_ = false;
     QString label_;
+    QString collection_;
     std::optional<std::set<std::string>> onlyNames_;
 };

@@ -1,5 +1,6 @@
 #include "NewSongDialog.hpp"
 
+#include "CollectionTabs.hpp"
 #include "convert.hpp"
 
 #include <QComboBox>
@@ -10,9 +11,10 @@
 #include <QVBoxLayout>
 #include <zub/core/songimport.hpp>
 
-NewSongDialog::NewSongDialog(const std::map<QString, QString>& artistFolders, QWidget* parent)
+NewSongDialog::NewSongDialog(const std::map<QString, QString>& artistFolders,
+                             const std::vector<std::string>& collections, QWidget* parent)
     : QDialog(parent), artistFolders_(artistFolders), title_(new QLineEdit), artist_(new QComboBox),
-      file_(new QLineEdit),
+      collection_(new QComboBox), file_(new QLineEdit),
       buttons_(new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel)) {
     setWindowTitle(tr("New Song"));
     title_->setObjectName(QStringLiteral("newSongTitle"));
@@ -33,9 +35,18 @@ NewSongDialog::NewSongDialog(const std::map<QString, QString>& artistFolders, QW
     file_->setFocusPolicy(Qt::NoFocus);
     file_->setPlaceholderText(tr("(type a title and an artist)"));
 
+    collection_->setObjectName(QStringLiteral("newSongCollection"));
+    for (const std::string& name : collections)
+        collection_->addItem(CollectionTabs::displayName(toQString(name)), toQString(name));
+    if (collection_->count() == 0)
+        collection_->addItem(CollectionTabs::displayName(QStringLiteral("chords")),
+                             QStringLiteral("chords"));
+
     auto* form = new QFormLayout;
     form->addRow(tr("&Title:"), title_);
     form->addRow(tr("&Artist:"), artist_);
+    form->addRow(tr("&Collection:"), collection_);
+    form->setRowVisible(collection_, collection_->count() > 1);
     form->addRow(tr("File:"), file_);
     auto* layout = new QVBoxLayout(this);
     layout->addLayout(form);
@@ -44,12 +55,17 @@ NewSongDialog::NewSongDialog(const std::map<QString, QString>& artistFolders, QW
     connect(buttons_, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(title_, &QLineEdit::textChanged, this, &NewSongDialog::update);
     connect(artist_, &QComboBox::currentTextChanged, this, &NewSongDialog::update);
+    connect(collection_, &QComboBox::currentIndexChanged, this, &NewSongDialog::update);
     update();
     resize(520, sizeHint().height());
 }
 
 QString NewSongDialog::title() const {
     return title_->text().trimmed();
+}
+
+QString NewSongDialog::collection() const {
+    return collection_->currentData().toString();
 }
 
 QString NewSongDialog::artist() const {
@@ -69,9 +85,9 @@ QString NewSongDialog::inputName() const {
 
 void NewSongDialog::update() {
     const QString name = inputName();
-    file_->setText(name.isEmpty()
-                       ? QString()
-                       : QStringLiteral("songs/chords/") + name + QStringLiteral(".tex"));
+    file_->setText(name.isEmpty() ? QString()
+                                  : QStringLiteral("songs/") + collection() + QLatin1Char('/') +
+                                        name + QStringLiteral(".tex"));
     file_->setCursorPosition(0);
     buttons_->button(QDialogButtonBox::Ok)->setEnabled(!name.isEmpty());
 }

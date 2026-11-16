@@ -610,6 +610,7 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
     issuesLabel_->setToolTip(issueLines.join(QLatin1Char('\n')));
 
     model_->setSongs(std::move(library->songs));
+    listPage_->setCollections(zub::collections(root)); // Chords, Tin whistle, …
     updateLanguageFilter();
     preview_->setDocumentClasses(
         zub::preview::documentClasses(packageDir_),
@@ -1658,7 +1659,8 @@ void MainWindow::refreshSongMetadata(SongEditor* editor, const std::string& cont
     if (!model_->updateSong(editor->path(), *meta, todos, scores)) {
         // A new song's first save: it joins the table now.
         model_->addSong({editor->path(), inputNameOf(editor), std::move(*meta), std::move(todos),
-                         std::move(scores)});
+                         std::move(scores),
+                         zub::collectionOf(songbookRoot_, editor->path()).value_or("chords")});
         updateLanguageFilter();
     }
 }
@@ -1709,9 +1711,11 @@ void MainWindow::createPreview() {
 }
 
 std::string MainWindow::inputNameOf(const SongEditor* editor) const {
-    // songs/chords/Artist/Title.tex -> "Artist/Title"
+    // songs/<collection>/Artist/Title.tex -> "Artist/Title"
+    const std::string collection =
+        zub::collectionOf(songbookRoot_, editor->path()).value_or("chords");
     const auto relative =
-        editor->path().lexically_relative(songbookRoot_ / "songs" / "chords").replace_extension();
+        editor->path().lexically_relative(songbookRoot_ / "songs" / collection).replace_extension();
     const auto u8 = relative.generic_u8string();
     return {u8.begin(), u8.end()};
 }
@@ -1781,7 +1785,7 @@ void MainWindow::requestPreview(bool userAsked) {
     request.packageDir = packageDir_;
     request.workDir = previewWorkDir_;
     request.inputName = inputNameOf(editor);
-    request.tinwhistleSong = zub::songbook::inTinwhistleTree(songbookRoot_, editor->path());
+    request.collection = zub::collectionOf(songbookRoot_, editor->path()).value_or("");
     request.songContent = std::move(content);
     request.documentClass = toStdString(preview_->documentClass());
     // Unsaved scores are built as they are in their editors.
@@ -1893,9 +1897,10 @@ std::filesystem::path MainWindow::scorePath(const std::string& name) const {
 }
 
 std::filesystem::path MainWindow::newScorePath(const std::string& name) const {
-    const bool tinwhistle =
-        editor_ && zub::songbook::inTinwhistleTree(songbookRoot_, editor_->path());
-    return songbookRoot_ / (tinwhistle ? "songs/tinwhistle" : "songs/chords") / pathOfName(name);
+    // Beside the song: in its own collection (songs/tinwhistle for a tin whistle song).
+    const std::string collection =
+        editor_ ? zub::collectionOf(songbookRoot_, editor_->path()).value_or("chords") : "chords";
+    return songbookRoot_ / "songs" / collection / pathOfName(name);
 }
 
 int MainWindow::scoreTabIndex(const std::string& name) const {
@@ -3749,7 +3754,7 @@ void MainWindow::newSong() {
         if (!artist.isEmpty())
             artistFolders.emplace(artist, toQString(song->path.parent_path().filename()));
     }
-    NewSongDialog dialog(artistFolders, this);
+    NewSongDialog dialog(artistFolders, zub::collections(songbookRoot_), this);
     if (dialog.exec() != QDialog::Accepted)
         return;
     const std::string inputName = toStdString(dialog.inputName());
@@ -3767,7 +3772,8 @@ void MainWindow::newSong() {
     }
     if (!closeSong())
         return;
-    const auto dest = zub::songimport::destination(songbookRoot_, inputName);
+    const auto dest = zub::songimport::destination(songbookRoot_, inputName,
+                                                   toStdString(dialog.collection()));
     approvedConstructs_.erase(dest.path); // nothing of an earlier file at this path carries over
     const auto song =
         zub::songimport::newSong(toStdString(dialog.title()), toStdString(dialog.artist()));

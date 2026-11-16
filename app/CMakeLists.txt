@@ -65,6 +65,7 @@ qt_add_executable(zpevnikar
     DiffView.cpp
     CodeTextEdit.hpp
     CodeTextEdit.cpp
+    CollectionTabs.cpp
     SongEditor.hpp
     SongEditor.cpp
     SongFilterProxy.hpp

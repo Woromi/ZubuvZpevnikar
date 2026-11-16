@@ -68,6 +68,24 @@
     </message>
 </context>
 <context>
+    <name>CollectionTabs</name>
+    <message>
+        <source>Chords</source>
+        <comment>song collection</comment>
+        <translation>Akordy</translation>
+    </message>
+    <message>
+        <source>Tin whistle</source>
+        <comment>song collection</comment>
+        <translation>Tin whistle</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <comment>song collections</comment>
+        <translation>Vše</translation>
+    </message>
+</context>
+<context>
     <name>ConverterRunner</name>
     <message>
         <source>Cannot create a temporary directory: %1</source>
@@ -1410,6 +1428,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>&amp;Artist:</source>
         <translation>&amp;Interpret:</translation>
+    </message>
+    <message>
+        <source>&amp;Collection:</source>
+        <translation>&amp;Sbírka:</translation>
     </message>
     <message>
         <source>File:</source>

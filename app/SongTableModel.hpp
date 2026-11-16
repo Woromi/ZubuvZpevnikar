@@ -37,6 +37,7 @@ public:
         FavouriteRole,               // bool: the song's tags include "fav"
         LabelsRole,                  // QStringList: the tags except "fav"
         HasTabsRole,                 // bool: the song includes a score
+        CollectionRole,              // QString: the folder under songs/ ("chords", "tinwhistle")
     };
 
     explicit SongTableModel(QObject* parent = nullptr);
