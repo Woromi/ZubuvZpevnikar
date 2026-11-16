@@ -3,6 +3,7 @@ include(Catch)
 
 add_executable(zub_core_tests
     test_audio.cpp
+    test_bookfile.cpp
     test_fretboard.cpp
     test_json.cpp
     test_latex.cpp

@@ -1,0 +1,35 @@
+\documentclass[chorded]{velkyzpevnik}
+
+\title{One Band}
+\author{Tester}
+
+\newindex{indexAA}{AA}
+\indexsongsas{indexAA}{\thepage}
+
+\newindex{indexBB}{BB}
+\indexsongsas{indexBB}{\thepage}
+
+\begin{document}
+
+{
+	\large \showindex[1]{First Album}{indexAA}
+	%\large \showindex[1]{Second Album}{indexBB}
+}
+
+\songsection{First Album}
+\begin{songs}{indexAA}\newpage
+	\input{Band/One}
+\end{songs}
+
+\songsection{Second Album}
+\begin{songs}{indexBB}
+\end{songs}
+
+\songsection{Third: Album}
+\pagebreak
+\begin{songs}{indexCC, indexAA}
+    \input{Band/Two}
+	\input{Band/Three}
+\end{songs}
+
+\end{document}

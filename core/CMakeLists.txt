@@ -3,6 +3,7 @@ configure_file(src/build_info.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/generated/build
 
 add_library(zub_core STATIC
     src/audio.cpp
+    src/bookfile.cpp
     src/converter.cpp
     src/fretboard.cpp
     src/json.cpp
