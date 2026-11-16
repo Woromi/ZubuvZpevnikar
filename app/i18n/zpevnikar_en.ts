@@ -125,17 +125,17 @@
         </translation>
     </message>
     <message numerus="yes">
-        <source> (%n page(s))</source>
+        <source>%n page(s)</source>
         <translation>
-            <numerusform> (%n page)</numerusform>
-            <numerusform> (%n pages)</numerusform>
+            <numerusform>%n page</numerusform>
+            <numerusform>%n pages</numerusform>
         </translation>
     </message>
     <message numerus="yes">
-        <source>, %n song(s) not marked as fitting this paper</source>
+        <source>%n song(s) not marked as fitting this paper</source>
         <translation>
-            <numerusform>, %n song not marked as fitting this paper</numerusform>
-            <numerusform>, %n songs not marked as fitting this paper</numerusform>
+            <numerusform>%n song not marked as fitting this paper</numerusform>
+            <numerusform>%n songs not marked as fitting this paper</numerusform>
         </translation>
     </message>
 </context>

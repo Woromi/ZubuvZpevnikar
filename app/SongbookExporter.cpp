@@ -137,16 +137,17 @@ bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution
     return box.clickedButton() == build;
 }
 
-void SongbookExporter::exportRepoPdf(const std::filesystem::path& bookFile, std::string text,
-                                     zub::songbook::Songbook book) {
+std::optional<zub::songbook::BuildCommand>
+SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const std::string& text,
+                                   const zub::songbook::Songbook& book) {
     if (package_.empty()) {
         QMessageBox::warning(window_, tr("Export PDF"), noPackageText());
-        return;
+        return std::nullopt;
     }
     const auto parsed = zub::bookfile::parse(text);
     if (!parsed) {
         QMessageBox::warning(window_, tr("Export PDF"), toQString(parsed.error()));
-        return;
+        return std::nullopt;
     }
     // The book file is LaTeX that runs too, and so is the chord chart a Tabor class inputs.
     const std::filesystem::path bookDir = bookFile.parent_path();
@@ -190,15 +191,8 @@ void SongbookExporter::exportRepoPdf(const std::filesystem::path& bookFile, std:
     }
     const auto resolution = zub::songbook::resolveSongs(all, root_);
     if (!confirmSafety(resolution, bookRisks))
-        return;
-
-    const QString stem = toQString(bookFile.stem());
-    const QString target = QFileDialog::getSaveFileName(
-        window_, tr("Export PDF"), QDir(lastExportDir()).filePath(stem + QStringLiteral(".pdf")),
-        tr("PDF (*.pdf)"));
-    if (target.isEmpty())
-        return;
-    QSettings{}.setValue(exportDirKey, QFileInfo(target).absolutePath());
+        return std::nullopt;
+    (void)book;
 
     // One work dir per book file: LilyPond's cache and the index files stay between builds.
     const QString hash = QString::fromLatin1(
@@ -208,8 +202,8 @@ void SongbookExporter::exportRepoPdf(const std::filesystem::path& bookFile, std:
     const QString workDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
                             QStringLiteral("/songbooks/repo-") + hash;
     if (!QDir().mkpath(workDir)) {
-        QMessageBox::warning(window_, tr("Export PDF"), tr("Cannot create %1").arg(workDir));
-        return;
+        QMessageBox::warning(window_, tr("Build"), tr("Cannot create %1").arg(workDir));
+        return std::nullopt;
     }
     // A stale index from an earlier song list would be used by the build.
     const QDir work(workDir);
@@ -219,53 +213,16 @@ void SongbookExporter::exportRepoPdf(const std::filesystem::path& bookFile, std:
         QFile::remove(work.filePath(name));
     QString error;
     if (!writeFile(workDir + QStringLiteral("/book.tex"), text, &error)) {
-        QMessageBox::warning(window_, tr("Export PDF"), error);
-        return;
+        QMessageBox::warning(window_, tr("Build"), error);
+        return std::nullopt;
     }
-    const auto command = zub::bookfile::buildCommand(root_, package_, toPath(workDir), bookDir,
-                                                     "book", zub::bookfile::indexFiles(*parsed));
-    QString message;
-    if (!runBuild(command, book.title.empty() ? stem : toQString(book.title), target, &message))
-        return;
-    QDesktopServices::openUrl(QUrl::fromLocalFile(target));
-    emit finished(message);
+    return zub::bookfile::buildCommand(root_, package_, toPath(workDir), bookDir, "book",
+                                       zub::bookfile::indexFiles(*parsed));
 }
 
-bool SongbookExporter::runBuild(const zub::songbook::BuildCommand& command, const QString& title,
-                                const QString& target, QString* result) {
-    QStringList arguments;
-    for (const std::string& argument : command.arguments)
-        arguments << toQString(argument);
-
-    // State the process lambdas use lives before the dialog: ~QDialog destroys the QProcess.
-    QByteArray output;
-    QStringDecoder decoder(QStringDecoder::Utf8);
-    bool succeeded = false;
-    bool finishedRun = false;
-    bool cancelled = false;
-    QString message;
-
-    QDialog dialog(window_);
-    dialog.setWindowTitle(tr("Building %1…").arg(title));
-    dialog.resize(800, 500);
-    auto* layout = new QVBoxLayout(&dialog);
-    auto* status = new QLabel(tr("Building the songbook (this can take minutes)…"), &dialog);
-    auto* bar = new QProgressBar(&dialog);
-    bar->setRange(0, 0);
-    auto* log = new QPlainTextEdit(&dialog);
-    log->setReadOnly(true);
-    log->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
-    log->setMaximumBlockCount(20000);
-    auto* buttons = new QDialogButtonBox(&dialog);
-    QPushButton* cancel = buttons->addButton(tr("Cancel"), QDialogButtonBox::RejectRole);
-    QPushButton* openLog = buttons->addButton(tr("Open Log"), QDialogButtonBox::ActionRole);
-    openLog->hide();
-    layout->addWidget(status);
-    layout->addWidget(bar);
-    layout->addWidget(log, 1);
-    layout->addWidget(buttons);
-
-    auto* process = new QProcess(&dialog);
+QProcess* SongbookExporter::createBuildProcess(const zub::songbook::BuildCommand& command,
+                                               QObject* parent) {
+    auto* process = new QProcess(parent);
     process->setProcessChannelMode(QProcess::MergedChannels);
     process->setWorkingDirectory(toQString(command.workingDirectory));
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
@@ -273,107 +230,58 @@ bool SongbookExporter::runBuild(const zub::songbook::BuildCommand& command, cons
         environment.insert(toQString(name), toQString(value));
     process->setProcessEnvironment(environment);
 #ifdef Q_OS_UNIX
+    // Its own process group: Cancel stops lualatex and lilypond with it.
     process->setChildProcessModifier([] { ::setpgid(0, 0); });
 #endif
-
-    const auto fail = [&](const QString& text) {
-        finishedRun = true;
-        status->setText(text);
-        bar->setRange(0, 1);
-        bar->setValue(0);
-        cancel->setText(tr("Close"));
-        openLog->setVisible(QFileInfo::exists(toQString(command.log)));
-    };
-
-    QObject::connect(process, &QProcess::readyRead, &dialog, [&] {
-        const QByteArray bytes = process->readAll();
-        output += bytes;
-        log->moveCursor(QTextCursor::End);
-        log->insertPlainText(QString(decoder(bytes)));
-        log->moveCursor(QTextCursor::End);
-    });
-    QObject::connect(process, &QProcess::errorOccurred, &dialog, [&](QProcess::ProcessError e) {
-        if (e == QProcess::FailedToStart)
-            fail(tr("Cannot start the build: %1").arg(process->errorString()));
-    });
-    QObject::connect(process, &QProcess::finished, &dialog, [&](int code, QProcess::ExitStatus st) {
-        const QByteArray rest = process->readAll();
-        if (!rest.isEmpty()) {
-            output += rest;
-            log->moveCursor(QTextCursor::End);
-            log->insertPlainText(QString(decoder(rest)));
-        }
-        if (cancelled)
-            return;
-        const QString pdf = toQString(command.pdf);
-        if (st != QProcess::NormalExit || code != 0 || !QFileInfo::exists(pdf)) {
-            fail(st != QProcess::NormalExit ? tr("Build crashed")
-                 : code != 0                ? tr("Build failed (exit %1)").arg(code)
-                                            : tr("Build failed (no PDF was written)"));
-            return;
-        }
-        // Copy beside the target, then replace it in one step: a failure keeps the old file.
-        const QString part = target + QStringLiteral(".part");
-        QFile::remove(part);
-        std::error_code renameError;
-        if (!QFile::copy(pdf, part)) {
-            QFile::remove(part);
-            fail(tr("Cannot write %1").arg(target));
-            return;
-        }
-        std::filesystem::rename(toPath(part), toPath(target), renameError);
-        if (renameError) {
-            QFile::remove(part);
-            fail(tr("Cannot write %1: %2")
-                     .arg(target, QString::fromStdString(renameError.message())));
-            return;
-        }
-        message = tr("Exported %1").arg(target);
-        static const QRegularExpression pages(QStringLiteral(R"(Finished: .*\((\d+) pages?\))"));
-        const auto match = pages.match(QString::fromUtf8(output));
-        if (match.hasMatch())
-            message += tr(" (%n page(s))", nullptr, match.captured(1).toInt());
-        QFile logFile(toQString(command.log));
-        if (logFile.open(QIODevice::ReadOnly)) {
-            const QByteArray bytes = logFile.readAll();
-            const int warnings = zub::songbook::paperWarnings(
-                std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())));
-            if (warnings > 0)
-                message += tr(", %n song(s) not marked as fitting this paper", nullptr, warnings);
-        }
-        succeeded = true;
-        dialog.accept();
-    });
-    QObject::connect(cancel, &QPushButton::clicked, &dialog, [&] {
-        if (!finishedRun) {
-            cancelled = true;
-            killTree(process);
-        }
-        dialog.reject();
-    });
-    QObject::connect(openLog, &QPushButton::clicked, &dialog, [&] {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(toQString(command.log)));
-    });
-    // Closing the window (Escape, X) while building is a cancel.
-    QObject::connect(&dialog, &QDialog::rejected, &dialog, [&] {
-        if (process->state() != QProcess::NotRunning) {
-            cancelled = true;
-            killTree(process);
-        }
-    });
-
     // The build must not outlive the app.
     QObject::connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, process,
                      [process] { killTree(process); });
+    return process;
+}
 
+void SongbookExporter::startBuild(QProcess* process, const zub::songbook::BuildCommand& command) {
+    QStringList arguments;
+    for (const std::string& argument : command.arguments)
+        arguments << toQString(argument);
     process->start(toQString(command.program), arguments);
-    dialog.exec();
-    if (process->state() != QProcess::NotRunning)
-        killTree(process);
-    // The dialog destroys the process after the widgets the lambdas use.
-    process->disconnect();
+}
 
-    if (succeeded)
-        *result = message;
-    return succeeded;
+void SongbookExporter::stopBuild(QProcess* process) {
+    killTree(process);
+}
+
+QString SongbookExporter::buildReport(const QByteArray& output,
+                                      const std::filesystem::path& log) {
+    QString report;
+    static const QRegularExpression pages(QStringLiteral(R"(Finished: .*\((\d+) pages?\))"));
+    if (const auto match = pages.match(QString::fromUtf8(output)); match.hasMatch())
+        report = tr("%n page(s)", nullptr, match.captured(1).toInt());
+    QFile logFile(toQString(log));
+    if (logFile.open(QIODevice::ReadOnly)) {
+        const QByteArray bytes = logFile.readAll();
+        const int warnings = zub::songbook::paperWarnings(
+            std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())));
+        if (warnings > 0)
+            report += (report.isEmpty() ? QString() : QStringLiteral(", ")) +
+                      tr("%n song(s) not marked as fitting this paper", nullptr, warnings);
+    }
+    return report;
+}
+
+void SongbookExporter::savePdf(const QByteArray& pdf, const QString& stem, const QString& report) {
+    const QString target = QFileDialog::getSaveFileName(
+        window_, tr("Export PDF"), QDir(lastExportDir()).filePath(stem + QStringLiteral(".pdf")),
+        tr("PDF (*.pdf)"));
+    if (target.isEmpty())
+        return;
+    QSettings{}.setValue(exportDirKey, QFileInfo(target).absolutePath());
+    QSaveFile file(target);
+    if (!file.open(QIODevice::WriteOnly) || file.write(pdf) != pdf.size() || !file.commit()) {
+        QMessageBox::warning(window_, tr("Export PDF"),
+                             tr("Cannot write %1: %2").arg(target, file.errorString()));
+        return;
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(target));
+    emit finished(report.isEmpty() ? tr("Exported %1").arg(target)
+                                   : tr("Exported %1 (%2)").arg(target, report));
 }

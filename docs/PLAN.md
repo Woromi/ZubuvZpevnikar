@@ -160,7 +160,7 @@ Decided with the user (2026-11-11): the app stores songbooks itself (`AppDataLoc
   - The Songbook tab edits the settings (`zub::bookfile::setSetting`), the sections and the songs; the LaTeX tab edits the whole file.
   - New Songbook… writes a .tex and a build.sh (`newBook`); Duplicate… copies a book under a new name (unlocked).
   - Lock/Unlock (`% zpevnikar: locked`) keeps released books from changing.
-- [ ] Songbook preview: a Preview tab beside Add Songs, built on a button (the PDF in the cache, "out of date" after changes); Export PDF reuses it.
+- [x] Songbook preview (`BookPreview`): a Preview tab beside Add Songs, built on a button (the PDF in the cache, kept per book for the session, "out of date" after changes); Export PDF saves it, building first when it is out of date.
 - [x] Cover image (none by default; png/jpg/pdf), a title page per named section, the title index split into sections, the author index optional (2026-11-11). The camp booklet falls back to one title index when the split would not fit its single index page.
 
 ## 8. Scores (LilyPond)

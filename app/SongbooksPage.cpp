@@ -1,5 +1,6 @@
 #include "SongbooksPage.hpp"
 
+#include "BookPreview.hpp"
 #include "CodeTextEdit.hpp"
 #include "LabelFilterBox.hpp"
 #include "PageHeader.hpp"
@@ -150,10 +151,7 @@ void SongbooksPage::buildUi() {
     connect(duplicate_, &QAction::triggered, this, &SongbooksPage::duplicateSongbook);
     connect(lock_, &QAction::triggered, this, &SongbooksPage::toggleLock);
     connect(check_, &QAction::triggered, this, &SongbooksPage::checkBook);
-    connect(exportPdf_, &QAction::triggered, this, [this] {
-        if (!id_.isEmpty())
-            exporter_->exportRepoPdf(pathOf(id_), text_, book_);
-    });
+    connect(exportPdf_, &QAction::triggered, this, &SongbooksPage::exportPdf);
 
     bookTabs_ = new QTabWidget(this);
     bookTabs_->setDocumentMode(true);
@@ -162,6 +160,14 @@ void SongbooksPage::buildUi() {
     rightTabs_ = new QTabWidget(this);
     rightTabs_->setDocumentMode(true);
     rightTabs_->addTab(buildPickerPane(), tr("Add Songs"));
+    preview_ = new BookPreview(exporter_, this);
+    rightTabs_->addTab(preview_, tr("Preview"));
+    connect(preview_, &BookPreview::built, this, [this](const QString& id, bool ok) {
+        const bool exporting = ok && id == pendingExport_ && id == id_;
+        pendingExport_.clear();
+        if (exporting)
+            exporter_->savePdf(preview_->pdf(), toQString(pathOf(id_).stem()), preview_->report());
+    });
 
     splitter_ = new QSplitter(Qt::Horizontal, this);
     splitter_->addWidget(buildListPane());
@@ -711,6 +717,22 @@ void SongbooksPage::toggleLock() {
     }
 }
 
+void SongbooksPage::exportPdf() {
+    if (id_.isEmpty() || text_.empty())
+        return;
+    if (preview_->upToDate()) {
+        exporter_->savePdf(preview_->pdf(), toQString(pathOf(id_).stem()), preview_->report());
+        return;
+    }
+    rightTabs_->setCurrentWidget(preview_);
+    if (preview_->building()) {
+        showWarning(tr("A preview is being built: export when it is done."));
+        return;
+    }
+    if (preview_->build())
+        pendingExport_ = id_;
+}
+
 // ---- New and duplicate ----
 
 namespace {
@@ -1022,6 +1044,7 @@ void SongbooksPage::loadBook() {
         latex_->setPlainText(text);
     }
     loading_ = false;
+    preview_->setBook(id_, shown ? pathOf(id_) : std::filesystem::path(), text_, book_);
     updateCoverLabel();
     updateFormVisibility();
     updateLatexState();

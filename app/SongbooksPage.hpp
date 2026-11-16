@@ -17,6 +17,7 @@
 namespace KSyntaxHighlighting {
 class Repository;
 }
+class BookPreview;
 class CodeTextEdit;
 class QAction;
 class QTabWidget;
@@ -86,6 +87,8 @@ private:
     bool applyEdit(const std::expected<std::string, std::string>& edited);
     bool canEdit() const; // a book is shown, it can be edited and it is not locked
     void toggleLock();
+    // Export PDF: the preview's PDF when it is of the current text, else built first.
+    void exportPdf();
     // What the sorter orders in section s: its songs, or for a repo book the first song of each
     // keep-order block and the single songs (zub::bookfile::leaders); and that order back.
     std::vector<std::string> sortUnits(int s) const;
@@ -220,6 +223,8 @@ private:
     QLabel* count_ = nullptr;
 
     QTabWidget* rightTabs_ = nullptr; // Add Songs | Preview
+    BookPreview* preview_ = nullptr;
+    QString pendingExport_; // the book whose preview build ends in Export PDF
     QWidget* pickerPane_ = nullptr;
     QLabel* pickerHeader_ = nullptr;
     QComboBox* target_ = nullptr;

@@ -3,16 +3,19 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <optional>
 #include <filesystem>
 #include <functional>
 #include <string>
 #include <string_view>
 #include <zub/core/songbook.hpp>
 
+class QProcess;
 class QWidget;
 
-// Builds a songbook of the songbook repo as a PDF with lualatex (in a dialog that shows the
-// output), after the safety checks. Dialogs are modal to the parent widget.
+// Building a songbook of the songbook repo as a PDF with lualatex: the safety checks and the
+// work dir, the build process (run by the page's preview), and saving the PDF. Dialogs are modal
+// to the parent widget.
 class SongbookExporter : public QObject {
     Q_OBJECT
 
@@ -25,12 +28,24 @@ public:
         package_ = package;
     }
 
-    // A book of the songbook repo (`bookFile`, its current `text`; `book` gives the title), built
-    // as it is from a copy in CacheLocation/songbooks/repo-<hash>/ after checking the book file,
-    // a Tabor book's akordy.tex, every \input (a song of the songbook, then the song itself) and
-    // stray index files next to it.
-    void exportRepoPdf(const std::filesystem::path& bookFile, std::string text,
-                       zub::songbook::Songbook book);
+    // Before building a book of the songbook repo (`bookFile` with its current `text`): the
+    // safety checks of the book file, a Tabor book's akordy.tex, every \input (a song of the
+    // songbook, then the song itself) and stray index files next to it (asking when something is
+    // unknown), then the work dir CacheLocation/songbooks/repo-<hash>/ with the text as book.tex.
+    // nullopt (after a message) when it is not to be built.
+    std::optional<zub::songbook::BuildCommand> prepareRepoBuild(
+        const std::filesystem::path& bookFile, const std::string& text,
+        const zub::songbook::Songbook& book);
+    // A process for `command` (environment, working dir, its own process group, stopped when the
+    // app quits); startBuild runs it, stopBuild stops it and what it started.
+    static QProcess* createBuildProcess(const zub::songbook::BuildCommand& command,
+                                        QObject* parent);
+    static void startBuild(QProcess* process, const zub::songbook::BuildCommand& command);
+    static void stopBuild(QProcess* process);
+    // "N pages, M songs not marked as fitting this paper" from a build's output and log.
+    static QString buildReport(const QByteArray& output, const std::filesystem::path& log);
+    // Asks where to save `pdf` (named <stem>.pdf), writes it and opens it.
+    void savePdf(const QByteArray& pdf, const QString& stem, const QString& report);
 
 signals:
     // A short report for the status bar after a successful PDF export.
@@ -43,10 +58,6 @@ private:
     // finds.
     // `extra`: what the check of the book file itself found (shown first).
     bool confirmSafety(const zub::songbook::Resolution& resolution, const QStringList& extra = {});
-    // Runs the build in a dialog showing its output and copies the PDF to `target`; on success
-    // `*message` is the report for the status bar.
-    bool runBuild(const zub::songbook::BuildCommand& command, const QString& title,
-                  const QString& target, QString* message);
 
     QWidget* window_;
     std::filesystem::path root_;

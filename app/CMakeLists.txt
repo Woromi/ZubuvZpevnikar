@@ -47,6 +47,7 @@ qt_add_executable(zpevnikar
     SongbookSorter.hpp
     SongbookSorter.cpp
     SongbookExporter.hpp
+    BookPreview.cpp
     SongbookExporter.cpp
     SongbookTree.hpp
     SongbookTree.cpp

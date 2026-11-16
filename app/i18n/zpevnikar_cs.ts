@@ -21,6 +21,49 @@
     </message>
 </context>
 <context>
+    <name>BookPreview</name>
+    <message>
+        <source>Build Preview</source>
+        <translation>Sestavit náhled</translation>
+    </message>
+    <message>
+        <source>Build the whole songbook as a PDF (this can take minutes)</source>
+        <translation>Sestavit celý zpěvník jako PDF (může to trvat minuty)</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Zrušit</translation>
+    </message>
+    <message>
+        <source>The build did not start: is bash installed?</source>
+        <translation>Sestavení se nespustilo: je nainstalovaný bash?</translation>
+    </message>
+    <message>
+        <source>Rebuild Preview</source>
+        <translation>Sestavit náhled znovu</translation>
+    </message>
+    <message>
+        <source>Building… (a whole songbook takes a minute or more)</source>
+        <translation>Sestavuje se… (celý zpěvník trvá minutu i déle)</translation>
+    </message>
+    <message>
+        <source>Another songbook is being built.</source>
+        <translation>Sestavuje se jiný zpěvník.</translation>
+    </message>
+    <message>
+        <source>The build failed; its output is below.</source>
+        <translation>Sestavení selhalo; jeho výstup je níže.</translation>
+    </message>
+    <message>
+        <source>Not built yet: Build Preview typesets the whole songbook.</source>
+        <translation>Ještě nesestaveno: Sestavit náhled vysází celý zpěvník.</translation>
+    </message>
+    <message>
+        <source>Out of date: the songbook changed since this preview. %1</source>
+        <translation>Zastaralé: zpěvník se od tohoto náhledu změnil. %1</translation>
+    </message>
+</context>
+<context>
     <name>ConverterRunner</name>
     <message>
         <source>Cannot create a temporary directory: %1</source>
@@ -2226,9 +2269,29 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <source>Export PDF</source>
         <translation>Exportovat PDF</translation>
     </message>
+    <message numerus="yes">
+        <source>%n page(s)</source>
+        <translation>
+            <numerusform>%n strana</numerusform>
+            <numerusform>%n strany</numerusform>
+            <numerusform>%n stran</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n song(s) not marked as fitting this paper</source>
+        <translation>
+            <numerusform>%n píseň neoznačená, že se na tento papír vejde</numerusform>
+            <numerusform>%n písně neoznačené, že se na tento papír vejdou</numerusform>
+            <numerusform>%n písní neoznačených, že se na tento papír vejdou</numerusform>
+        </translation>
+    </message>
     <message>
         <source>PDF (*.pdf)</source>
         <translation>PDF (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Exported %1 (%2)</source>
+        <translation>Exportováno %1 (%2)</translation>
     </message>
     <message>
         <source>\input{%1}: not a song of the songbook</source>
@@ -2239,68 +2302,12 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>%1: soubor rejstříku, který by sestavení načetlo</translation>
     </message>
     <message>
-        <source>Building %1…</source>
-        <translation>Sestavuji %1…</translation>
-    </message>
-    <message>
-        <source>Building the songbook (this can take minutes)…</source>
-        <translation>Sestavuji zpěvník (může to trvat i několik minut)…</translation>
-    </message>
-    <message>
-        <source>Cancel</source>
-        <translation>Zrušit</translation>
-    </message>
-    <message>
-        <source>Open Log</source>
-        <translation>Otevřít log</translation>
-    </message>
-    <message>
-        <source>Close</source>
-        <translation>Zavřít</translation>
-    </message>
-    <message>
-        <source>Cannot start the build: %1</source>
-        <translation>Sestavení nelze spustit: %1</translation>
-    </message>
-    <message>
-        <source>Build crashed</source>
-        <translation>Sestavení spadlo</translation>
-    </message>
-    <message>
-        <source>Build failed (exit %1)</source>
-        <translation>Sestavení selhalo (návratový kód %1)</translation>
-    </message>
-    <message>
-        <source>Build failed (no PDF was written)</source>
-        <translation>Sestavení selhalo (nevzniklo žádné PDF)</translation>
-    </message>
-    <message>
-        <source>Cannot write %1</source>
-        <translation>Nelze zapsat %1</translation>
-    </message>
-    <message>
         <source>Cannot write %1: %2</source>
         <translation>Nelze zapsat %1: %2</translation>
     </message>
     <message>
         <source>Exported %1</source>
         <translation>Exportováno: %1</translation>
-    </message>
-    <message numerus="yes">
-        <source> (%n page(s))</source>
-        <translation>
-            <numerusform> (%n strana)</numerusform>
-            <numerusform> (%n strany)</numerusform>
-            <numerusform> (%n stran)</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>, %n song(s) not marked as fitting this paper</source>
-        <translation>
-            <numerusform>, %n píseň není označena jako vhodná pro tento papír</numerusform>
-            <numerusform>, %n písně nejsou označeny jako vhodné pro tento papír</numerusform>
-            <numerusform>, %n písní není označeno jako vhodné pro tento papír</numerusform>
-        </translation>
     </message>
 </context>
 <context>
@@ -2465,6 +2472,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Open Folder</source>
         <translation>Otevřít složku</translation>
+    </message>
+    <message>
+        <source>Preview</source>
+        <translation>Náhled</translation>
     </message>
     <message>
         <source>Velký zpěvník (A4)</source>
@@ -2765,6 +2776,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Unlock %1? It was locked as released or printed; changes make it differ from that edition.</source>
         <translation>Odemknout %1? Byl zamčen jako vydaný nebo vytištěný; změny ho od toho vydání odliší.</translation>
+    </message>
+    <message>
+        <source>A preview is being built: export when it is done.</source>
+        <translation>Sestavuje se náhled: exportujte, až bude hotový.</translation>
     </message>
     <message>
         <source>New Songbook</source>
