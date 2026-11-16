@@ -27,7 +27,8 @@ QString CollectionTabs::displayName(const QString& collection) {
 }
 
 void CollectionTabs::setCollections(const std::vector<std::string>& collections) {
-    const QString wanted = count() > 0 ? current() : QSettings{}.value(settingsKey_).toString();
+    // The user's last choice (written on every change), also after it was missing for a while.
+    const QString wanted = QSettings{}.value(settingsKey_).toString();
     filling_ = true;
     while (count() > 0)
         removeTab(0);

@@ -54,6 +54,8 @@ public:
                   KSyntaxHighlighting::Repository& repository, QWidget* parent = nullptr);
 
     void setSongbookRoot(const std::filesystem::path& root);
+    // The song collections (folders under songs/) for the picker's tabs.
+    void setCollections(const std::vector<std::string>& collections);
     // Before the app closes: asks to save unsaved LaTeX; false to keep the app open.
     bool confirmClose();
     // Lists the books again and reads the selected one (kept where possible) from disk.

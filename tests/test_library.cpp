@@ -43,6 +43,15 @@ TEST_CASE("collections lists the folders under songs/", "[library]") {
     std::ofstream(root / "songs" / "file.txt") << "x";
     CHECK(zub::collections(root) ==
           std::vector<std::string>{"chords", "alto", "banjo", "tinwhistle"});
+    // Names that would add TEXINPUTS entries or run code in a build.sh, and links: skipped.
+    for (const char* d : {"a:b", "x$(id)", "sp ace", "q\"q"})
+        fs::create_directories(root / "songs" / d);
+    fs::create_directory_symlink(root / "songs" / "alto", root / "songs" / "linked");
+    CHECK(zub::collections(root) ==
+          std::vector<std::string>{"chords", "alto", "banjo", "tinwhistle"});
+    CHECK(zub::validCollectionName("tin_whistle-2"));
+    CHECK_FALSE(zub::validCollectionName("a:b"));
+    CHECK_FALSE(zub::validCollectionName(""));
     // chords need not exist for the list
     fs::remove_all(root / "songs" / "chords");
     CHECK(zub::collections(root) == std::vector<std::string>{"alto", "banjo", "tinwhistle"});

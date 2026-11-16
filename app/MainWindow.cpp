@@ -610,7 +610,9 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
     issuesLabel_->setToolTip(issueLines.join(QLatin1Char('\n')));
 
     model_->setSongs(std::move(library->songs));
-    listPage_->setCollections(zub::collections(root)); // Chords, Tin whistle, …
+    const auto collections = zub::collections(root); // Chords, Tin whistle, …
+    listPage_->setCollections(collections);
+    songbooksPage_->setCollections(collections);
     updateLanguageFilter();
     preview_->setDocumentClasses(
         zub::preview::documentClasses(packageDir_),

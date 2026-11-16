@@ -253,10 +253,12 @@ std::expected<Command, std::string> prepare(const Request& request) {
                                                         : "";
     if (const auto it = std::ranges::find(names, own); it != names.end())
         std::rotate(names.begin(), it, it + 1);
-    std::string texinputs = std::string(".") + kSep + utf8(overrideDir) + kSep + root + kSep +
-                            utf8(request.packageDir) + kSep;
+    // The repo root (img/) last: a file there cannot stand in for a checked score.
+    std::string texinputs =
+        std::string(".") + kSep + utf8(overrideDir) + kSep + utf8(request.packageDir) + kSep;
     for (const auto& name : names)
         texinputs += root + "/songs/" + name + kSep;
+    texinputs += root + kSep;
     cmd.environment = {{"TEXINPUTS", texinputs},
                        {"max_print_line", "1000"},
                        {"error_line", "254"},

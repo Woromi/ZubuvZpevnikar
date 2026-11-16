@@ -442,7 +442,7 @@ TEST_CASE("bookfile build TEXINPUTS lists every collection", "[bookfile]") {
     const auto command = zub::bookfile::buildCommand(repo, "/pkg", "/work", "/bd", "book", {});
     const auto root = repo.generic_string();
     CHECK(command.environment[0].second ==
-          ".:/work:" + root + "/songs/chords:" + root + "/songs/whistle2:/pkg:/bd:" + root + ":");
+          ".:/work:/pkg:" + root + "/songs/chords:" + root + "/songs/whistle2:/bd:" + root + ":");
 
     const auto script = zub::bookfile::buildScriptFor("b", zub::songbook::BookClass::Velky, {},
                                                       {"chords", "tinwhistle", "whistle2"});
@@ -1062,4 +1062,12 @@ TEST_CASE("a new section shares the book's indexes, not an album's own", "[bookf
 TEST_CASE("booksFolder is songbooks, or projects in an older checkout", "[bookfile]") {
     const auto root = std::filesystem::path(ZUB_TEST_DATA_DIR) / "songbook";
     CHECK(zub::bookfile::booksFolder(root) == "songbooks");
+}
+
+TEST_CASE("a build.sh never gets an odd collection name", "[bookfile]") {
+    const auto script = zub::bookfile::buildScriptFor("b", zub::songbook::BookClass::Velky,
+                                                      {"obsah"}, {"chords", "x$(id)", "a:b"});
+    CHECK(script.find("songs/chords:") != std::string::npos);
+    CHECK(script.find("x$(id)") == std::string::npos);
+    CHECK(script.find("a:b") == std::string::npos);
 }

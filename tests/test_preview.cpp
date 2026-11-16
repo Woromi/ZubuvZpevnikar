@@ -108,9 +108,11 @@ TEST_CASE("prepare writes the wrapper, the song copy and the command", "[preview
 #endif
     const auto g = [](const fs::path& p) { return p.generic_string(); };
     const std::string root = g(fixtureRepo);
-    const std::string expected = std::string(".") + sep + g(work / "override") + sep + root + sep +
+    // The package, the song collections, then the repo root (nothing there can stand in for a
+    // checked score).
+    const std::string expected = std::string(".") + sep + g(work / "override") + sep +
                                  g(fixtureRepo / "zubuvzpevnik") + sep + root + "/songs/chords" +
-                                 sep + root + "/songs/whistle2" + sep;
+                                 sep + root + "/songs/whistle2" + sep + root + sep;
     REQUIRE(cmd->environment.size() == 4);
     CHECK(cmd->environment[0].first == "TEXINPUTS");
     CHECK(cmd->environment[0].second == expected);

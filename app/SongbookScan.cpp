@@ -5,6 +5,7 @@
 
 #include <QProcess>
 #include <QTimer>
+#include <zub/core/library.hpp>
 #include <zub/core/score.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/safety.hpp>
@@ -215,6 +216,16 @@ void SongbookScan::next() {
             };
             break;
         case Kind::Shrink: {
+            // The package's checkpaper.py measures songs of songs/chords and songs/tinwhistle.
+            if (const auto collection = zub::collectionOf(options_.songbookRoot, song.path);
+                collection && *collection != "chords" && *collection != "tinwhistle") {
+                finding_.errors << tr("not measured: the package measures only Chords and Tin "
+                                      "whistle songs");
+                ++current_;
+                if (current_ >= steps_.size() || steps_[current_].song != step.song)
+                    endSong(step.song);
+                continue;
+            }
             // Measuring builds the song: never one with commands outside the song format.
             if (!zub::safety::unknownConstructs(content_).empty()) {
                 finding_.errors << tr("not measured: commands outside the song format");

@@ -692,12 +692,13 @@ songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
     }
     command.arguments.push_back(utf8(workDir / (std::string(bookName) + ".tex")));
     command.workingDirectory = workDir;
-    // The songs and the package first: nothing in the book's folder or the repo root can stand
-    // in for a checked song or a package file (class, .sty, .cfg, Lua).
-    std::string texinputs = ".:" + utf8(workDir) + ":";
+    // The package, then the songs, before anything else: no folder under songs/ can stand in for
+    // a package file (class, .sty, .cfg, Lua; song names are Artist/Title), and nothing in the
+    // book's folder or the repo root for a checked song.
+    std::string texinputs = ".:" + utf8(workDir) + ":" + utf8(packageDir) + ":";
     for (const auto& collection : collections(repoRoot))
         texinputs += root + "/songs/" + collection + ":";
-    texinputs += utf8(packageDir) + ":" + utf8(bookDir) + ":" + root + ":";
+    texinputs += utf8(bookDir) + ":" + root + ":";
     command.environment.emplace_back("TEXINPUTS", std::move(texinputs));
     command.pdf = workDir / (std::string(bookName) + ".pdf");
     command.log = workDir / (std::string(bookName) + ".log");
@@ -1365,7 +1366,8 @@ string buildScript(string_view name, songbook::BookClass cls, const std::vector<
                    const std::vector<string>& collections) {
     string songTrees;
     for (const auto& c : collections)
-        songTrees += "$REPO_ROOT/songs/" + c + ":";
+        if (validCollectionName(c)) // written into the shell script
+            songTrees += "$REPO_ROOT/songs/" + c + ":";
     string indexArgs;
     for (const auto& i : indexes)
         indexArgs += " -i " + i;

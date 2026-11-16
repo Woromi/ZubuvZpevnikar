@@ -240,7 +240,7 @@ std::filesystem::path findScoreFile(const std::filesystem::path& repoRoot,
 }
 
 std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,
-                                    const std::filesystem::path& songPath,
+                                    const std::filesystem::path& /*songPath*/,
                                     std::string_view songText) {
     std::vector<std::string> risks;
     for (const std::string& reference : referencedFiles(songText)) {
@@ -249,16 +249,22 @@ std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,
             risks.push_back("\\lilypondfile{" + reference + "}");
             continue;
         }
-        const auto file = findScoreFile(repoRoot, songPath, *name);
-        if (file.empty())
-            continue;
-        const auto text = readTextFile(file);
-        if (!text) {
-            risks.push_back(*name + ": cannot read the file");
-            continue;
+        // Every collection's copy: the preview and a book build search the collections in
+        // different orders, so whichever one a build finds has been checked.
+        for (const std::string& collection : collections(repoRoot)) {
+            const auto file = repoRoot / "songs" / fromUtf8(collection) / fromUtf8(*name);
+            std::error_code ec;
+            if (!std::filesystem::is_regular_file(file, ec))
+                continue;
+            const auto text = readTextFile(file);
+            if (!text) {
+                risks.push_back(*name + ": cannot read the file");
+                continue;
+            }
+            for (const std::string& risk : safety::lilypondRisks(*text))
+                if (std::ranges::find(risks, *name + ": " + risk) == risks.end())
+                    risks.push_back(*name + ": " + risk);
         }
-        for (const std::string& risk : safety::lilypondRisks(*text))
-            risks.push_back(*name + ": " + risk);
     }
     return risks;
 }

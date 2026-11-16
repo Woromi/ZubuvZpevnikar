@@ -98,7 +98,8 @@ std::vector<std::string> referencedFiles(std::string_view songText);
 std::optional<std::string> resolveScoreReference(std::string_view target);
 
 // What building the song would run through LilyPond that the scan flags (lilypondRisks of every
-// score it references, read from disk, found like findScoreFile): "Artist/X.ly: #(system", and
+// score it references, read from disk: every collection's copy, as builds search the collections
+// in different orders): "Artist/X.ly: #(system", and
 // "\lilypondfile{name}" for a reference that is not an in-tree score (resolveScoreReference
 // fails) and so cannot be checked. A score that does not exist adds nothing.
 std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,

@@ -173,11 +173,12 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
     // the song folders first): those are what the song check below reads.
     zub::songbook::Songbook all;
     all.sections.push_back({});
+    const auto songCollections = zub::collections(root_);
     for (const std::string& name : inputs) {
         const auto inCollection = [&](const std::string& collection) {
-            return std::filesystem::is_regular_file(root_ / "songs" / collection / (name + ".tex"));
+            return std::filesystem::is_regular_file(root_ / "songs" / toPath(toQString(collection)) /
+                                                    toPath(toQString(name + ".tex")));
         };
-        const auto songCollections = zub::collections(root_);
         const bool song = !name.empty() && !zub::invalidInputName(name) &&
                           std::ranges::any_of(songCollections, inCollection);
         if (song)

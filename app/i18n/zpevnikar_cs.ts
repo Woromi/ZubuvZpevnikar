@@ -2403,6 +2403,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>zapsaná %1, podle akordů %2 (rozdíl %3)</translation>
     </message>
     <message>
+        <source>not measured: the package measures only Chords and Tin whistle songs</source>
+        <translation>neměřeno: balíček měří jen písně sbírek Akordy a Tin whistle</translation>
+    </message>
+    <message>
         <source>Tidy</source>
         <translation>Učesání</translation>
     </message>

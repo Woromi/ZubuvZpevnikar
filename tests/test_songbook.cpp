@@ -288,3 +288,19 @@ TEST_CASE("removeSong takes a song out of every section", "[songbook]") {
     CHECK(b.sections[1].songs.empty());
     CHECK_FALSE(removeSong(b, "A/X"));
 }
+
+TEST_CASE("scoreRisks checks every collection's copy of a score", "[songbook]") {
+    namespace fs = std::filesystem;
+    const auto root = fs::temp_directory_path() / "zub-scorerisks-test";
+    fs::remove_all(root);
+    fs::create_directories(root / "songs/chords/A");
+    fs::create_directories(root / "songs/tinwhistle/A");
+    std::ofstream(root / "songs/tinwhistle/A/X.ly") << "{ c'4 }\n";
+    std::ofstream(root / "songs/chords/A/X.ly") << "#(system \"id\")\n";
+    // The tin whistle song's own copy is harmless, but a book build may find the chords one.
+    const auto risks = zub::songbook::scoreRisks(root, root / "songs/tinwhistle/A/S.tex",
+                                                 "\\lilypondfile{A/X.ly}");
+    REQUIRE(risks.size() == 1);
+    CHECK(risks[0].starts_with("A/X.ly: #(system"));
+    fs::remove_all(root);
+}

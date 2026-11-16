@@ -155,6 +155,9 @@ void SongListPage::showScanResults(bool found) {
 void SongListPage::selectSong(const std::filesystem::path& path) {
     const int row = model_->rowOf(path);
     if (row >= 0) {
+        // A song of another collection than the tab shows (a new one): show all.
+        if (!proxy_->mapFromSource(model_->index(row, 0)).isValid() && collections_->count() > 0)
+            collections_->setCurrentIndex(0);
         const QModelIndex index = proxy_->mapFromSource(model_->index(row, 0));
         if (index.isValid()) {
             table_->selectRow(index.row());

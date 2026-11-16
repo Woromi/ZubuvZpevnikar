@@ -131,11 +131,14 @@ SongbooksPage::SongbooksPage(SongTableModel* model, SongbookSorter* sorter,
     reloadList();
 }
 
+void SongbooksPage::setCollections(const std::vector<std::string>& collections) {
+    pickerCollections_->setCollections(collections);
+}
+
 void SongbooksPage::setSongbookRoot(const std::filesystem::path& root) {
     if (root == root_)
         return;
     root_ = root;
-    pickerCollections_->setCollections(zub::collections(root_));
     fillList(id_);
 }
 

@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace zub {
@@ -38,6 +39,9 @@ std::expected<void, std::string> validateSongbookRepo(const std::filesystem::pat
 // The song collections of a songbook: the directories directly under <root>/songs/ ("chords",
 // "tinwhistle", a future "<instrument>"), "chords" first, then the rest sorted by name (byte
 // order). Hidden ones (a leading '.') are skipped; empty when <root>/songs is missing.
+// A collection's folder name as it may be used: [A-Za-z0-9_-]+ (it goes onto TEXINPUTS and into
+// a build.sh).
+bool validCollectionName(std::string_view name);
 std::vector<std::string> collections(const std::filesystem::path& root);
 
 // The collection of a file under <root>/songs/<collection>/... (lexically, nothing is read from

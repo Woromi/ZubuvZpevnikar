@@ -73,16 +73,25 @@ std::expected<void, std::string> validateSongbookRepo(const fs::path& root) {
     return {};
 }
 
+bool validCollectionName(std::string_view name) {
+    return !name.empty() && std::ranges::all_of(name, [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+               c == '_' || c == '-';
+    });
+}
+
 std::vector<std::string> collections(const fs::path& root) {
     std::vector<std::string> names;
     std::error_code ec;
     fs::directory_iterator it(root / songsSubdir, ec);
     for (const fs::directory_iterator end; !ec && it != end; it.increment(ec)) {
         std::error_code typeEc;
-        if (!it->is_directory(typeEc))
+        // A real folder with a plain name: the names go onto TEXINPUTS and into build.sh (a ':'
+        // or '$' there would add paths or run code), and a link could point anywhere.
+        if (it->is_symlink(typeEc) || !it->is_directory(typeEc))
             continue;
         auto name = utf8(it->path().filename());
-        if (!name.empty() && name.front() != '.')
+        if (validCollectionName(name))
             names.push_back(std::move(name));
     }
     std::ranges::sort(names);
