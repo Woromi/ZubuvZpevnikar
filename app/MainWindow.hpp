@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ActivityBar.hpp"
-#include "ScorePreviewPane.hpp"
+#include "ScoreTabs.hpp"
 
 #include <QByteArray>
 #include <QMainWindow>
@@ -41,17 +41,9 @@ class QToolBar;
 class QTableView;
 class QWidget;
 class DiffView;
-class FretboardWidget;
 class SongListPage;
 class PreviewPane;
 class PreviewRunner;
-class NoteSounds;
-class PlaybackRunner;
-struct PlaybackResult;
-class ScoreInputBar;
-class ScorePlayer;
-class ScoreRunner;
-struct ScoreResult;
 class SongEditor;
 class SongbookExporter;
 class SongbookScan;
@@ -123,32 +115,10 @@ private:
     void goBack();
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
     bool confirmCloseAll();
-    bool confirmCloseScore(const std::string& name, SongEditor* score);
-    void removeScoreReference(const std::string& name);
     // Offers the `pap` header after a measurement of `measuredText` (a bar above the editor).
     void offerPapers(SongEditor* editor, const std::string& measuredText,
                      const zub::songsuggest::Suggestions& suggestions);
     void replaceSongText(const std::string& after); // one undo step in the song editor
-    void updateScoreWidthBars();
-    void updateFretboard(); // the current score tab's input panel
-    // The music event the editor's selection touches, when it is exactly one.
-    std::optional<zub::scoreregion::Range> singleSelectedEvent(SongEditor* editor) const;
-    // Actions on the selected notes of a score (tie, slur ...): enabled with a selection in the
-    // score editor; the preview marks the notes of the selection a moment after it changes.
-    void updateRegionActions();
-    void updateScoreHighlights();
-    void clickScoreNote(const QPoint& position, bool after, bool extend); // from the preview
-    void selectScoreNotes(const QPoint& anchor, bool anchorAfter, const QPoint& current,
-                          bool currentAfter); // a drag in the preview
-    void doubleClickScoreNote(const QPoint& position); // selects that event
-    // A key pressed while the preview has the focus: moves the score cursor, extends the
-    // selection, deletes events, undoes.
-    void scoreKey(ScorePreviewPane::KeyCommand command, bool extend, bool wholeScore);
-    void selectScoreOffsets(std::size_t anchor, std::size_t current); // caret offsets, any order
-    std::optional<std::size_t> caretOffsetOf(const QPoint& position, bool after) const;
-    void indexScoreEvents();
-    void insertStagedNotes(FretboardWidget* fretboard); // the staged positions as a note or chord
-    void setScoreWidth(const std::string& name, bool narrow); // the song and all its score tabs; false if the user cancelled
     void createSongToolBar();
     void updateSongActions();
     void updateEditState(); // Undo, Redo, Cut, Copy, Paste: from the current editor
@@ -162,34 +132,6 @@ private:
     SongEditor* currentEditor() const;
     bool onSongTab() const;
     bool anyModified() const;
-    void
-    syncScoreTabs(); // adds tabs for new \lilypondfile references; drops idle unreferenced ones
-    // Adds the tab of score `name` ("Artist/X.ly"). Without `editor` the score is loaded from
-    // disk, or shown as missing.
-    void addScoreTab(const std::string& name, SongEditor* editor = nullptr);
-    void createMissingScore(const std::string& name); // a missing score's tab becomes a new score
-    void attachScoreEditor(int tabIndex, SongEditor* editor);
-    int scoreTabIndex(const std::string& name) const; // tab widget index, or -1
-    void closeScoreTab(int tabIndex);                 // asks to save a modified score
-    void dropScoreTab(int tabIndex);                  // removes the tab without asking
-    void removeScoreTabs();                           // all, without asking
-    void updateScoreTabTitle(const SongEditor* editor);
-    std::filesystem::path scorePath(const std::string& name) const; // existing file or empty
-    std::filesystem::path newScorePath(const std::string& name) const;
-    void newScore(); // Edit → New Score…
-    void onTabChanged();
-    void requestScorePreview(bool userAsked = false);
-    void showScoreResult(const ScoreResult& result);
-    // Playback of the score preview (fluidsynth renders the build's MIDI file, Qt Multimedia plays
-    // the WAV) and the sound of a clicked fret.
-    void playScore();
-    void stopPlayback();
-    void forgetScoreMidi(); // stops Play and drops the MIDI file of the last build
-    void showPlaybackResult(const PlaybackResult& result);
-    void updateSoundAvailability(); // fluidsynth and a soundfont: enables Play and Sound
-    void soundFret(FretboardWidget* fretboard, int string, int fret);
-    void saveStaffInstrument(int staff, const QString& gmName);
-    void showStaves(SongEditor* editor, const std::string& name);
     // Labels (the `tags` header option; "fav" = favourite). `change` maps a song's current tags to
     // its new ones. An open song gets the new header in its editor (one undo step, unsaved); any
     // other song is rewritten on disk, if it round-trips, and its table row updated. Returns an
@@ -290,52 +232,9 @@ private:
     bool songPageShown_ = false;        // the splitter has been laid out (its state is worth saving)
     QStackedWidget* editorArea_ = nullptr; // {editor, diff view}
     QTabWidget* tabs_ = nullptr;           // song tab (index 0) + one tab per score
-    struct ScoreTab {
-        std::string name;            // "Artist/X.ly", as in \lilypondfile{}
-        QWidget* page = nullptr;     // the tab's widget
-        QPointer<SongEditor> editor; // null while the score is missing
-        ScoreInputBar* inputBar = nullptr;
-        FretboardWidget* fretboard = nullptr;
-        QWidget* inputPanel = nullptr; // {input bar, fretboard}; shown with fretboardAction_
-        // The event (editor text range) whose positions the fretboard staging was loaded from while
-        // it is the one selected note or chord: Insert replaces it then.
-        std::optional<zub::scoreregion::Range> replaceTarget;
-    };
-    std::vector<ScoreTab> scoreTabs_;        // in tab order, from index 1
-    QTimer* fretboardTimer_ = nullptr;       // cursor or text moved: refresh the fretboard
-    QList<QAction*> regionActions_;          // Tie, Slur ...: on the selected notes of a score
-    QTimer* highlightTimer_ = nullptr;       // selection moved: mark its notes in the preview
-    bool scoreLinksFresh_ = false;           // the preview's note positions match the editor text
-    // Of the text the preview was built from (valid while scoreLinksFresh_): the music events, the
-    // event of each link ({line, column}), a link of each event, the event a selection started at.
-    std::vector<zub::scoreregion::Range> scoreEvents_;
-    std::map<std::pair<int, int>, std::size_t> linkEvent_;
-    std::map<std::size_t, QPoint> eventLink_;
-    // The stops (zub::scoreregion::caretStop) the keys of the preview selected from and to; valid
-    // while the editor's selection is still what they stand for.
-    std::optional<std::pair<std::size_t, std::size_t>> scoreStops_;
-    std::optional<std::size_t> scoreAnchor_; // byte offset where a selection started
-    QAction* fretboardAction_ = nullptr;     // "Fretboard": shows the input panels
-    QTimer* scoreSyncTimer_ = nullptr;       // song text changed: look for new \lilypondfile
-    QTimer* scorePreviewTimer_ = nullptr;    // score text changed: rebuild the score preview
-    std::set<std::string> dismissedScores_;  // closed by the user while still referenced
-    bool pdfStale_ = false;                  // a score changed since the song's PDF was built
+    ScoreTabs* scores_ = nullptr;          // the tabs after the song's (LilyPond scores)
+    ScoreTabs::Dirs scoreDirs_;            // chosen in createPreview, used for scores_
     QStackedWidget* previewStack_ = nullptr; // {song PDF preview, score preview}
-    ScorePreviewPane* scorePreview_ = nullptr;
-    ScoreRunner* scoreRunner_ = nullptr;
-    PlaybackRunner* playbackRunner_ = nullptr;
-    ScorePlayer* scorePlayer_ = nullptr;
-    NoteSounds* noteSounds_ = nullptr;
-    bool scoreAmp_ = false; // the latest preview build's MIDI file is for the amp instrument
-    std::filesystem::path scoreAmpMidi_; // ... and the amp staves' own file when others don't use it
-    // The instrument choices of each staff (zub::midi::Instrument ids, "auto" = as the file), by
-    // score name ("Artist/X.ly"): kept for the session only.
-    std::map<std::string, QStringList> staffChoices_;
-    std::map<std::string, QString> chordChoices_; // the chord names' instrument per score (session)
-    QAction* soundAction_ = nullptr; // "Sound": clicking a fret plays the note
-    std::filesystem::path scoreMidi_;        // the MIDI file of the latest successful build
-    std::filesystem::path playbackCacheDir_; // the rendered WAV files
-    std::filesystem::path scoreWorkDir_;
     DiffView* diffView_ = nullptr;
     QWidget* tidyPanel_ = nullptr; // "Tidy changed:" list under the editor area
     QListWidget* tidyList_ = nullptr;

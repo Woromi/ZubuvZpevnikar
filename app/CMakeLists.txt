@@ -15,6 +15,8 @@ qt_add_library(zpevnikar_app STATIC
     ImportDialog.cpp
     MainWindow.hpp
     MainWindow.cpp
+    ScoreTabs.hpp
+    ScoreTabs.cpp
     PreviewPane.hpp
     PreviewPane.cpp
     PreviewRunner.hpp

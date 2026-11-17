@@ -23,6 +23,7 @@
 #include "MainWindow.hpp"
 #include "PreviewPane.hpp"
 #include "ScorePreviewPane.hpp"
+#include "ScoreTabs.hpp"
 #include <zub/core/songsuggest.hpp>
 
 #include "SongEditor.hpp"
@@ -64,41 +65,50 @@ struct AppTestAccess {
         w.offerPapers(editor, measuredText, suggestions);
     }
 
-    static void syncScoreTabs(MainWindow& w) { w.syncScoreTabs(); }
-    static void removeScoreTabs(MainWindow& w) { w.removeScoreTabs(); }
-    static std::vector<MainWindow::ScoreTab>& scoreTabs(MainWindow& w) { return w.scoreTabs_; }
-    static std::optional<std::pair<std::size_t, std::size_t>>& scoreStops(MainWindow& w) {
-        return w.scoreStops_;
+    static ScoreTabs* scores(MainWindow& w) { return w.scores_; }
+    static void syncScoreTabs(MainWindow& w) { w.scores_->syncScoreTabs(); }
+    static void removeScoreTabs(MainWindow& w) { w.scores_->removeScoreTabs(); }
+    static std::vector<ScoreTabs::ScoreTab>& scoreTabs(MainWindow& w) {
+        return w.scores_->scoreTabs_;
     }
-    static std::optional<std::size_t>& scoreAnchor(MainWindow& w) { return w.scoreAnchor_; }
+    static std::optional<std::pair<std::size_t, std::size_t>>& scoreStops(MainWindow& w) {
+        return w.scores_->scoreStops_;
+    }
+    static std::optional<std::size_t>& scoreAnchor(MainWindow& w) {
+        return w.scores_->scoreAnchor_;
+    }
     static void scoreKey(MainWindow& w, ScorePreviewPane::KeyCommand command, bool extend,
                          bool wholeScore) {
-        w.scoreKey(command, extend, wholeScore);
+        w.scores_->scoreKey(command, extend, wholeScore);
     }
     static void insertStagedNotes(MainWindow& w, FretboardWidget* fretboard) {
-        w.insertStagedNotes(fretboard);
+        w.scores_->insertStagedNotes(fretboard);
     }
-    static void newScore(MainWindow& w) { w.newScore(); }
+    static void newScore(MainWindow& w) { w.scores_->newScore(); }
 
     // The preview and the score preview
-    static bool scoreLinksFresh(MainWindow& w) { return w.scoreLinksFresh_; }
-    static ScorePreviewPane* scorePreview(MainWindow& w) { return w.scorePreview_; }
+    static bool scoreLinksFresh(MainWindow& w) { return w.scores_->scoreLinksFresh_; }
+    static ScorePreviewPane* scorePreview(MainWindow& w) { return w.scores_->scorePreview_; }
     static const std::vector<zub::scoreregion::Range>& scoreEvents(MainWindow& w) {
-        return w.scoreEvents_;
+        return w.scores_->scoreEvents_;
     }
-    static const std::map<std::size_t, QPoint>& eventLink(MainWindow& w) { return w.eventLink_; }
+    static const std::map<std::size_t, QPoint>& eventLink(MainWindow& w) {
+        return w.scores_->eventLink_;
+    }
     static const std::map<std::pair<int, int>, std::size_t>& linkEvent(MainWindow& w) {
-        return w.linkEvent_;
+        return w.scores_->linkEvent_;
     }
-    static const QList<QAction*>& regionActions(MainWindow& w) { return w.regionActions_; }
+    static const QList<QAction*>& regionActions(MainWindow& w) { return w.scores_->regionActions_; }
     static PreviewRunner* previewRunner(MainWindow& w) { return w.previewRunner_; }
     static PreviewPane* preview(MainWindow& w) { return w.preview_; }
     static const std::filesystem::path& previewWorkDir(MainWindow& w) { return w.previewWorkDir_; }
-    static const std::filesystem::path& scoreMidi(MainWindow& w) { return w.scoreMidi_; }
-    static const std::filesystem::path& scoreAmpMidi(MainWindow& w) { return w.scoreAmpMidi_; }
-    static bool scoreAmp(MainWindow& w) { return w.scoreAmp_; }
+    static const std::filesystem::path& scoreMidi(MainWindow& w) { return w.scores_->scoreMidi_; }
+    static const std::filesystem::path& scoreAmpMidi(MainWindow& w) {
+        return w.scores_->scoreAmpMidi_;
+    }
+    static bool scoreAmp(MainWindow& w) { return w.scores_->scoreAmp_; }
     static std::map<std::string, QStringList>& staffChoices(MainWindow& w) {
-        return w.staffChoices_;
+        return w.scores_->staffChoices_;
     }
     // Converter actions
     static ConverterRunner* converterRunner(MainWindow& w) { return w.converterRunner_; }

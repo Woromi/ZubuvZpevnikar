@@ -459,20 +459,8 @@ Použijte vestavěný.</translation>
         <translation>&amp;Zpěvníky</translation>
     </message>
     <message>
-        <source>Show the fretboard: click frets to stage notes (one per string), Insert (Ctrl+Return) writes them as a note or chord, Escape clears; double-click a fret inserts at once</source>
-        <translation>Zobrazí hmatník: kliky na pražce připraví noty (jednu na strunu), Vložit (Ctrl+Return) je zapíše jako notu nebo akord, Escape je zruší; dvojklik na pražec vloží hned</translation>
-    </message>
-    <message>
-        <source>Fretboard Sound</source>
-        <translation>Zvuk hmatníku</translation>
-    </message>
-    <message>
         <source>Cannot save score</source>
         <translation>Nelze uložit notovou ukázku</translation>
-    </message>
-    <message>
-        <source>Discard the new score %1? Its \lilypondfile line is removed from the song too.</source>
-        <translation>Zahodit novou notovou ukázku %1? Její řádek \lilypondfile se z písně také odstraní.</translation>
     </message>
     <message>
         <source>Undo</source>
@@ -719,26 +707,6 @@ Použijte vestavěný.</translation>
         <translation>Žádné neuložené změny</translation>
     </message>
     <message>
-        <source>The score has no MIDI file yet: it is being built, or the build failed.</source>
-        <translation>Notová ukázka zatím nemá soubor MIDI: sestavuje se, nebo sestavení selhalo.</translation>
-    </message>
-    <message>
-        <source>e.g. Intro, Solo, Verse</source>
-        <translation>např. Intro, Solo, Verse</translation>
-    </message>
-    <message>
-        <source>The score&apos;s file is the song&apos;s file name followed by the part name. Leave it empty for the song&apos;s only score.</source>
-        <translation>Soubor ukázky se jmenuje jako soubor písně, za kterým následuje název části. Pro jedinou ukázku písně nechte prázdné.</translation>
-    </message>
-    <message>
-        <source>Part name:</source>
-        <translation>Název části:</translation>
-    </message>
-    <message>
-        <source>Use only letters, digits and spaces.</source>
-        <translation>Použijte jen písmena, číslice a mezery.</translation>
-    </message>
-    <message>
         <source>Nothing else found. Write or keep the key in the bar above the song.</source>
         <translation>Nic dalšího se nenašlo. Tóninu zapište nebo ponechte v liště nad písní.</translation>
     </message>
@@ -753,94 +721,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>%1: the song header has a problem: %2</source>
         <translation>%1: problém v hlavičce písně: %2</translation>
-    </message>
-    <message>
-        <source>Fretboard</source>
-        <translation>Hmatník</translation>
-    </message>
-    <message>
-        <source>Play the note when a fret is clicked</source>
-        <translation>Po kliknutí na pražec zahrát tón</translation>
-    </message>
-    <message>
-        <source>Fret clicks play their note.</source>
-        <translation>Kliknutí na pražec zahraje tón.</translation>
-    </message>
-    <message>
-        <source>Fret clicks are silent.</source>
-        <translation>Kliknutí na pražec je bez zvuku.</translation>
-    </message>
-    <message>
-        <source>Tie</source>
-        <translation>Ligatura</translation>
-    </message>
-    <message>
-        <source>Tie the selected notes: ~ after each one but the last</source>
-        <translation>Ligatura mezi označenými notami: ~ za každou kromě poslední</translation>
-    </message>
-    <message>
-        <source>Slur</source>
-        <translation>Legato oblouček</translation>
-    </message>
-    <message>
-        <source>Slur over the selected notes: ( after the first, ) after the last</source>
-        <translation>Legato oblouček přes označené noty: ( za první, ) za poslední</translation>
-    </message>
-    <message>
-        <source>Glissando</source>
-        <translation>Glissando</translation>
-    </message>
-    <message>
-        <source>Glissando after the first selected note</source>
-        <translation>Glissando za první označenou notou</translation>
-    </message>
-    <message>
-        <source>Repeat</source>
-        <translation>Repetice</translation>
-    </message>
-    <message>
-        <source>Play the selected notes twice: \repeat volta 2 { ... }</source>
-        <translation>Zahrát označené noty dvakrát: \repeat volta 2 { ... }</translation>
-    </message>
-    <message>
-        <source>Stroke Down</source>
-        <translation>Úder dolů</translation>
-    </message>
-    <message>
-        <source>Down stroke over every selected chord and note (replaces an up stroke)</source>
-        <translation>Úder dolů nad každým označeným akordem a notou (nahradí úder nahoru)</translation>
-    </message>
-    <message>
-        <source>Stroke Up</source>
-        <translation>Úder nahoru</translation>
-    </message>
-    <message>
-        <source>Up stroke over every selected chord and note (replaces a down stroke)</source>
-        <translation>Úder nahoru nad každým označeným akordem a notou (nahradí úder dolů)</translation>
-    </message>
-    <message>
-        <source>Dead Notes</source>
-        <translation>Mrtvé tóny</translation>
-    </message>
-    <message>
-        <source>Dead (muted) notes: \deadNote before every selected note; again removes them</source>
-        <translation>Mrtvé (dušené) tóny: \deadNote před každou označenou notou; podruhé je odebere</translation>
-    </message>
-    <message>
-        <source>A slur is already open here or the selection has slur marks.</source>
-        <translation>Oblouček je tu už otevřený nebo výběr už obsahuje obloučky.</translation>
-    </message>
-    <message>
-        <source>The selection crosses a { } block: select notes within one block.</source>
-        <translation>Výběr přesahuje blok { }: vyberte noty v jednom bloku.</translation>
-    </message>
-    <message>
-        <source>Preparing playback…</source>
-        <translation>Připravuji přehrávání…</translation>
-    </message>
-    <message>
-        <source>Cannot play: %1</source>
-        <translation>Nelze přehrát: %1</translation>
     </message>
     <message>
         <source>%1 needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
@@ -941,114 +821,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>This song uses commands that songs normally don&apos;t: %1</source>
         <translation>Tato píseň používá příkazy, které písně běžně nepoužívají: %1</translation>
-    </message>
-    <message>
-        <source>Create It</source>
-        <translation>Vytvořit</translation>
-    </message>
-    <message>
-        <source>Width:</source>
-        <translation>Šířka:</translation>
-    </message>
-    <message>
-        <source>Full</source>
-        <translation>Plná</translation>
-    </message>
-    <message>
-        <source>Narrow</source>
-        <translation>Zúžená</translation>
-    </message>
-    <message>
-        <source>The score spans the whole width of the page (\lilypondfile).</source>
-        <translation>Notová ukázka zabírá celou šířku stránky (\lilypondfile).</translation>
-    </message>
-    <message>
-        <source>On A4 the score is narrowed to 80 % of the width, so that it does not run into the song&apos;s details on the right (chord diagrams, tuning, tempo). On A5 it is full width anyway (\narrowlilypondfile).</source>
-        <translation>Na A4 se notová ukázka zúží na 80 % šířky, aby nezasahovala do údajů o písni vpravo (diagramy akordů, ladění, tempo). Na A5 má i tak plnou šířku (\narrowlilypondfile).</translation>
-    </message>
-    <message>
-        <source>Insert Staged Notes</source>
-        <translation>Vložit připravené noty</translation>
-    </message>
-    <message>
-        <source>Clear Staged Notes</source>
-        <translation>Vymazat připravené noty</translation>
-    </message>
-    <message>
-        <source>The cursor is in a comment.</source>
-        <translation>Kurzor je v komentáři.</translation>
-    </message>
-    <message>
-        <source>%1 cannot be opened: %2</source>
-        <translation>%1 nelze otevřít: %2</translation>
-    </message>
-    <message>
-        <source>%1 does not exist yet.</source>
-        <translation>%1 ještě neexistuje.</translation>
-    </message>
-    <message>
-        <source>%1 (missing)</source>
-        <translation>%1 (chybí)</translation>
-    </message>
-    <message>
-        <source>The selected note cannot be replaced.</source>
-        <translation>Vybranou notu nelze nahradit.</translation>
-    </message>
-    <message>
-        <source>Not built automatically: the score uses %1, which scores normally don&apos;t. Building runs it with full access to your files. Check the score, then press Rebuild to build it anyway.</source>
-        <translation>Nesestaveno automaticky: notová ukázka používá %1, což notové ukázky běžně nepoužívají. Sestavení to spustí s plným přístupem k vašim souborům. Zkontrolujte notovou ukázku a pak ji tlačítkem Sestavit znovu přesto sestavte.</translation>
-    </message>
-    <message>
-        <source>Staff %1 (banjo tab)</source>
-        <translation>Osnova %1 (banjová tabulatura)</translation>
-    </message>
-    <message>
-        <source>Staff %1 (tab)</source>
-        <translation>Osnova %1 (tabulatura)</translation>
-    </message>
-    <message>
-        <source>Staff %1</source>
-        <translation>Osnova %1</translation>
-    </message>
-    <message>
-        <source>The instrument cannot be written into this score (read-only, or the staff&apos;s music is a bare variable).</source>
-        <translation>Nástroj nelze do notové ukázky zapsat (je jen pro čtení, nebo je hudba osnovy jen proměnná).</translation>
-    </message>
-    <message>
-        <source>Instrument written into the score; save the file to keep it.</source>
-        <translation>Nástroj je zapsán do notové ukázky; soubor uložte, ať se zachová.</translation>
-    </message>
-    <message>
-        <source>Playing</source>
-        <translation>Hraje</translation>
-    </message>
-    <message>
-        <source>A chord is not closed (a &gt; is missing): nothing was deleted.</source>
-        <translation>Akord není uzavřený (chybí &gt;): nic se nesmazalo.</translation>
-    </message>
-    <message>
-        <source>The song is not in an artist folder.</source>
-        <translation>Píseň není ve složce interpreta.</translation>
-    </message>
-    <message>
-        <source>New Score</source>
-        <translation>Nová notová ukázka</translation>
-    </message>
-    <message>
-        <source>&quot;%1&quot; is not a valid name for a score file.</source>
-        <translation>„%1“ není platný název souboru notové ukázky.</translation>
-    </message>
-    <message>
-        <source>%1 already exists.</source>
-        <translation>%1 už existuje.</translation>
-    </message>
-    <message>
-        <source>File: %1</source>
-        <translation>Soubor: %1</translation>
-    </message>
-    <message>
-        <source>New score %1. Save it with Ctrl+S to create the file.</source>
-        <translation>Nová notová ukázka %1. Uložením (Ctrl+S) se soubor vytvoří.</translation>
     </message>
     <message>
         <source>Measure</source>
@@ -1812,6 +1584,249 @@ Použijte vestavěný.</translation>
     <message>
         <source>The build failed; see the log.</source>
         <translation>Sestavení selhalo; viz log.</translation>
+    </message>
+</context>
+<context>
+    <name>ScoreTabs</name>
+    <message>
+        <source>Fretboard</source>
+        <translation>Hmatník</translation>
+    </message>
+    <message>
+        <source>Show the fretboard: click frets to stage notes (one per string), Insert (Ctrl+Return) writes them as a note or chord, Escape clears; double-click a fret inserts at once</source>
+        <translation>Zobrazí hmatník: kliky na pražce připraví noty (jednu na strunu), Vložit (Ctrl+Return) je zapíše jako notu nebo akord, Escape je zruší; dvojklik na pražec vloží hned</translation>
+    </message>
+    <message>
+        <source>Fretboard Sound</source>
+        <translation>Zvuk hmatníku</translation>
+    </message>
+    <message>
+        <source>Play the note when a fret is clicked</source>
+        <translation>Po kliknutí na pražec zahrát tón</translation>
+    </message>
+    <message>
+        <source>Fret clicks play their note.</source>
+        <translation>Kliknutí na pražec zahraje tón.</translation>
+    </message>
+    <message>
+        <source>Fret clicks are silent.</source>
+        <translation>Kliknutí na pražec je bez zvuku.</translation>
+    </message>
+    <message>
+        <source>Tie</source>
+        <translation>Ligatura</translation>
+    </message>
+    <message>
+        <source>Tie the selected notes: ~ after each one but the last</source>
+        <translation>Ligatura mezi označenými notami: ~ za každou kromě poslední</translation>
+    </message>
+    <message>
+        <source>Slur</source>
+        <translation>Legato oblouček</translation>
+    </message>
+    <message>
+        <source>Slur over the selected notes: ( after the first, ) after the last</source>
+        <translation>Legato oblouček přes označené noty: ( za první, ) za poslední</translation>
+    </message>
+    <message>
+        <source>Glissando</source>
+        <translation>Glissando</translation>
+    </message>
+    <message>
+        <source>Glissando after the first selected note</source>
+        <translation>Glissando za první označenou notou</translation>
+    </message>
+    <message>
+        <source>Repeat</source>
+        <translation>Repetice</translation>
+    </message>
+    <message>
+        <source>Play the selected notes twice: \repeat volta 2 { ... }</source>
+        <translation>Zahrát označené noty dvakrát: \repeat volta 2 { ... }</translation>
+    </message>
+    <message>
+        <source>Stroke Down</source>
+        <translation>Úder dolů</translation>
+    </message>
+    <message>
+        <source>Down stroke over every selected chord and note (replaces an up stroke)</source>
+        <translation>Úder dolů nad každým označeným akordem a notou (nahradí úder nahoru)</translation>
+    </message>
+    <message>
+        <source>Stroke Up</source>
+        <translation>Úder nahoru</translation>
+    </message>
+    <message>
+        <source>Up stroke over every selected chord and note (replaces a down stroke)</source>
+        <translation>Úder nahoru nad každým označeným akordem a notou (nahradí úder dolů)</translation>
+    </message>
+    <message>
+        <source>Dead Notes</source>
+        <translation>Mrtvé tóny</translation>
+    </message>
+    <message>
+        <source>Dead (muted) notes: \deadNote before every selected note; again removes them</source>
+        <translation>Mrtvé (dušené) tóny: \deadNote před každou označenou notou; podruhé je odebere</translation>
+    </message>
+    <message>
+        <source>A slur is already open here or the selection has slur marks.</source>
+        <translation>Oblouček je tu už otevřený nebo výběr už obsahuje obloučky.</translation>
+    </message>
+    <message>
+        <source>The selection crosses a { } block: select notes within one block.</source>
+        <translation>Výběr přesahuje blok { }: vyberte noty v jednom bloku.</translation>
+    </message>
+    <message>
+        <source>Preparing playback…</source>
+        <translation>Připravuji přehrávání…</translation>
+    </message>
+    <message>
+        <source>Cannot play: %1</source>
+        <translation>Nelze přehrát: %1</translation>
+    </message>
+    <message>
+        <source>Unsaved changes</source>
+        <translation>Neuložené změny</translation>
+    </message>
+    <message>
+        <source>Discard the new score %1? Its \lilypondfile line is removed from the song too.</source>
+        <translation>Zahodit novou notovou ukázku %1? Její řádek \lilypondfile se z písně také odstraní.</translation>
+    </message>
+    <message>
+        <source>Cannot save score</source>
+        <translation>Nelze uložit notovou ukázku</translation>
+    </message>
+    <message>
+        <source>Create It</source>
+        <translation>Vytvořit</translation>
+    </message>
+    <message>
+        <source>Width:</source>
+        <translation>Šířka:</translation>
+    </message>
+    <message>
+        <source>Full</source>
+        <translation>Plná</translation>
+    </message>
+    <message>
+        <source>Narrow</source>
+        <translation>Zúžená</translation>
+    </message>
+    <message>
+        <source>The score spans the whole width of the page (\lilypondfile).</source>
+        <translation>Notová ukázka zabírá celou šířku stránky (\lilypondfile).</translation>
+    </message>
+    <message>
+        <source>On A4 the score is narrowed to 80 % of the width, so that it does not run into the song&apos;s details on the right (chord diagrams, tuning, tempo). On A5 it is full width anyway (\narrowlilypondfile).</source>
+        <translation>Na A4 se notová ukázka zúží na 80 % šířky, aby nezasahovala do údajů o písni vpravo (diagramy akordů, ladění, tempo). Na A5 má i tak plnou šířku (\narrowlilypondfile).</translation>
+    </message>
+    <message>
+        <source>Insert Staged Notes</source>
+        <translation>Vložit připravené noty</translation>
+    </message>
+    <message>
+        <source>Clear Staged Notes</source>
+        <translation>Vymazat připravené noty</translation>
+    </message>
+    <message>
+        <source>The cursor is in a comment.</source>
+        <translation>Kurzor je v komentáři.</translation>
+    </message>
+    <message>
+        <source>%1 cannot be opened: %2</source>
+        <translation>%1 nelze otevřít: %2</translation>
+    </message>
+    <message>
+        <source>%1 does not exist yet.</source>
+        <translation>%1 ještě neexistuje.</translation>
+    </message>
+    <message>
+        <source>%1 (missing)</source>
+        <translation>%1 (chybí)</translation>
+    </message>
+    <message>
+        <source>%1 changed on disk and was reloaded.</source>
+        <translation>Soubor %1 se na disku změnil a byl znovu načten.</translation>
+    </message>
+    <message>
+        <source>The selected note cannot be replaced.</source>
+        <translation>Vybranou notu nelze nahradit.</translation>
+    </message>
+    <message>
+        <source>Not built automatically: the score uses %1, which scores normally don&apos;t. Building runs it with full access to your files. Check the score, then press Rebuild to build it anyway.</source>
+        <translation>Nesestaveno automaticky: notová ukázka používá %1, což notové ukázky běžně nepoužívají. Sestavení to spustí s plným přístupem k vašim souborům. Zkontrolujte notovou ukázku a pak ji tlačítkem Sestavit znovu přesto sestavte.</translation>
+    </message>
+    <message>
+        <source>Staff %1 (banjo tab)</source>
+        <translation>Osnova %1 (banjová tabulatura)</translation>
+    </message>
+    <message>
+        <source>Staff %1 (tab)</source>
+        <translation>Osnova %1 (tabulatura)</translation>
+    </message>
+    <message>
+        <source>Staff %1</source>
+        <translation>Osnova %1</translation>
+    </message>
+    <message>
+        <source>The instrument cannot be written into this score (read-only, or the staff&apos;s music is a bare variable).</source>
+        <translation>Nástroj nelze do notové ukázky zapsat (je jen pro čtení, nebo je hudba osnovy jen proměnná).</translation>
+    </message>
+    <message>
+        <source>Instrument written into the score; save the file to keep it.</source>
+        <translation>Nástroj je zapsán do notové ukázky; soubor uložte, ať se zachová.</translation>
+    </message>
+    <message>
+        <source>The score has no MIDI file yet: it is being built, or the build failed.</source>
+        <translation>Notová ukázka zatím nemá soubor MIDI: sestavuje se, nebo sestavení selhalo.</translation>
+    </message>
+    <message>
+        <source>Playing</source>
+        <translation>Hraje</translation>
+    </message>
+    <message>
+        <source>A chord is not closed (a &gt; is missing): nothing was deleted.</source>
+        <translation>Akord není uzavřený (chybí &gt;): nic se nesmazalo.</translation>
+    </message>
+    <message>
+        <source>The song is not in an artist folder.</source>
+        <translation>Píseň není ve složce interpreta.</translation>
+    </message>
+    <message>
+        <source>New Score</source>
+        <translation>Nová notová ukázka</translation>
+    </message>
+    <message>
+        <source>e.g. Intro, Solo, Verse</source>
+        <translation>např. Intro, Solo, Verse</translation>
+    </message>
+    <message>
+        <source>The score&apos;s file is the song&apos;s file name followed by the part name. Leave it empty for the song&apos;s only score.</source>
+        <translation>Soubor ukázky se jmenuje jako soubor písně, za kterým následuje název části. Pro jedinou ukázku písně nechte prázdné.</translation>
+    </message>
+    <message>
+        <source>Part name:</source>
+        <translation>Název části:</translation>
+    </message>
+    <message>
+        <source>Use only letters, digits and spaces.</source>
+        <translation>Použijte jen písmena, číslice a mezery.</translation>
+    </message>
+    <message>
+        <source>&quot;%1&quot; is not a valid name for a score file.</source>
+        <translation>„%1“ není platný název souboru notové ukázky.</translation>
+    </message>
+    <message>
+        <source>%1 already exists.</source>
+        <translation>%1 už existuje.</translation>
+    </message>
+    <message>
+        <source>File: %1</source>
+        <translation>Soubor: %1</translation>
+    </message>
+    <message>
+        <source>New score %1. Save it with Ctrl+S to create the file.</source>
+        <translation>Nová notová ukázka %1. Uložením (Ctrl+S) se soubor vytvoří.</translation>
     </message>
 </context>
 <context>
