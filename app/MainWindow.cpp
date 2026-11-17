@@ -158,6 +158,11 @@ MainWindow::~MainWindow() {
         delete editor_;
         editor_ = nullptr;
     }
+    // The helpers are children and outlive the members (repository_, approvedConstructs_): no
+    // signal of theirs may reach this half-destroyed window.
+    disconnect(scores_, nullptr, this, nullptr);
+    disconnect(songActions_, nullptr, this, nullptr);
+    disconnect(songbookCheck_, nullptr, this, nullptr);
 }
 
 void MainWindow::createMenus() {

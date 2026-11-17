@@ -262,6 +262,10 @@ void ScoreTabs::shutdown() {
         }
     }
     scoreTabs_.clear();
+    // The window's widgets (the tabs, the song editor) go next, while this object lives on as
+    // its child: nothing may reach them from here any more.
+    disconnect(tabs_, nullptr, this, nullptr);
+    song_ = nullptr;
 }
 
 bool ScoreTabs::confirmCloseScores() {
