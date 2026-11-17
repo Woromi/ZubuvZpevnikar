@@ -735,14 +735,6 @@ Použijte vestavěný.</translation>
         <translation>Tato píseň používá příkazy, které písně běžně nepoužívají: %1</translation>
     </message>
     <message>
-        <source>Cancel</source>
-        <translation>Zrušit</translation>
-    </message>
-    <message>
-        <source>Key:</source>
-        <translation>Tónina:</translation>
-    </message>
-    <message>
         <source>Settings</source>
         <translation>Nastavení</translation>
     </message>
@@ -797,138 +789,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>New song %1: write it, then save with Ctrl+S.</source>
         <translation>Nová píseň %1: napište ji a uložte pomocí Ctrl+S.</translation>
-    </message>
-    <message>
-        <source>Check Songs</source>
-        <translation>Zkontrolovat písně</translation>
-    </message>
-    <message>
-        <source>Look for songs where a song action would change something, or a check finds something. Nothing is changed: the songs are marked in the list (this session only), and you decide song by song.</source>
-        <translation>Najde písně, ve kterých by akce s písní něco změnila nebo kontrola něco našla. Nic se nemění: písně se označí v seznamu (jen v tomto sezení) a rozhodujete píseň po písni.</translation>
-    </message>
-    <message>
-        <source>Unsaved edits are not checked: the check reads the files.</source>
-        <translation>Neuložené úpravy se nekontrolují: kontrola čte soubory.</translation>
-    </message>
-    <message>
-        <source>Check</source>
-        <translation>Zkontrolovat</translation>
-    </message>
-    <message>
-        <source>Checking…</source>
-        <translation>Kontroluji…</translation>
-    </message>
-    <message>
-        <source>Check cancelled. </source>
-        <translation>Kontrola zrušena. </translation>
-    </message>
-    <message numerus="yes">
-        <source>%n song(s) with possible changes: open one to see them and decide.</source>
-        <translation>
-            <numerusform>%n píseň s možnými změnami: otevřete ji, uvidíte je a rozhodnete.</numerusform>
-            <numerusform>%n písně s možnými změnami: otevřete některou, uvidíte je a rozhodnete.</numerusform>
-            <numerusform>%n písní s možnými změnami: otevřete některou, uvidíte je a rozhodnete.</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>its paper</source>
-        <translation>svůj papír</translation>
-    </message>
-    <message>
-        <source>Tidy: a chorus typed again, chords inside a syllable, spaces</source>
-        <translation>Učesat: znovu vypsaný refrén, akordy uvnitř slabiky, mezery</translation>
-    </message>
-    <message>
-        <source>Check Song: typos, apostrophes typed two ways, a chorus typed as a verse</source>
-        <translation>Zkontrolovat píseň: překlepy, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
-    </message>
-    <message>
-        <source>Make Smaller: songs that don&apos;t fit %1 (the preview&apos;s paper). Typesets every song: about 2 seconds each, some 8 minutes for the whole songbook.</source>
-        <translation>Zmenšit: písně, které se nevejdou na %1 (papír náhledu). Vysází každou píseň: asi 2 sekundy na píseň, celý zpěvník zhruba 8 minut.</translation>
-    </message>
-    <message>
-        <source>Keys: a key for the songs that have none (from their chords)</source>
-        <translation>Tóniny: tónina pro písně, které ji nemají (podle akordů)</translation>
-    </message>
-    <message>
-        <source>Keys: written keys the chords disagree with (unless confirmed)</source>
-        <translation>Tóniny: zapsané tóniny, se kterými akordy nesouhlasí (pokud nejsou potvrzené)</translation>
-    </message>
-    <message>
-        <source>Metadata: the header&apos;s keys and values (missing tempo, meter …)</source>
-        <translation>Metadata: klíče a hodnoty hlavičky (chybějící tempo, takt …)</translation>
-    </message>
-    <message>
-        <source>Needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
-        <translation>Potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
-    </message>
-    <message numerus="yes">
-        <source>All %n song(s)</source>
-        <translation>
-            <numerusform>Všechny písně (%n)</numerusform>
-            <numerusform>Všechny písně (%n)</numerusform>
-            <numerusform>Všechny písně (%n)</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>The %n song(s) shown in the list</source>
-        <translation>
-            <numerusform>Píseň zobrazená v seznamu (%n)</numerusform>
-            <numerusform>Písně zobrazené v seznamu (%n)</numerusform>
-            <numerusform>Písně zobrazené v seznamu (%n)</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>Tidy %1</source>
-        <translation>Učesání %1</translation>
-    </message>
-    <message>
-        <source>Check %1</source>
-        <translation>Kontrola %1</translation>
-    </message>
-    <message>
-        <source>Too big</source>
-        <translation>Příliš velká</translation>
-    </message>
-    <message>
-        <source>Too big (%1)</source>
-        <translation>Příliš velká (%1)</translation>
-    </message>
-    <message>
-        <source>Key</source>
-        <translation>Tónina</translation>
-    </message>
-    <message>
-        <source>Metadata %1</source>
-        <translation>Metadata %1</translation>
-    </message>
-    <message>
-        <source>Errors %1</source>
-        <translation>Chyby %1</translation>
-    </message>
-    <message>
-        <source>Tidy:</source>
-        <translation>Učesat:</translation>
-    </message>
-    <message>
-        <source>Check Song:</source>
-        <translation>Zkontrolovat píseň:</translation>
-    </message>
-    <message>
-        <source>Make Smaller:</source>
-        <translation>Zmenšit:</translation>
-    </message>
-    <message>
-        <source>Make Smaller (%1):</source>
-        <translation>Zmenšit (%1):</translation>
-    </message>
-    <message>
-        <source>Metadata:</source>
-        <translation>Metadata:</translation>
-    </message>
-    <message>
-        <source>Problems:</source>
-        <translation>Problémy:</translation>
     </message>
 </context>
 <context>
@@ -2289,6 +2149,149 @@ Použijte vestavěný.</translation>
     <message>
         <source>Possible changes</source>
         <translation>Možné změny</translation>
+    </message>
+</context>
+<context>
+    <name>SongbookCheck</name>
+    <message>
+        <source>Check Songs</source>
+        <translation>Zkontrolovat písně</translation>
+    </message>
+    <message>
+        <source>its paper</source>
+        <translation>svůj papír</translation>
+    </message>
+    <message>
+        <source>Look for songs where a song action would change something, or a check finds something. Nothing is changed: the songs are marked in the list (this session only), and you decide song by song.</source>
+        <translation>Najde písně, ve kterých by akce s písní něco změnila nebo kontrola něco našla. Nic se nemění: písně se označí v seznamu (jen v tomto sezení) a rozhodujete píseň po písni.</translation>
+    </message>
+    <message>
+        <source>Tidy: a chorus typed again, chords inside a syllable, spaces</source>
+        <translation>Učesat: znovu vypsaný refrén, akordy uvnitř slabiky, mezery</translation>
+    </message>
+    <message>
+        <source>Check Song: typos, apostrophes typed two ways, a chorus typed as a verse</source>
+        <translation>Zkontrolovat píseň: překlepy, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
+    </message>
+    <message>
+        <source>Make Smaller: songs that don&apos;t fit %1 (the preview&apos;s paper). Typesets every song: about 2 seconds each, some 8 minutes for the whole songbook.</source>
+        <translation>Zmenšit: písně, které se nevejdou na %1 (papír náhledu). Vysází každou píseň: asi 2 sekundy na píseň, celý zpěvník zhruba 8 minut.</translation>
+    </message>
+    <message>
+        <source>Keys: a key for the songs that have none (from their chords)</source>
+        <translation>Tóniny: tónina pro písně, které ji nemají (podle akordů)</translation>
+    </message>
+    <message>
+        <source>Keys: written keys the chords disagree with (unless confirmed)</source>
+        <translation>Tóniny: zapsané tóniny, se kterými akordy nesouhlasí (pokud nejsou potvrzené)</translation>
+    </message>
+    <message>
+        <source>Metadata: the header&apos;s keys and values (missing tempo, meter …)</source>
+        <translation>Metadata: klíče a hodnoty hlavičky (chybějící tempo, takt …)</translation>
+    </message>
+    <message>
+        <source>Needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
+        <translation>Potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
+    </message>
+    <message numerus="yes">
+        <source>All %n song(s)</source>
+        <translation>
+            <numerusform>Všechny písně (%n)</numerusform>
+            <numerusform>Všechny písně (%n)</numerusform>
+            <numerusform>Všechny písně (%n)</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>The %n song(s) shown in the list</source>
+        <translation>
+            <numerusform>Píseň zobrazená v seznamu (%n)</numerusform>
+            <numerusform>Písně zobrazené v seznamu (%n)</numerusform>
+            <numerusform>Písně zobrazené v seznamu (%n)</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Unsaved edits are not checked: the check reads the files.</source>
+        <translation>Neuložené úpravy se nekontrolují: kontrola čte soubory.</translation>
+    </message>
+    <message>
+        <source>Check</source>
+        <translation>Zkontrolovat</translation>
+    </message>
+    <message>
+        <source>Checking…</source>
+        <translation>Kontroluji…</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Zrušit</translation>
+    </message>
+    <message>
+        <source>Tidy %1</source>
+        <translation>Učesání %1</translation>
+    </message>
+    <message>
+        <source>Check %1</source>
+        <translation>Kontrola %1</translation>
+    </message>
+    <message>
+        <source>Too big</source>
+        <translation>Příliš velká</translation>
+    </message>
+    <message>
+        <source>Too big (%1)</source>
+        <translation>Příliš velká (%1)</translation>
+    </message>
+    <message>
+        <source>Key</source>
+        <translation>Tónina</translation>
+    </message>
+    <message>
+        <source>Metadata %1</source>
+        <translation>Metadata %1</translation>
+    </message>
+    <message>
+        <source>Errors %1</source>
+        <translation>Chyby %1</translation>
+    </message>
+    <message>
+        <source>Tidy:</source>
+        <translation>Učesat:</translation>
+    </message>
+    <message>
+        <source>Check Song:</source>
+        <translation>Zkontrolovat píseň:</translation>
+    </message>
+    <message>
+        <source>Make Smaller:</source>
+        <translation>Zmenšit:</translation>
+    </message>
+    <message>
+        <source>Make Smaller (%1):</source>
+        <translation>Zmenšit (%1):</translation>
+    </message>
+    <message>
+        <source>Key:</source>
+        <translation>Tónina:</translation>
+    </message>
+    <message>
+        <source>Metadata:</source>
+        <translation>Metadata:</translation>
+    </message>
+    <message>
+        <source>Problems:</source>
+        <translation>Problémy:</translation>
+    </message>
+    <message>
+        <source>Check cancelled. </source>
+        <translation>Kontrola zrušena. </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n song(s) with possible changes: open one to see them and decide.</source>
+        <translation>
+            <numerusform>%n píseň s možnými změnami: otevřete ji, uvidíte je a rozhodnete.</numerusform>
+            <numerusform>%n písně s možnými změnami: otevřete některou, uvidíte je a rozhodnete.</numerusform>
+            <numerusform>%n písní s možnými změnami: otevřete některou, uvidíte je a rozhodnete.</numerusform>
+        </translation>
     </message>
 </context>
 <context>

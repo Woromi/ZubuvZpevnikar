@@ -17,27 +17,6 @@
             <numerusform>⚠ %n files with issues (hover for details)</numerusform>
         </translation>
     </message>
-    <message numerus="yes">
-        <source>All %n song(s)</source>
-        <translation>
-            <numerusform>All %n song</numerusform>
-            <numerusform>All %n songs</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>The %n song(s) shown in the list</source>
-        <translation>
-            <numerusform>The %n song shown in the list</numerusform>
-            <numerusform>The %n songs shown in the list</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%n song(s) with possible changes: open one to see them and decide.</source>
-        <translation>
-            <numerusform>%n song with possible changes: open it to see them and decide.</numerusform>
-            <numerusform>%n songs with possible changes: open one to see them and decide.</numerusform>
-        </translation>
-    </message>
 </context>
 <context>
     <name>PreviewPane</name>
@@ -115,6 +94,30 @@
         <translation>
             <numerusform>%n change</numerusform>
             <numerusform>%n changes</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>SongbookCheck</name>
+    <message numerus="yes">
+        <source>All %n song(s)</source>
+        <translation>
+            <numerusform>All %n song</numerusform>
+            <numerusform>All %n songs</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>The %n song(s) shown in the list</source>
+        <translation>
+            <numerusform>The %n song shown in the list</numerusform>
+            <numerusform>The %n songs shown in the list</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n song(s) with possible changes: open one to see them and decide.</source>
+        <translation>
+            <numerusform>%n song with possible changes: open it to see them and decide.</numerusform>
+            <numerusform>%n songs with possible changes: open one to see them and decide.</numerusform>
         </translation>
     </message>
 </context>

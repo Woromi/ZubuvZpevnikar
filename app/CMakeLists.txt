@@ -19,6 +19,8 @@ qt_add_library(zpevnikar_app STATIC
     ScoreTabs.cpp
     SongActions.hpp
     SongActions.cpp
+    SongbookCheck.hpp
+    SongbookCheck.cpp
     PreviewPane.hpp
     PreviewPane.cpp
     PreviewRunner.hpp

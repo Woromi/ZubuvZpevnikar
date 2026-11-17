@@ -44,7 +44,7 @@ class PreviewPane;
 class PreviewRunner;
 class SongEditor;
 class SongbookExporter;
-class SongbookScan;
+class SongbookCheck;
 class SongbookSorter;
 class SongbooksPage;
 class SongFilterProxy;
@@ -143,9 +143,6 @@ private:
     void showTableMenu(const QPoint& position);
     void updateLabelActions(); // enabled state and ★ check of the song toolbar's actions
     void updateMarkChecked(); // enabled while the editor text has the "not checked yet" line
-    // Songs → Scan Songbook…: runs tidy/check/shrink on many songs and marks the ones with
-    // possible changes in the list (this session only); changes nothing.
-    void scanSongbook(); // Songs → Check Songs…
     void showSongbooks(); // the songbook assembler page
     void clearTidyChanges();
     void showChanges(bool show); // the diff of the saved file vs the editor text, or the editor
@@ -204,8 +201,7 @@ private:
     QAction* favouriteAction_ = nullptr;   // ★ checkable: the open song is a favourite
     QTimer* favouriteTimer_ = nullptr;     // syncs the ★ with the editor text after typing
     QAction* markCheckedAction_ = nullptr; // removes the import's "not checked yet" TODO line
-    SongbookScan* scan_ = nullptr;         // while a songbook scan runs
-    int scanFound_ = 0;                    // songs it marked so far
+    SongbookCheck* songbookCheck_ = nullptr; // Songs → Check Songs…
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any
     QLabel* inputLabel_ = nullptr;

@@ -13,6 +13,7 @@
 #include "SongActions.hpp"
 #include "SongEditor.hpp"
 #include "SongListPage.hpp"
+#include "SongbookCheck.hpp"
 #include "SongbookTree.hpp"
 #include "SongbooksPage.hpp"
 
@@ -122,8 +123,8 @@ struct AppTestAccess {
     }
     static QAction* tidyAction(MainWindow& w) { return w.songActions_->tidyAction_; }
     static QAction* checkAction(MainWindow& w) { return w.songActions_->checkAction_; }
-    static void scanSongbook(MainWindow& w) { w.scanSongbook(); }
-    static bool scanRunning(MainWindow& w) { return w.scan_ != nullptr; }
+    static void scanSongbook(MainWindow& w) { w.songbookCheck_->start(); }
+    static bool scanRunning(MainWindow& w) { return w.songbookCheck_->scan_ != nullptr; }
     static const std::map<std::filesystem::path, zub::songcheck::KeyFinding>&
     keyFindings(MainWindow& w) {
         return w.songActions_->keyFindings_;
