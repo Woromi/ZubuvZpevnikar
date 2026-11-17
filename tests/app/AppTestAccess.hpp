@@ -2,9 +2,24 @@
 
 // The app tests' way into private members: the tested classes declare `friend struct
 // AppTestAccess;`, this struct (global namespace) holds the accessors the tests use.
+#include "ActivityBar.hpp"
+#include "CodeTextEdit.hpp"
+#include "CollectionTabs.hpp"
+#include "ConverterRunner.hpp"
+#include "MainWindow.hpp"
+#include "PreviewPane.hpp"
+#include "ScorePreviewPane.hpp"
+#include "ScoreTabs.hpp"
+#include "SongActions.hpp"
+#include "SongEditor.hpp"
+#include "SongListPage.hpp"
+#include "SongbookTree.hpp"
+#include "SongbooksPage.hpp"
+
 #include <QAction>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFrame>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -13,23 +28,7 @@
 #include <QTimer>
 #include <QTreeWidget>
 #include <filesystem>
-
-#include "ActivityBar.hpp"
-#include "CodeTextEdit.hpp"
-#include "CollectionTabs.hpp"
-#include <QFrame>
-
-#include "ConverterRunner.hpp"
-#include "MainWindow.hpp"
-#include "PreviewPane.hpp"
-#include "ScorePreviewPane.hpp"
-#include "ScoreTabs.hpp"
 #include <zub/core/songsuggest.hpp>
-
-#include "SongEditor.hpp"
-#include "SongListPage.hpp"
-#include "SongbookTree.hpp"
-#include "SongbooksPage.hpp"
 
 struct AppTestAccess {
     // ---- CodeTextEdit
@@ -62,7 +61,7 @@ struct AppTestAccess {
     static void openSettings(MainWindow& w) { w.openSettings(); }
     static void offerPapers(MainWindow& w, SongEditor* editor, const std::string& measuredText,
                             const zub::songsuggest::Suggestions& suggestions) {
-        w.offerPapers(editor, measuredText, suggestions);
+        w.songActions_->offerPapers(editor, measuredText, suggestions);
     }
 
     static ScoreTabs* scores(MainWindow& w) { return w.scores_; }
@@ -111,17 +110,23 @@ struct AppTestAccess {
         return w.scores_->staffChoices_;
     }
     // Converter actions
-    static ConverterRunner* converterRunner(MainWindow& w) { return w.converterRunner_; }
-    static void startMeasure(MainWindow& w, SongEditor* editor) { w.startMeasure(editor); }
-    static void startTidy(MainWindow& w) { w.startTidy(); }
-    static bool tidyRunning(MainWindow& w) { return w.runKind_ == MainWindow::RunKind::Tidy; }
-    static QAction* tidyAction(MainWindow& w) { return w.tidyAction_; }
-    static QAction* checkAction(MainWindow& w) { return w.checkAction_; }
+    static ConverterRunner* converterRunner(MainWindow& w) {
+        return w.songActions_->converterRunner_;
+    }
+    static void startMeasure(MainWindow& w, SongEditor* editor) {
+        w.songActions_->startMeasure(editor);
+    }
+    static void startTidy(MainWindow& w) { w.songActions_->startTidy(); }
+    static bool tidyRunning(MainWindow& w) {
+        return w.songActions_->runKind_ == SongActions::RunKind::Tidy;
+    }
+    static QAction* tidyAction(MainWindow& w) { return w.songActions_->tidyAction_; }
+    static QAction* checkAction(MainWindow& w) { return w.songActions_->checkAction_; }
     static void scanSongbook(MainWindow& w) { w.scanSongbook(); }
     static bool scanRunning(MainWindow& w) { return w.scan_ != nullptr; }
-    static const std::map<std::filesystem::path, zub::songcheck::KeyFinding>& keyFindings(
-        MainWindow& w) {
-        return w.keyFindings_;
+    static const std::map<std::filesystem::path, zub::songcheck::KeyFinding>&
+    keyFindings(MainWindow& w) {
+        return w.songActions_->keyFindings_;
     }
 
     // ---- ScorePreviewPane

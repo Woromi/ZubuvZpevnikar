@@ -18,9 +18,7 @@
 #include <string>
 #include <vector>
 #include <zub/core/scoreregion.hpp>
-#include <zub/core/songcheck.hpp>
 #include <zub/core/songedit.hpp>
-#include <zub/core/songsuggest.hpp>
 #include <zub/core/songtidy.hpp>
 
 class QAction;
@@ -51,8 +49,7 @@ class SongbookSorter;
 class SongbooksPage;
 class SongFilterProxy;
 class SongTableModel;
-class ConverterRunner;
-struct ConverterOutput;
+class SongActions;
 
 namespace KSyntaxHighlighting {
 class Repository;
@@ -115,9 +112,6 @@ private:
     void goBack();
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
     bool confirmCloseAll();
-    // Offers the `pap` header after a measurement of `measuredText` (a bar above the editor).
-    void offerPapers(SongEditor* editor, const std::string& measuredText,
-                     const zub::songsuggest::Suggestions& suggestions);
     void replaceSongText(const std::string& after); // one undo step in the song editor
     void createSongToolBar();
     void updateSongActions();
@@ -152,40 +146,7 @@ private:
     // Songs → Scan Songbook…: runs tidy/check/shrink on many songs and marks the ones with
     // possible changes in the list (this session only); changes nothing.
     void scanSongbook(); // Songs → Check Songs…
-    // The bar above the song with a key the last Check Songs found for it (to write, or to
-    // confirm the written one with % nocheck key).
-    void offerKey(SongEditor* editor);
-    // checkkeys.py on `content` (the song's current text, in a temporary copy), in the
-    // background: keyFindings_ follows (a missing key or one the chords disagree with, unless
-    // confirmed with % nocheck key), then `done` gets the finding (nullopt: none, or the check
-    // could not run).
-    void checkKey(SongEditor* editor, const std::string& content,
-                  std::function<void(std::optional<zub::songcheck::KeyFinding>)> done);
-    QString keyFindingText(const zub::songcheck::KeyFinding& finding,
-                           const std::string& content) const;
     void showSongbooks(); // the songbook assembler page
-    // Tidy (chords_converter tidy on the open song, one undo step) and the Changes view
-    void startTidy(const QString& note = {});
-    void onConverterFinished(const std::expected<ConverterOutput, QString>& output);
-    void onTidyFinished(const std::expected<ConverterOutput, QString>& output);
-    // Make Smaller, Join Lines, Check Song: shrink, join or check (a dialog to pick proposals),
-    // then apply the picked ones (one undo step)
-    enum class SongAction { Shrink, Join, Check };
-    void startProposals(SongAction action);
-    QString actionName(SongAction action) const;
-    void onSuggestFinished(const std::expected<ConverterOutput, QString>& output);
-    void startApply(std::vector<std::string> ids, const QString& description);
-    void onApplyFinished(const std::expected<ConverterOutput, QString>& output);
-    // After a proposal was applied: measures the new text in the background (the same shrink
-    // --fit --measure; no dialog) and offers the `pap` header from its result alone.
-    void startMeasure(SongEditor* editor);
-    void onMeasureFinished(const std::expected<ConverterOutput, QString>& output);
-    void cancelMeasure(); // the background measurement, if one runs (the text changed ...)
-    // Takes over the state of the run that just finished; the editor it belongs to, or nullptr
-    // (after a status message) when the song changed meanwhile. `input` gets the bytes sent.
-    SongEditor* takeRun(std::string& input, const QString& what);
-    // False and a message box when the converter is older than zub::converter::kRequired.
-    bool converterUsable(const std::filesystem::path& converter, const QString& action);
     void clearTidyChanges();
     void showChanges(bool show); // the diff of the saved file vs the editor text, or the editor
     void refreshChanges();
@@ -238,29 +199,13 @@ private:
     DiffView* diffView_ = nullptr;
     QWidget* tidyPanel_ = nullptr; // "Tidy changed:" list under the editor area
     QListWidget* tidyList_ = nullptr;
-    ConverterRunner* converterRunner_ = nullptr;
-    enum class RunKind { Tidy, Suggest, Apply, Measure };
-    RunKind runKind_ = RunKind::Tidy;
-    QPointer<SongEditor> runEditor_; // the editor the running converter belongs to
-    std::string runInput_;           // the bytes that were sent
-    QString tidyNote_;               // appended to the status message when a tidy is done
-    QString applyDescription_;       // of the proposal being applied
-    SongAction songAction_ = SongAction::Shrink; // the action whose shrink/join/check/apply runs
-    bool measuredRun_ = false;       // the running/last shrink or join measured (was approved)
-    bool measureAfterApply_ = false; // measure the text again once the proposals are applied
-    bool applyRestructures_ = false; // the proposals being applied make a part a chorus: Tidy after
-    QAction* tidyAction_ = nullptr;
-    QAction* makeSmallerAction_ = nullptr;
-    QAction* checkAction_ = nullptr;
+    SongActions* songActions_ = nullptr;     // Tidy, Make Smaller, Join Lines, Check Song
     QAction* labelsAction_ = nullptr;      // Labels… of the open song
     QAction* favouriteAction_ = nullptr;   // ★ checkable: the open song is a favourite
     QTimer* favouriteTimer_ = nullptr;     // syncs the ★ with the editor text after typing
     QAction* markCheckedAction_ = nullptr; // removes the import's "not checked yet" TODO line
     SongbookScan* scan_ = nullptr;         // while a songbook scan runs
     int scanFound_ = 0;                    // songs it marked so far
-    // Keys the last Check Songs found, by song path (this session; dropped when acted on).
-    std::map<std::filesystem::path, zub::songcheck::KeyFinding> keyFindings_;
-    QAction* joinLinesAction_ = nullptr;
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any
     QLabel* inputLabel_ = nullptr;

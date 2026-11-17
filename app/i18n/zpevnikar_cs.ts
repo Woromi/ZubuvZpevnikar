@@ -503,38 +503,6 @@ Použijte vestavěný.</translation>
         <translation>Vložit (Ctrl+V)</translation>
     </message>
     <message>
-        <source>Tidy</source>
-        <translation>Učesat</translation>
-    </message>
-    <message>
-        <source>Tidy the song with chords_converter: repeated choruses, chord positions (one undo step)</source>
-        <translation>Učesat píseň pomocí chords_converter: opakované refrény, pozice akordů (jeden krok zpět)</translation>
-    </message>
-    <message>
-        <source>Make Smaller</source>
-        <translation>Zmenšit</translation>
-    </message>
-    <message>
-        <source>Ask chords_converter for changes that make the song print smaller; apply one (one undo step), then ask again</source>
-        <translation>Nechat chords_converter navrhnout změny, díky kterým se píseň vytiskne menší; jednu použít (jeden krok zpět) a pak se zeptat znovu</translation>
-    </message>
-    <message>
-        <source>Join Lines</source>
-        <translation>Spojit řádky</translation>
-    </message>
-    <message>
-        <source>Join every two lines of a kind of part into one, where they still fit the column (typesets the song on A4 and A5: a few seconds)</source>
-        <translation>Spojit vždy dva řádky v částech jednoho druhu do jednoho, pokud se ještě vejdou do sloupce (vysází píseň na A4 i A5: pár sekund)</translation>
-    </message>
-    <message>
-        <source>Check Song</source>
-        <translation>Zkontrolovat píseň</translation>
-    </message>
-    <message>
-        <source>Look for mistakes: typos where a line&apos;s copies differ, apostrophes typed two ways, a chorus typed as a verse</source>
-        <translation>Hledat chyby: překlepy, kde se kopie řádku liší, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
-    </message>
-    <message>
         <source>Mark Checked</source>
         <translation>Označit jako zkontrolované</translation>
     </message>
@@ -663,42 +631,6 @@ Použijte vestavěný.</translation>
         <translation>&amp;Uložit notovou ukázku</translation>
     </message>
     <message>
-        <source>Tidying…</source>
-        <translation>Učesávám…</translation>
-    </message>
-    <message>
-        <source>%1 discarded: the song changed while it ran.</source>
-        <translation>Výsledek akce „%1“ byl zahozen: píseň se mezitím změnila.</translation>
-    </message>
-    <message>
-        <source>Tidy failed</source>
-        <translation>Učesání se nezdařilo</translation>
-    </message>
-    <message>
-        <source>line %1: %2</source>
-        <translation>řádek %1: %2</translation>
-    </message>
-    <message>
-        <source>Tidy: nothing to change</source>
-        <translation>Učesání: není co měnit</translation>
-    </message>
-    <message numerus="yes">
-        <source>Tidy: %n change(s)</source>
-        <translation>
-            <numerusform>Učesání: %n změna</numerusform>
-            <numerusform>Učesání: %n změny</numerusform>
-            <numerusform>Učesání: %n změn</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source> (chord positions not checked: set lang in the song header)</source>
-        <translation> (pozice akordů nezkontrolovány: nastavte lang v hlavičce písně)</translation>
-    </message>
-    <message>
-        <source> (chord positions are only checked for lang czech, slovak or english)</source>
-        <translation> (pozice akordů se kontrolují jen pro lang czech, slovak nebo english)</translation>
-    </message>
-    <message>
         <source>No changes since the import</source>
         <translation>Od importu žádné změny</translation>
     </message>
@@ -707,24 +639,8 @@ Použijte vestavěný.</translation>
         <translation>Žádné neuložené změny</translation>
     </message>
     <message>
-        <source>Nothing else found. Write or keep the key in the bar above the song.</source>
-        <translation>Nic dalšího se nenašlo. Tóninu zapište nebo ponechte v liště nad písní.</translation>
-    </message>
-    <message>
-        <source>No lines can be joined: the parts of a kind need the same number of lines, and the joined lines must still fit the column on A4 and A5.</source>
-        <translation>Žádné řádky nelze spojit: části jednoho druhu potřebují stejný počet řádků a spojené řádky se musí vejít do sloupce na A4 i A5.</translation>
-    </message>
-    <message>
-        <source>No lines can be joined.</source>
-        <translation>Žádné řádky nelze spojit.</translation>
-    </message>
-    <message>
         <source>%1: the song header has a problem: %2</source>
         <translation>%1: problém v hlavičce písně: %2</translation>
-    </message>
-    <message>
-        <source>%1 needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
-        <translation>%1 potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
     </message>
     <message>
         <source>No package to build the songs with: the songbook&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
@@ -795,10 +711,6 @@ Použijte vestavěný.</translation>
         <translation>Štítky změněny. Uložením je zachováte.</translation>
     </message>
     <message>
-        <source>Tidy needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
-        <translation>Učesání potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
-    </message>
-    <message>
         <source>The score %1 does not exist: create it, or remove its \lilypondfile line from the song.</source>
         <translation>Notová ukázka %1 neexistuje: vytvořte ji, nebo odstraňte její řádek \lilypondfile z písně.</translation>
     </message>
@@ -823,176 +735,12 @@ Použijte vestavěný.</translation>
         <translation>Tato píseň používá příkazy, které písně běžně nepoužívají: %1</translation>
     </message>
     <message>
-        <source>Measure</source>
-        <translation>Změřit</translation>
-    </message>
-    <message>
-        <source>Suggest Without Measuring</source>
-        <translation>Navrhnout bez měření</translation>
-    </message>
-    <message>
-        <source>Looking for ways to make the song smaller…</source>
-        <translation>Hledám, jak píseň zmenšit…</translation>
-    </message>
-    <message>
-        <source>Checking the song…</source>
-        <translation>Kontroluji píseň…</translation>
-    </message>
-    <message>
-        <source>Build</source>
-        <translation>Sestavit</translation>
-    </message>
-    <message>
         <source>Cancel</source>
         <translation>Zrušit</translation>
     </message>
     <message>
-        <source>Checking which lines can be joined (typesetting the song, a few seconds)…</source>
-        <translation>Zjišťuji, které řádky lze spojit (sázím píseň, pár sekund)…</translation>
-    </message>
-    <message>
-        <source>%1 failed</source>
-        <translation>Akce „%1“ selhala</translation>
-    </message>
-    <message>
-        <source>No more changes to suggest.</source>
-        <translation>Žádné další změny k navržení.</translation>
-    </message>
-    <message>
-        <source>The song fits on %1 already.</source>
-        <translation>Píseň se už vejde na %1.</translation>
-    </message>
-    <message>
-        <source>A5</source>
-        <translation>A5</translation>
-    </message>
-    <message>
-        <source>A4</source>
-        <translation>A4</translation>
-    </message>
-    <message>
-        <source>No mistakes found.</source>
-        <translation>Žádné chyby nenalezeny.</translation>
-    </message>
-    <message>
-        <source>Pick a change, most readable first (score 0–100: how readable the song stays):</source>
-        <translation>Vyberte změnu, nejčitelnější jsou nahoře (hodnocení 0–100: jak čitelná píseň zůstane):</translation>
-    </message>
-    <message>
-        <source>Possible mistakes, in song order. A part with a chorus&apos;s words: only you can tell whether it is the chorus sung again (the melody may differ); made a chorus, Tidy runs after it to shorten the copies.</source>
-        <translation>Možné chyby v pořadí písně. Část se slovy refrénu: jen vy poznáte, zda jde o znovu zpívaný refrén (melodie se může lišit); když z ní uděláte refrén, spustí se potom Učesat a zkrátí kopie.</translation>
-    </message>
-    <message>
-        <source>Pick the parts whose lines to join in pairs (checked: the joined lines fit the column on A4 and A5):</source>
-        <translation>Vyberte části, jejichž řádky se mají spojit po dvou (zaškrtnuté: spojené řádky se vejdou do sloupce na A4 i A5):</translation>
-    </message>
-    <message>
-        <source>%1 discarded: the song changed.</source>
-        <translation>Výsledek akce „%1“ byl zahozen: píseň se změnila.</translation>
-    </message>
-    <message>
-        <source>Marked as correct: %1</source>
-        <translation>Označeno jako správné: %1</translation>
-    </message>
-    <message numerus="yes">
-        <source>Marked as correct: %n finding(s)</source>
-        <translation>
-            <numerusform>Označeno jako správné: %n nález</numerusform>
-            <numerusform>Označeno jako správné: %n nálezy</numerusform>
-            <numerusform>Označeno jako správné: %n nálezů</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%n changes</source>
-        <translation>
-            <numerusform>%n změna</numerusform>
-            <numerusform>%n změny</numerusform>
-            <numerusform>%n změn</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>Measured: the song fits one page of %1.</source>
-        <translation>Změřeno: píseň se vejde na jednu stránku %1.</translation>
-    </message>
-    <message>
-        <source> and </source>
-        <translation> a </translation>
-    </message>
-    <message>
-        <source>Measured: the song no longer fits one page of %1.</source>
-        <translation>Změřeno: píseň se už nevejde na jednu stránku %1.</translation>
-    </message>
-    <message>
-        <source>none</source>
-        <translation>žádné</translation>
-    </message>
-    <message>
-        <source>pap: %1 → %2</source>
-        <translation>pap: %1 → %2</translation>
-    </message>
-    <message>
-        <source>Mark</source>
-        <translation>Označit</translation>
-    </message>
-    <message>
-        <source>Update</source>
-        <translation>Aktualizovat</translation>
-    </message>
-    <message>
-        <source>Paper marks updated. Save to keep them.</source>
-        <translation>Značky papíru změněny. Uložte, aby se zachovaly.</translation>
-    </message>
-    <message>
-        <source>Key: none written; the chords say %1.</source>
-        <translation>Tónina: nezapsaná; akordy říkají %1.</translation>
-    </message>
-    <message>
-        <source>Key: written %1, the chords say %2.</source>
-        <translation>Tónina: zapsaná %1, akordy říkají %2.</translation>
-    </message>
-    <message>
-        <source>Key written. Save to keep it.</source>
-        <translation>Tónina zapsána. Uložte, aby zůstala.</translation>
-    </message>
-    <message>
         <source>Key:</source>
         <translation>Tónina:</translation>
-    </message>
-    <message>
-        <source>none written; the chords say %1 (margin %2).</source>
-        <translation>není zapsaná; podle akordů je to %1 (rozdíl %2).</translation>
-    </message>
-    <message>
-        <source>Write %1</source>
-        <translation>Zapsat %1</translation>
-    </message>
-    <message>
-        <source>written %1, the chords say %2 (margin %3).</source>
-        <translation>zapsaná %1, podle akordů je to %2 (rozdíl %3).</translation>
-    </message>
-    <message>
-        <source>Keep the Written Key</source>
-        <translation>Ponechat zapsanou</translation>
-    </message>
-    <message>
-        <source>The written key is confirmed (% nocheck key). Save to keep it.</source>
-        <translation>Zapsaná tónina je potvrzená (% nocheck key). Uložte, aby to zůstalo.</translation>
-    </message>
-    <message>
-        <source>Applying…</source>
-        <translation>Provádím změnu…</translation>
-    </message>
-    <message>
-        <source>Applied: %1</source>
-        <translation>Použito: %1</translation>
-    </message>
-    <message>
-        <source> (after making a part a chorus)</source>
-        <translation> (po převedení části na refrén)</translation>
-    </message>
-    <message>
-        <source>Measuring…</source>
-        <translation>Měřím…</translation>
     </message>
     <message>
         <source>Settings</source>
@@ -2073,6 +1821,269 @@ Použijte vestavěný.</translation>
     <message>
         <source>line %1</source>
         <translation>řádek %1</translation>
+    </message>
+</context>
+<context>
+    <name>SongActions</name>
+    <message>
+        <source>Tidy</source>
+        <translation>Učesat</translation>
+    </message>
+    <message>
+        <source>Tidy the song with chords_converter: repeated choruses, chord positions (one undo step)</source>
+        <translation>Učesat píseň pomocí chords_converter: opakované refrény, pozice akordů (jeden krok zpět)</translation>
+    </message>
+    <message>
+        <source>Make Smaller</source>
+        <translation>Zmenšit</translation>
+    </message>
+    <message>
+        <source>Ask chords_converter for changes that make the song print smaller; apply one (one undo step), then ask again</source>
+        <translation>Nechat chords_converter navrhnout změny, díky kterým se píseň vytiskne menší; jednu použít (jeden krok zpět) a pak se zeptat znovu</translation>
+    </message>
+    <message>
+        <source>Join Lines</source>
+        <translation>Spojit řádky</translation>
+    </message>
+    <message>
+        <source>Join every two lines of a kind of part into one, where they still fit the column (typesets the song on A4 and A5: a few seconds)</source>
+        <translation>Spojit vždy dva řádky v částech jednoho druhu do jednoho, pokud se ještě vejdou do sloupce (vysází píseň na A4 i A5: pár sekund)</translation>
+    </message>
+    <message>
+        <source>Check Song</source>
+        <translation>Zkontrolovat píseň</translation>
+    </message>
+    <message>
+        <source>Look for mistakes: typos where a line&apos;s copies differ, apostrophes typed two ways, a chorus typed as a verse</source>
+        <translation>Hledat chyby: překlepy, kde se kopie řádku liší, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
+    </message>
+    <message>
+        <source>Tidy needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
+        <translation>Učesání potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
+    </message>
+    <message>
+        <source>Tidying…</source>
+        <translation>Učesávám…</translation>
+    </message>
+    <message>
+        <source>%1 discarded: the song changed while it ran.</source>
+        <translation>Výsledek akce „%1“ byl zahozen: píseň se mezitím změnila.</translation>
+    </message>
+    <message>
+        <source>Tidy failed</source>
+        <translation>Učesání se nezdařilo</translation>
+    </message>
+    <message>
+        <source>line %1: %2</source>
+        <translation>řádek %1: %2</translation>
+    </message>
+    <message>
+        <source>Tidy: nothing to change</source>
+        <translation>Učesání: není co měnit</translation>
+    </message>
+    <message numerus="yes">
+        <source>Tidy: %n change(s)</source>
+        <translation>
+            <numerusform>Učesání: %n změna</numerusform>
+            <numerusform>Učesání: %n změny</numerusform>
+            <numerusform>Učesání: %n změn</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source> (chord positions not checked: set lang in the song header)</source>
+        <translation> (pozice akordů nezkontrolovány: nastavte lang v hlavičce písně)</translation>
+    </message>
+    <message>
+        <source> (chord positions are only checked for lang czech, slovak or english)</source>
+        <translation> (pozice akordů se kontrolují jen pro lang czech, slovak nebo english)</translation>
+    </message>
+    <message>
+        <source>%1 needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
+        <translation>%1 potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
+    </message>
+    <message>
+        <source>Measure</source>
+        <translation>Změřit</translation>
+    </message>
+    <message>
+        <source>Suggest Without Measuring</source>
+        <translation>Navrhnout bez měření</translation>
+    </message>
+    <message>
+        <source>Looking for ways to make the song smaller…</source>
+        <translation>Hledám, jak píseň zmenšit…</translation>
+    </message>
+    <message>
+        <source>Checking the song…</source>
+        <translation>Kontroluji píseň…</translation>
+    </message>
+    <message>
+        <source>Build</source>
+        <translation>Sestavit</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Zrušit</translation>
+    </message>
+    <message>
+        <source>Checking which lines can be joined (typesetting the song, a few seconds)…</source>
+        <translation>Zjišťuji, které řádky lze spojit (sázím píseň, pár sekund)…</translation>
+    </message>
+    <message>
+        <source>%1 failed</source>
+        <translation>Akce „%1“ selhala</translation>
+    </message>
+    <message>
+        <source>Nothing else found. Write or keep the key in the bar above the song.</source>
+        <translation>Nic dalšího se nenašlo. Tóninu zapište nebo ponechte v liště nad písní.</translation>
+    </message>
+    <message>
+        <source>No mistakes found.</source>
+        <translation>Žádné chyby nenalezeny.</translation>
+    </message>
+    <message>
+        <source>No more changes to suggest.</source>
+        <translation>Žádné další změny k navržení.</translation>
+    </message>
+    <message>
+        <source>The song fits on %1 already.</source>
+        <translation>Píseň se už vejde na %1.</translation>
+    </message>
+    <message>
+        <source>A5</source>
+        <translation>A5</translation>
+    </message>
+    <message>
+        <source>A4</source>
+        <translation>A4</translation>
+    </message>
+    <message>
+        <source>No lines can be joined: the parts of a kind need the same number of lines, and the joined lines must still fit the column on A4 and A5.</source>
+        <translation>Žádné řádky nelze spojit: části jednoho druhu potřebují stejný počet řádků a spojené řádky se musí vejít do sloupce na A4 i A5.</translation>
+    </message>
+    <message>
+        <source>No lines can be joined.</source>
+        <translation>Žádné řádky nelze spojit.</translation>
+    </message>
+    <message>
+        <source>Pick a change, most readable first (score 0–100: how readable the song stays):</source>
+        <translation>Vyberte změnu, nejčitelnější jsou nahoře (hodnocení 0–100: jak čitelná píseň zůstane):</translation>
+    </message>
+    <message>
+        <source>Possible mistakes, in song order. A part with a chorus&apos;s words: only you can tell whether it is the chorus sung again (the melody may differ); made a chorus, Tidy runs after it to shorten the copies.</source>
+        <translation>Možné chyby v pořadí písně. Část se slovy refrénu: jen vy poznáte, zda jde o znovu zpívaný refrén (melodie se může lišit); když z ní uděláte refrén, spustí se potom Učesat a zkrátí kopie.</translation>
+    </message>
+    <message>
+        <source>Pick the parts whose lines to join in pairs (checked: the joined lines fit the column on A4 and A5):</source>
+        <translation>Vyberte části, jejichž řádky se mají spojit po dvou (zaškrtnuté: spojené řádky se vejdou do sloupce na A4 i A5):</translation>
+    </message>
+    <message>
+        <source>%1 discarded: the song changed.</source>
+        <translation>Výsledek akce „%1“ byl zahozen: píseň se změnila.</translation>
+    </message>
+    <message>
+        <source>Marked as correct: %1</source>
+        <translation>Označeno jako správné: %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>Marked as correct: %n finding(s)</source>
+        <translation>
+            <numerusform>Označeno jako správné: %n nález</numerusform>
+            <numerusform>Označeno jako správné: %n nálezy</numerusform>
+            <numerusform>Označeno jako správné: %n nálezů</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n changes</source>
+        <translation>
+            <numerusform>%n změna</numerusform>
+            <numerusform>%n změny</numerusform>
+            <numerusform>%n změn</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Measured: the song fits one page of %1.</source>
+        <translation>Změřeno: píseň se vejde na jednu stránku %1.</translation>
+    </message>
+    <message>
+        <source> and </source>
+        <translation> a </translation>
+    </message>
+    <message>
+        <source>Measured: the song no longer fits one page of %1.</source>
+        <translation>Změřeno: píseň se už nevejde na jednu stránku %1.</translation>
+    </message>
+    <message>
+        <source>none</source>
+        <translation>žádné</translation>
+    </message>
+    <message>
+        <source>pap: %1 → %2</source>
+        <translation>pap: %1 → %2</translation>
+    </message>
+    <message>
+        <source>Mark</source>
+        <translation>Označit</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Aktualizovat</translation>
+    </message>
+    <message>
+        <source>Paper marks updated. Save to keep them.</source>
+        <translation>Značky papíru změněny. Uložte, aby se zachovaly.</translation>
+    </message>
+    <message>
+        <source>Key: none written; the chords say %1.</source>
+        <translation>Tónina: nezapsaná; akordy říkají %1.</translation>
+    </message>
+    <message>
+        <source>Key: written %1, the chords say %2.</source>
+        <translation>Tónina: zapsaná %1, akordy říkají %2.</translation>
+    </message>
+    <message>
+        <source>Key written. Save to keep it.</source>
+        <translation>Tónina zapsána. Uložte, aby zůstala.</translation>
+    </message>
+    <message>
+        <source>Key:</source>
+        <translation>Tónina:</translation>
+    </message>
+    <message>
+        <source>none written; the chords say %1 (margin %2).</source>
+        <translation>není zapsaná; podle akordů je to %1 (rozdíl %2).</translation>
+    </message>
+    <message>
+        <source>Write %1</source>
+        <translation>Zapsat %1</translation>
+    </message>
+    <message>
+        <source>written %1, the chords say %2 (margin %3).</source>
+        <translation>zapsaná %1, podle akordů je to %2 (rozdíl %3).</translation>
+    </message>
+    <message>
+        <source>Keep the Written Key</source>
+        <translation>Ponechat zapsanou</translation>
+    </message>
+    <message>
+        <source>The written key is confirmed (% nocheck key). Save to keep it.</source>
+        <translation>Zapsaná tónina je potvrzená (% nocheck key). Uložte, aby to zůstalo.</translation>
+    </message>
+    <message>
+        <source>Applying…</source>
+        <translation>Provádím změnu…</translation>
+    </message>
+    <message>
+        <source>Applied: %1</source>
+        <translation>Použito: %1</translation>
+    </message>
+    <message>
+        <source> (after making a part a chorus)</source>
+        <translation> (po převedení části na refrén)</translation>
+    </message>
+    <message>
+        <source>Measuring…</source>
+        <translation>Měřím…</translation>
     </message>
 </context>
 <context>

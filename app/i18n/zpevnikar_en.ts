@@ -18,27 +18,6 @@
         </translation>
     </message>
     <message numerus="yes">
-        <source>Tidy: %n change(s)</source>
-        <translation>
-            <numerusform>Tidy: %n change</numerusform>
-            <numerusform>Tidy: %n changes</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>Marked as correct: %n finding(s)</source>
-        <translation>
-            <numerusform>Marked as correct: %n finding</numerusform>
-            <numerusform>Marked as correct: %n findings</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%n changes</source>
-        <translation>
-            <numerusform>%n change</numerusform>
-            <numerusform>%n changes</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
         <source>All %n song(s)</source>
         <translation>
             <numerusform>All %n song</numerusform>
@@ -112,6 +91,30 @@
         <translation>
             <numerusform>%1 → %n line</numerusform>
             <numerusform>%1 → %n lines</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>SongActions</name>
+    <message numerus="yes">
+        <source>Tidy: %n change(s)</source>
+        <translation>
+            <numerusform>Tidy: %n change</numerusform>
+            <numerusform>Tidy: %n changes</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Marked as correct: %n finding(s)</source>
+        <translation>
+            <numerusform>Marked as correct: %n finding</numerusform>
+            <numerusform>Marked as correct: %n findings</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n changes</source>
+        <translation>
+            <numerusform>%n change</numerusform>
+            <numerusform>%n changes</numerusform>
         </translation>
     </message>
 </context>
