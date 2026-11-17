@@ -202,6 +202,10 @@ TEST_CASE("the instrument menu names real General MIDI programs", "[midi]") {
     CHECK(mi::findInstrumentByName("acoustic guitar (steel)")->id == "steel");
     CHECK(mi::findInstrumentByName("banjo")->id == "banjo");
     CHECK(mi::findInstrumentByName("whistle")->id == "whistle");
+    // The harmonica (Heart of Gold's harp part), General MIDI program 23 (0-based 22).
+    REQUIRE(mi::findInstrument("harmonica"));
+    CHECK(mi::findInstrument("harmonica")->program == 22);
+    CHECK(mi::findInstrumentByName("harmonica")->id == "harmonica");
     CHECK(mi::findInstrumentByName("electric guitar (clean)")->id == "clean");
     // ids are unique, programs in range
     for (const auto& a : mi::instruments()) {

@@ -696,6 +696,7 @@ QString instrumentText(const QString& id) {
         {QStringLiteral("piano"), ScorePreviewPane::tr("Piano")},
         {QStringLiteral("whistle"), ScorePreviewPane::tr("Tin whistle")},
         {QStringLiteral("flute"), ScorePreviewPane::tr("Flute")},
+        {QStringLiteral("harmonica"), ScorePreviewPane::tr("Harmonica")},
         {QStringLiteral("bass"), ScorePreviewPane::tr("Bass guitar")},
     };
     return texts.value(id, id);

@@ -1727,6 +1727,10 @@ Použijte vestavěný.</translation>
         <translation>Zkreslená elektrická kytara</translation>
     </message>
     <message>
+        <source>Harmonica</source>
+        <translation>Foukací harmonika</translation>
+    </message>
+    <message>
         <source>Chord names</source>
         <translation>Akordy</translation>
     </message>
