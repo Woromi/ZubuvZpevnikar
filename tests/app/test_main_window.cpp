@@ -1,0 +1,185 @@
+// MainWindow: the views, the package lookup, the language filter and the papers offer.
+#include <QAbstractButton>
+#include <QComboBox>
+#include <QLabel>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QStackedWidget>
+#include <QTableView>
+#include <QToolButton>
+#include <catch2/catch_test_macros.hpp>
+#include <zub/core/songheader.hpp>
+
+#include "AppTestAccess.hpp"
+#include "SettingsDialog.hpp"
+#include "SongFilterProxy.hpp"
+#include "SongTableModel.hpp"
+#include "Support.hpp"
+
+using apptest::slurp;
+using A = AppTestAccess;
+using V = ActivityBar::View;
+
+TEST_CASE("Views: the open song stays open while the other pages are shown", "[app][views]") {
+    apptest::Fixture fixture;
+    MainWindow w;
+    w.resize(1300, 560);
+    w.show();
+    w.activateWindow(); // the Ctrl+2 shortcut needs the active window
+    REQUIRE(QTest::qWaitForWindowActive(&w));
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    ActivityBar* bar = A::activityBar(w);
+    CHECK(!bar->button(V::Song)->isEnabled());
+
+    A::openSong(w, A::proxy(w)->index(0, 0));
+    CHECK(A::pages(w)->currentWidget() == A::songPage(w));
+    CHECK(bar->button(V::Song)->isEnabled());
+    CHECK(bar->button(V::Song)->isChecked());
+    SongEditor* editor = A::editor(w);
+    REQUIRE(editor != nullptr);
+    editor->textEdit()->insertPlainText("% edit\n");
+
+    // To the list: the song stays open, edited.
+    bar->button(V::Songs)->click();
+    CHECK(A::pages(w)->currentWidget() == A::listPage(w));
+    CHECK(A::editor(w) == editor);
+    CHECK(editor->isModified());
+
+    // The same song from the list: shown again, not reloaded.
+    A::openSong(w, A::proxy(w)->index(0, 0));
+    CHECK(A::editor(w) == editor);
+    CHECK(A::pages(w)->currentWidget() == A::songPage(w));
+
+    // Songbooks with the song open, and back with Ctrl+2.
+    bar->button(V::Songbooks)->click();
+    CHECK(A::pages(w)->currentWidget() == static_cast<QWidget*>(A::songbooksPage(w)));
+    QTest::keyClick(&w, Qt::Key_2, Qt::ControlModifier);
+    CHECK(A::pages(w)->currentWidget() == A::songPage(w));
+
+    // Closing asks (modified); Discard goes to the list with the song selected.
+    {
+        auto answer = apptest::answerMessageBox(QMessageBox::Discard);
+        CHECK(A::closeSong(w));
+        REQUIRE(answer.fired());
+    }
+    CHECK(A::editor(w) == nullptr);
+    CHECK(A::pages(w)->currentWidget() == A::listPage(w));
+    CHECK(!bar->button(V::Song)->isEnabled());
+    CHECK(bar->button(V::Songs)->isChecked());
+    CHECK(A::listPage(w)->table()->currentIndex().row() == 0);
+
+    // The settings dialog opens and closes.
+    auto settings = apptest::answerDialog<SettingsDialog>([](SettingsDialog* d) { d->reject(); });
+    A::openSettings(w);
+    CHECK(settings.fired());
+}
+
+TEST_CASE("Package: a songbook without its own package builds with the bundled copy",
+          "[app][package]") {
+    apptest::Fixture fixture;
+    MainWindow w;
+    w.show();
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    // The fixture's zubuvzpevnik/ has no zubuvzpevnik.sty: not a package checkout. Without the
+    // submodule checked out the app has no copy either.
+    if (A::packageDir(w).empty())
+        SKIP("the bundled package (external/zubuvzpevnik-package) is not checked out");
+    CHECK(A::packageDir(w).filename() == "zubuvzpevnik-package");
+
+    // A songbook with its own package uses that one.
+    apptest::writeFile(fixture / "zubuvzpevnik/zubuvzpevnik.sty", "x");
+    apptest::writeFile(fixture / "zubuvzpevnik/scripts/build.sh", "x");
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    CHECK(A::packageDir(w) == fixture / "zubuvzpevnik");
+}
+
+TEST_CASE("Language filter: a song listing several languages is shown under each", "[app][language]") {
+    apptest::Fixture fixture(apptest::Fixture::Extras::Yes);
+    MainWindow w;
+    w.show();
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    QComboBox* combo = A::language(*A::listPage(w));
+    QStringList items;
+    for (int i = 0; i < combo->count(); ++i)
+        items << combo->itemText(i);
+    INFO(items.join(", ").toStdString());
+    CHECK(items.contains("hebrew"));
+    CHECK(items.contains("czech"));
+
+    const auto shown = [&](const QString& lang) {
+        combo->setCurrentIndex(combo->findData(lang));
+        QStringList titles;
+        for (int r = 0; r < A::proxy(w)->rowCount(); ++r)
+            titles << A::proxy(w)->index(r, SongTableModel::Title).data().toString() + " [" +
+                          A::proxy(w)->index(r, SongTableModel::Language).data().toString() + "]";
+        return titles;
+    };
+    const QStringList hebrew = shown("hebrew");
+    REQUIRE(hebrew.size() == 1);
+    CHECK(hebrew[0] == "Bilingual [czech, hebrew]");
+    const QStringList czech = shown("czech");
+    CHECK(czech.contains("Bilingual [czech, hebrew]"));
+    CHECK(czech.size() > 1);
+}
+
+TEST_CASE("Papers: the bar offers the measured papers; Mark writes them, typing closes it",
+          "[app][papers]") {
+    apptest::Fixture fixture(apptest::Fixture::Extras::Yes);
+    MainWindow w;
+    w.resize(1200, 800);
+    w.show();
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    REQUIRE(A::openExistingSong(w, fixture / "songs/chords/Test/En.tex"));
+    SongEditor* ed = A::editor(w);
+    REQUIRE(ed != nullptr);
+    const std::string text = ed->content();
+    REQUIRE(!zub::songheader::option(text, "pap").has_value());
+
+    zub::songsuggest::Suggestions fits;
+    fits.fits = true;
+    fits.a4 = zub::songsuggest::Measured{1, true, {}, 0};
+    fits.a5 = zub::songsuggest::Measured{1, true, {}, 0};
+    A::offerPapers(w, ed, text, fits);
+    CHECK(ed->suggestionShown());
+    CHECK(!ed->textEdit()->isReadOnly());
+
+    // The text changed since the measurement: no bar.
+    ed->hideSuggestion();
+    A::offerPapers(w, ed, text + "x", fits);
+    CHECK(!ed->suggestionShown());
+
+    A::offerPapers(w, ed, text, fits);
+    auto* button = ed->findChild<QWidget*>("suggestionBar")->findChild<QPushButton*>();
+    REQUIRE(button != nullptr);
+    CHECK(button->text() == "Mark");
+    QTest::mouseClick(button, Qt::LeftButton);
+    CHECK(!ed->suggestionShown());
+    const std::string after = ed->content();
+    CHECK(zub::songheader::option(after, "pap") == "a4,a5");
+    ed->textEdit()->undo(); // one undo step
+    CHECK(ed->content() == text);
+
+    // Typing closes the bar.
+    A::offerPapers(w, ed, text, fits);
+    CHECK(ed->suggestionShown());
+    ed->textEdit()->insertPlainText("z");
+    CHECK(!ed->suggestionShown());
+    ed->textEdit()->undo();
+
+    ed->textEdit()->document()->setModified(false);
+
+    // The song is marked a4,a5 and a5 no longer fits: the bar offers to take it off.
+    REQUIRE(A::openExistingSong(w, fixture / "songs/chords/Abba/OurLastSummer.tex"));
+    ed = A::editor(w);
+    const std::string marked = ed->content();
+    REQUIRE(zub::songheader::option(marked, "pap") == "a4,a5");
+    zub::songsuggest::Suggestions tooLong;
+    tooLong.a5 = zub::songsuggest::Measured{2, false, {}, 0};
+    A::offerPapers(w, ed, marked, tooLong);
+    REQUIRE(ed->suggestionShown());
+    auto* update = ed->findChild<QWidget*>("suggestionBar")->findChild<QPushButton*>();
+    CHECK(update->text() == "Update");
+    QTest::mouseClick(update, Qt::LeftButton);
+    CHECK(zub::songheader::option(ed->content(), "pap") == "a4");
+    ed->textEdit()->document()->setModified(false);
+}

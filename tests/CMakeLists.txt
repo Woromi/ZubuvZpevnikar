@@ -40,3 +40,8 @@ target_compile_definitions(zub_core_tests PRIVATE
 )
 
 catch_discover_tests(zub_core_tests DISCOVERY_MODE PRE_TEST)
+
+# The app's widgets, headless. Needs the Qt application (ZUB_BUILD_APP).
+if(TARGET zpevnikar_app)
+    add_subdirectory(app)
+endif()

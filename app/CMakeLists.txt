@@ -2,8 +2,8 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Svg Pdf PdfWidgets Multimedia L
 find_package(KF6SyntaxHighlighting REQUIRED)
 qt_standard_project_setup(REQUIRES 6.5)
 
-qt_add_executable(zpevnikar
-    main.cpp
+# Everything but main() is a static library, so the app tests (tests/app) link the same code.
+qt_add_library(zpevnikar_app STATIC
     ActivityBar.hpp
     ActivityBar.cpp
     SettingsDialog.hpp
@@ -74,7 +74,13 @@ qt_add_executable(zpevnikar
     SongTableModel.cpp
     convert.hpp
 )
-target_link_libraries(zpevnikar PRIVATE Zub::core zub_warnings Qt6::Widgets Qt6::Svg Qt6::Pdf Qt6::PdfWidgets Qt6::Multimedia KF6::SyntaxHighlighting)
+target_include_directories(zpevnikar_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(zpevnikar_app
+    PUBLIC Zub::core Qt6::Widgets Qt6::Svg Qt6::Pdf Qt6::PdfWidgets Qt6::Multimedia KF6::SyntaxHighlighting
+    PRIVATE zub_warnings)
+
+qt_add_executable(zpevnikar main.cpp)
+target_link_libraries(zpevnikar PRIVATE zpevnikar_app Zub::core zub_warnings Qt6::Widgets)
 
 # The LaTeX package that builds the songs (external/zubuvzpevnik-package, a git submodule), for
 # songbooks without one of their own: found in the source tree by builds that run from here, and
@@ -82,7 +88,7 @@ target_link_libraries(zpevnikar PRIVATE Zub::core zub_warnings Qt6::Widgets Qt6:
 # without the submodule checked out.
 set(zub_package_dir ${PROJECT_SOURCE_DIR}/external/zubuvzpevnik-package)
 if(EXISTS ${zub_package_dir}/zubuvzpevnik.sty)
-    target_compile_definitions(zpevnikar PRIVATE ZUB_BUNDLED_PACKAGE_DIR="${zub_package_dir}")
+    target_compile_definitions(zpevnikar_app PRIVATE ZUB_BUNDLED_PACKAGE_DIR="${zub_package_dir}")
 else()
     message(STATUS "zubuvzpevnik-package: submodule not checked out "
                    "(git submodule update --init), the app gets no copy of the package")
@@ -92,7 +98,7 @@ endif()
 # zpevnikar_en.ts only holds the plural forms of the English texts ("%n song(s)"). The .qm files
 # are compiled by the normal build and embedded under ":/i18n". Target update_translations runs
 # lupdate over the sources and rewrites the .ts files.
-qt_add_translations(zpevnikar
+qt_add_translations(zpevnikar_app
     TS_FILES i18n/zpevnikar_cs.ts
     PLURALS_TS_FILE i18n/zpevnikar_en.ts
     LUPDATE_OPTIONS -no-obsolete -locations none
@@ -100,7 +106,7 @@ qt_add_translations(zpevnikar
 )
 
 # Song syntax highlighting, found by KSyntaxHighlighting::Repository in this resource path.
-qt_add_resources(zpevnikar syntax
+qt_add_resources(zpevnikar_app syntax
     PREFIX /org.kde.syntax-highlighting/syntax-addons
     BASE syntax
     FILES syntax/zubuvzpevnik-song.xml

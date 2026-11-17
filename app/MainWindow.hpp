@@ -68,6 +68,7 @@ class Repository;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
+    friend struct AppTestAccess;
 
 public:
     explicit MainWindow(QWidget* parent = nullptr);

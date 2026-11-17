@@ -23,6 +23,7 @@ class SvgCanvas;
 // of a failed build. A failed build keeps the last good image on screen.
 class ScorePreviewPane : public QWidget {
     Q_OBJECT
+    friend struct AppTestAccess;
 
 public:
     explicit ScorePreviewPane(QWidget* parent = nullptr);

@@ -21,6 +21,7 @@ class SongTableModel;
 // changes after a scan) and the table. MainWindow owns the model and the proxy.
 class SongListPage : public QWidget {
     Q_OBJECT
+    friend struct AppTestAccess;
 
 public:
     SongListPage(SongTableModel* model, SongFilterProxy* proxy, QWidget* parent = nullptr);

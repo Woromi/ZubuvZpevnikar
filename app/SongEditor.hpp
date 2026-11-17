@@ -31,6 +31,7 @@ class SyntaxHighlighter;
 // written back unchanged (non-breaking spaces, tabs, a missing final newline, CRLF line endings).
 class SongEditor : public QWidget {
     Q_OBJECT
+    friend struct AppTestAccess;
 
 public:
     enum class Kind { Song, Score };

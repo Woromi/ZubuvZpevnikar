@@ -48,6 +48,7 @@ class SongTableModel;
 // locked book (zub::bookfile::lockMark) is not changed at all until it is unlocked.
 class SongbooksPage : public QWidget {
     Q_OBJECT
+    friend struct AppTestAccess;
 
 public:
     SongbooksPage(SongTableModel* model, SongbookSorter* sorter, SongbookExporter* exporter,

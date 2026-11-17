@@ -17,6 +17,7 @@ class QToolButton;
 // error of a failed build. A failed build keeps the last good PDF on screen.
 class PreviewPane : public QWidget {
     Q_OBJECT
+    friend struct AppTestAccess;
 
 public:
     explicit PreviewPane(QWidget* parent = nullptr);

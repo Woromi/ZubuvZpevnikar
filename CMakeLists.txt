@@ -45,9 +45,13 @@ add_subdirectory(core)
 
 if(ZUB_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
 endif()
 
+# The app before the tests: tests/app links its library (zpevnikar_app).
 if(ZUB_BUILD_APP)
     add_subdirectory(app)
+endif()
+
+if(ZUB_BUILD_TESTS)
+    add_subdirectory(tests)
 endif()

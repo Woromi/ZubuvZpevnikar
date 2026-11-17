@@ -65,6 +65,7 @@ protected:
 
 private:
     friend class LineNumberArea;
+    friend struct AppTestAccess;
     // Marks the other occurrences of the selected text (one line, case-sensitive) with a lighter
     // background than the selection; none without a selection.
     void markOccurrences();
