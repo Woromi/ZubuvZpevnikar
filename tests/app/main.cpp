@@ -32,6 +32,14 @@ int main(int argc, char** argv) {
     if (!wantsTools)
         qputenv("PATH", "/nonexistent");
 
+    // Silent: playback and fret sounds go to a sound server that does not exist (Qt Multimedia
+    // talks to PulseAudio/PipeWire), never to the speakers. ZUB_TEST_SOUND=1 lets them be heard.
+    if (qEnvironmentVariable("ZUB_TEST_SOUND") != QLatin1String("1")) {
+        qputenv("PULSE_SERVER", "unix:/nonexistent/zub-test-no-sound");
+        qputenv("PIPEWIRE_REMOTE", "/nonexistent/zub-test-no-sound");
+        qputenv("ALSA_CONFIG_PATH", "/nonexistent/zub-test-no-sound");
+    }
+
     // Alive for the whole run; every test process (ctest runs one test case per process) gets its own.
     QTemporaryDir state;
     if (!state.isValid())
