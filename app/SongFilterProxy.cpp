@@ -81,7 +81,11 @@ bool SongFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceP
         return false;
     if (tabsOnly_ && !index.data(SongTableModel::HasTabsRole).toBool())
         return false;
-    if (recentOnly_ && !index.data(SongTableModel::RecentRole).toBool())
+    // Only while dates are known: without them (no git) the filter would hide every song,
+    // behind a choice that is greyed out and cannot be undone.
+    const auto* songs = qobject_cast<const SongTableModel*>(sourceModel());
+    if (recentOnly_ && songs && songs->hasDates() &&
+        !index.data(SongTableModel::RecentRole).toBool())
         return false;
     if (!collection_.isEmpty() &&
         index.data(SongTableModel::CollectionRole).toString() != collection_)

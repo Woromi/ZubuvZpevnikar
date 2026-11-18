@@ -454,8 +454,9 @@ void MainWindow::showWelcome(const QString& path) {
     if (path.isEmpty()) {
         welcomePage_->showFirstStart();
     } else {
-        const auto library = zub::scanLibrary(toPath(path));
-        welcomePage_->showMissing(path, library ? QString() : toQString(library.error()));
+        // Why, from the quick check alone (a second full scan would only repeat the first).
+        const auto valid = zub::validateSongbookRepo(toPath(path));
+        welcomePage_->showMissing(path, valid ? QString() : toQString(valid.error()));
     }
     if (songbookRoot_.empty()) {
         pages_->setCurrentWidget(welcomePage_);

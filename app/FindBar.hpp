@@ -44,6 +44,7 @@ public:
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
+    void showEvent(QShowEvent* event) override;
 
 private:
     friend struct AppTestAccess;
@@ -58,6 +59,8 @@ private:
     void updateMarks();
     void updateCount();
     void updateEnabled();
+    // Searches again when the text changed since the last search (never act on old positions).
+    void refreshIfStale();
 
     CodeTextEdit* edit_;
     QLineEdit* find_;

@@ -38,8 +38,9 @@ Result findAll(const QString& text, const QString& needle, const Options& option
     if (options.regex) {
         QString pattern = needle;
         if (options.wholeWord)
+            // \\E ends a \\Q the needle may leave open (harmless without one).
             pattern = QStringLiteral("(?<![\\p{L}\\p{N}\\p{M}_])(?:") + needle +
-                      QStringLiteral(")(?![\\p{L}\\p{N}\\p{M}_])");
+                      QStringLiteral("\\E)(?![\\p{L}\\p{N}\\p{M}_])");
         QRegularExpression::PatternOptions flags =
             QRegularExpression::UseUnicodePropertiesOption | QRegularExpression::MultilineOption;
         if (!options.matchCase)

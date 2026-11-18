@@ -2,6 +2,7 @@
 
 #include "convert.hpp"
 
+#include <QFileInfo>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QStringList>
@@ -55,6 +56,11 @@ void SongDatesRunner::run(Stage stage) {
     process->setProcessChannelMode(QProcess::SeparateChannels);
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     environment.insert(QStringLiteral("GIT_TERMINAL_PROMPT"), QStringLiteral("0"));
+    // Started from a git hook or a shell with these set, git would read another repository
+    // than -C names.
+    for (const char* name : {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
+                             "GIT_OBJECT_DIRECTORY"})
+        environment.remove(QString::fromLatin1(name));
     process->setProcessEnvironment(environment);
     connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
         if (process == process_ && error == QProcess::FailedToStart)
@@ -80,6 +86,17 @@ void SongDatesRunner::onFinished(QProcess* process, Stage stage) {
     const std::string_view text(out.constData(), static_cast<std::size_t>(out.size()));
     if (stage == Stage::Log) {
         dates_ = zub::songdates::parseLog(text);
+        // A shallow clone's oldest commit lists every file as added: those dates are the
+        // clone's, not the songs'. Dropped (the edited dates stay).
+        if (QFileInfo::exists(toQString(root_ / ".git" / "shallow"))) {
+            std::optional<std::chrono::sys_seconds> oldest;
+            for (const auto& [path, dates] : dates_)
+                if (dates.added && (!oldest || *dates.added < *oldest))
+                    oldest = dates.added;
+            for (auto& [path, dates] : dates_)
+                if (dates.added == oldest)
+                    dates.added.reset();
+        }
         release();
         run(Stage::Status);
         return;

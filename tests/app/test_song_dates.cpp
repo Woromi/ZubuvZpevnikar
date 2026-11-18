@@ -228,3 +228,13 @@ TEST_CASE("Song dates: read from git", "[.tools][app][dates]") {
     CHECK_FALSE(model->index(fresh, 0).data(SongTableModel::AddedRole).toDateTime().isValid());
     CHECK(model->index(fresh, SongTableModel::Added).data().toString() == QStringLiteral("new"));
 }
+
+TEST_CASE("Song dates: Recently added filters nothing while no dates are known", "[app][dates]") {
+    SongTableModel model;
+    SongFilterProxy proxy;
+    proxy.setSourceModel(&model);
+    model.setSongs({zub::SongEntry{"/sb/songs/chords/A/B.tex", "A/B", {}, {}, {}, "chords"}});
+    proxy.setRecentOnly(true);
+    // No git: the choice cannot hide every song behind a greyed-out control.
+    CHECK(proxy.rowCount() == 1);
+}

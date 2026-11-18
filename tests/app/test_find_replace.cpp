@@ -396,3 +396,19 @@ TEST_CASE("FindBar: the arrow opens and closes the replace row", "[app][find]") 
     CHECK(arrow->isChecked());
     CHECK(arrow->text() == QStringLiteral("▾"));
 }
+
+TEST_CASE("FindBar: a change made while the bar is not shown is searched again before Replace",
+          "[app][find]") {
+    Bar b(QStringLiteral("xx Am yy Am"));
+    b.bar.open(true);
+    b.search(QStringLiteral("Am"));
+    QTest::qWait(50);
+    b.host.hide(); // its tab is not the current one
+    QTextCursor c(b.edit.document());
+    c.insertText(QStringLiteral("% a new header line\n")); // e.g. a ★ set from the song list
+    b.host.show();
+    QTest::qWait(50);
+    A::replaceField(b.bar)->setText(QStringLiteral("Dm"));
+    b.bar.replaceAll();
+    CHECK(b.edit.toPlainText() == QStringLiteral("% a new header line\nxx Dm yy Dm"));
+}

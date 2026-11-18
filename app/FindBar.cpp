@@ -141,9 +141,12 @@ FindBar::FindBar(CodeTextEdit* edit, QWidget* parent) : QWidget(parent), edit_(e
         textChanged_ = false;
     });
     connect(edit_->document(), &QTextDocument::contentsChanged, this, [this] {
-        if (isVisible() && !busy_) {
+        // Also while the bar is not shown (its tab or page is not the current one): the old
+        // match positions are stale either way and are searched again before they are used.
+        if (!busy_) {
             textChanged_ = true;
-            pending_->start();
+            if (isVisible())
+                pending_->start();
         }
     });
     connect(edit_, &QPlainTextEdit::selectionChanged, this, [this] {
@@ -308,7 +311,20 @@ void FindBar::selectFromStart() {
     select(it != result_.matches.end() ? *it : result_.matches.first());
 }
 
+void FindBar::refreshIfStale() {
+    if (textChanged_) {
+        refresh();
+        textChanged_ = false;
+    }
+}
+
+void FindBar::showEvent(QShowEvent* event) {
+    QWidget::showEvent(event);
+    refreshIfStale(); // the text may have changed while the bar was not shown
+}
+
 void FindBar::findNext() {
+    refreshIfStale();
     if (result_.matches.isEmpty())
         return;
     const int from = edit_->textCursor().selectionEnd();
@@ -318,6 +334,7 @@ void FindBar::findNext() {
 }
 
 void FindBar::findPrevious() {
+    refreshIfStale();
     if (result_.matches.isEmpty())
         return;
     const int from = edit_->textCursor().selectionStart();
@@ -331,6 +348,7 @@ void FindBar::findPrevious() {
 }
 
 void FindBar::replaceCurrent() {
+    refreshIfStale();
     if (edit_->isReadOnly())
         return;
     const int at = currentIndex();
@@ -350,6 +368,7 @@ void FindBar::replaceCurrent() {
 }
 
 void FindBar::replaceAll() {
+    refreshIfStale();
     if (edit_->isReadOnly() || result_.matches.isEmpty())
         return;
     const findmatches::Options opts = options();
