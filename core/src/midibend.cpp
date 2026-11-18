@@ -177,6 +177,7 @@ std::optional<int> markerKind(int program) {
     case markerPreBend:
     case markerPreBendRelease:
     case markerSlide:
+    case markerSlideIn:
         return program;
     default:
         return std::nullopt;
@@ -185,7 +186,7 @@ std::optional<int> markerKind(int program) {
 
 bool isMarkerName(const std::string& name) {
     return name == "gunshot" || name == "applause" || name == "helicopter" ||
-           name == "telephone ring" || name == "seashore";
+           name == "telephone ring" || name == "seashore" || name == "bird tweet";
 }
 
 struct Point {
@@ -319,6 +320,27 @@ bool processTrack(std::vector<Event>& events, Tick ticksPerStep) {
                 tick = std::max(tick, x->curve.back().tick);
             x->curve.push_back({tick, semis});
         };
+        if (t.kind == markerSlideIn) {
+            // A slide from a grace note into this one: the grace note (only there to draw the
+            // slide) goes, with the time it took from the note before; this note starts at the
+            // grace note's pitch and slides to its own fast (70 ms, at most a third of it), then
+            // stays.
+            const double from = x->key - y.key;
+            if (std::abs(from) > bendRange)
+                continue;
+            if (Note* before = noteEndingAt(notes, x->channel, x->on, *x)) {
+                Event& off = events[before->offIdx];
+                off.tick = y.on;
+                before->off = y.on;
+            }
+            x->removed = true;
+            events[x->onIdx].removed = true;
+            events[x->offIdx].removed = true;
+            const Tick quick = std::min<Tick>(7 * ticksPerStep, (y.off - y.on) / 3);
+            y.curve.push_back({y.on, from});
+            y.curve.push_back({y.on + std::max<Tick>(quick, 1), 0.0});
+            continue;
+        }
         if (t.kind == markerSlide) {
             if (x->curve.empty())
                 add(x->on, 0.0);

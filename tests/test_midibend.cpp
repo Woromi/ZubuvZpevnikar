@@ -2,6 +2,7 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -290,4 +291,39 @@ TEST_CASE("smoothBends folds a note above MIDI's range down by octaves", "[midi]
     for (const auto& e : track)
         if (e.status == 0x90)
             CHECK(e.d1 == 127); // 139 - 12, the same note name
+}
+
+TEST_CASE("smoothBends: a grace note sliding in is a fast slide at the start of the note",
+          "[midi][bend]") {
+    // f3 0-340 (shortened by the grace note), the grace g3 340-383, the marked e4 384-768.
+    const std::string midi = testmidi::build({{0, {0xc0, 25}},
+                                              {0, {0x90, 53, 90}},
+                                              {340, {0x90, 53, 0}},
+                                              {340, {0x90, 55, 90}},
+                                              {383, {0x90, 55, 0}},
+                                              {384, {0xc0, 123}},
+                                              {384, {0x90, 64, 90}},
+                                              {768, {0x90, 64, 0}}});
+    const auto track = trackOf(smooth(midi));
+    // Two notes only: f3, then e4 for its whole length; the grace note is gone.
+    REQUIRE(noteOns(track) == 2);
+    int fOff = -1;
+    int eOn = -1;
+    double firstBend = 1;
+    double lastBend = 1;
+    for (const auto& e : track) {
+        if (e.status == 0x90 && e.d1 == 53 && e.d2 == 0)
+            fOff = static_cast<int>(e.tick);
+        if (e.noteOn() && e.d1 == 64)
+            eOn = static_cast<int>(e.tick);
+        if (e.status == 0xe0 && e.tick >= 384) {
+            if (firstBend == 1)
+                firstBend = semis(e);
+            lastBend = semis(e);
+        }
+    }
+    CHECK(fOff == 384); // the F keeps the time the grace note took
+    CHECK(eOn == 384);
+    CHECK(firstBend < -8.5);          // starts at the grace note's pitch (g3, 9 semitones down)
+    CHECK(std::abs(lastBend) < 0.01); // then the E itself
 }

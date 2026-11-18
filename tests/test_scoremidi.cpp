@@ -322,15 +322,17 @@ TEST_CASE("markBends finds a slide's target past \\unHideNotes and a grace's bra
     // A slide from nowhere: a hidden grace note slides into the note.
     const std::string slide = "\\grace { \\hideNotes g\\3 \\glissando \\unHideNotes } e'4\\3";
     const std::string marked = sc::markBends(slide);
-    CHECK(marked.find("\"seashore\" e'4") != std::string::npos);
+    CHECK(marked.find("\"bird tweet\" e'4") != std::string::npos); // slides in
     // A grace note that slides on is no bend target (no bend marker before it).
     for (const std::string text : {"f4\\4 \\hideNotes\\grace g4\\3\\glissando\\unHideNotes e'4\\3",
                                     "g'4\\2 \\grace g'\\2 \\glissando a'8\\2"}) {
         const std::string out = sc::markBends(text);
         INFO(out);
         CHECK(out.find("gunshot") == std::string::npos);
-        CHECK(out.find("seashore") != std::string::npos);
+        CHECK(out.find("bird tweet") != std::string::npos);
     }
+    // Between two sounding notes it is still a slide from one to the other.
+    CHECK(sc::markBends("c4\\3 \\glissando e4\\3").find("seashore") != std::string::npos);
     // Still nothing before a rest after the brace.
     CHECK(sc::markBends("\\grace { g\\3 \\glissando } r4").find("seashore") == std::string::npos);
 }
@@ -449,7 +451,7 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
                 for (const auto& e : raw[t]) {
                     before += e.noteOn() ? 1 : 0;
                     markers +=
-                        e.status == 0xc0 && e.d1 >= 122 && e.d1 != 123 && e.d1 <= 127 ? 1 : 0;
+                        e.status == 0xc0 && e.d1 >= 122 && e.d1 <= 127 ? 1 : 0;
                 }
                 for (const auto& e : after[t]) {
                     now += e.noteOn() ? 1 : 0;

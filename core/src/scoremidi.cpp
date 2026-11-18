@@ -567,6 +567,7 @@ std::string markBends(std::string_view music) {
     };
     std::vector<std::pair<std::size_t, std::string>> inserts;
     std::size_t preBendEnd = npos;
+    std::size_t graceEnd = 0; // the end of the last \grace's music: a slide begun in it slides in
     walk(
         music, 0,
         [&](std::size_t begin, std::size_t wordEnd, std::string_view word) {
@@ -584,6 +585,10 @@ std::string markBends(std::string_view music) {
                 }
                 preBendEnd = npos;
                 const std::size_t note = skipSpace(music, wordEnd);
+                if (note < music.size() && music[note] == '{') {
+                    const std::size_t close = closingBrace(music, note);
+                    graceEnd = close == npos ? music.size() : close;
+                }
                 if (note >= music.size() || music[note] == '{' || music[note] == '}')
                     return proceed;
                 std::size_t end = note;
@@ -591,6 +596,8 @@ std::string markBends(std::string_view music) {
                     ++end;
                 const std::string_view chunk = music.substr(note, end - note);
                 const std::size_t after = skipSpace(music, end);
+                // A \glissando right after the grace note is still the grace note's.
+                graceEnd = music.substr(after).starts_with("\\glissando") ? after + 10 : after;
                 // A grace note that slides on (`\grace g\3 \glissando e'4`) starts a slide,
                 // it is no bend target: the \glissando marks the slide's target instead.
                 if (chunk.find("\\glissando") != npos ||
@@ -629,7 +636,10 @@ std::string markBends(std::string_view music) {
                 if (next < music.size() && ((music[next] >= 'a' && music[next] <= 'z' &&
                                              music[next] != 'r' && music[next] != 's') ||
                                             music[next] == '<'))
-                    inserts.emplace_back(next, marker("seashore"));
+                    // From a grace note: a slide into the note (the grace note is only there to
+                    // draw the slide), else from one sounding note to the next.
+                    inserts.emplace_back(next, marker(begin < graceEnd ? "bird tweet"
+                                                                       : "seashore"));
             }
             return proceed;
         },

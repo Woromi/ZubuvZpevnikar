@@ -86,6 +86,7 @@ inline constexpr int markerBendRelease = 126;    // ... and the note after it is
 inline constexpr int markerPreBend = 125;        // grace note: the note before it starts bent to it
 inline constexpr int markerPreBendRelease = 124; // ... and the note after it is the release
 inline constexpr int markerSlide = 122;          // the note the previous one slides to
+inline constexpr int markerSlideIn = 123; // the note a grace note slides into ("bird tweet")
 // Raise when smoothBends changes the sound (part of the WAV cache key).
 inline constexpr int bendVersion = 1;
 
