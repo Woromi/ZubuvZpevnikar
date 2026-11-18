@@ -255,11 +255,19 @@ TEST_CASE("Song editor: a selected word marks its other occurrences", "[app][edi
     all.insertText("\nJá zpívám\nzpívám a zpívám, Zpívám");
     QTextCursor sel = all;
     sel.movePosition(QTextCursor::StartOfBlock);
-    sel.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, 6);
+    // A selection the app makes (the playing note, a click in the preview) marks nothing.
+    QTextCursor appSelection = sel;
+    appSelection.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, 6);
+    s.edit->setTextCursor(appSelection);
+    QTest::qWait(200);
+    CHECK(s.edit->extraSelections().isEmpty());
+    // The user's selection does: the other zpívám on this line and the one of the earlier text;
+    // not the capitalised one.
     s.edit->setTextCursor(sel);
-    // The other zpívám on this line and the one of the earlier text; not the capitalised one.
+    s.edit->setFocus();
+    for (int i = 0; i < 6; ++i)
+        QTest::keyClick(s.edit, Qt::Key_Right, Qt::ShiftModifier);
     CHECK(apptest::waitUntil([&] { return s.edit->extraSelections().size() == 2; }));
-    sel.clearSelection();
-    s.edit->setTextCursor(sel);
+    QTest::keyClick(s.edit, Qt::Key_Left); // the selection goes, its marks too
     CHECK(apptest::waitUntil([&] { return s.edit->extraSelections().isEmpty(); }));
 }

@@ -34,8 +34,22 @@ CodeTextEdit::CodeTextEdit(QWidget* parent)
     occurrenceTimer_->setSingleShot(true);
     occurrenceTimer_->setInterval(80);
     connect(occurrenceTimer_, &QTimer::timeout, this, &CodeTextEdit::markOccurrences);
-    connect(this, &QPlainTextEdit::selectionChanged, occurrenceTimer_, qOverload<>(&QTimer::start));
-    connect(this, &QPlainTextEdit::textChanged, occurrenceTimer_, qOverload<>(&QTimer::start));
+    // Only a selection the user makes (keys, mouse) marks its occurrences: one the app sets (the
+    // playing note, a click in the score preview, find & replace, undo) is just a selection.
+    connect(this, &QPlainTextEdit::selectionChanged, this, [this] {
+        if (userInput_ > 0) {
+            occurrenceTimer_->start();
+        } else if (!occurrenceMarks_.isEmpty()) {
+            occurrenceTimer_->stop();
+            occurrenceMarks_.clear();
+            updateExtraSelections();
+        }
+    });
+    // The marks of the user's selection follow the text.
+    connect(this, &QPlainTextEdit::textChanged, this, [this] {
+        if (userInput_ > 0 || !occurrenceMarks_.isEmpty())
+            occurrenceTimer_->start();
+    });
     // The main cursor moved by anything but a multi-cursor edit: back to one cursor.
     connect(this, &QPlainTextEdit::cursorPositionChanged, this, [this] {
         if (!keepingCursors_)
@@ -373,7 +387,33 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
     return false;
 }
 
+bool CodeTextEdit::viewportEvent(QEvent* event) {
+    switch (event->type()) {
+    case QEvent::MouseButtonPress:
+    case QEvent::MouseButtonRelease:
+    case QEvent::MouseButtonDblClick:
+    case QEvent::MouseMove: {
+        ++userInput_;
+        const bool handled = QPlainTextEdit::viewportEvent(event);
+        --userInput_;
+        return handled;
+    }
+    default:
+        return QPlainTextEdit::viewportEvent(event);
+    }
+}
+
 bool CodeTextEdit::event(QEvent* event) {
+    if (event->type() == QEvent::KeyPress) {
+        ++userInput_; // a selection made by the keyboard is the user's
+        const bool handled = handleEvent(event);
+        --userInput_;
+        return handled;
+    }
+    return handleEvent(event);
+}
+
+bool CodeTextEdit::handleEvent(QEvent* event) {
     // With several cursors, copy, cut and paste and Escape act at all of them, before any
     // shortcut of the window gets these keys.
     if (event->type() == QEvent::ShortcutOverride && !extraCursors_.isEmpty()) {

@@ -11,6 +11,7 @@ class QTimer;
 // A QPlainTextEdit with a line-number area on the left (Qt's "Code Editor" example). The
 // numbers are the 1-based block numbers, which are the file's lines (the editor does not wrap).
 // Enter keeps the current line's indentation. Selecting text marks its other occurrences.
+// (Only a selection the user makes with the keys or the mouse; one set by the app is not marked.)
 // Ctrl+Shift+Up/Down add cursors on the lines above/below, the other direction takes them back
 // (like a code editor's multi-cursor):
 // typing, Backspace/Delete, Enter, the arrows, Home/End (with Shift and Ctrl), copy, cut and paste
@@ -60,6 +61,7 @@ public:
 
 protected:
     bool event(QEvent* event) override;
+    bool viewportEvent(QEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
@@ -67,6 +69,7 @@ protected:
     void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
+    bool handleEvent(QEvent* event); // event() without the user-input bookkeeping
     friend class LineNumberArea;
     friend struct AppTestAccess;
     // Marks the other occurrences of the selected text (one line, case-sensitive) with a lighter
@@ -96,6 +99,7 @@ private:
     int multiColumn_ = -1;        // the column new cursors go to
     bool keepingCursors_ = false; // our own edits move the main cursor: keep the extra ones
     QTimer* occurrenceTimer_ = nullptr;
+    int userInput_ = 0; // > 0 while a key or mouse event of the user is handled
     std::function<bool(QKeyEvent*)> keyFilter_;
     CursorKeyHook cursorKeyHook_;
     QWidget* area_ = nullptr;

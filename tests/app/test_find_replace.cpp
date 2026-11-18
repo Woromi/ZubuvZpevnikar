@@ -244,11 +244,12 @@ TEST_CASE("FindBar: the matches are marked apart from the selection's occurrence
     b.search(QStringLiteral("dog"));
     // Two matches, plus the current one drawn again.
     CHECK(b.edit.extraSelections().size() == 2);
-    QTest::qWait(200); // the occurrence marks of the selection join after a pause
-    CHECK(b.edit.extraSelections().size() == 3);
+    // The current match is a selection the bar made: no marks of its occurrences join.
+    QTest::qWait(200);
+    CHECK(b.edit.extraSelections().size() == 2);
     b.bar.dismiss();
     QTest::qWait(200);
-    CHECK(b.edit.extraSelections().size() == 1);
+    CHECK(b.edit.extraSelections().isEmpty());
 }
 
 TEST_CASE("Ctrl+F: the Songs page keeps its search, the song page opens the find bar",
