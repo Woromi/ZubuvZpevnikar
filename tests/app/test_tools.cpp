@@ -529,3 +529,52 @@ TEST_CASE("Playback: Play starts at the cursor's note and the cursor follows the
     CHECK(player->played[0].second == 0);
     A::stopPlayback(s.window);
 }
+
+// Everything that sounds at a time is boxed in the preview of a real build: the tab staff's chord,
+// the chord name and the lyric syllable together.
+TEST_CASE("Playback: the preview boxes the notes, chord names and lyrics sounding together",
+          "[.tools][app][playback]") {
+    PlayableScore s("Sing");
+    auto* player = new apptest::SilentPlayer;
+    A::replacePlayer(s.window, player);
+    auto* editor = A::scoreTabs(s.window)[0].editor.data();
+    REQUIRE(editor != nullptr);
+    const auto& timeline = A::timeline(s.window);
+    REQUIRE(!timeline.empty());
+    const std::string text = editor->editorText();
+
+    // At the start: the tab staff's chord, the chord name c1 and the syllable "la".
+    using zub::scoretiming::Kind;
+    const auto now = zub::scoretiming::soundingAt(timeline, 0.05);
+    const auto find = [&](Kind kind, std::string_view word) {
+        return std::ranges::find_if(now, [&](const auto& sound) {
+            return sound.kind == kind &&
+                   text.substr(sound.range.begin, sound.range.end - sound.range.begin) == word;
+        });
+    };
+    const auto note = find(Kind::Note, "<e, e>2");
+    const auto name = find(Kind::ChordName, "c1");
+    const auto syllable = find(Kind::Lyric, "la");
+    REQUIRE(note != now.end());
+    REQUIRE(name != now.end());
+    REQUIRE(syllable != now.end());
+    // The melody (Devnull) is silent: no sound of its own.
+    CHECK(std::ranges::none_of(
+        now, [&](const auto& sound) { return text.substr(sound.range.begin, 4) == "c''4"; }));
+
+    // Play and let the preview follow: each of the three has a link in the preview and is boxed.
+    QTest::mouseClick(s.play, Qt::LeftButton);
+    REQUIRE(apptest::waitUntil([&] { return !player->played.empty(); }, 60000));
+    A::followAt(s.window, 0.05);
+    int linked = 0;
+    for (const auto& sound : {*note, *name, *syllable})
+        for (const QPoint& position : s.pane->notePositions()) {
+            const auto offset = zub::scoreregion::offsetOf(text, position.y(), position.x());
+            if (offset && *offset >= sound.range.begin && *offset < sound.range.end)
+                ++linked;
+        }
+    CHECK(linked >= 3); // a link each (the chord: one per note)
+    CHECK(s.pane->soundingNoteCount() == linked);
+    A::stopPlayback(s.window);
+    CHECK(s.pane->soundingNoteCount() == 0);
+}

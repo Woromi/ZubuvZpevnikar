@@ -168,7 +168,10 @@ TEST_CASE("midiScore is a score that unfolds repeats and plays", "[score][midi]"
     CHECK(std::ranges::count(*score, '#') == 2); // the `##t` of skipTypesetting, no Scheme
     CHECK(contains(*score, "\\layout {\n    \\context { \\Score skipTypesetting = ##t }\n"
                            "    \\context { \\Voice \\consists \\zubNoteLogger }\n"
-                           "    \\context { \\TabVoice \\consists \\zubNoteLogger }\n  }"));
+                           "    \\context { \\TabVoice \\consists \\zubNoteLogger }\n"
+                           "    \\context { \\ChordNames \\consists \\zubNoteLogger }\n"
+                           "    \\context { \\Devnull \\consists \\zubNoteLogger }\n"
+                           "    \\context { \\Lyrics \\consists \\zubNoteLogger }\n  }"));
     CHECK_FALSE(contains(score->substr(score->find("\\layout") + 1), "\\layout"));
     CHECK_FALSE(contains(*score, "\\header"));
     CHECK_FALSE(contains(*score, "= 50")); // the score's own \midi is not copied
@@ -370,6 +373,8 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
     }
     int count = 0;
     int timed = 0;
+    int withChordNames = 0;
+    int withLyrics = 0;
     TempDir dir;
     for (const auto& entry : fs::recursive_directory_iterator(realRepo / "songs")) {
         if (!entry.is_regular_file() || entry.path().extension() != ".ly")
@@ -466,12 +471,22 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
             }
             CHECK((timeline->unmapped == 0 || hasSingle));
             CHECK_FALSE(timeline->empty());
+            // Sounds (zub::scoretiming::soundingAt): the chord names and lyrics of the scores that
+            // have them are mapped too.
+            for (const auto& sound : timeline->sounds) {
+                withChordNames += sound.kind == zub::scoretiming::Kind::ChordName ? 1 : 0;
+                withLyrics += sound.kind == zub::scoretiming::Kind::Lyric ? 1 : 0;
+                CHECK(sound.end > sound.start);
+                CHECK(sound.range.end <= editorText.size());
+            }
             ++timed;
         }
         ++count;
     }
     CHECK(count > 0);
     CHECK(timed > 0);
+    CHECK(withChordNames > 0);
+    CHECK(withLyrics > 0);
 #endif
 }
 

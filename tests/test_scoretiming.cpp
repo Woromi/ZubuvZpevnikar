@@ -1,5 +1,6 @@
 // The score cursor as the play position: the note list of the playback score, the tempo map and
 // the timeline. tests/data/timing/ is a real LilyPond run (see tests/data/README.md).
+#include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
@@ -100,6 +101,31 @@ TEST_CASE("Note list: lines parse, damaged ones are skipped", "[scoretiming]") {
     CHECK(notes[1].file == "/a b/X.ly");
     CHECK(notes[2].whole == Approx(0.75));
     CHECK(timing::parseNotes("").empty());
+}
+
+TEST_CASE("Note list: kind and length", "[scoretiming]") {
+    const auto notes = timing::parseNotes("n 1 4 0 1 7 19 1 4 /a b/X.ly\n"
+                                          "l 19 8 -1 8 27 85 1 2 /x.ly\n"
+                                          "c 0 1 0 1 6 33 3 8 /x.ly\n"
+                                          "m 0 1 0 1 9 27 1 8 /x.ly\n"
+                                          "x 0 1 0 1 9 27 1 8 /x.ly\n" // unknown kind
+                                          "n 0 1 0 1 9 27 1 0 /x.ly\n" // a zero denominator
+                                          "n 0 1 0 1 9 27 /x.ly\n"     // no length
+                                          "0 1 0 1 2 10 /old.ly\n");   // the old format
+    REQUIRE(notes.size() == 5);
+    CHECK(notes[0].kind == timing::Kind::Note);
+    CHECK(notes[0].whole == Approx(0.25));
+    CHECK(notes[0].length == Approx(0.25));
+    CHECK(notes[0].file == "/a b/X.ly");
+    CHECK(notes[1].kind == timing::Kind::Lyric);
+    CHECK(notes[1].whole == Approx(19.0 / 8 - 1.0 / 8));
+    CHECK(notes[1].length == Approx(0.5));
+    CHECK(notes[2].kind == timing::Kind::ChordName);
+    CHECK(notes[2].length == Approx(0.375));
+    CHECK(notes[3].kind == timing::Kind::Melody);
+    CHECK(notes[4].kind == timing::Kind::Note); // the old format: no length
+    CHECK(notes[4].length == 0);
+    CHECK(notes[4].file == "/old.ly");
 }
 
 TEST_CASE("Tempo map: whole notes to seconds across tempo changes", "[scoretiming][midi]") {
@@ -217,6 +243,103 @@ TEST_CASE("Timeline: the cue playing at a time", "[scoretiming]") {
     CHECK(f.textOf(timing::cueAt(t, 3.6)->event) == "b'8");
     CHECK(f.textOf(timing::cueAt(t, 5.3)->event) == "\\grace a'8");
     CHECK(f.textOf(timing::cueAt(t, 99)->event) == "b'4");
+}
+
+namespace {
+
+// tests/data/timing/Sing.ly: a chord name, a staff, a tab staff, a silent melody (Devnull) timing
+// the lyrics, at 120 bpm (a whole note is 2 s). The real LilyPond run of it, the first score is
+// shorter than the playback score that is appended from line 13.
+struct Sing {
+    std::string original = readFile(dataDir / "Sing.ly");
+    std::string copy = readFile(dataDir / "Sing.copy.ly");
+    std::string notes;
+    std::string midi = readFile(dataDir / "sing.mid");
+    fs::path copyFile = "/work/score/Test/Sing.ly";
+    Sing() { notes = replaceAll(readFile(dataDir / "sing.notes"), "@COPY@", copyFile.string()); }
+    timing::Source source() const { return {notes, midi, copy, original, copyFile, 13}; }
+    std::size_t at(std::string_view needle, std::size_t from = 0) const {
+        const auto found = original.find(needle, from);
+        REQUIRE(found != std::string::npos);
+        return found;
+    }
+    // The texts of what sounds at `seconds`, in text order.
+    std::vector<std::string> soundingTexts(const timing::Timeline& t, double seconds) const {
+        std::vector<std::string> texts;
+        for (const auto& sound : timing::soundingAt(t, seconds))
+            texts.push_back(
+                original.substr(sound.range.begin, sound.range.end - sound.range.begin));
+        std::ranges::sort(texts);
+        return texts;
+    }
+};
+
+} // namespace
+
+TEST_CASE("Timeline: everything that sounds at a time, in all parts", "[scoretiming]") {
+    Sing f;
+    const auto result = timing::buildTimeline(f.source());
+    REQUIRE(result);
+    const auto& t = *result;
+    using V = std::vector<std::string>;
+    // The first syllable has the length of the first melody note (a quarter, 0.5 s): the staff's
+    // c', the tab staff's chord (two notes: one event), the chord name c2 (a half note, 1 s) and
+    // the syllable "la".
+    CHECK(f.soundingTexts(t, 0.0) == V{"<e, e>2", "c'4", "c2", "la"});
+    CHECK(f.soundingTexts(t, 0.49) == V{"<e, e>2", "c'4", "c2", "la"});
+    // 0.5 s: d' and the second "la" (which the hyphen follows: only the word is the syllable).
+    CHECK(f.soundingTexts(t, 0.5) == V{"<e, e>2", "c2", "d'", "la"});
+    CHECK(f.soundingTexts(t, 0.8) == V{"<e, e>2", "c2", "d'", "la"});
+    // 1.0 s: the second half: g2:m7 (the whole of the chord's text), g', e'2, "lo".
+    CHECK(f.soundingTexts(t, 1.0) == V{"e'2", "g'2", "g2:m7", "lo"});
+    CHECK(f.soundingTexts(t, 1.99) == V{"e'2", "g'2", "g2:m7", "lo"});
+    // Before and after the music: nothing.
+    CHECK(timing::soundingAt(t, -0.1).empty());
+    CHECK(timing::soundingAt(t, 2.0).empty());
+    // The silent melody is no sound and no cue; the cues are the staves' notes only.
+    for (const auto& cue : t.cues)
+        CHECK(f.original.substr(cue.event.begin, 3) != "c''");
+    for (const auto& sound : t.sounds)
+        CHECK(sound.kind != timing::Kind::Melody);
+    CHECK(t.unmapped == 0);
+    // Each sound belongs to its kind.
+    for (const auto& sound : timing::soundingAt(t, 1.0)) {
+        const auto text = f.original.substr(sound.range.begin, sound.range.end - sound.range.begin);
+        if (text == "lo")
+            CHECK(sound.kind == timing::Kind::Lyric);
+        if (text == "g2:m7")
+            CHECK(sound.kind == timing::Kind::ChordName);
+        if (text == "e'2")
+            CHECK(sound.kind == timing::Kind::Note);
+    }
+    // The selected-note cue is unchanged: the later note of two that begin together (text order).
+    CHECK(f.original.substr(timing::cueAt(t, 0.2)->event.begin, 7) == "<e, e>2");
+}
+
+TEST_CASE("Timeline: sounds of the old note list, grace notes and words that do not map",
+          "[scoretiming]") {
+    // An old list (no kind, no length): a note sounds for the minimum.
+    Fixture old;
+    const auto base = timing::buildTimeline(old.source());
+    REQUIRE(base);
+    const auto at = timing::soundingAt(*base, 0.0);
+    REQUIRE(!at.empty());
+    for (const auto& s : at)
+        CHECK(s.end - s.start == Approx(timing::minimumSounding));
+    CHECK(timing::soundingAt(*base, 0.2).empty());
+    CHECK(base->sounds.size() == base->cues.size());
+
+    // A lyric with a word the generated copy has more often than the block (a changed copy) is
+    // skipped, not mapped to the wrong word.
+    Sing changed;
+    const auto lyrics = changed.copy.find("la la -- la lo", changed.copy.find("\\book"));
+    REQUIRE(lyrics != std::string::npos);
+    changed.copy.insert(lyrics + 14, " la");
+    const auto result = timing::buildTimeline(changed.source());
+    REQUIRE(result);
+    using V = std::vector<std::string>;
+    CHECK(changed.soundingTexts(*result, 0.0) == V{"<e, e>2", "c'4", "c2"}); // no "la"
+    CHECK(changed.soundingTexts(*result, 1.0) == V{"e'2", "g'2", "g2:m7", "lo"});
 }
 
 TEST_CASE("Timeline: other files, CR LF copies and files that do not belong together",

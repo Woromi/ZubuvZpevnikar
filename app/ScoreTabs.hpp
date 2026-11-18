@@ -165,9 +165,11 @@ private:
     std::optional<double> startSeconds() const; // where Play starts for the cursor or selection
     void rememberPlayStart() { playFrom_ = startSeconds(); } // Play was asked for
     void startFollowing();                                   // the cursor follows the playing notes
-    void stopFollowing();          // the cursor stays at the last note played
-    void followTick();             // a timer: the player's position -> followAt
-    void followAt(double seconds); // moves the cursor to the note sounding then
+    void stopFollowing();              // the cursor stays at the last note played
+    void followTick();                 // a timer: the player's position -> followAt
+    void followAt(double seconds);     // moves the cursor to the note sounding then, and marks all
+                                       // that sounds in the preview
+    void showSounding(double seconds); // the preview's "sounding" boxes for that time
 
     void updateScoreHighlights();
     void clickScoreNote(const QPoint& position, bool after, bool extend); // from the preview
@@ -198,6 +200,9 @@ private:
     // Of the text the preview was built from (valid while scoreLinksFresh_): the music events, the
     // event of each link ({line, column}), a link of each event, the event a selection started at.
     std::vector<zub::scoreregion::Range> scoreEvents_;
+    // Every link of the preview (any kind) with its offset in the text, by offset: the links that
+    // sound at a time are those inside the sounding ranges.
+    std::vector<std::pair<std::size_t, QPoint>> linkOffsets_;
     std::map<std::pair<int, int>, std::size_t> linkEvent_;
     std::map<std::size_t, QPoint> eventLink_;
     // The stops (zub::scoreregion::caretStop) the keys of the preview selected from and to; valid
@@ -217,7 +222,7 @@ private:
     zub::scoretiming::Timeline timeline_;
     std::optional<double> playFrom_; // seconds Play was asked to start at; none: the start
     QTimer* followTimer_ = nullptr;
-    bool following_ = false;                  // the cursor moves with the playing notes
+    bool following_ = false; // the cursor moves with the playing notes
     std::optional<std::pair<std::size_t, std::size_t>> followRange_; // the note it selected
     NoteSounds* noteSounds_ = nullptr;
     bool scoreAmp_ = false; // the latest preview build's MIDI file is for the amp instrument

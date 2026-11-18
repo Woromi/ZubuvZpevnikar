@@ -117,6 +117,9 @@ struct AppTestAccess {
         w.scores_->showPlaybackResult(result);
     }
     static void playFromCursor(MainWindow& w) { w.scores_->rememberPlayStart(); }
+    static void showScoreResult(MainWindow& w, const ScoreResult& result) {
+        w.scores_->showScoreResult(result);
+    }
     static void followAt(MainWindow& w, double seconds) { w.scores_->followAt(seconds); }
     static bool following(MainWindow& w) { return w.scores_->following_; }
     static void stopPlayback(MainWindow& w) { w.scores_->stopPlayback(); }

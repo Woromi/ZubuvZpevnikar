@@ -1112,6 +1112,7 @@ void ScoreTabs::startFollowing() {
 void ScoreTabs::stopFollowing() {
     following_ = false;
     followTimer_->stop();
+    scorePreview_->setSoundingNotes({});
 }
 
 void ScoreTabs::followTick() {
@@ -1131,6 +1132,7 @@ void ScoreTabs::followAt(double seconds) {
         stopFollowing();
         return;
     }
+    showSounding(seconds);
     const auto* cue = zub::scoretiming::cueAt(timeline_, seconds);
     if (!cue)
         return;
@@ -1143,6 +1145,25 @@ void ScoreTabs::followAt(double seconds) {
     scoreStops_.reset();
     editor->selectByteRange(range.first, range.second, false);
     followRange_ = editor->selectedByteRange();
+}
+
+// Everything that sounds at `seconds` in all parts (the staves' notes, chord names, lyric
+// syllables) is boxed in the preview: the links of the preview inside the sounding texts. What has
+// no link is skipped.
+void ScoreTabs::showSounding(double seconds) {
+    QList<QPoint> notes;
+    QList<ScorePreviewPane::SoundingText> texts;
+    for (const auto& sound : zub::scoretiming::soundingAt(timeline_, seconds)) {
+        auto link = std::ranges::lower_bound(linkOffsets_, sound.range.begin, {},
+                                             [](const auto& l) { return l.first; });
+        for (; link != linkOffsets_.end() && link->first < sound.range.end; ++link) {
+            if (sound.kind == zub::scoretiming::Kind::Note)
+                notes.append(link->second);
+            else
+                texts.append({link->second, static_cast<int>(sound.range.end - sound.range.begin)});
+        }
+    }
+    scorePreview_->setSoundingNotes(notes, texts);
 }
 
 void ScoreTabs::soundFret(FretboardWidget* fretboard, int string, int fret) {
@@ -1213,6 +1234,7 @@ void ScoreTabs::indexScoreEvents() {
     scoreEvents_.clear();
     linkEvent_.clear();
     eventLink_.clear();
+    linkOffsets_.clear();
     scoreAnchor_.reset();
     SongEditor* editor = currentEditor();
     QList<QPoint> selectable;
@@ -1221,6 +1243,8 @@ void ScoreTabs::indexScoreEvents() {
         scoreEvents_ = zub::scoreregion::musicEvents(text);
         for (const QPoint& position : scorePreview_->notePositions()) {
             const auto offset = zub::scoreregion::offsetOf(text, position.y(), position.x());
+            if (offset)
+                linkOffsets_.emplace_back(*offset, position);
             const auto event =
                 offset ? zub::scoreregion::eventAt(scoreEvents_, *offset) : std::nullopt;
             if (!event)
@@ -1231,6 +1255,7 @@ void ScoreTabs::indexScoreEvents() {
         }
     }
     scorePreview_->setSelectableNotes(selectable);
+    std::ranges::sort(linkOffsets_, {}, [](const auto& link) { return link.first; });
 }
 
 void ScoreTabs::updateRegionActions() {

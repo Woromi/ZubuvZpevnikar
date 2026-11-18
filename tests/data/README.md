@@ -16,4 +16,4 @@
 `timing/` is a real LilyPond run of the synthetic score `Timing.ly` (two staves, a repeat with alternatives, tempo
 changes, a tuplet, a grace note, a variable) through `zub::score::prepare` for the score-cursor-as-play-position tests:
 `Timing.copy.ly` is the score copy LilyPond read (the playback score is appended from line 17), `timing.notes` the
-list it wrote (the copy's path replaced by `@COPY@`), `timing.mid` the playback MIDI file.
+list it wrote (the copy's path replaced by `@COPY@`), `timing.mid` the playback MIDI file. That list is of the first format (no kind, no length); `Sing.ly` (chord names, a staff, a tab staff, a silent Devnull melody timing lyrics) with `Sing.copy.ly`, `sing.notes`, `sing.mid` is a run of the current one (generated from line 13), for `soundingAt`.

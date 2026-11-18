@@ -4,6 +4,7 @@
 #include "FretboardWidget.hpp"
 #include "ScoreInputBar.hpp"
 #include "ScorePreviewPane.hpp"
+#include "ScoreRunner.hpp"
 #include "SongEditor.hpp"
 #include "Support.hpp"
 
@@ -20,10 +21,13 @@
 #include <QTest>
 #include <QTextBlock>
 #include <QToolButton>
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
+#include <filesystem>
 #include <zub/core/scoreregion.hpp>
 
 using A = AppTestAccess;
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -399,4 +403,148 @@ TEST_CASE("Score tab: Play passes the start to the player; Stop and the end leav
     emit player->finished();
     CHECK(!A::following(s.window));
     CHECK(ed->cursorByteOffset() == at);
+}
+
+namespace {
+
+// 1-based line and 0-based column (code points) of byte `offset` of `text`: a link's position.
+QPoint linkPosition(const std::string& text, std::size_t offset) {
+    const int line = 1 + static_cast<int>(std::ranges::count(
+                             text.begin(), text.begin() + static_cast<long>(offset), '\n'));
+    const auto lineStart = text.rfind('\n', offset == 0 ? 0 : offset - 1);
+    const std::size_t from = lineStart == std::string::npos || offset == 0 ? 0 : lineStart + 1;
+    const int column =
+        static_cast<int>(QString::fromStdString(text.substr(from, offset - from)).size());
+    return {column, line};
+}
+
+} // namespace
+
+TEST_CASE("Score tab: everything that sounds is highlighted in the preview, in all parts",
+          "[app][score][playback]") {
+    ScoreWindow s("Sing");
+    auto* player = new apptest::SilentPlayer;
+    A::replacePlayer(s.window, player);
+    SongEditor* ed = s.editor();
+    const std::string text = ed->editorText();
+    const auto range = [&](std::string_view needle, std::size_t length = 0) {
+        const auto at = text.find(needle);
+        REQUIRE(at != std::string::npos);
+        return zub::scoreregion::Range{at, at + (length ? length : needle.size())};
+    };
+    const auto chord = range("<e, e>2");
+    const auto chordName = range("c1");
+    const auto syllable = range("la");
+    const auto nextNote = range("g'2");
+    const auto nextName = range("g1:m7");
+    const auto nextSyllable = range("lo");
+
+    // A preview built from these texts: a link at the start of each (and one in the chord's
+    // second note), and one in a place no sound is logged for.
+    const fs::path copy = "/nonexistent/copy/Test/Sing.ly";
+    QByteArray svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
+        "width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">";
+    int x = 10;
+    const auto addLink = [&](std::size_t offset) {
+        const QPoint p = linkPosition(text, offset);
+        svg +=
+            QStringLiteral("<a xlink:href=\"textedit://%1:%2:%3:%4\"><g transform=\"translate(%5, "
+                           "%6)\"><path d=\"M0,0 L4,0\"/></g></a>")
+                .arg(toQString(copy))
+                .arg(p.y())
+                .arg(p.x())
+                .arg(p.x() + 1)
+                .arg(x)
+                .arg(40)
+                .toUtf8();
+        x += 20;
+        return p;
+    };
+    const QPoint chordLink = addLink(chord.begin);
+    addLink(chord.begin + 4); // the chord's second note
+    const QPoint nameLink = addLink(chordName.begin);
+    const QPoint syllableLink = addLink(syllable.begin);
+    const QPoint nextNoteLink = addLink(nextNote.begin);
+    const QPoint nextNameLink = addLink(nextName.begin);
+    const QPoint nextSyllableLink = addLink(nextSyllable.begin);
+    const QPoint elsewhere = addLink(text.find("\\tabFullNotation"));
+    svg += "</svg>";
+    Q_UNUSED(chordLink);
+    Q_UNUSED(nextNoteLink);
+    Q_UNUSED(nextNameLink);
+    Q_UNUSED(nextSyllableLink);
+    Q_UNUSED(nameLink);
+    Q_UNUSED(syllableLink);
+    Q_UNUSED(elsewhere);
+
+    QTest::qWait(300); // the preview build timer; no lilypond here, nothing comes of it
+    ScoreResult result;
+    result.success = true;
+    result.svg = svg;
+    result.inputName = s.tab().name;
+    result.scoreCopy = copy;
+    A::showScoreResult(s.window, result);
+    REQUIRE(A::scoreLinksFresh(s.window));
+    ScorePreviewPane* pane = A::scorePreview(s.window);
+    CHECK(pane->soundingNoteCount() == 0);
+
+    // An injected timeline: two bars of parts that begin together.
+    auto& timeline = A::timeline(s.window);
+    using zub::scoretiming::Kind;
+    timeline.firstBegin = chord.begin;
+    timeline.cues = {{0.0, chord}, {1.0, nextNote}};
+    timeline.sounds = {
+        {0.0, 1.0, Kind::Note, chord},         {0.0, 1.0, Kind::ChordName, chordName},
+        {0.0, 0.5, Kind::Lyric, syllable},     {1.0, 2.0, Kind::Note, nextNote},
+        {1.0, 2.0, Kind::ChordName, nextName}, {1.0, 1.5, Kind::Lyric, nextSyllable}};
+
+    ed->setCursorByteOffset(0, false);
+    A::playFromCursor(s.window);
+    PlaybackResult rendered;
+    rendered.success = true;
+    rendered.wav = "/nonexistent/x.wav";
+    A::showPlaybackResult(s.window, rendered);
+    REQUIRE(A::following(s.window));
+
+    // 0.2 s: the chord (two links: both notes), its name, the syllable; the editor has the chord
+    // selected, which the selection highlight shows apart from the sounding boxes.
+    A::followAt(s.window, 0.2);
+    CHECK(pane->soundingNoteCount() == 4);
+    CHECK(ed->selectedByteRange() == std::make_pair(chord.begin, chord.end));
+    QTest::qWait(300); // the selection's highlight follows on a timer
+    CHECK(pane->highlightedNoteCount() == 2);
+    // 0.7 s: the syllable is over, the rest goes on.
+    A::followAt(s.window, 0.7);
+    CHECK(pane->soundingNoteCount() == 3);
+    // 1.2 s: the next note, chord name and syllable (three parts).
+    A::followAt(s.window, 1.2);
+    CHECK(pane->soundingNoteCount() == 3);
+    CHECK(ed->selectedByteRange() == std::make_pair(nextNote.begin, nextNote.end));
+    // 1.8 s: no syllable.
+    A::followAt(s.window, 1.8);
+    CHECK(pane->soundingNoteCount() == 2);
+
+    // Stop clears the boxes (the selected note stays).
+    A::stopPlayback(s.window);
+    CHECK(pane->soundingNoteCount() == 0);
+    CHECK(ed->selectedByteRange() == std::make_pair(nextNote.begin, nextNote.end));
+
+    // The end of the audio clears them too, and so does an edit while playing.
+    A::playFromCursor(s.window);
+    A::showPlaybackResult(s.window, rendered);
+    A::followAt(s.window, 0.2);
+    CHECK(pane->soundingNoteCount() == 4);
+    emit player->finished();
+    CHECK(pane->soundingNoteCount() == 0);
+    A::setScoreLinksFresh(s.window, true);
+    A::playFromCursor(s.window);
+    A::showPlaybackResult(s.window, rendered);
+    A::followAt(s.window, 0.2);
+    CHECK(pane->soundingNoteCount() == 4);
+    QTextCursor c = ed->textEdit()->textCursor();
+    c.movePosition(QTextCursor::End);
+    c.insertText(" ");
+    A::followAt(s.window, 0.3);
+    CHECK(pane->soundingNoteCount() == 0);
 }

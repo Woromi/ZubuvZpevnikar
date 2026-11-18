@@ -61,7 +61,7 @@ public:
     QStringList staffChoices() const; // by staff index
     QString chordChoice() const;      // "silent" without chord names
     QString melodyChoice() const;     // "silent" without a hidden melody
-    QWidget* playButton() const; // for tests
+    QWidget* playButton() const;      // for tests
 
     // Where the note that LilyPond linked to `line` (1-based) and `column` (0-based) is drawn, in
     // widget coordinates of the score view; a null point when the score has no such link. For
@@ -83,6 +83,17 @@ public:
     // empty clears them. A new build clears them too: positions refer to its text.
     void setHighlightedNotes(const QList<QPoint>& positions);
     int highlightedNoteCount() const; // how many links are drawn highlighted; for tests
+    // Draws everything that sounds now (notes of every staff, chord names, lyric syllables) in
+    // an accent colour of its own, apart from the selection; empty clears it. A new build clears
+    // it too.
+    // `notes` are boxed around their link, `texts` (chord names, lyric syllables: the link is
+    // where the text starts) over the text of that many characters.
+    struct SoundingText {
+        QPoint position; // x = column, y = line
+        int characters = 1;
+    };
+    void setSoundingNotes(const QList<QPoint>& notes, const QList<SoundingText>& texts = {});
+    int soundingNoteCount() const; // how many links are drawn as sounding; for tests
     // The leftmost (`right`: rightmost) selectable note on the staff the score cursor is on (x =
     // column, y = line); none without a score cursor (the links are stale) or off any staff.
     std::optional<QPoint> staffEdgeNote(bool right) const;
@@ -95,7 +106,7 @@ public:
 
 signals:
     void rebuildRequested();
-    void tempoChanged(); // the playback speed combo changed: the MIDI file must be built again
+    void tempoChanged();      // the playback speed combo changed: the MIDI file must be built again
     void instrumentChanged(); // ... and so did a staff's instrument choice
     // "Save to file" of a staff: the General MIDI name of its chosen instrument.
     void saveInstrumentRequested(int staff, const QString& gmName);

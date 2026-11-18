@@ -201,6 +201,7 @@ public:
         for (const NoteLink& link : links_)
             linkStaff_.push_back(staffIndexOf(link.point));
         highlighted_.clear();
+        sounding_.clear();
         selectable_.clear();
         caret_.reset();
         update();
@@ -262,6 +263,21 @@ public:
             return;
         highlighted_ = next;
         update();
+    }
+    // The links of everything that sounds now, in every part (notes, chord names, lyrics): drawn
+    // in an accent colour of their own, apart from the selection.
+    // {line, column} -> 0 for a note (boxed around its point), else the characters of the chord
+    // name or syllable that starts at its point (boxed over its text).
+    void setSounding(const std::map<std::pair<int, int>, int>& positions) {
+        if (positions == sounding_)
+            return;
+        sounding_ = positions;
+        update();
+    }
+    int soundingCount() const {
+        return static_cast<int>(std::ranges::count_if(links_, [this](const NoteLink& link) {
+            return sounding_.contains({link.line, link.column});
+        }));
     }
     const std::vector<NoteLink>& links() const { return links_; }
     int highlightedCount() const {
@@ -500,6 +516,7 @@ protected:
         painter.setPen(Qt::NoPen);
         painter.setBrush(fill);
         paintSelection(painter);
+        paintSounding(painter);
         if (caret_) {
             if (const NoteLink* link = findLink(caret_->first, caret_->second)) {
                 const QPointF at = toWidget(link->point);
@@ -590,6 +607,33 @@ private:
         return {y - highlightSize * 1.5, y + highlightSize * 1.5};
     }
 
+    // What sounds now: a box around each link, in orange (the selection and the caret use the
+    // palette's highlight colour, which is blue or the like in every scheme) with a solid edge.
+    void paintSounding(QPainter& painter) const {
+        if (sounding_.empty())
+            return;
+        const QColor accent(230, 126, 34);
+        QColor fill = accent;
+        fill.setAlpha(90);
+        painter.setPen(QPen(accent, 2));
+        painter.setBrush(fill);
+        for (const NoteLink& link : links_) {
+            if (!sounding_.contains({link.line, link.column}))
+                continue;
+            const QPointF at = toWidget(link.point);
+            const int characters = sounding_.at({link.line, link.column});
+            if (characters > 0) {
+                // The point of a chord name or lyric is the left end of its baseline.
+                const double width = std::max(highlightSize, characters * 8.0 + 6);
+                painter.drawRoundedRect(QRectF(at.x() - 3, at.y() - 16, width, 22), 4, 4);
+                continue;
+            }
+            painter.drawRoundedRect(QRectF(at.x() - highlightSize / 2, at.y() - highlightSize / 2,
+                                           highlightSize, highlightSize),
+                                    4, 4);
+        }
+    }
+
     // The selection like selected text: on each staff one band from its first to its last
     // selected note, over the whole staff height; a staff that the selection goes on from or to
     // another staff gets the band to its start or end. Notes off any staff get a box each.
@@ -664,8 +708,9 @@ private:
     }
 
     std::vector<NoteLink> links_;
-    std::set<std::pair<int, int>> highlighted_; // {line, column} of the links to highlight
-    std::set<std::pair<int, int>> selectable_;  // {line, column} of the links that are notes
+    std::set<std::pair<int, int>> highlighted_;   // {line, column} of the links to highlight
+    std::map<std::pair<int, int>, int> sounding_; // the links that sound now (setSounding)
+    std::set<std::pair<int, int>> selectable_;    // {line, column} of the links that are notes
     std::vector<Staff> staves_;
     std::vector<int> linkStaff_; // for each link, the index of its staff in staves_ (-1: none)
     std::optional<std::pair<int, int>> caret_; // the link the score cursor is before or after
@@ -1070,6 +1115,20 @@ void ScorePreviewPane::setHighlightedNotes(const QList<QPoint>& positions) {
     for (const QPoint& position : positions)
         list.emplace_back(position.y(), position.x());
     canvas_->setHighlighted(list);
+}
+
+void ScorePreviewPane::setSoundingNotes(const QList<QPoint>& notes,
+                                        const QList<SoundingText>& texts) {
+    std::map<std::pair<int, int>, int> list;
+    for (const SoundingText& text : texts)
+        list[{text.position.y(), text.position.x()}] = std::max(1, text.characters);
+    for (const QPoint& position : notes)
+        list.try_emplace({position.y(), position.x()}, 0);
+    canvas_->setSounding(list);
+}
+
+int ScorePreviewPane::soundingNoteCount() const {
+    return canvas_->soundingCount();
 }
 
 void ScorePreviewPane::setSelectableNotes(const QList<QPoint>& positions) {

@@ -56,9 +56,12 @@ bool appendIsNeutral(const std::string& content, const std::string& withPlayback
 }
 
 // The Scheme of the playback score's note list: fixed text, only the path of the output file
-// varies. A \\layout of the playback score `\\consists` it in every Voice; for each note event it
-// appends a line "<moment main num> <den> <moment grace num> <den> <line> <char> <file>" (the
-// origin as in LilyPond's point-and-click links) to `notes` and flushes it.
+// varies. A \\layout of the playback score `\\consists` it in every Voice, TabVoice, ChordNames,
+// Devnull (a melody without sound) and Lyrics; for each note event (a lyric event in Lyrics) it
+// appends a line "<kind> <moment main num> <den> <moment grace num> <den> <line> <char> <length
+// num> <den> <file>" (the origin as in LilyPond's point-and-click links; kind n: a staff's voice,
+// c: chord names, m: Devnull, l: lyrics; the length is the event's duration) to `notes` and
+// flushes it.
 std::string loggerScheme(const fs::path& notes) {
     std::string path;
     for (const char c : utf8(notes)) {
@@ -67,24 +70,36 @@ std::string loggerScheme(const fs::path& notes) {
         path += c;
     }
     return "zubNoteLogger = #(lambda (context)\n"
-           "  (let ((port #f))\n"
-           "    (make-engraver\n"
-           "      (listeners\n"
-           "        ((note-event engraver event)\n"
-           "          (let* ((origin (ly:event-property event 'origin))\n"
-           "                 (where (and (ly:input-location? origin)\n"
-           "                             (ly:input-file-line-char-column origin)))\n"
-           "                 (now (ly:context-current-moment context)))\n"
-           "            (if where\n"
-           "              (begin\n"
-           "                (if (not port) (set! port (open-file \"" +
+           "  (let* ((port #f)\n"
+           "         (kind (case (ly:context-name context)\n"
+           "                 ((ChordNames) \"c\") ((Devnull) \"m\") ((Lyrics) \"l\") (else "
+           "\"n\")))\n"
+           "         (record (lambda (event)\n"
+           "           (let* ((origin (ly:event-property event 'origin))\n"
+           "                  (where (and (ly:input-location? origin)\n"
+           "                              (ly:input-file-line-char-column origin)))\n"
+           "                  (now (ly:context-current-moment context))\n"
+           "                  (duration (ly:event-property event 'duration))\n"
+           "                  (length (if (ly:duration? duration)\n"
+           "                              (ly:duration-length duration)\n"
+           "                              (ly:make-moment 0))))\n"
+           "             (if where\n"
+           "               (begin\n"
+           "                 (if (not port) (set! port (open-file \"" +
            path +
            "\" \"a\")))\n"
-           "                (format port \"~a ~a ~a ~a ~a ~a ~a\\n\"\n"
-           "                  (ly:moment-main-numerator now) (ly:moment-main-denominator now)\n"
-           "                  (ly:moment-grace-numerator now) (ly:moment-grace-denominator now)\n"
-           "                  (cadr where) (caddr where) (car where))\n"
-           "                (force-output port))))))\n"
+           "                 (format port \"~a ~a ~a ~a ~a ~a ~a ~a ~a ~a\\n\"\n"
+           "                   kind\n"
+           "                   (ly:moment-main-numerator now) (ly:moment-main-denominator now)\n"
+           "                   (ly:moment-grace-numerator now) (ly:moment-grace-denominator now)\n"
+           "                   (cadr where) (caddr where)\n"
+           "                   (ly:moment-main-numerator length)\n"
+           "                   (ly:moment-main-denominator length) (car where))\n"
+           "                 (force-output port)))))))\n"
+           "    (make-engraver\n"
+           "      (listeners\n"
+           "        ((note-event engraver event) (record event))\n"
+           "        ((lyric-event engraver event) (record event)))\n"
            "      ((finalize engraver) (if port (close-port port))))))\n";
 }
 

@@ -829,7 +829,10 @@ std::optional<std::string> midiScore(std::string_view text, const MidiOptions& o
             ? std::string()
             : "\n  \\layout {\n    \\context { \\Score skipTypesetting = ##t }\n"
               "    \\context { \\Voice \\consists \\zubNoteLogger }\n"
-              "    \\context { \\TabVoice \\consists \\zubNoteLogger }\n  }";
+              "    \\context { \\TabVoice \\consists \\zubNoteLogger }\n"
+              "    \\context { \\ChordNames \\consists \\zubNoteLogger }\n"
+              "    \\context { \\Devnull \\consists \\zubNoteLogger }\n"
+              "    \\context { \\Lyrics \\consists \\zubNoteLogger }\n  }";
     return "\\score {\n  " + played + listing +
            "\n  \\midi {\n    \\tempo 4 = " + std::to_string(beats) +
            "\n    \\context { \\ChordNames " + chordContext +
