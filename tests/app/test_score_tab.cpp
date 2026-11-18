@@ -257,7 +257,7 @@ TEST_CASE("New Score: asks for the part name and references the file", "[app][sc
             tab.editor->textEdit()->document()->setModified(false);
 }
 
-TEST_CASE("Instruments: a hidden melody gets a row of its own, silent by default",
+TEST_CASE("Instruments: a hidden melody gets a row of its own, voice by default",
           "[app][score][melody]") {
     ScoreWindow w("Lyr");
     QTest::qWait(300); // the staves are read on a timer
@@ -267,13 +267,11 @@ TEST_CASE("Instruments: a hidden melody gets a row of its own, silent by default
     }));
     const auto combos = pane->findChildren<QComboBox*>(QStringLiteral("scoreInstrument"));
     REQUIRE(combos.size() == 2); // the staff, the melody
-    CHECK(pane->melodyChoice() == QStringLiteral("silent"));
-    QComboBox* melody = combos.back();
-    CHECK(melody->itemData(0).toString() == QStringLiteral("silent"));
-    const int voice = melody->findData(QStringLiteral("voice"));
-    REQUIRE(voice >= 0);
-    melody->setCurrentIndex(voice);
     CHECK(pane->melodyChoice() == QStringLiteral("voice"));
+    QComboBox* melody = combos.back();
+    CHECK(melody->itemData(0).toString() == QStringLiteral("silent")); // still selectable
+    melody->setCurrentIndex(0);
+    CHECK(pane->melodyChoice() == QStringLiteral("silent"));
 }
 
 TEST_CASE("Score tab: Play starts at the cursor's note and the cursor follows the music",
@@ -298,7 +296,9 @@ TEST_CASE("Score tab: Play starts at the cursor's note and the cursor follows th
     CHECK(A::startSeconds(s.window) == 2.0);
     ed->setCursorByteOffset(events[1].begin + 1, false); // inside the repeated note
     CHECK(A::startSeconds(s.window) == 1.0);
-    ed->setCursorByteOffset(events[1].end, false); // behind it: the next one that sounds
+    ed->setCursorByteOffset(events[1].end, false); // right behind it: that note (where Stop leaves it)
+    CHECK(A::startSeconds(s.window) == 1.0);
+    ed->setCursorByteOffset(events[1].end + 1, false); // in the gap before the next: the next one
     CHECK(A::startSeconds(s.window) == 2.0);
     ed->setCursorByteOffset(0, false);
     CHECK(A::startSeconds(s.window) == 0.0);
@@ -324,29 +324,62 @@ TEST_CASE("Score tab: Play starts at the cursor's note and the cursor follows th
     CHECK(A::followTimer(s.window)->isActive());
 
     A::followAt(s.window, 0.2);
-    CHECK(ed->selectedByteRange() == std::make_pair(events[0].begin, events[0].end));
+    CHECK(ed->cursorByteOffset() == events[0].end);
+    CHECK(!ed->selectedByteRange());
     A::followAt(s.window, 1.5);
-    CHECK(ed->selectedByteRange() == std::make_pair(events[1].begin, events[1].end));
+    CHECK(ed->cursorByteOffset() == events[1].end);
+    CHECK(!ed->selectedByteRange());
     A::followAt(s.window, 2.9);
-    CHECK(ed->selectedByteRange() == std::make_pair(events[2].begin, events[2].end));
+    CHECK(ed->cursorByteOffset() == events[2].end);
+    CHECK(!ed->selectedByteRange());
     A::followAt(s.window, 3.0); // the repeat: the second note again
-    CHECK(ed->selectedByteRange() == std::make_pair(events[1].begin, events[1].end));
-    // The note that sounds is selected whole (not a caret before it, which reads as the previous
-    // note): exactly at its time, and up to just before the next one.
+    CHECK(ed->cursorByteOffset() == events[1].end);
+    CHECK(!ed->selectedByteRange());
+    // The cursor is right behind the note that began last: exactly at its time, and up to just
+    // before the next one.
     A::followAt(s.window, 0.999);
-    CHECK(ed->selectedByteRange() == std::make_pair(events[0].begin, events[0].end));
+    CHECK(ed->cursorByteOffset() == events[0].end);
+    CHECK(!ed->selectedByteRange());
     A::followAt(s.window, 1.0);
-    CHECK(ed->selectedByteRange() == std::make_pair(events[1].begin, events[1].end));
+    CHECK(ed->cursorByteOffset() == events[1].end);
+    CHECK(!ed->selectedByteRange());
     A::followAt(s.window, 99);
-    CHECK(ed->selectedByteRange() == std::make_pair(events[4].begin, events[4].end));
+    CHECK(ed->cursorByteOffset() == events[4].end);
+    CHECK(!ed->selectedByteRange());
     CHECK(A::following(s.window));
 
-    // The user moves the cursor: the music goes on, the cursor stays theirs.
-    ed->setCursorByteOffset(events[3].begin, false);
-    A::followAt(s.window, 2.1);
-    CHECK(ed->cursorByteOffset() == events[3].begin);
+    // Stop, then Play: resumes at the note that was sounding (the one just before the caret).
+    CHECK(A::startSeconds(s.window) == 4.0);
+
+    // The user clicks into the text (or the preview): the player restarts at that note (the
+    // cursor before event 2: 2 s) and the following goes on from there.
+    player->played.clear();
+    ed->setCursorByteOffset(events[2].begin, false);
+    A::followAt(s.window, 4.5);
+    REQUIRE(player->played.size() == 1);
+    CHECK(player->played[0].first == rendered.wav);
+    CHECK(player->played[0].second == 2000);
+    CHECK(A::following(s.window));
+    CHECK(A::followTimer(s.window)->isActive());
+    CHECK(ed->cursorByteOffset() == events[2].end); // the caret is behind the note that sounds
+    // A selection (a drag over notes): from its first note.
+    ed->selectByteRange(events[1].begin, events[2].end, false);
+    A::followAt(s.window, 2.5);
+    REQUIRE(player->played.size() == 2);
+    CHECK(player->played[1].second == 1000);
+    CHECK(A::following(s.window));
+    CHECK(!ed->selectedByteRange());
+    // An edit stops the following and the playback.
+    QTextCursor typed = ed->textEdit()->textCursor();
+    typed.movePosition(QTextCursor::End);
+    typed.insertText(" ");
     CHECK(!A::following(s.window));
+    CHECK(!player->playing);
     CHECK(!A::followTimer(s.window)->isActive());
+    // A caret the user put right behind a note starts at that note, in front of it too.
+    A::setScoreLinksFresh(s.window, true);
+    ed->setCursorByteOffset(events[1].end, false);
+    CHECK(A::startSeconds(s.window) == 1.0);
 }
 
 TEST_CASE("Score tab: Play passes the start to the player; Stop and the end leave the cursor",
@@ -375,13 +408,14 @@ TEST_CASE("Score tab: Play passes the start to the player; Stop and the end leav
     // The next position: the cursor follows; Stop leaves it at the last played note.
     player->position = 2600;
     A::followAt(s.window, 2.6);
-    CHECK(ed->selectedByteRange() == std::make_pair(events[2].begin, events[2].end));
+    CHECK(ed->cursorByteOffset() == events[2].end);
     A::followAt(s.window, 0.4);
-    CHECK(ed->selectedByteRange() == std::make_pair(events[0].begin, events[0].end));
+    CHECK(ed->cursorByteOffset() == events[0].end);
     A::stopPlayback(s.window);
     CHECK(!A::following(s.window));
+    CHECK(A::startSeconds(s.window) == 0.0); // Play again: at the note that was sounding
     A::followAt(s.window, 2.6); // no longer following
-    CHECK(ed->selectedByteRange() == std::make_pair(events[0].begin, events[0].end));
+    CHECK(ed->cursorByteOffset() == events[0].end);
 
     // An edit while playing ends the following too.
     A::playFromCursor(s.window);
@@ -403,6 +437,22 @@ TEST_CASE("Score tab: Play passes the start to the player; Stop and the end leav
     emit player->finished();
     CHECK(!A::following(s.window));
     CHECK(ed->cursorByteOffset() == at);
+
+    // Play again with the caret where the end left it: the whole score from 0, not the last note.
+    player->played.clear();
+    A::playFromCursor(s.window);
+    A::showPlaybackResult(s.window, rendered);
+    REQUIRE(player->played.size() == 1);
+    CHECK(player->played[0].second == 0);
+    // The caret moved after the end: Play starts at that note as usual.
+    A::followAt(s.window, 1.2);
+    emit player->finished();
+    ed->setCursorByteOffset(events[2].begin, false);
+    player->played.clear();
+    A::playFromCursor(s.window);
+    A::showPlaybackResult(s.window, rendered);
+    REQUIRE(player->played.size() == 1);
+    CHECK(player->played[0].second == 2500);
 }
 
 namespace {
@@ -419,6 +469,65 @@ QPoint linkPosition(const std::string& text, std::size_t offset) {
 }
 
 } // namespace
+
+// The orange box of a sounding lyric or chord name is as wide as the text as the renderer draws it,
+// for long words and for wide letters alike (not an estimate from the character count).
+TEST_CASE("Score tab: the sounding box covers the rendered text", "[app][score][playback]") {
+    ScoreWindow s("Sing");
+    const fs::path copy = "/nonexistent/copy/Test/Sing.ly";
+    const std::vector<std::string> words{"la", "nejkrásnější", "WWWWMMMM", "Cmaj7/G#", "iiiiiiiiii"};
+    QByteArray svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
+        "width=\"400\" height=\"200\" viewBox=\"0 0 400 200\">";
+    for (std::size_t i = 0; i < words.size(); ++i)
+        svg += QStringLiteral("<a xlink:href=\"textedit://%1:%2:0:2\"><g transform=\"translate(10, %3)\">"
+                              "<text font-family=\"%4\" font-size=\"10\" text-anchor=\"start\" "
+                              "fill=\"currentColor\"><tspan>%5</tspan></text></g></a>")
+                   .arg(toQString(copy))
+                   .arg(i + 1)
+                   .arg(20 + 35 * i)
+                   .arg(i == 3 ? "sans-serif" : "serif")
+                   .arg(QString::fromStdString(words[i]))
+                   .toUtf8();
+    svg += "</svg>";
+    QTest::qWait(300);
+    ScoreResult result;
+    result.success = true;
+    result.svg = svg;
+    result.inputName = s.tab().name;
+    result.scoreCopy = copy;
+    A::showScoreResult(s.window, result);
+    ScorePreviewPane* pane = A::scorePreview(s.window);
+    QWidget* view = pane->scoreView();
+    view->resize(800, view->heightForWidth(800));
+    QList<ScorePreviewPane::SoundingText> texts;
+    for (std::size_t i = 0; i < words.size(); ++i)
+        texts.append({QPoint(0, static_cast<int>(i) + 1), static_cast<int>(words[i].size())});
+    pane->setSoundingNotes({}, texts);
+    const QImage plain = [&] {
+        pane->setSoundingNotes({});
+        const QImage image = view->grab().toImage();
+        pane->setSoundingNotes({}, texts);
+        return image;
+    }();
+    for (std::size_t i = 0; i < words.size(); ++i) {
+        const auto box = pane->soundingBox(QPoint(0, static_cast<int>(i) + 1));
+        REQUIRE(box.has_value());
+        // The dark pixels of the text inside the box's rows.
+        int left = plain.width(), right = -1;
+        for (int y = static_cast<int>(box->top()); y < static_cast<int>(box->bottom()); ++y)
+            for (int x = 0; x < plain.width(); ++x)
+                if (qGray(plain.pixel(x, y)) < 100) {
+                    left = std::min(left, x);
+                    right = std::max(right, x);
+                }
+        INFO(words[i]);
+        REQUIRE(right >= 0);
+        CHECK(box->left() <= left);
+        CHECK(box->right() >= right);
+        CHECK(box->width() < static_cast<double>(right - left) + 30); // and not far too wide
+    }
+}
 
 TEST_CASE("Score tab: everything that sounds is highlighted in the preview, in all parts",
           "[app][score][playback]") {
@@ -498,6 +607,18 @@ TEST_CASE("Score tab: everything that sounds is highlighted in the preview, in a
         {0.0, 1.0, Kind::Note, chord},         {0.0, 1.0, Kind::ChordName, chordName},
         {0.0, 0.5, Kind::Lyric, syllable},     {1.0, 2.0, Kind::Note, nextNote},
         {1.0, 2.0, Kind::ChordName, nextName}, {1.0, 1.5, Kind::Lyric, nextSyllable}};
+    // The hidden melody's note (no link in the preview): marked in the text only.
+    const std::size_t melodyAt = text.find("\\score");
+    REQUIRE(melodyAt != std::string::npos);
+    timeline.sounds.push_back({0.0, 0.5, Kind::Melody, {melodyAt, melodyAt + 6}});
+    const auto marked = [&] {
+        QStringList texts;
+        for (const auto& mark : ed->textEdit()->extraSelections())
+            texts.append(mark.cursor.selectedText());
+        texts.sort();
+        return texts;
+    };
+    CHECK(marked().isEmpty());
 
     ed->setCursorByteOffset(0, false);
     A::playFromCursor(s.window);
@@ -507,28 +628,41 @@ TEST_CASE("Score tab: everything that sounds is highlighted in the preview, in a
     A::showPlaybackResult(s.window, rendered);
     REQUIRE(A::following(s.window));
 
-    // 0.2 s: the chord (two links: both notes), its name, the syllable; the editor has the chord
-    // selected, which the selection highlight shows apart from the sounding boxes.
+    // 0.2 s: the chord (two links: both notes), its name, the syllable. The editor's cursor is a
+    // plain cursor right behind the chord (no selection); the text has marks on everything that
+    // sounds (the chord, its name, the syllable, the melody note); the preview has the same cue's
+    // caret line at once (no highlight timer), and the boxes.
     A::followAt(s.window, 0.2);
     CHECK(pane->soundingNoteCount() == 4);
-    CHECK(ed->selectedByteRange() == std::make_pair(chord.begin, chord.end));
-    QTest::qWait(300); // the selection's highlight follows on a timer
-    CHECK(pane->highlightedNoteCount() == 2);
-    // 0.7 s: the syllable is over, the rest goes on.
+    CHECK(!ed->selectedByteRange());
+    CHECK(ed->cursorByteOffset() == chord.end);
+    CHECK(pane->hasCaret()); // no qWait: the same tick
+    CHECK(pane->highlightedNoteCount() == 0);
+    const auto word = [&](const zub::scoreregion::Range& r) {
+        return QString::fromStdString(text.substr(r.begin, r.end - r.begin));
+    };
+    QStringList expected{word(chord), word(chordName), word(syllable), QStringLiteral("\\score")};
+    expected.sort();
+    CHECK(marked() == expected);
+    // 0.7 s: the syllable and the melody note are over, the rest goes on.
     A::followAt(s.window, 0.7);
     CHECK(pane->soundingNoteCount() == 3);
-    // 1.2 s: the next note, chord name and syllable (three parts).
+    CHECK(marked().size() == 2);
+    // 1.2 s: the next note, chord name and syllable (three parts); the cursor behind the note.
     A::followAt(s.window, 1.2);
     CHECK(pane->soundingNoteCount() == 3);
-    CHECK(ed->selectedByteRange() == std::make_pair(nextNote.begin, nextNote.end));
+    CHECK(ed->cursorByteOffset() == nextNote.end);
+    CHECK(marked().size() == 3);
     // 1.8 s: no syllable.
     A::followAt(s.window, 1.8);
     CHECK(pane->soundingNoteCount() == 2);
+    CHECK(marked().size() == 2);
 
-    // Stop clears the boxes (the selected note stays).
+    // Stop clears the boxes and the marks (the cursor stays behind the last note).
     A::stopPlayback(s.window);
     CHECK(pane->soundingNoteCount() == 0);
-    CHECK(ed->selectedByteRange() == std::make_pair(nextNote.begin, nextNote.end));
+    CHECK(marked().isEmpty());
+    CHECK(ed->cursorByteOffset() == nextNote.end);
 
     // The end of the audio clears them too, and so does an edit while playing.
     A::playFromCursor(s.window);
@@ -537,6 +671,7 @@ TEST_CASE("Score tab: everything that sounds is highlighted in the preview, in a
     CHECK(pane->soundingNoteCount() == 4);
     emit player->finished();
     CHECK(pane->soundingNoteCount() == 0);
+    CHECK(marked().isEmpty());
     A::setScoreLinksFresh(s.window, true);
     A::playFromCursor(s.window);
     A::showPlaybackResult(s.window, rendered);
@@ -547,4 +682,5 @@ TEST_CASE("Score tab: everything that sounds is highlighted in the preview, in a
     c.insertText(" ");
     A::followAt(s.window, 0.3);
     CHECK(pane->soundingNoteCount() == 0);
+    CHECK(marked().isEmpty());
 }

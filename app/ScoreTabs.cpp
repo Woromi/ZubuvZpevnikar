@@ -194,6 +194,7 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
         scorePlayer_->stop();
         stopFollowing();
         timeline_ = {};
+        endedAt_.reset();
         scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
         scoreMidi_.clear();
         updateSoundAvailability();
@@ -244,6 +245,13 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
 // The player's signals (a test stands in another player, see AppTestAccess).
 void ScoreTabs::connectPlayer() {
     connect(scorePlayer_, &ScorePlayer::finished, this, [this] {
+        // Played to the end: the caret stays behind the last note, and Play from there (the caret
+        // unmoved) plays the whole score again.
+        SongEditor* editor = currentEditor();
+        if (following_ && editor && !onSongTab() && !editor->selectedByteRange())
+            endedAt_ = editor->cursorByteOffset();
+        else
+            endedAt_.reset();
         stopFollowing();
         scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
         scorePreview_->showPlaybackMessage({}, false);
@@ -629,6 +637,9 @@ void ScoreTabs::attachScoreEditor(int tabIndex, SongEditor* editor) {
         pdfStale_ = true;
         if (currentEditor() == editor) {
             scoreLinksFresh_ = false; // the note positions of the preview are of an older text
+            endedAt_.reset();
+            if (following_)
+                stopPlayback(); // an edit makes the timeline stale: stop, clear the marks
             scorePreview_->setHighlightedNotes({});
             scorePreview_->setSelectableNotes({});
             scorePreview_->setCaretNote({});
@@ -979,7 +990,7 @@ void ScoreTabs::showStaves(SongEditor* editor, const std::string& name) {
         infos, choices, zub::score::hasChordNames(text),
         chordChoice != chordChoices_.end() ? chordChoice->second : QStringLiteral("silent"),
         zub::score::hasHiddenMelody(text),
-        melodyChoice != melodyChoices_.end() ? melodyChoice->second : QStringLiteral("silent"));
+        melodyChoice != melodyChoices_.end() ? melodyChoice->second : QStringLiteral("voice"));
 }
 
 // "Save to file" of a staff: writes the chosen General MIDI instrument into the score as one edit.
@@ -1066,6 +1077,9 @@ void ScoreTabs::showPlaybackResult(const PlaybackResult& result) {
     }
     scorePreview_->setPlayState(ScorePreviewPane::PlayState::Playing);
     scorePreview_->showPlaybackMessage(tr("Playing"), false);
+    playingWav_ = result.wav;
+    endedAt_.reset();
+    seekMs_ = -1;
     scorePlayer_->play(result.wav, std::llround(playFrom_.value_or(0.0) * 1000.0));
     startFollowing();
 }
@@ -1099,11 +1113,13 @@ std::optional<double> ScoreTabs::startSeconds() const {
         return std::nullopt;
     const auto selection = editor->selectedByteRange();
     const std::size_t caret = selection ? selection->first : editor->cursorByteOffset();
+    if (!selection && endedAt_ == caret)
+        return 0.0; // the caret is where the end of the playback left it: again from the start
     return zub::scoretiming::startSeconds(timeline_, caret);
 }
 
 void ScoreTabs::startFollowing() {
-    followRange_.reset();
+    followOffset_.reset();
     following_ = scoreLinksFresh_ && !timeline_.empty();
     if (following_)
         followTimer_->start();
@@ -1111,59 +1127,100 @@ void ScoreTabs::startFollowing() {
 
 void ScoreTabs::stopFollowing() {
     following_ = false;
+    seekMs_ = -1;
     followTimer_->stop();
     scorePreview_->setSoundingNotes({});
+    if (markedEditor_)
+        markedEditor_->setPlaybackMarks({});
+    markedEditor_.clear();
 }
 
 void ScoreTabs::followTick() {
     const qint64 position = scorePlayer_->positionMs();
+    // Just after a seek the player may still report the old position (or 0): wait for it.
+    if (seekMs_ >= 0) {
+        if (position >= seekMs_ - 50 || (seekGuard_.isValid() && seekGuard_.elapsed() > 500))
+            seekMs_ = -1;
+        else
+            return;
+    }
     if (position >= 0)
         followAt(static_cast<double>(position) / 1000.0);
 }
 
-// The note sounding at `seconds` is selected (the preview highlights it). Following ends when the
-// text changed or the user moved the cursor: the playback goes on and the cursor is theirs.
+// The cursor goes right behind the note that began last at `seconds` (a plain cursor: the preview's
+// caret line stands behind that note, the orange boxes and the editor's marks show what sounds).
+// Cue, cursor, marks and boxes all come from this one time. Following ends when the text changed
+// (then the playback stops too: the timeline is stale). When the user moved the cursor or selected
+// (a click in the preview or the editor, a key in the preview) the playback restarts from there,
+// like Play at that caret (a selection: at its first note), and the following goes on.
 void ScoreTabs::followAt(double seconds) {
     SongEditor* editor = currentEditor();
     if (!following_)
         return;
-    if (!editor || onSongTab() || !scoreLinksFresh_ ||
-        (followRange_ && editor->selectedByteRange() != followRange_)) {
+    if (!editor || onSongTab() || !scoreLinksFresh_) {
         stopFollowing();
         return;
     }
+    if (followOffset_ && (editor->selectedByteRange() || editor->cursorByteOffset() != followOffset_)) {
+        followOffset_.reset();
+        if (const auto start = startSeconds(); start && !playingWav_.empty()) {
+            playFrom_ = start;
+            scorePlayer_->play(playingWav_, std::llround(*start * 1000.0));
+            seekMs_ = std::llround(*start * 1000.0);
+            seekGuard_.start();
+            seconds = *start;
+        }
+    }
     showSounding(seconds);
     const auto* cue = zub::scoretiming::cueAt(timeline_, seconds);
-    if (!cue)
+    // Of the events that begin together (the latest in the text first) the caret goes behind the
+    // last one the preview shows: a hidden melody's voice has no note there.
+    if (cue && !eventLink_.empty()) {
+        const auto shown = [this](const zub::scoretiming::Cue& c) {
+            const auto event = zub::scoreregion::eventAt(scoreEvents_, c.event.begin);
+            return event && eventLink_.contains(*event);
+        };
+        for (const auto* c = cue; c >= timeline_.cues.data() && std::abs(c->seconds - cue->seconds) < 1e-6;
+             --c)
+            if (shown(*c)) {
+                cue = c;
+                break;
+            }
+    }
+    if (!cue || followOffset_ == cue->event.end)
         return;
-    const std::pair<std::size_t, std::size_t> range{cue->event.begin, cue->event.end};
-    if (followRange_ == range)
-        return;
-    // The sounding note itself is selected (highlighted in the preview): a caret before it would
-    // read as the previous note, and a caret behind it as the next one.
-    scoreAnchor_ = range.first;
+    scoreAnchor_ = cue->event.end;
     scoreStops_.reset();
-    editor->selectByteRange(range.first, range.second, false);
-    followRange_ = editor->selectedByteRange();
+    editor->selectByteRange(cue->event.end, cue->event.end, false); // a cursor; keeps it in view
+    followOffset_ = editor->cursorByteOffset();
+    updateScoreHighlights(); // now, not on the highlight timer: the caret line and the boxes agree
 }
 
-// Everything that sounds at `seconds` in all parts (the staves' notes, chord names, lyric
-// syllables) is boxed in the preview: the links of the preview inside the sounding texts. What has
-// no link is skipped.
+// Everything that sounds at `seconds` in all parts (the staves' notes, chord names, the melody,
+// lyric syllables): marked in the editor's text, and boxed in the preview on its links inside those
+// texts (links that do not exist are skipped).
 void ScoreTabs::showSounding(double seconds) {
     QList<QPoint> notes;
     QList<ScorePreviewPane::SoundingText> texts;
+    std::vector<std::pair<std::size_t, std::size_t>> ranges;
     for (const auto& sound : zub::scoretiming::soundingAt(timeline_, seconds)) {
+        ranges.emplace_back(sound.range.begin, sound.range.end);
         auto link = std::ranges::lower_bound(linkOffsets_, sound.range.begin, {},
                                              [](const auto& l) { return l.first; });
         for (; link != linkOffsets_.end() && link->first < sound.range.end; ++link) {
-            if (sound.kind == zub::scoretiming::Kind::Note)
+            if (sound.kind == zub::scoretiming::Kind::Note ||
+                sound.kind == zub::scoretiming::Kind::Melody)
                 notes.append(link->second);
             else
                 texts.append({link->second, static_cast<int>(sound.range.end - sound.range.begin)});
         }
     }
     scorePreview_->setSoundingNotes(notes, texts);
+    if (SongEditor* editor = currentEditor()) {
+        editor->setPlaybackMarks(ranges);
+        markedEditor_ = editor;
+    }
 }
 
 void ScoreTabs::soundFret(FretboardWidget* fretboard, int string, int fret) {

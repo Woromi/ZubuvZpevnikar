@@ -11,6 +11,7 @@ class QKeyEvent;
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 #include <zub/core/scoreregion.hpp>
 #include <zub/core/songedit.hpp>
 
@@ -148,6 +149,9 @@ public:
     // Selects [begin, end) of the editor text, shows it and focuses the editor (unless `focus` is
     // false: the score preview keeps the keyboard).
     void selectByteRange(std::size_t begin, std::size_t end, bool focus = true);
+    // The byte ranges (of editorText()) that sound now, drawn as marks (not a selection, the text
+    // cursor stays as it is); none clears them.
+    void setPlaybackMarks(const std::vector<std::pair<std::size_t, std::size_t>>& ranges);
     // Replaces the whole editor text by `text` (LF line ends) as ONE undo step; only the differing
     // middle is edited, so the cursor and scroll stay. False in a read-only editor (Kind::Score only).
     bool replaceScoreText(const std::string& text);

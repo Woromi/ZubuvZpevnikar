@@ -215,9 +215,10 @@ TEST_CASE("Timeline: where playback starts for a caret", "[scoretiming]") {
     const auto chord = f.at("<e e'>4");
     CHECK(timing::startSeconds(t, chord + 1) == Approx(1.0));
     CHECK(timing::startSeconds(t, chord + 4) == Approx(1.0));
-    // Right behind the chord: the next event; g' sounds at 1.5 s in the first pass, 3.0 s in the
-    // second.
-    CHECK(timing::startSeconds(t, chord + 7) == Approx(1.5));
+    // Right behind the chord (where the playback leaves the caret): that chord again. In the gap
+    // before the next note: that note; g' sounds at 1.5 s in the first pass, 3.0 s in the second.
+    CHECK(timing::startSeconds(t, chord + 7) == Approx(1.0));
+    CHECK(timing::startSeconds(t, chord + 8) == Approx(1.5));
     // In the second ending only.
     CHECK(timing::startSeconds(t, f.at("b'8 \\tempo")) == Approx(3.5));
     // A rest does not sound: the next event that does (here the tab staff's, which is next in the
@@ -285,22 +286,22 @@ TEST_CASE("Timeline: everything that sounds at a time, in all parts", "[scoretim
     // The first syllable has the length of the first melody note (a quarter, 0.5 s): the staff's
     // c', the tab staff's chord (two notes: one event), the chord name c2 (a half note, 1 s) and
     // the syllable "la".
-    CHECK(f.soundingTexts(t, 0.0) == V{"<e, e>2", "c'4", "c2", "la"});
-    CHECK(f.soundingTexts(t, 0.49) == V{"<e, e>2", "c'4", "c2", "la"});
+    CHECK(f.soundingTexts(t, 0.0) == V{"<e, e>2", "c''4", "c'4", "c2", "la"});
+    CHECK(f.soundingTexts(t, 0.49) == V{"<e, e>2", "c''4", "c'4", "c2", "la"});
     // 0.5 s: d' and the second "la" (which the hyphen follows: only the word is the syllable).
-    CHECK(f.soundingTexts(t, 0.5) == V{"<e, e>2", "c2", "d'", "la"});
-    CHECK(f.soundingTexts(t, 0.8) == V{"<e, e>2", "c2", "d'", "la"});
+    CHECK(f.soundingTexts(t, 0.5) == V{"<e, e>2", "c2", "d'", "d''8", "la"});
+    CHECK(f.soundingTexts(t, 0.8) == V{"<e, e>2", "c2", "d'", "e''8", "la"});
     // 1.0 s: the second half: g2:m7 (the whole of the chord's text), g', e'2, "lo".
-    CHECK(f.soundingTexts(t, 1.0) == V{"e'2", "g'2", "g2:m7", "lo"});
-    CHECK(f.soundingTexts(t, 1.99) == V{"e'2", "g'2", "g2:m7", "lo"});
+    CHECK(f.soundingTexts(t, 1.0) == V{"e'2", "f''2", "g'2", "g2:m7", "lo"});
+    CHECK(f.soundingTexts(t, 1.99) == V{"e'2", "f''2", "g'2", "g2:m7", "lo"});
     // Before and after the music: nothing.
     CHECK(timing::soundingAt(t, -0.1).empty());
     CHECK(timing::soundingAt(t, 2.0).empty());
-    // The silent melody is no sound and no cue; the cues are the staves' notes only.
+    // The hidden melody (c'' d'' e'' f'') sounds too (it is a Melody sound) but is no cue; the cues
+    // are the staves' notes only.
     for (const auto& cue : t.cues)
         CHECK(f.original.substr(cue.event.begin, 3) != "c''");
-    for (const auto& sound : t.sounds)
-        CHECK(sound.kind != timing::Kind::Melody);
+    CHECK(std::ranges::count(t.sounds, timing::Kind::Melody, &timing::Sound::kind) == 4);
     CHECK(t.unmapped == 0);
     // Each sound belongs to its kind.
     for (const auto& sound : timing::soundingAt(t, 1.0)) {
@@ -338,8 +339,8 @@ TEST_CASE("Timeline: sounds of the old note list, grace notes and words that do 
     const auto result = timing::buildTimeline(changed.source());
     REQUIRE(result);
     using V = std::vector<std::string>;
-    CHECK(changed.soundingTexts(*result, 0.0) == V{"<e, e>2", "c'4", "c2"}); // no "la"
-    CHECK(changed.soundingTexts(*result, 1.0) == V{"e'2", "g'2", "g2:m7", "lo"});
+    CHECK(changed.soundingTexts(*result, 0.0) == V{"<e, e>2", "c''4", "c'4", "c2"}); // no "la"
+    CHECK(changed.soundingTexts(*result, 1.0) == V{"e'2", "f''2", "g'2", "g2:m7", "lo"});
 }
 
 TEST_CASE("Timeline: other files, CR LF copies and files that do not belong together",

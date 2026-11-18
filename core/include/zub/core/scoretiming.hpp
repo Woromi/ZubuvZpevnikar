@@ -47,7 +47,7 @@ struct Cue {
 struct Sound {
     double start = 0;
     double end = 0;
-    Kind kind = Kind::Note; // never Melody
+    Kind kind = Kind::Note; // Melody: a note of the hidden melody (no cue, no link in the preview)
     scoreregion::Range range;
 };
 
@@ -80,7 +80,9 @@ struct Source {
 std::expected<Timeline, std::string> buildTimeline(const Source& source);
 
 // Where playback starts for a caret (or the start of a selection) at byte offset `caret` of the
-// text: the first pass of the first event at or after it that has a cue; 0 when the caret is
+// text: the first pass of the first event that has a cue and ends at or after it (so a caret right
+// behind a note, where the playback leaves it, starts at that note; a caret in the gap before a
+// note, at that note); 0 when the caret is
 // before the music of the first \score (`firstBegin`), nothing when no event at or after it sounds.
 std::optional<double> startSeconds(const Timeline& timeline, std::size_t caret);
 

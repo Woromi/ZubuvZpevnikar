@@ -2,6 +2,7 @@
 
 #include "ScorePreviewPane.hpp"
 
+#include <QElapsedTimer>
 #include <QList>
 #include <QObject>
 #include <QPoint>
@@ -167,9 +168,9 @@ private:
     void startFollowing();                                   // the cursor follows the playing notes
     void stopFollowing();              // the cursor stays at the last note played
     void followTick();                 // a timer: the player's position -> followAt
-    void followAt(double seconds);     // moves the cursor to the note sounding then, and marks all
+    void followAt(double seconds);     // cursor behind the note that began last, marks all sounding
                                        // that sounds in the preview
-    void showSounding(double seconds); // the preview's "sounding" boxes for that time
+    void showSounding(double seconds); // the editor's marks and the preview's boxes for that time
 
     void updateScoreHighlights();
     void clickScoreNote(const QPoint& position, bool after, bool extend); // from the preview
@@ -223,7 +224,12 @@ private:
     std::optional<double> playFrom_; // seconds Play was asked to start at; none: the start
     QTimer* followTimer_ = nullptr;
     bool following_ = false; // the cursor moves with the playing notes
-    std::optional<std::pair<std::size_t, std::size_t>> followRange_; // the note it selected
+    std::filesystem::path playingWav_; // what the player plays (a click restarts it from there)
+    std::optional<std::size_t> endedAt_; // the caret the end of the playback left; Play: from 0
+    qint64 seekMs_ = -1;               // the position the player was just sent to, else -1
+    QElapsedTimer seekGuard_;
+    std::optional<std::size_t> followOffset_; // where following put the cursor
+    QPointer<SongEditor> markedEditor_;       // the editor that has playback marks
     NoteSounds* noteSounds_ = nullptr;
     bool scoreAmp_ = false; // the latest preview build's MIDI file is for the amp instrument
     std::filesystem::path

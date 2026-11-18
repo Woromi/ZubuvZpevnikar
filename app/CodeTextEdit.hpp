@@ -52,6 +52,9 @@ public:
     // The find bar's matches: drawn after the marks of the selection's occurrences, under the
     // multi-cursor selections.
     void setSearchMarks(const QList<QTextEdit::ExtraSelection>& marks);
+    // What sounds while a score plays: drawn like the search marks (not a selection), in the
+    // preview's orange, readable on a light and a dark background; empty clears them.
+    void setPlaybackMarks(const QList<QTextCursor>& ranges);
     // Runs `edit` (changes made through QTextCursors of the document) as one undo step, keeping
     // the extra cursors (they move with the text).
     void editKeepingCursors(const std::function<void()>& edit);
@@ -92,6 +95,7 @@ private:
     QList<QTextCursor> extraCursors_;
     QList<QTextEdit::ExtraSelection> occurrenceMarks_;
     QList<QTextEdit::ExtraSelection> searchMarks_;
+    QList<QTextEdit::ExtraSelection> playbackMarks_;
     QTimer* blinkTimer_ = nullptr;
     bool blinkOn_ = true;
     int ownCursorWidth_ = -1;     // Qt's cursor width while it is hidden, else -1

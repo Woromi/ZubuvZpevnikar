@@ -237,13 +237,11 @@ std::expected<Timeline, std::string> buildTimeline(const Source& source) {
     for (const Note& note : parseNotes(source.notes)) {
         if (fs::path(note.file).lexically_normal() != copyFile)
             continue;
-        if (note.kind == Kind::Melody) {
+        if (note.kind == Kind::Melody)
             melody.emplace_back(note.whole, note.length);
-            continue;
-        }
         const auto at = copyLines.offsetOf(note.line, note.column);
         std::optional<scoreregion::Range> event;
-        if (note.kind == Kind::Note) {
+        if (note.kind == Kind::Note || note.kind == Kind::Melody) {
             if (at && *at >= originalEnd) {
                 if (const auto g = scoreregion::eventAt(generated, *at))
                     event = blockEvents[*g];
@@ -251,10 +249,14 @@ std::expected<Timeline, std::string> buildTimeline(const Source& source) {
                 if (const auto e = scoreregion::eventAt(originalEvents, *at))
                     event = originalEvents[*e];
             }
-            if (event)
-                timeline.cues.push_back({tempo->seconds(note.whole), *event});
-            else
-                ++timeline.unmapped;
+            // The melody (Devnull) times the lyrics and sounds when it is given an instrument; it
+            // is no cue (the editor's caret follows the staves), but it is something that sounds.
+            if (note.kind == Kind::Note) {
+                if (event)
+                    timeline.cues.push_back({tempo->seconds(note.whole), *event});
+                else
+                    ++timeline.unmapped;
+            }
         } else if (at) {
             std::optional<std::size_t> begin;
             if (*at < originalEnd)
@@ -320,10 +322,11 @@ std::expected<Timeline, std::string> buildTimeline(const Source& source) {
 std::optional<double> startSeconds(const Timeline& timeline, std::size_t caret) {
     if (timeline.cues.empty())
         return std::nullopt;
-    // The event the caret is in or the next one that sounds, then its first pass.
+    // The event the caret is in, right behind (the follow's caret: the note that just sounded) or
+    // before, else the next one that sounds; then its first pass.
     const Cue* first = nullptr;
     for (const Cue& cue : timeline.cues) {
-        if (cue.event.end <= caret)
+        if (cue.event.end < caret)
             continue;
         if (!first || cue.event.begin < first->event.begin ||
             (cue.event.begin == first->event.begin && cue.seconds < first->seconds))

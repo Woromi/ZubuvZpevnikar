@@ -515,11 +515,16 @@ TEST_CASE("Playback: Play starts at the cursor's note and the cursor follows the
     // The player's position moves the cursor over the notes.
     player->position = std::llround(*expected * 1000.0) + 20;
     A::followAt(s.window, static_cast<double>(player->position) / 1000.0);
-    CHECK(editor->selectedByteRange()->first == chord);
+    const auto* chordCue = zub::scoretiming::cueAt(timeline, *expected + 0.02);
+    REQUIRE(chordCue != nullptr);
+    CHECK(!editor->selectedByteRange());
+    CHECK(editor->cursorByteOffset() == chordCue->event.end); // a cursor right behind the note
     A::followAt(s.window, timeline.cues.front().seconds);
-    CHECK(editor->selectedByteRange()->first == timeline.cues.front().event.begin);
+    CHECK(editor->cursorByteOffset() == timeline.cues.front().event.end);
     A::stopPlayback(s.window);
-    CHECK(editor->selectedByteRange()->first == timeline.cues.front().event.begin);
+    CHECK(editor->cursorByteOffset() == timeline.cues.front().event.end);
+    // Play again resumes at the note that was sounding.
+    CHECK(A::startSeconds(s.window) == timeline.cues.front().seconds);
 
     // At the start of the music it plays from the beginning.
     editor->setCursorByteOffset(0, false);
@@ -558,9 +563,11 @@ TEST_CASE("Playback: the preview boxes the notes, chord names and lyrics soundin
     REQUIRE(note != now.end());
     REQUIRE(name != now.end());
     REQUIRE(syllable != now.end());
-    // The melody (Devnull) is silent: no sound of its own.
-    CHECK(std::ranges::none_of(
-        now, [&](const auto& sound) { return text.substr(sound.range.begin, 4) == "c''4"; }));
+    // The hidden melody is a sound of its own: with the default Voice instrument the playback score
+    // plays it in a voice (a Note), silent it is a Devnull (a Melody sound).
+    CHECK(std::ranges::any_of(now, [&](const auto& sound) {
+        return (sound.kind == Kind::Melody || sound.kind == Kind::Note) && text.substr(sound.range.begin, 4) == "c''4";
+    }));
 
     // Play and let the preview follow: each of the three has a link in the preview and is boxed.
     QTest::mouseClick(s.play, Qt::LeftButton);

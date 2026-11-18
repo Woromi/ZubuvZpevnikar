@@ -1120,6 +1120,21 @@ void SongEditor::selectByteRange(std::size_t begin, std::size_t end, bool focus)
         edit_->setFocus();
 }
 
+void SongEditor::setPlaybackMarks(const std::vector<std::pair<std::size_t, std::size_t>>& ranges) {
+    QList<QTextCursor> cursors;
+    if (!ranges.empty()) {
+        const std::string text = editorText();
+        for (const auto& [begin, end] : ranges) {
+            QTextCursor cursor(edit_->document());
+            cursor.setPosition(utf16Position(text, std::min(begin, text.size())));
+            cursor.setPosition(utf16Position(text, std::min(end, text.size())),
+                               QTextCursor::KeepAnchor);
+            cursors.append(cursor);
+        }
+    }
+    static_cast<CodeTextEdit*>(edit_)->setPlaybackMarks(cursors);
+}
+
 bool SongEditor::replaceScoreRange(std::size_t begin, std::size_t end, const std::string& text,
                                    std::size_t selectBegin, std::size_t selectEnd) {
     if (edit_->isReadOnly() || kind_ != Kind::Score)

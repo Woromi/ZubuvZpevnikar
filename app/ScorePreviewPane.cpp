@@ -10,6 +10,7 @@
 #include <QDialog>
 #include <QEvent>
 #include <QFontDatabase>
+#include <QFontMetricsF>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QHash>
@@ -48,6 +49,8 @@ struct NoteLink {
     int line;
     int column;
     QPointF point;
+    double textRight = 0; // the right end of the link's rendered text (chord name, lyric), SVG
+                          // units; 0 for a link with no text (a note)
 };
 
 // A horizontal staff line of the score, in SVG units: from x1 to x2 at height y.
@@ -111,8 +114,51 @@ ParsedScore parseLinks(const QByteArray& svg, const QString& scorePath) {
         inLink = false;
         state = State::None;
     };
+    // The extent of a link's text: each <text> of the link, measured with its own font (the one
+    // the renderer draws it with), from its <g transform="translate"> origin.
+    bool scoreAnchor = false; // inside a link to the score
+    std::size_t linksBefore = 0;
+    QPointF textOrigin;
+    bool inText = false;
+    QString family, textBuffer;
+    double fontSize = 0;
     while (!xml.atEnd()) {
         const auto token = xml.readNext();
+        if (token == QXmlStreamReader::StartElement) {
+            if (depth == 0 && xml.name() == QLatin1String("a")) {
+                QString path;
+                int l = 0, c = 0;
+                const QString href =
+                    xml.attributes().value(xlink, QLatin1String("href")).toString();
+                scoreAnchor = parseTextEdit(href, path, l, c) && path == scorePath;
+                linksBefore = links.size();
+            } else if (scoreAnchor && depth > 0 && xml.name() == QLatin1String("g")) {
+                const auto match = translate.match(xml.attributes().value("transform").toString());
+                if (match.hasMatch())
+                    textOrigin = {match.captured(1).toDouble(), match.captured(2).toDouble()};
+            } else if (scoreAnchor && depth > 0 && xml.name() == QLatin1String("text")) {
+                inText = true;
+                textBuffer.clear();
+                family = xml.attributes().value("font-family").toString();
+                fontSize = xml.attributes().value("font-size").toDouble();
+            }
+        } else if (token == QXmlStreamReader::Characters && inText) {
+            textBuffer += xml.text();
+        } else if (token == QXmlStreamReader::EndElement) {
+            if (inText && xml.name() == QLatin1String("text")) {
+                inText = false;
+                if (links.size() > linksBefore && fontSize > 0) {
+                    QFont font;
+                    font.setFamilies({family});
+                    font.setPixelSize(100);
+                    const double width =
+                        QFontMetricsF(font).horizontalAdvance(textBuffer) * fontSize / 100.0;
+                    links.back().textRight = std::max(links.back().textRight, textOrigin.x() + width);
+                }
+            } else if (depth == 1 && xml.name() == QLatin1String("a")) {
+                scoreAnchor = false;
+            }
+        }
         if (token == QXmlStreamReader::StartElement) {
             if (depth == 0 && xml.name() == QLatin1String("g")) {
                 const auto match = translate.match(xml.attributes().value("transform").toString());
@@ -620,20 +666,37 @@ private:
         for (const NoteLink& link : links_) {
             if (!sounding_.contains({link.line, link.column}))
                 continue;
-            const QPointF at = toWidget(link.point);
-            const int characters = sounding_.at({link.line, link.column});
-            if (characters > 0) {
-                // The point of a chord name or lyric is the left end of its baseline.
-                const double width = std::max(highlightSize, characters * 8.0 + 6);
-                painter.drawRoundedRect(QRectF(at.x() - 3, at.y() - 16, width, 22), 4, 4);
-                continue;
-            }
-            painter.drawRoundedRect(QRectF(at.x() - highlightSize / 2, at.y() - highlightSize / 2,
-                                           highlightSize, highlightSize),
-                                    4, 4);
+            painter.drawRoundedRect(soundingRect(link, sounding_.at({link.line, link.column})), 4,
+                                    4);
         }
     }
+    // The box of a sounding link in widget coordinates. `characters` > 0: a chord name or lyric,
+    // whose point is the left end of its baseline: the box reaches the right end of the rendered
+    // text (an estimate from the character count without one).
+    QRectF soundingRect(const NoteLink& link, int characters) const {
+        const QPointF at = toWidget(link.point);
+        if (characters <= 0)
+            return {at.x() - highlightSize / 2, at.y() - highlightSize / 2, highlightSize,
+                    highlightSize};
+        const double width =
+            link.textRight > link.point.x()
+                ? std::max(highlightSize,
+                           toWidget(QPointF(link.textRight, link.point.y())).x() - at.x() + 6)
+                : std::max(highlightSize, characters * 8.0 + 6);
+        return {at.x() - 3, at.y() - 16, width, 22};
+    }
+public:
+    std::optional<QRectF> soundingBox(int line, int column) const {
+        const auto found = sounding_.find({line, column});
+        if (found == sounding_.end())
+            return std::nullopt;
+        for (const NoteLink& link : links_)
+            if (link.line == line && link.column == column)
+                return soundingRect(link, found->second);
+        return std::nullopt;
+    }
 
+private:
     // The selection like selected text: on each staff one band from its first to its last
     // selected note, over the whole staff height; a staff that the selection goes on from or to
     // another staff gets the band to its start or end. Notes off any staff get a box each.
@@ -891,7 +954,7 @@ void ScorePreviewPane::rebuildStaffRows() {
 void ScorePreviewPane::markStaffChoicesFromRows() {
     staffChoices_.clear();
     chordChoice_ = QStringLiteral("silent");
-    melodyChoice_ = QStringLiteral("silent");
+    melodyChoice_ = QStringLiteral("voice");
     for (qsizetype i = 0; i < staffRows_.size(); ++i) {
         if (i < staves_.size())
             staffChoices_.append(staffRows_[i]->choice());
@@ -1125,6 +1188,10 @@ void ScorePreviewPane::setSoundingNotes(const QList<QPoint>& notes,
     for (const QPoint& position : notes)
         list.try_emplace({position.y(), position.x()}, 0);
     canvas_->setSounding(list);
+}
+
+std::optional<QRectF> ScorePreviewPane::soundingBox(const QPoint& position) const {
+    return canvas_->soundingBox(position.y(), position.x());
 }
 
 int ScorePreviewPane::soundingNoteCount() const {

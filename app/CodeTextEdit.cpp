@@ -93,8 +93,22 @@ void CodeTextEdit::setSearchMarks(const QList<QTextEdit::ExtraSelection>& marks)
     updateExtraSelections();
 }
 
+void CodeTextEdit::setPlaybackMarks(const QList<QTextCursor>& ranges) {
+    if (ranges.isEmpty() && playbackMarks_.isEmpty())
+        return;
+    QTextCharFormat format;
+    // A translucent orange (the preview's "sounding" boxes): the text colour stays readable.
+    format.setBackground(QColor(255, 140, 0, 110));
+    playbackMarks_.clear();
+    for (const QTextCursor& cursor : ranges)
+        if (cursor.hasSelection())
+            playbackMarks_.append({cursor, format});
+    updateExtraSelections();
+}
+
 void CodeTextEdit::updateExtraSelections() {
     QList<QTextEdit::ExtraSelection> all = occurrenceMarks_;
+    all.append(playbackMarks_);
     all.append(searchMarks_);
     QTextCharFormat format;
     format.setBackground(palette().color(QPalette::Highlight));

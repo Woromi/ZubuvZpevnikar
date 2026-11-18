@@ -57,10 +57,10 @@ public:
     };
     void setStaves(const QList<StaffInfo>& staves, const QStringList& choices, bool chords = false,
                    const QString& chordChoice = QStringLiteral("silent"), bool melody = false,
-                   const QString& melodyChoice = QStringLiteral("silent"));
+                   const QString& melodyChoice = QStringLiteral("voice"));
     QStringList staffChoices() const; // by staff index
     QString chordChoice() const;      // "silent" without chord names
-    QString melodyChoice() const;     // "silent" without a hidden melody
+    QString melodyChoice() const;     // "voice" without a hidden melody
     QWidget* playButton() const;      // for tests
 
     // Where the note that LilyPond linked to `line` (1-based) and `column` (0-based) is drawn, in
@@ -94,6 +94,9 @@ public:
     };
     void setSoundingNotes(const QList<QPoint>& notes, const QList<SoundingText>& texts = {});
     int soundingNoteCount() const; // how many links are drawn as sounding; for tests
+    // The box drawn around the sounding link at this position, in widget coordinates of the score
+    // view; none when it does not sound. For tests.
+    std::optional<QRectF> soundingBox(const QPoint& position) const;
     // The leftmost (`right`: rightmost) selectable note on the staff the score cursor is on (x =
     // column, y = line); none without a score cursor (the links are stale) or off any staff.
     std::optional<QPoint> staffEdgeNote(bool right) const;
@@ -145,7 +148,7 @@ private:
     QList<StaffInfo> staves_;
     bool chords_ = false; // a row after the staves is the chord names'
     bool melody_ = false; // the last row is the hidden melody's
-    QString melodyChoice_ = QStringLiteral("silent");
+    QString melodyChoice_ = QStringLiteral("voice");
     QStringList staffChoices_;
     QString chordChoice_ = QStringLiteral("silent");
     QList<StaffInstrumentRow*> staffRows_;
