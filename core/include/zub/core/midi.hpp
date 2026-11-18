@@ -94,6 +94,23 @@ inline constexpr int bendVersion = 1;
 // unchanged. Error for anything that is no readable SMF (or has SMPTE time).
 std::expected<std::string, std::string> smoothBends(std::string_view midi);
 
+// ---- Time ----
+// The tempo changes of a Standard MIDI File, to turn LilyPond's moments (whole notes from the
+// start of the music) into seconds of the audio FluidSynth renders from it.
+struct TempoMap {
+    struct Change {
+        std::int64_t tick = 0;
+        std::uint32_t microsPerQuarter = 500000;
+    };
+    int division = 384;          // ticks per quarter note
+    std::vector<Change> changes; // by tick; the first is at tick 0 (120 bpm unless the file says)
+    // Seconds from the start at `wholeNotes` whole notes (a negative value is 0).
+    double seconds(double wholeNotes) const;
+};
+// Reads the tempo meta events (of every track) of `midi`. Error for anything that is no readable
+// SMF (or has SMPTE time).
+std::expected<TempoMap, std::string> tempoMap(std::string_view midi);
+
 // FNV-1a, 64 bit: a hash that is the same in every build (std::hash is not).
 std::uint64_t fnv1a64(std::string_view data);
 // fnv1a64 of the parts joined with NUL bytes, as 16 lower-case hex digits: a cache file name.

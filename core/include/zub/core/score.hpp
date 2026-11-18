@@ -63,6 +63,14 @@ inline constexpr std::string_view playbackOutputName = "zub-playback";
 // ... and of the second book prepare appends when some staves are "amp" and others are not.
 inline constexpr std::string_view playbackAmpOutputName = "zub-playback-amp";
 
+// The generated playback score also lists when each note sounds and where it is written, for the
+// score cursor as the play position (zub::scoretiming): prepare writes the fixed Scheme that does
+// it into workDir/zub-playback.ily (the wrapper includes it) and the playback score runs it as a
+// `\consists` of its `\layout` (skipTypesetting: nothing is drawn); the list is written next to the
+// MIDI file. Neither the user's .ly nor its safety check is involved.
+inline constexpr std::string_view playbackNotesName = "zub-playback.notes";
+inline constexpr std::string_view playbackLoggerName = "zub-playback.ily";
+
 struct Command {
     std::string program; // "lilypond"
     std::vector<std::string> arguments;
@@ -70,13 +78,17 @@ struct Command {
     // Set on top of the inherited environment: LC_ALL=C, so the log is in English and
     // errors() can read it (LilyPond translates "error" with the user's locale).
     std::vector<std::pair<std::string, std::string>> environment;
-    std::filesystem::path svg;       // the cropped SVG, written on success 
-    std::filesystem::path midi;      // the MIDI file, written on success; empty when not asked for
-                                     // or the score has no \\score block to play
+    std::filesystem::path svg;  // the cropped SVG, written on success
+    std::filesystem::path midi; // the MIDI file, written on success; empty when not asked for
+                                // or the score has no \\score block to play
     // The MIDI file of the amp staves when other staves sound without the amp (two books were
     // appended); empty otherwise. Both files have the same length of music: mix their audio.
     std::filesystem::path ampMidi;
-    // `midi` holds only amp staves (every staff of the score chose "amp"): run its audio through the amp.
+    // The note list of the playback score (zub::scoretiming::parseNotes), written next to `midi`;
+    // empty when no playback score was appended.
+    std::filesystem::path notes;
+    // `midi` holds only amp staves (every staff of the score chose "amp"): run its audio through
+    // the amp.
     bool midiIsAmp = false;
     std::filesystem::path scoreCopy; // the copy of content the build reads
     // 1-based first line of the score copy that prepare appended (the playback score); 0 when
@@ -127,6 +139,11 @@ int songCapo(std::string_view cap);
 // "acoustic guitar (steel)".
 std::string midiInstrument(std::string_view scoreText);
 
+// The body of the first \score { } block of `text` (between its braces, outside comments, strings
+// and Scheme) as a byte range [begin, end); nullopt when there is none or its braces are not
+// balanced.
+std::optional<std::pair<std::size_t, std::size_t>> firstScoreBody(std::string_view text);
+
 // The music of the first \score { } block of `text` (outside comments, strings and Scheme),
 // without that block's own \layout, \header and \midi blocks; nullopt when there is no block
 // or its braces are not balanced.
@@ -145,7 +162,9 @@ std::string scaleTempo(std::string_view music, double factor);
 std::string markBends(std::string_view music);
 
 // The score that makes LilyPond write the MIDI file, to append to `text`:
-//   \\score { \\unfoldRepeats { <scoreMusic with scaled tempi, markBends> } \\midi { \\tempo 4 = N ... } }
+//   \\score { \\unfoldRepeats { <scoreMusic with scaled tempi, markBends> }
+//             \\layout { ... \\consists \\zubNoteLogger } \\midi { \\tempo 4 = N ... } }
+// (the \\layout, left out of the amp staves' book, only lists the notes: see playbackNotesName)
 // (the chord names make no sound unless `options.chordInstrument` names one; Staff and TabStaff
 // play `options.instrument`). Only numbers and
 // the instrument name are written into it. Nullopt when `text` has no \\score block.
@@ -166,23 +185,23 @@ inline constexpr std::size_t noPosition = static_cast<std::size_t>(-1);
 // Lyrics or Dynamics, are no staves; RhythmicStaff and DrumStaff are skipped). All offsets are byte
 // offsets into the text given to staves().
 struct Staff {
-    std::string type;       // "Staff" or "TabStaff"
-    std::string name;       // `\new Staff = "name"`; empty without
-    std::string instrument; // the General MIDI name the file sets, empty if none: the first
-                            // `\set Staff.midiInstrument = "..."` directly in the staff's music,
-                            // else `midiInstrument = "..."` in its \with
-    std::string tuning;     // `stringTunings = #...` of the \with without the `#`, e.g.
-                            // "banjo-open-g-tuning"; empty without
-    std::size_t begin = 0;  // the backslash of `\new`
-    std::size_t end = 0;    // after the staff's music
-    std::size_t headEnd = 0;           // after `\new Staff` and its `= "name"`
+    std::string type;        // "Staff" or "TabStaff"
+    std::string name;        // `\new Staff = "name"`; empty without
+    std::string instrument;  // the General MIDI name the file sets, empty if none: the first
+                             // `\set Staff.midiInstrument = "..."` directly in the staff's music,
+                             // else `midiInstrument = "..."` in its \with
+    std::string tuning;      // `stringTunings = #...` of the \with without the `#`, e.g.
+                             // "banjo-open-g-tuning"; empty without
+    std::size_t begin = 0;   // the backslash of `\new`
+    std::size_t end = 0;     // after the staff's music
+    std::size_t headEnd = 0; // after `\new Staff` and its `= "name"`
     std::size_t withOpen = noPosition; // the `{` and `}` of its \with block
     std::size_t withClose = noPosition;
-    std::size_t setBegin = noPosition;  // the text inside the quotes of the `\set`
+    std::size_t setBegin = noPosition; // the text inside the quotes of the `\set`
     std::size_t setEnd = noPosition;
     std::size_t withBegin = noPosition; // ... and of `midiInstrument = "..."` in the \with
     std::size_t withEnd = noPosition;
-    std::size_t insertAt = noPosition;  // right after the `{` (or `<<`) that opens the music
+    std::size_t insertAt = noPosition; // right after the `{` (or `<<`) that opens the music
 };
 
 // The staves of the first \score block of `text` in the order they are written, outside

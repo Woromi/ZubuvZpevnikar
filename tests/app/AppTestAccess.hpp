@@ -8,7 +8,9 @@
 #include "ConverterRunner.hpp"
 #include "FindBar.hpp"
 #include "MainWindow.hpp"
+#include "PlaybackRunner.hpp"
 #include "PreviewPane.hpp"
+#include "ScorePlayer.hpp"
 #include "ScorePreviewPane.hpp"
 #include "ScoreTabs.hpp"
 #include "SongActions.hpp"
@@ -97,6 +99,28 @@ struct AppTestAccess {
         w.scores_->insertStagedNotes(fretboard);
     }
     static void newScore(MainWindow& w) { w.scores_->newScore(); }
+
+    // Playback position: the player is replaced by a silent one, the timeline injected (no
+    // lilypond, no audio device).
+    static void replacePlayer(MainWindow& w, ScorePlayer* player) {
+        delete w.scores_->scorePlayer_;
+        w.scores_->scorePlayer_ = player;
+        player->setParent(w.scores_);
+        w.scores_->connectPlayer();
+    }
+    static void setScoreLinksFresh(MainWindow& w, bool fresh) {
+        w.scores_->scoreLinksFresh_ = fresh;
+    }
+    static zub::scoretiming::Timeline& timeline(MainWindow& w) { return w.scores_->timeline_; }
+    static std::optional<double> startSeconds(MainWindow& w) { return w.scores_->startSeconds(); }
+    static void showPlaybackResult(MainWindow& w, const PlaybackResult& result) {
+        w.scores_->showPlaybackResult(result);
+    }
+    static void playFromCursor(MainWindow& w) { w.scores_->rememberPlayStart(); }
+    static void followAt(MainWindow& w, double seconds) { w.scores_->followAt(seconds); }
+    static bool following(MainWindow& w) { return w.scores_->following_; }
+    static void stopPlayback(MainWindow& w) { w.scores_->stopPlayback(); }
+    static QTimer* followTimer(MainWindow& w) { return w.scores_->followTimer_; }
 
     // The preview and the score preview
     static bool scoreLinksFresh(MainWindow& w) { return w.scores_->scoreLinksFresh_; }

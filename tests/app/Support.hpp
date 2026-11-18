@@ -1,6 +1,9 @@
 #pragma once
 
 // Helpers of the app tests: a songbook fixture copy, dialogs answered by themselves, waiting.
+#include "ScorePlayer.hpp"
+#include "convert.hpp"
+
 #include <QApplication>
 #include <QMessageBox>
 #include <QString>
@@ -13,8 +16,6 @@
 #include <memory>
 #include <string>
 
-#include "convert.hpp"
-
 namespace Catch {
 // Failures print the text, not {?}.
 template <> struct StringMaker<QString> {
@@ -23,6 +24,22 @@ template <> struct StringMaker<QString> {
 } // namespace Catch
 
 namespace apptest {
+
+// A score player without an audio device: records what it is asked to play (the real one talks
+// to the sound server). Install it with AppTestAccess::replacePlayer.
+class SilentPlayer : public ScorePlayer {
+public:
+    void play(const std::filesystem::path& file, qint64 startMs) override {
+        played.push_back({file, startMs});
+        playing = true;
+    }
+    void stop() override { playing = false; }
+    bool isPlaying() const override { return playing; }
+    qint64 positionMs() const override { return position; }
+    std::vector<std::pair<std::filesystem::path, qint64>> played;
+    bool playing = false;
+    qint64 position = 0;
+};
 
 // The whole file as bytes in a string ("" when missing).
 std::string slurp(const std::filesystem::path& path);
@@ -37,7 +54,9 @@ public:
     enum class Extras { No, Yes };
     explicit Fixture(Extras extras = Extras::No);
     const std::filesystem::path& root() const { return root_; }
-    std::filesystem::path operator/(const std::filesystem::path& part) const { return root_ / part; }
+    std::filesystem::path operator/(const std::filesystem::path& part) const {
+        return root_ / part;
+    }
 
 private:
     QTemporaryDir dir_;

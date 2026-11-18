@@ -1,5 +1,12 @@
 // The score tabs of a song: caret stops, the fretboard input and its tuning, New Score.
 // (Nothing here needs lilypond: the preview is never built, PATH is empty in default runs.)
+#include "AppTestAccess.hpp"
+#include "FretboardWidget.hpp"
+#include "ScoreInputBar.hpp"
+#include "ScorePreviewPane.hpp"
+#include "SongEditor.hpp"
+#include "Support.hpp"
+
 #include <QAction>
 #include <QComboBox>
 #include <QDialog>
@@ -16,13 +23,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <zub/core/scoreregion.hpp>
 
-#include "AppTestAccess.hpp"
-#include "FretboardWidget.hpp"
-#include "ScoreInputBar.hpp"
-#include "ScorePreviewPane.hpp"
-#include "SongEditor.hpp"
-#include "Support.hpp"
-
 using A = AppTestAccess;
 
 namespace {
@@ -36,7 +36,8 @@ struct ScoreWindow {
         window.activateWindow();
         REQUIRE(QTest::qWaitForWindowActive(&window));
         REQUIRE(A::openSongbook(window, fixture.root()));
-        REQUIRE(A::openExistingSong(window, fixture / "songs/chords/Test" / (std::string(song) + ".tex")));
+        REQUIRE(A::openExistingSong(window,
+                                    fixture / "songs/chords/Test" / (std::string(song) + ".tex")));
         A::syncScoreTabs(window);
         A::syncScoreTabs(window);
         REQUIRE(A::scoreTabs(window).size() == 1);
@@ -150,7 +151,8 @@ TEST_CASE("Fretboard: a note inserted with Ctrl+Return is named by the staff's t
     edit->document()->setModified(false);
 }
 
-TEST_CASE("Fretboard: staging, Insert, Clear, double-click and keypad Enter", "[app][score][fretboard]") {
+TEST_CASE("Fretboard: staging, Insert, Clear, double-click and keypad Enter",
+          "[app][score][fretboard]") {
     ScoreWindow s;
     FretboardWidget* fb = s.tab().fretboard;
     auto* edit = s.editor()->textEdit();
@@ -268,4 +270,133 @@ TEST_CASE("Instruments: a hidden melody gets a row of its own, silent by default
     REQUIRE(voice >= 0);
     melody->setCurrentIndex(voice);
     CHECK(pane->melodyChoice() == QStringLiteral("voice"));
+}
+
+TEST_CASE("Score tab: Play starts at the cursor's note and the cursor follows the music",
+          "[app][score][playback]") {
+    ScoreWindow s;
+    auto* player = new apptest::SilentPlayer;
+    A::replacePlayer(s.window, player);
+    SongEditor* ed = s.editor();
+    const auto events = zub::scoreregion::musicEvents(ed->editorText());
+    REQUIRE(events.size() > 4);
+
+    // An injected timeline (the build would give it): the first events at 0, 1, 2 s; the second
+    // event again at 3 s (a repeat); the last one at 4 s.
+    auto& timeline = A::timeline(s.window);
+    timeline.firstBegin = events[0].begin;
+    timeline.cues = {
+        {0.0, events[0]}, {1.0, events[1]}, {2.0, events[2]}, {3.0, events[1]}, {4.0, events[4]}};
+    A::setScoreLinksFresh(s.window, true);
+
+    // The cursor's note, its first pass; before the music or no cursor: the start.
+    ed->setCursorByteOffset(events[2].begin, false);
+    CHECK(A::startSeconds(s.window) == 2.0);
+    ed->setCursorByteOffset(events[1].begin + 1, false); // inside the repeated note
+    CHECK(A::startSeconds(s.window) == 1.0);
+    ed->setCursorByteOffset(events[1].end, false); // behind it: the next one that sounds
+    CHECK(A::startSeconds(s.window) == 2.0);
+    ed->setCursorByteOffset(0, false);
+    CHECK(A::startSeconds(s.window) == 0.0);
+    // A selection starts where it starts.
+    ed->selectByteRange(events[2].begin, events[4].end, false);
+    CHECK(A::startSeconds(s.window) == 2.0);
+    // A text changed since the build: from the start.
+    A::setScoreLinksFresh(s.window, false);
+    CHECK(!A::startSeconds(s.window).has_value());
+    A::setScoreLinksFresh(s.window, true);
+
+    // Play from the third event: the player is told the position, the cursor follows.
+    ed->setCursorByteOffset(events[2].begin, false);
+    A::playFromCursor(s.window);
+    PlaybackResult rendered;
+    rendered.success = true;
+    rendered.wav = "/nonexistent/x.wav";
+    A::showPlaybackResult(s.window, rendered);
+    REQUIRE(player->played.size() == 1);
+    CHECK(player->played[0].first == rendered.wav);
+    CHECK(player->played[0].second == 2000);
+    CHECK(A::following(s.window));
+    CHECK(A::followTimer(s.window)->isActive());
+
+    A::followAt(s.window, 0.2);
+    CHECK(ed->selectedByteRange() == std::make_pair(events[0].begin, events[0].end));
+    A::followAt(s.window, 1.5);
+    CHECK(ed->selectedByteRange() == std::make_pair(events[1].begin, events[1].end));
+    A::followAt(s.window, 2.9);
+    CHECK(ed->selectedByteRange() == std::make_pair(events[2].begin, events[2].end));
+    A::followAt(s.window, 3.0); // the repeat: the second note again
+    CHECK(ed->selectedByteRange() == std::make_pair(events[1].begin, events[1].end));
+    // The note that sounds is selected whole (not a caret before it, which reads as the previous
+    // note): exactly at its time, and up to just before the next one.
+    A::followAt(s.window, 0.999);
+    CHECK(ed->selectedByteRange() == std::make_pair(events[0].begin, events[0].end));
+    A::followAt(s.window, 1.0);
+    CHECK(ed->selectedByteRange() == std::make_pair(events[1].begin, events[1].end));
+    A::followAt(s.window, 99);
+    CHECK(ed->selectedByteRange() == std::make_pair(events[4].begin, events[4].end));
+    CHECK(A::following(s.window));
+
+    // The user moves the cursor: the music goes on, the cursor stays theirs.
+    ed->setCursorByteOffset(events[3].begin, false);
+    A::followAt(s.window, 2.1);
+    CHECK(ed->cursorByteOffset() == events[3].begin);
+    CHECK(!A::following(s.window));
+    CHECK(!A::followTimer(s.window)->isActive());
+}
+
+TEST_CASE("Score tab: Play passes the start to the player; Stop and the end leave the cursor",
+          "[app][score][playback]") {
+    ScoreWindow s;
+    auto* player = new apptest::SilentPlayer;
+    A::replacePlayer(s.window, player);
+    SongEditor* ed = s.editor();
+    const auto events = zub::scoreregion::musicEvents(ed->editorText());
+    REQUIRE(events.size() > 3);
+    auto& timeline = A::timeline(s.window);
+    timeline.firstBegin = events[0].begin;
+    timeline.cues = {{0.0, events[0]}, {1.0, events[1]}, {2.5, events[2]}};
+    A::setScoreLinksFresh(s.window, true);
+
+    // MainWindow-free stand-in of playScore: the start comes from the cursor.
+    ed->setCursorByteOffset(events[2].begin, false);
+    A::playFromCursor(s.window);
+    PlaybackResult rendered;
+    rendered.success = true;
+    rendered.wav = "/nonexistent/x.wav";
+    A::showPlaybackResult(s.window, rendered);
+    REQUIRE(player->played.size() == 1);
+    CHECK(player->played[0].second == 2500);
+
+    // The next position: the cursor follows; Stop leaves it at the last played note.
+    player->position = 2600;
+    A::followAt(s.window, 2.6);
+    CHECK(ed->selectedByteRange() == std::make_pair(events[2].begin, events[2].end));
+    A::followAt(s.window, 0.4);
+    CHECK(ed->selectedByteRange() == std::make_pair(events[0].begin, events[0].end));
+    A::stopPlayback(s.window);
+    CHECK(!A::following(s.window));
+    A::followAt(s.window, 2.6); // no longer following
+    CHECK(ed->selectedByteRange() == std::make_pair(events[0].begin, events[0].end));
+
+    // An edit while playing ends the following too.
+    A::playFromCursor(s.window);
+    A::showPlaybackResult(s.window, rendered);
+    CHECK(A::following(s.window));
+    QTextCursor c = ed->textEdit()->textCursor();
+    c.movePosition(QTextCursor::End);
+    c.insertText(" ");
+    CHECK(!A::scoreLinksFresh(s.window));
+    A::followAt(s.window, 1.0);
+    CHECK(!A::following(s.window));
+
+    // Played to the end: the cursor stays at the last note.
+    A::setScoreLinksFresh(s.window, true);
+    A::playFromCursor(s.window);
+    A::showPlaybackResult(s.window, rendered);
+    A::followAt(s.window, 1.2);
+    const auto at = ed->cursorByteOffset();
+    emit player->finished();
+    CHECK(!A::following(s.window));
+    CHECK(ed->cursorByteOffset() == at);
 }

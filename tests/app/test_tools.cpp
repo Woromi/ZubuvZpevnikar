@@ -1,6 +1,16 @@
 // Hidden [.tools] cases that run the real tools: lualatex (the song preview), texlua (the
 // songbook sorter), python3 (the package's linters), the converter, fluidsynth (playback).
 // Run: build/debug/tests/app/zub_app_tests "[.tools]"   (each case skips what it cannot find)
+#include "AppTestAccess.hpp"
+#include "ConverterRunner.hpp"
+#include "PreviewRunner.hpp"
+#include "ScorePreviewPane.hpp"
+#include "ShrinkDialog.hpp"
+#include "SongFilterProxy.hpp"
+#include "SongTableModel.hpp"
+#include "Support.hpp"
+#include "midi_events.hpp"
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
@@ -20,16 +30,6 @@
 #include <set>
 #include <sstream>
 #include <zub/core/songheader.hpp>
-
-#include "AppTestAccess.hpp"
-#include "ConverterRunner.hpp"
-#include "PreviewRunner.hpp"
-#include "ScorePreviewPane.hpp"
-#include "ShrinkDialog.hpp"
-#include "SongFilterProxy.hpp"
-#include "SongTableModel.hpp"
-#include "Support.hpp"
-#include "midi_events.hpp"
 
 using apptest::has;
 using apptest::slurp;
@@ -121,11 +121,12 @@ TEST_CASE("Preview: a song builds with the bundled package, also a whistle song 
     // The whistle song's preview finds its score (songs/whistle2/Imaginary/HumMelody.ly).
     REQUIRE(A::closeSong(w));
     REQUIRE(A::openExistingSong(w, fixture / "songs/whistle2/Imaginary/Hum.tex"));
-    CHECK(apptest::waitUntil(
-        [&] { return A::status(*A::preview(w))->text().contains("page"); }, 120000));
+    CHECK(apptest::waitUntil([&] { return A::status(*A::preview(w))->text().contains("page"); },
+                             120000));
 }
 
-TEST_CASE("Converter: Measure offers pap, is cancelled by typing and by Tidy", "[.tools][app][converter]") {
+TEST_CASE("Converter: Measure offers pap, is cancelled by typing and by Tidy",
+          "[.tools][app][converter]") {
     REQUIRE_TOOL("lualatex");
     useBuiltConverter();
     apptest::Fixture fixture(apptest::Fixture::Extras::Yes);
@@ -153,8 +154,9 @@ TEST_CASE("Converter: Measure offers pap, is cancelled by typing and by Tidy", "
     std::string converterOut;
     QObject::connect(A::converterRunner(w), &ConverterRunner::finished, &w,
                      [&](const std::expected<ConverterOutput, QString>& r) {
-                         converterOut = r ? "exit " + std::to_string(r->exitCode) + "\n" + r->out + r->err
-                                          : r.error().toStdString();
+                         converterOut =
+                             r ? "exit " + std::to_string(r->exitCode) + "\n" + r->out + r->err
+                               : r.error().toStdString();
                      });
     A::startMeasure(w, ed);
     CHECK(A::converterRunner(w)->isRunning());
@@ -189,7 +191,8 @@ TEST_CASE("Converter: Measure offers pap, is cancelled by typing and by Tidy", "
     ed->textEdit()->document()->setModified(false);
 }
 
-TEST_CASE("Check Songs: the key check offers the key and a nocheck comment", "[.tools][app][converter]") {
+TEST_CASE("Check Songs: the key check offers the key and a nocheck comment",
+          "[.tools][app][converter]") {
     REQUIRE_TOOL("python3");
     useBuiltConverter();
     apptest::Fixture fixture;
@@ -240,7 +243,8 @@ TEST_CASE("Check Songs: the key check offers the key and a nocheck comment", "[.
     CHECK(A::keyFindings(w).size() == 2);
 
     // Our Last Summer: the bar offers the key; Write writes it, one undo step.
-    A::openSong(w, A::proxy(w)->mapFromSource(A::model(w)->index(row("Abba/OurLastSummer.tex"), 0)));
+    A::openSong(w,
+                A::proxy(w)->mapFromSource(A::model(w)->index(row("Abba/OurLastSummer.tex"), 0)));
     SongEditor* ed = A::editor(w);
     REQUIRE(ed != nullptr);
     REQUIRE(apptest::waitUntil([&] { return ed->suggestionShown(); }, 5000));
@@ -251,7 +255,8 @@ TEST_CASE("Check Songs: the key check offers the key and a nocheck comment", "[.
     ed->textEdit()->document()->setModified(false);
 
     // Montgomery: keep the written key: a "% nocheck key" line above it.
-    A::openSong(w, A::proxy(w)->mapFromSource(A::model(w)->index(row("WabiDanek/Montgomery.tex"), 0)));
+    A::openSong(w,
+                A::proxy(w)->mapFromSource(A::model(w)->index(row("WabiDanek/Montgomery.tex"), 0)));
     ed = A::editor(w);
     REQUIRE(ed != nullptr);
     REQUIRE(apptest::waitUntil([&] { return ed->suggestionShown(); }, 5000));
@@ -275,7 +280,8 @@ struct PlayableScore {
         window.activateWindow();
         REQUIRE(QTest::qWaitForWindowActive(&window));
         REQUIRE(A::openSongbook(window, fixture.root()));
-        REQUIRE(A::openExistingSong(window, fixture / "songs/chords/Test" / (std::string(song) + ".tex")));
+        REQUIRE(A::openExistingSong(window,
+                                    fixture / "songs/chords/Test" / (std::string(song) + ".tex")));
         A::syncScoreTabs(window);
         A::syncScoreTabs(window);
         A::tabs(window)->setCurrentIndex(1);
@@ -355,7 +361,8 @@ TEST_CASE("Playback: instruments per staff, saved into the file, one-staff toolb
     CHECK(tab.editor->textEdit()->toPlainText() == before);
     tab.editor->textEdit()->redo();
     CHECK(tab.editor->textEdit()->toPlainText() == after);
-    CHECK(apptest::waitUntil([&] { return A::staves(*s.pane)[0].fileInstrument == "banjo"; }, 20000));
+    CHECK(
+        apptest::waitUntil([&] { return A::staves(*s.pane)[0].fileInstrument == "banjo"; }, 20000));
     CHECK(s.pane->staffChoices().value(0) == "auto");
     REQUIRE(s.waitPlay());
     const auto p3 = programs(A::scoreMidi(s.window));
@@ -364,7 +371,8 @@ TEST_CASE("Playback: instruments per staff, saved into the file, one-staff toolb
 
     // Saved file: closing and reopening shows the file's instrument as the staff's default.
     REQUIRE(tab.editor->save().has_value());
-    CHECK(has(slurp(s.fixture / "songs/chords/Test/Two.ly"), "\\set Staff.midiInstrument = \"banjo\""));
+    CHECK(has(slurp(s.fixture / "songs/chords/Test/Two.ly"),
+              "\\set Staff.midiInstrument = \"banjo\""));
     A::tabs(s.window)->setCurrentIndex(0);
     A::removeScoreTabs(s.window);
     A::staffChoices(s.window).clear(); // a fresh session
@@ -378,7 +386,8 @@ TEST_CASE("Playback: instruments per staff, saved into the file, one-staff toolb
     CHECK(again[0]->currentText().contains("banjo"));
     CHECK(again[1]->currentText() == "Automatic");
     // The MIDI file of the fresh session (both staves in one file) comes with the rebuild.
-    REQUIRE(apptest::waitUntil([&] { return programs(A::scoreMidi(s.window)).size() == 2; }, 60000));
+    REQUIRE(
+        apptest::waitUntil([&] { return programs(A::scoreMidi(s.window)).size() == 2; }, 60000));
     const auto p4 = programs(A::scoreMidi(s.window));
     REQUIRE(p4.size() == 2);
     CHECK(p4[0].count(105)); // banjo from the file
@@ -451,4 +460,72 @@ TEST_CASE("Playback: every instrument has its own cached WAV, the amp does not c
     for (auto& t : A::scoreTabs(s.window))
         if (t.editor)
             t.editor->textEdit()->document()->setModified(false);
+}
+
+// The score cursor as the play position, with the real lilypond (the listener's note list) and
+// fluidsynth (the audio), and a player that makes no sound.
+TEST_CASE("Playback: Play starts at the cursor's note and the cursor follows the audio",
+          "[.tools][app][playback]") {
+    PlayableScore s;
+    auto* player = new apptest::SilentPlayer;
+    A::replacePlayer(s.window, player);
+    auto* editor = A::scoreTabs(s.window)[0].editor.data();
+    REQUIRE(editor != nullptr);
+
+    // The build's note list became a timeline of the text's events.
+    const auto& timeline = A::timeline(s.window);
+    REQUIRE(!timeline.empty());
+    CHECK(timeline.unmapped < 10); // only the notes of the single-chord variable emChord
+    const std::string text = editor->editorText();
+    const std::size_t chord = text.find("<e,\\6 h,\\5 e\\4>4");
+    REQUIRE(chord != std::string::npos);
+    std::optional<double> expected;
+    for (const auto& cue : timeline.cues)
+        if (cue.event.begin == chord && !expected)
+            expected = cue.seconds;
+    REQUIRE(expected);
+    CHECK(*expected > 0.5); // the third bar of the score
+
+    // Play from there.
+    editor->setCursorByteOffset(chord, false);
+    QTest::mouseClick(s.play, Qt::LeftButton);
+    REQUIRE(apptest::waitUntil([&] { return !player->played.empty(); }, 60000));
+    const auto wav = player->played[0].first;
+    CHECK(player->played[0].second == std::llround(*expected * 1000.0));
+    CHECK(A::following(s.window));
+
+    // The audio is as long as the music, and its first sound is at the start of the file (the
+    // timeline counts from the MIDI file's start): the leading silence is not trimmed, so a note's
+    // time is a position in the file.
+    const std::string bytes = apptest::slurp(wav);
+    REQUIRE(bytes.size() > 44);
+    const double length = static_cast<double>(bytes.size() - 44) / (44100.0 * 4.0);
+    CHECK(length >= timeline.cues.back().seconds);
+    std::size_t firstSound = 0;
+    for (std::size_t i = 44; i + 1 < bytes.size(); i += 2) {
+        const auto sample = static_cast<short>(static_cast<unsigned char>(bytes[i]) |
+                                               (static_cast<unsigned char>(bytes[i + 1]) << 8));
+        if (sample > 200 || sample < -200) {
+            firstSound = (i - 44) / 4;
+            break;
+        }
+    }
+    CHECK(static_cast<double>(firstSound) / 44100.0 < 0.1);
+
+    // The player's position moves the cursor over the notes.
+    player->position = std::llround(*expected * 1000.0) + 20;
+    A::followAt(s.window, static_cast<double>(player->position) / 1000.0);
+    CHECK(editor->selectedByteRange()->first == chord);
+    A::followAt(s.window, timeline.cues.front().seconds);
+    CHECK(editor->selectedByteRange()->first == timeline.cues.front().event.begin);
+    A::stopPlayback(s.window);
+    CHECK(editor->selectedByteRange()->first == timeline.cues.front().event.begin);
+
+    // At the start of the music it plays from the beginning.
+    editor->setCursorByteOffset(0, false);
+    player->played.clear();
+    QTest::mouseClick(s.play, Qt::LeftButton);
+    REQUIRE(apptest::waitUntil([&] { return !player->played.empty(); }, 60000));
+    CHECK(player->played[0].second == 0);
+    A::stopPlayback(s.window);
 }

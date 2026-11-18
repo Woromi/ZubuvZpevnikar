@@ -502,4 +502,53 @@ std::expected<std::string, std::string> smoothBends(std::string_view midi) {
     return out;
 }
 
+std::expected<TempoMap, std::string> tempoMap(std::string_view midi) {
+    if (midi.size() < 14 || midi.substr(0, 4) != "MThd" || readBe(midi, 4, 4) < 6)
+        return std::unexpected("not a Standard MIDI File");
+    const std::size_t headerLength = readBe(midi, 4, 4);
+    const std::uint32_t division = readBe(midi, 12, 2);
+    if (division == 0 || (division & 0x8000u))
+        return std::unexpected("unsupported MIDI time division");
+    if (8 + headerLength > midi.size())
+        return std::unexpected("truncated MIDI header");
+    TempoMap map;
+    map.division = static_cast<int>(division);
+    std::size_t at = 8 + headerLength;
+    while (at < midi.size()) {
+        if (at + 8 > midi.size())
+            return std::unexpected("truncated MIDI chunk");
+        const std::size_t length = readBe(midi, at + 4, 4);
+        if (at + 8 + length > midi.size())
+            return std::unexpected("truncated MIDI chunk");
+        if (midi.substr(at, 4) == "MTrk") {
+            auto track = parseTrack(midi.substr(at + 8, length));
+            if (!track)
+                return std::unexpected(track.error());
+            for (const Event& e : *track)
+                if (e.metaType == 0x51 && e.metaText.size() == 3)
+                    map.changes.push_back({e.tick, readBe(e.metaText, 0, 3)});
+        }
+        at += 8 + length;
+    }
+    std::ranges::stable_sort(map.changes, {}, &TempoMap::Change::tick);
+    if (map.changes.empty() || map.changes.front().tick > 0)
+        map.changes.insert(map.changes.begin(), TempoMap::Change{});
+    return map;
+}
+
+double TempoMap::seconds(double wholeNotes) const {
+    if (wholeNotes <= 0 || changes.empty())
+        return 0;
+    const double ticks = wholeNotes * 4.0 * division;
+    double total = 0; // microseconds
+    for (std::size_t i = 0; i < changes.size(); ++i) {
+        const double from = static_cast<double>(changes[i].tick);
+        if (ticks <= from)
+            break;
+        const double to = i + 1 < changes.size() ? static_cast<double>(changes[i + 1].tick) : ticks;
+        total += (std::min(ticks, to) - from) * changes[i].microsPerQuarter / division;
+    }
+    return total / 1e6;
+}
+
 } // namespace zub::midi

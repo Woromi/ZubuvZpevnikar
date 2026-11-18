@@ -12,3 +12,8 @@
 - `Synthetic/` holds valid hand-written songs for edge cases (e.g. a commented-out second header).
 - `.ly` and `.log` files must be ignored by the scanner.
 - `zubuvzpevnik/*.cls` are empty placeholders: only their names matter (document class discovery).
+
+`timing/` is a real LilyPond run of the synthetic score `Timing.ly` (two staves, a repeat with alternatives, tempo
+changes, a tuplet, a grace note, a variable) through `zub::score::prepare` for the score-cursor-as-play-position tests:
+`Timing.copy.ly` is the score copy LilyPond read (the playback score is appended from line 17), `timing.notes` the
+list it wrote (the copy's path replaced by `@COPY@`), `timing.mid` the playback MIDI file.

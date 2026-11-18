@@ -35,6 +35,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <algorithm>
+#include <cmath>
 #include <zub/core/fretboard.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/midi.hpp>
@@ -191,6 +192,8 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
         // The build replaces the MIDI file: nothing to play until it is done.
         playbackRunner_->cancel();
         scorePlayer_->stop();
+        stopFollowing();
+        timeline_ = {};
         scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
         scoreMidi_.clear();
         updateSoundAvailability();
@@ -216,19 +219,15 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
     connect(scoreRunner_, &ScoreRunner::finished, this, &ScoreTabs::showScoreResult);
     playbackRunner_ = new PlaybackRunner(this);
     scorePlayer_ = new ScorePlayer(this);
+    followTimer_ = new QTimer(this);
+    followTimer_->setInterval(30);
+    connect(followTimer_, &QTimer::timeout, this, &ScoreTabs::followTick);
     connect(playbackRunner_, &PlaybackRunner::started, this, [this] {
         scorePreview_->setPlayState(ScorePreviewPane::PlayState::Preparing);
         scorePreview_->showPlaybackMessage(tr("Preparing playback…"), false);
     });
     connect(playbackRunner_, &PlaybackRunner::finished, this, &ScoreTabs::showPlaybackResult);
-    connect(scorePlayer_, &ScorePlayer::finished, this, [this] {
-        scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
-        scorePreview_->showPlaybackMessage({}, false);
-    });
-    connect(scorePlayer_, &ScorePlayer::failed, this, [this](const QString& message) {
-        scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
-        scorePreview_->showPlaybackMessage(tr("Cannot play: %1").arg(message), true);
-    });
+    connectPlayer();
     connect(scorePreview_, &ScorePreviewPane::playRequested, this, &ScoreTabs::playScore);
     connect(scorePreview_, &ScorePreviewPane::stopRequested, this, &ScoreTabs::stopPlayback);
     updateSoundAvailability();
@@ -240,6 +239,20 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
     });
     connect(tabs_, &QTabWidget::currentChanged, this, &ScoreTabs::onTabChanged);
     connect(tabs_, &QTabWidget::tabCloseRequested, this, &ScoreTabs::closeScoreTab);
+}
+
+// The player's signals (a test stands in another player, see AppTestAccess).
+void ScoreTabs::connectPlayer() {
+    connect(scorePlayer_, &ScorePlayer::finished, this, [this] {
+        stopFollowing();
+        scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
+        scorePreview_->showPlaybackMessage({}, false);
+    });
+    connect(scorePlayer_, &ScorePlayer::failed, this, [this](const QString& message) {
+        stopFollowing();
+        scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
+        scorePreview_->showPlaybackMessage(tr("Cannot play: %1").arg(message), true);
+    });
 }
 
 void ScoreTabs::setSong(SongEditor* song) {
@@ -1015,6 +1028,7 @@ void ScoreTabs::forgetScoreMidi() {
 void ScoreTabs::stopPlayback() {
     playbackRunner_->cancel();
     scorePlayer_->stop();
+    stopFollowing();
     scorePreview_->setPlayState(ScorePreviewPane::PlayState::Idle);
     scorePreview_->showPlaybackMessage({}, false);
 }
@@ -1036,6 +1050,8 @@ void ScoreTabs::playScore() {
     request.cacheDir = playbackCacheDir_;
     request.amp = scoreAmp_;
     request.ampMidiFile = scoreAmpMidi_;
+    rememberPlayStart();
+    stopFollowing();
     scorePlayer_->stop();
     playbackRunner_->request(std::move(request));
 }
@@ -1050,7 +1066,83 @@ void ScoreTabs::showPlaybackResult(const PlaybackResult& result) {
     }
     scorePreview_->setPlayState(ScorePreviewPane::PlayState::Playing);
     scorePreview_->showPlaybackMessage(tr("Playing"), false);
-    scorePlayer_->play(result.wav);
+    scorePlayer_->play(result.wav, std::llround(playFrom_.value_or(0.0) * 1000.0));
+    startFollowing();
+}
+
+// The timeline of the latest build: the playback score's note list (when each note sounds and
+// where it is written), mapped onto the music events of the editor's text and the MIDI file's
+// tempo map. Without one Play starts at the beginning and the cursor stays where it is.
+void ScoreTabs::buildTimeline(const ScoreResult& result) {
+    timeline_ = {};
+    SongEditor* editor = currentEditor();
+    if (!scoreLinksFresh_ || !editor || result.notes.empty() || result.midi.empty())
+        return;
+    const auto notes = zub::readTextFile(result.notes);
+    const auto copy = zub::readTextFile(result.scoreCopy);
+    const auto midi = zub::readTextFile(result.midi);
+    if (!notes || !copy || !midi)
+        return;
+    const std::string text = editor->editorText();
+    auto built = zub::scoretiming::buildTimeline(
+        {*notes, *midi, *copy, text, result.scoreCopy, result.generatedFromLine});
+    if (built)
+        timeline_ = std::move(*built);
+}
+
+// Where Play starts: the cursor's note (the start of a selection), its first pass if it is
+// repeated; the beginning without a timeline (the text changed since the build) or when the cursor
+// is before the music.
+std::optional<double> ScoreTabs::startSeconds() const {
+    SongEditor* editor = currentEditor();
+    if (!editor || onSongTab() || !scoreLinksFresh_ || timeline_.empty())
+        return std::nullopt;
+    const auto selection = editor->selectedByteRange();
+    const std::size_t caret = selection ? selection->first : editor->cursorByteOffset();
+    return zub::scoretiming::startSeconds(timeline_, caret);
+}
+
+void ScoreTabs::startFollowing() {
+    followRange_.reset();
+    following_ = scoreLinksFresh_ && !timeline_.empty();
+    if (following_)
+        followTimer_->start();
+}
+
+void ScoreTabs::stopFollowing() {
+    following_ = false;
+    followTimer_->stop();
+}
+
+void ScoreTabs::followTick() {
+    const qint64 position = scorePlayer_->positionMs();
+    if (position >= 0)
+        followAt(static_cast<double>(position) / 1000.0);
+}
+
+// The note sounding at `seconds` is selected (the preview highlights it). Following ends when the
+// text changed or the user moved the cursor: the playback goes on and the cursor is theirs.
+void ScoreTabs::followAt(double seconds) {
+    SongEditor* editor = currentEditor();
+    if (!following_)
+        return;
+    if (!editor || onSongTab() || !scoreLinksFresh_ ||
+        (followRange_ && editor->selectedByteRange() != followRange_)) {
+        stopFollowing();
+        return;
+    }
+    const auto* cue = zub::scoretiming::cueAt(timeline_, seconds);
+    if (!cue)
+        return;
+    const std::pair<std::size_t, std::size_t> range{cue->event.begin, cue->event.end};
+    if (followRange_ == range)
+        return;
+    // The sounding note itself is selected (highlighted in the preview): a caret before it would
+    // read as the previous note, and a caret behind it as the next one.
+    scoreAnchor_ = range.first;
+    scoreStops_.reset();
+    editor->selectByteRange(range.first, range.second, false);
+    followRange_ = editor->selectedByteRange();
 }
 
 void ScoreTabs::soundFret(FretboardWidget* fretboard, int string, int fret) {
@@ -1109,6 +1201,7 @@ void ScoreTabs::showScoreResult(const ScoreResult& result) {
     scoreAmpMidi_ = result.ampMidi;
     updateSoundAvailability();
     scoreLinksFresh_ = result.success && !scorePreviewTimer_->isActive();
+    buildTimeline(result);
     indexScoreEvents();
     updateScoreHighlights();
 }

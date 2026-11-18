@@ -17,6 +17,7 @@ add_executable(zub_core_tests
     test_scoremidi.cpp
     test_scorestaves.cpp
     test_scoreregion.cpp
+    test_scoretiming.cpp
     test_score.cpp
     test_song.cpp
     test_songbook.cpp

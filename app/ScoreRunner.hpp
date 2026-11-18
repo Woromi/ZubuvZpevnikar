@@ -24,8 +24,11 @@ struct ScoreResult {
     std::filesystem::path scoreCopy;       // the file errors() locations refer to
     QString log;                           // LilyPond's output
     qint64 elapsedMs = 0;
-    bool amp = false;                      // `midi` holds only amp staves: run its audio through the amp
-    std::filesystem::path ampMidi;         // the amp staves' own MIDI file when others don't use the amp
+    bool amp = false;              // `midi` holds only amp staves: run its audio through the amp
+    std::filesystem::path ampMidi; // the amp staves' own MIDI file when others don't use the amp
+    std::filesystem::path notes;   // the playback score's note list (zub::scoretiming); empty
+                                   // without a MIDI file
+    int generatedFromLine = 0;     // zub::score::Command::generatedFromLine
 };
 
 // Runs one score build (lilypond to SVG) at a time with QProcess. A new request while a build

@@ -17,6 +17,7 @@
 #include <utility>
 #include <vector>
 #include <zub/core/scoreregion.hpp>
+#include <zub/core/scoretiming.hpp>
 
 class QAction;
 class QStackedWidget;
@@ -153,10 +154,20 @@ private:
 
     // Playback of the score preview (fluidsynth renders the build's MIDI file, Qt Multimedia plays
     // the WAV) and the sound of a clicked fret.
+    void connectPlayer();
     void playScore();
     void stopPlayback();
     void forgetScoreMidi(); // stops Play and drops the MIDI file of the last build
     void showPlaybackResult(const PlaybackResult& result);
+    // The score cursor as the play position: the timeline of the latest build (note list, MIDI
+    // tempo map) tells where in the audio the cursor's note sounds, and which note sounds now.
+    void buildTimeline(const ScoreResult& result);
+    std::optional<double> startSeconds() const; // where Play starts for the cursor or selection
+    void rememberPlayStart() { playFrom_ = startSeconds(); } // Play was asked for
+    void startFollowing();                                   // the cursor follows the playing notes
+    void stopFollowing();          // the cursor stays at the last note played
+    void followTick();             // a timer: the player's position -> followAt
+    void followAt(double seconds); // moves the cursor to the note sounding then
 
     void updateScoreHighlights();
     void clickScoreNote(const QPoint& position, bool after, bool extend); // from the preview
@@ -202,6 +213,12 @@ private:
     ScoreRunner* scoreRunner_ = nullptr;
     PlaybackRunner* playbackRunner_ = nullptr;
     ScorePlayer* scorePlayer_ = nullptr;
+    // Valid while scoreLinksFresh_ (the editor's text is the text the build was made from).
+    zub::scoretiming::Timeline timeline_;
+    std::optional<double> playFrom_; // seconds Play was asked to start at; none: the start
+    QTimer* followTimer_ = nullptr;
+    bool following_ = false;                  // the cursor moves with the playing notes
+    std::optional<std::pair<std::size_t, std::size_t>> followRange_; // the note it selected
     NoteSounds* noteSounds_ = nullptr;
     bool scoreAmp_ = false; // the latest preview build's MIDI file is for the amp instrument
     std::filesystem::path
@@ -211,8 +228,8 @@ private:
     std::map<std::string, QStringList> staffChoices_;
     std::map<std::string, QString> chordChoices_; // the chord names' instrument per score (session)
     std::map<std::string, QString> melodyChoices_; // the hidden melody's instrument (session)
-    QAction* soundAction_ = nullptr;              // "Sound": clicking a fret plays the note
-    std::filesystem::path scoreMidi_;             // the MIDI file of the latest successful build
-    std::filesystem::path playbackCacheDir_;      // the rendered WAV files
+    QAction* soundAction_ = nullptr;               // "Sound": clicking a fret plays the note
+    std::filesystem::path scoreMidi_;              // the MIDI file of the latest successful build
+    std::filesystem::path playbackCacheDir_;       // the rendered WAV files
     std::filesystem::path scoreWorkDir_;
 };

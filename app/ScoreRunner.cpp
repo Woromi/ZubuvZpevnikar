@@ -192,6 +192,8 @@ void ScoreRunner::onProcessFinished() {
             std::filesystem::is_regular_file(cmd.midi, ec)) {
             result.midi = cmd.midi;
             result.amp = cmd.midiIsAmp;
+            result.notes = cmd.notes;
+            result.generatedFromLine = cmd.generatedFromLine;
             if (!cmd.ampMidi.empty() && std::filesystem::is_regular_file(cmd.ampMidi, ec))
                 result.ampMidi = cmd.ampMidi;
         }

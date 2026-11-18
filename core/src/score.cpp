@@ -55,6 +55,39 @@ bool appendIsNeutral(const std::string& content, const std::string& withPlayback
            safety::lilypondRisks(withPlayback) == risks;
 }
 
+// The Scheme of the playback score's note list: fixed text, only the path of the output file
+// varies. A \\layout of the playback score `\\consists` it in every Voice; for each note event it
+// appends a line "<moment main num> <den> <moment grace num> <den> <line> <char> <file>" (the
+// origin as in LilyPond's point-and-click links) to `notes` and flushes it.
+std::string loggerScheme(const fs::path& notes) {
+    std::string path;
+    for (const char c : utf8(notes)) {
+        if (c == '"' || c == '\\')
+            path += '\\';
+        path += c;
+    }
+    return "zubNoteLogger = #(lambda (context)\n"
+           "  (let ((port #f))\n"
+           "    (make-engraver\n"
+           "      (listeners\n"
+           "        ((note-event engraver event)\n"
+           "          (let* ((origin (ly:event-property event 'origin))\n"
+           "                 (where (and (ly:input-location? origin)\n"
+           "                             (ly:input-file-line-char-column origin)))\n"
+           "                 (now (ly:context-current-moment context)))\n"
+           "            (if where\n"
+           "              (begin\n"
+           "                (if (not port) (set! port (open-file \"" +
+           path +
+           "\" \"a\")))\n"
+           "                (format port \"~a ~a ~a ~a ~a ~a ~a\\n\"\n"
+           "                  (ly:moment-main-numerator now) (ly:moment-main-denominator now)\n"
+           "                  (ly:moment-grace-numerator now) (ly:moment-grace-denominator now)\n"
+           "                  (cadr where) (caddr where) (car where))\n"
+           "                (force-output port))))))\n"
+           "      ((finalize engraver) (if port (close-port port))))))\n";
+}
+
 } // namespace
 
 std::expected<Command, std::string> prepare(const Request& request) {
@@ -112,8 +145,8 @@ std::expected<Command, std::string> prepare(const Request& request) {
             if (!appended.empty() && appended.back() != '\n')
                 appended += '\n';
             const int firstGenerated = static_cast<int>(std::ranges::count(appended, '\n')) + 1;
-            appended += "\\book {\n\\bookOutputName \"" + std::string(playbackOutputName) +
-                        "\"\n" + *played + "\n}\n";
+            appended += "\\book {\n\\bookOutputName \"" + std::string(playbackOutputName) + "\"\n" +
+                        *played + "\n}\n";
             if (mixed) {
                 options.sounding = MidiOptions::Sounding::AmpOnly;
                 if (const auto amp = midiScore(content, options)) {
@@ -150,6 +183,13 @@ std::expected<Command, std::string> prepare(const Request& request) {
     // songs; LilyPond itself would default to Dutch note names.
     std::string wrapper =
         request.germanNames ? "\\language \"deutsch\"\n" : "\\language \"english\"\n";
+    if (withMidi) {
+        wrapper += "\\include \"" + std::string(playbackLoggerName) + "\"\n";
+        if (auto w = writeTextFileAtomic(work / std::string(playbackLoggerName),
+                                         loggerScheme(outDir / std::string(playbackNotesName)));
+            !w)
+            return std::unexpected(w.error());
+    }
     wrapper += "\\include \"" + request.inputName + "\"\n";
     if (auto w = writeTextFileAtomic(work / "score.ly", wrapper); !w)
         return std::unexpected(w.error());
@@ -173,6 +213,7 @@ std::expected<Command, std::string> prepare(const Request& request) {
         if (!ampOutput.empty())
             cmd.ampMidi = outDir / ampOutput;
         cmd.midiIsAmp = allAmp;
+        cmd.notes = outDir / std::string(playbackNotesName);
     }
     cmd.scoreCopy = copy;
     cmd.generatedFromLine = generatedFromLine;

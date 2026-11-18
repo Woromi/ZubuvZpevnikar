@@ -1,16 +1,20 @@
 #include "midi_events.hpp"
 
+#include <algorithm>
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <random>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <zub/core/midi.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/score.hpp>
+#include <zub/core/scoretiming.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/songbook.hpp>
 #include <zub/core/textfile.hpp>
@@ -160,10 +164,24 @@ TEST_CASE("midiScore is a score that unfolds repeats and plays", "[score][midi]"
     CHECK(
         contains(*score, "\\context { \\TabStaff midiInstrument = \"acoustic guitar (steel)\" }"));
     CHECK(contains(*score, "\\repeat volta 2 { a,16\\5"));
-    CHECK_FALSE(contains(*score, "\\layout"));
+    // The score's own \layout is not copied; the only one lists the notes (zub::scoretiming).
+    CHECK(std::ranges::count(*score, '#') == 2); // the `##t` of skipTypesetting, no Scheme
+    CHECK(contains(*score, "\\layout {\n    \\context { \\Score skipTypesetting = ##t }\n"
+                           "    \\context { \\Voice \\consists \\zubNoteLogger }\n"
+                           "    \\context { \\TabVoice \\consists \\zubNoteLogger }\n  }"));
+    CHECK_FALSE(contains(score->substr(score->find("\\layout") + 1), "\\layout"));
     CHECK_FALSE(contains(*score, "\\header"));
     CHECK_FALSE(contains(*score, "= 50")); // the score's own \midi is not copied
     CHECK(score->ends_with("\n  }\n}"));
+}
+
+TEST_CASE("midiScore: the amp staves' own book does not list notes", "[score][midi]") {
+    auto o = options();
+    o.sounding = sc::MidiOptions::Sounding::AmpOnly;
+    const auto score = sc::midiScore(jolene, o);
+    REQUIRE(score);
+    CHECK_FALSE(contains(*score, "\\layout"));
+    CHECK_FALSE(contains(*score, "zubNoteLogger"));
 }
 
 TEST_CASE("midiScore sounds as with the capo on", "[score][midi]") {
@@ -351,6 +369,7 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
         }
     }
     int count = 0;
+    int timed = 0;
     TempDir dir;
     for (const auto& entry : fs::recursive_directory_iterator(realRepo / "songs")) {
         if (!entry.is_regular_file() || entry.path().extension() != ".ly")
@@ -370,6 +389,7 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
         midi.tempo = tempoOf.contains(name) ? tempoOf[name] : 100;
         midi.instrument = sc::midiInstrument(*content);
         midi.melodyInstrument = "voice"; // a hidden melody must build as a sounding staff too
+        midi.transpose = 2;              // ... and the music inside \\transpose
         request.midi = midi;
         const auto cmd = sc::prepare(request);
         REQUIRE(cmd);
@@ -417,9 +437,108 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
                 CHECK(now >= before - 2 * markers);
             }
         }
+        // The listener's note list gives a timeline: every note of the score's own file sits in a
+        // music event of the text (the score cursor can follow it), the playback score's copy of
+        // the music pairs with the text's events.
+        if (ok) {
+            const auto notes = zub::readTextFile(cmd->notes);
+            const auto copy = zub::readTextFile(cmd->scoreCopy);
+            const auto midiBytes = zub::readTextFile(cmd->midi);
+            REQUIRE(notes);
+            REQUIRE(copy);
+            REQUIRE(midiBytes);
+            std::string editorText = *content; // the editor's text has LF
+            for (std::size_t at = 0; (at = editorText.find("\r\n", at)) != std::string::npos;)
+                editorText.erase(at, 1);
+            const zub::scoretiming::Source source{
+                *notes, *midiBytes, *copy, editorText, cmd->scoreCopy, cmd->generatedFromLine};
+            const auto timeline = zub::scoretiming::buildTimeline(source);
+            if (!timeline) {
+                UNSCOPED_INFO(name << ": " << timeline.error());
+            }
+            REQUIRE(timeline);
+            // Not events (zub::scoreregion::musicEvents): a definition of a single note or chord
+            // (`emChord = <e,\\6 e\\4>4`), which the cursor cannot stand in either.
+            static const std::regex singleDefinition(R"((^|\n)[A-Za-z]+ *= *(<|[a-g]))");
+            const bool hasSingle = std::regex_search(editorText, singleDefinition);
+            if (timeline->unmapped > 0 && !hasSingle) {
+                UNSCOPED_INFO(name << ": " << timeline->unmapped << " notes are in no music event");
+            }
+            CHECK((timeline->unmapped == 0 || hasSingle));
+            CHECK_FALSE(timeline->empty());
+            ++timed;
+        }
         ++count;
     }
     CHECK(count > 0);
+    CHECK(timed > 0);
+#endif
+}
+
+// Hidden: needs lilypond. The timeline of the synthetic score of tests/data/timing/ built for every
+// way the playback score is assembled: all staves in one book, some staves through the amp (a
+// second book with the same music appended), all of them through the amp, chord names and capo.
+TEST_CASE("the timeline is the same for every way the playback score is built",
+          "[.integration][score][midi][scoretiming]") {
+#ifdef _WIN32
+    SKIP("POSIX shell only");
+#else
+    if (std::system("command -v lilypond >/dev/null 2>&1") != 0)
+        SKIP("lilypond is not installed");
+    const fs::path data = fs::path(ZUB_TEST_DATA_DIR) / "timing";
+    const auto content = zub::readTextFile(data / "Timing.ly");
+    REQUIRE(content);
+    struct Variant {
+        const char* name;
+        std::vector<std::string> staves;
+        int capo;
+        std::string chords;
+    };
+    const std::vector<Variant> variants{{"default", {}, 0, ""},
+                                        {"mixed amp", {"amp", "steel"}, 0, ""},
+                                        {"all amp", {"amp", "amp"}, 2, ""},
+                                        {"amp chords", {"steel", "steel"}, 0, "amp"}};
+    std::size_t cueCount = 0;
+    for (const auto& variant : variants) {
+        TempDir dir;
+        sc::Request request;
+        request.workDir = dir.path / "work";
+        request.songbookRoot = dir.path;
+        request.inputName = "Test/Timing.ly";
+        request.content = *content;
+        request.includeDir = dir.path;
+        sc::MidiOptions midi;
+        midi.instrument = "acoustic guitar (steel)";
+        midi.staffInstruments = variant.staves;
+        midi.transpose = variant.capo;
+        midi.chordInstrument = variant.chords;
+        request.midi = midi;
+        const auto cmd = sc::prepare(request);
+        REQUIRE(cmd);
+        std::string line =
+            "cd '" + cmd->workingDirectory.string() + "' && LC_ALL=C " + cmd->program;
+        for (const auto& a : cmd->arguments)
+            line += " '" + a + "'";
+        line += " >'" + (dir.path / "log").string() + "' 2>&1";
+        INFO(variant.name);
+        REQUIRE(std::system(line.c_str()) == 0);
+        const auto notes = zub::readTextFile(cmd->notes);
+        const auto copy = zub::readTextFile(cmd->scoreCopy);
+        const auto midiBytes = zub::readTextFile(cmd->midi);
+        REQUIRE(notes);
+        REQUIRE(copy);
+        REQUIRE(midiBytes);
+        const auto timeline = zub::scoretiming::buildTimeline(
+            {*notes, *midiBytes, *copy, *content, cmd->scoreCopy, cmd->generatedFromLine});
+        REQUIRE(timeline);
+        CHECK(timeline->unmapped == 0);
+        CHECK(timeline->cues.size() > 10);
+        if (cueCount == 0)
+            cueCount = timeline->cues.size();
+        CHECK(timeline->cues.size() == cueCount);
+        // Raising the music by the capo does not move it in time.
+        CHECK(timeline->cues.back().seconds == Catch::Approx(5.75));
+    }
 #endif
 }
 
