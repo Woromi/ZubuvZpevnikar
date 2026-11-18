@@ -611,3 +611,17 @@ TEST_CASE("per-staff instruments reach the MIDI file", "[.integration][score][st
     CHECK(scores > 0);
 #endif
 }
+
+TEST_CASE("the amp sound is saved as General MIDI's distorted guitar and read back as amp",
+          "[score][staves]") {
+    const std::string text = "\\score {\n  \\new TabStaff {\n    { c4 }\n  }\n}\n";
+    const auto change = sc::saveStaffInstrument(text, 0, zub::midi::ampFileName);
+    REQUIRE(change);
+    CHECK(change->text.find("\\set Staff.midiInstrument = \"distorted guitar\"") !=
+          std::string::npos);
+    const auto* read = zub::midi::findInstrumentByName("distorted guitar");
+    REQUIRE(read);
+    CHECK(read->id == "amp");
+    // The clean guitar is still the clean guitar.
+    CHECK(zub::midi::findInstrumentByName("electric guitar (clean)")->id == "clean");
+}

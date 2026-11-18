@@ -10,6 +10,7 @@
 
 #include <QAction>
 #include <QComboBox>
+#include <QPushButton>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QLabel>
@@ -683,4 +684,19 @@ TEST_CASE("Score tab: everything that sounds is highlighted in the preview, in a
     A::followAt(s.window, 0.3);
     CHECK(pane->soundingNoteCount() == 0);
     CHECK(marked().isEmpty());
+}
+
+TEST_CASE("Instruments: the distorted guitar can be saved to the file", "[app][score]") {
+    ScoreWindow w("Tun"); // two staves: a row and a Save to file button each
+    ScorePreviewPane* pane = A::scorePreview(w.window);
+    REQUIRE(apptest::waitUntil([&] {
+        return pane->findChildren<QComboBox*>(QStringLiteral("scoreInstrument")).size() >= 2;
+    }));
+    QComboBox* combo = pane->findChildren<QComboBox*>(QStringLiteral("scoreInstrument")).front();
+    QPushButton* save = pane->findChildren<QPushButton*>(QStringLiteral("scoreInstrumentSave")).front();
+    combo->setCurrentIndex(combo->findData(QStringLiteral("amp")));
+    REQUIRE(save->isEnabled());
+    save->click();
+    CHECK(apptest::waitUntil(
+        [&] { return w.text().contains(QStringLiteral("midiInstrument = \"distorted guitar\"")); }));
 }

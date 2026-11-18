@@ -876,9 +876,13 @@ public:
         });
         connect(save_, &QPushButton::clicked, this, [this] {
             const auto* instrument = zub::midi::findInstrument(choice().toStdString());
-            if (instrument && !instrument->amp && onSave)
-                onSave(QString::fromUtf8(instrument->name.data(),
-                                         static_cast<qsizetype>(instrument->name.size())));
+            // The amp sound is saved as General MIDI's distorted guitar (read back as amp).
+            const std::string_view name =
+                instrument && instrument->amp ? zub::midi::ampFileName
+                : instrument                   ? std::string_view(instrument->name)
+                                               : std::string_view();
+            if (!name.empty() && onSave)
+                onSave(QString::fromUtf8(name.data(), static_cast<qsizetype>(name.size())));
         });
         updateSave();
     }
@@ -897,13 +901,13 @@ public:
 private:
     void updateSave() {
         const QString id = choice();
-        const bool saveable = id != QStringLiteral("auto") && id != QStringLiteral("amp") &&
-                              id != QStringLiteral("silent");
+        const bool saveable = id != QStringLiteral("auto") && id != QStringLiteral("silent");
         save_->setEnabled(saveable);
         save_->setToolTip(
             id == QStringLiteral("amp")
-                ? tr("The distorted guitar is this app's own effect, not a MIDI instrument: it "
-                     "cannot be saved to the file.")
+                ? tr("Write the distorted guitar into the score file as \\set "
+                     "Staff.midiInstrument = \"distorted guitar\" (General MIDI's; this app plays "
+                     "it with its own amp sound). One undo step; save the file as usual.")
             : id == QStringLiteral("auto")
                 ? tr("Choose an instrument first.")
                 : tr("Write this instrument into the score file as \\set Staff.midiInstrument "

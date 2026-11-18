@@ -338,7 +338,7 @@ TEST_CASE("Playback: instruments per staff, saved into the file, one-staff toolb
 
     combos[0]->setCurrentIndex(combos[0]->findData("banjo"));
     combos[1]->setCurrentIndex(combos[1]->findData("amp"));
-    CHECK(!saves[1]->isEnabled()); // amp cannot be saved
+    CHECK(saves[1]->isEnabled()); // amp is saved as General MIDI's distorted guitar
     CHECK(saves[0]->isEnabled());
     REQUIRE(s.waitPlay());
     CHECK(!A::scoreMidi(s.window).empty());

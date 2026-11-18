@@ -3151,8 +3151,8 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Uložit do souboru</translation>
     </message>
     <message>
-        <source>The distorted guitar is this app&apos;s own effect, not a MIDI instrument: it cannot be saved to the file.</source>
-        <translation>Zkreslená kytara je vlastní efekt této aplikace, ne nástroj MIDI: do souboru ji nelze uložit.</translation>
+        <source>Write the distorted guitar into the score file as \set Staff.midiInstrument = &quot;distorted guitar&quot; (General MIDI&apos;s; this app plays it with its own amp sound). One undo step; save the file as usual.</source>
+        <translation>Zapsat zkreslenou kytaru do souboru not jako \set Staff.midiInstrument = &quot;distorted guitar&quot; (zkreslená kytara podle General MIDI; tato aplikace ji hraje vlastním zvukem zesilovače). Jeden krok zpět; soubor uložte jako obvykle.</translation>
     </message>
     <message>
         <source>Choose an instrument first.</source>

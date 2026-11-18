@@ -182,6 +182,8 @@ const Instrument* findInstrument(std::string_view id) {
 }
 
 const Instrument* findInstrumentByName(std::string_view name) {
+    if (name == ampFileName)
+        return findInstrument("amp");
     for (const Instrument& instrument : instruments())
         if (instrument.name == name)
             return &instrument;

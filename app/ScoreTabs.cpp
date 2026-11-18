@@ -945,8 +945,20 @@ void ScoreTabs::requestScorePreview(bool userAsked) {
     zub::score::MidiOptions midi;
     midi.factor = scorePreview_->tempoFactor();
     midi.instrument = zub::score::midiInstrument(request.content);
-    for (const QString& id : scorePreview_->staffChoices())
-        midi.staffInstruments.push_back(toStdString(id));
+    {
+        // A staff left on Automatic whose file sets the distorted guitar plays this app's amp
+        // sound (the file's name for it, zub::midi::ampFileName), like choosing it.
+        const auto fileStaves = zub::score::staves(request.content);
+        const QStringList choices = scorePreview_->staffChoices();
+        for (qsizetype i = 0; i < choices.size(); ++i) {
+            const auto index = static_cast<std::size_t>(i);
+            const bool fileAmp = index < fileStaves.size() &&
+                                 fileStaves[index].instrument == zub::midi::ampFileName;
+            midi.staffInstruments.push_back(choices[i] == QStringLiteral("auto") && fileAmp
+                                                ? std::string("amp")
+                                                : toStdString(choices[i]));
+        }
+    }
     midi.chordInstrument = toStdString(scorePreview_->chordChoice());
     midi.melodyInstrument = toStdString(scorePreview_->melodyChoice());
     if (const auto meta = zub::parseSong(song_->content())) {

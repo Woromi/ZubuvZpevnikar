@@ -31,6 +31,10 @@ const std::vector<Instrument>& instruments();
 // By id, or by LilyPond name (the first one with it); nullptr when unknown.
 const Instrument* findInstrument(std::string_view id);
 const Instrument* findInstrumentByName(std::string_view name);
+// What "amp" (the app's distorted guitar: the clean guitar through zub::audio::applyAmp) is saved
+// as in a score file: General MIDI's distorted guitar, which findInstrumentByName reads back as
+// "amp" (other MIDI players then also play a distorted guitar).
+inline constexpr std::string_view ampFileName = "distorted guitar";
 
 struct Command {
     std::string program; // the fluidsynth executable as given
