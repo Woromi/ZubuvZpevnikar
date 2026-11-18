@@ -63,6 +63,8 @@ private:
     QLineEdit* find_;
     QLineEdit* replace_;
     QWidget* replaceRow_;
+    QToolButton* expand_; // ▸ / ▾: shows or hides the replace row
+    void setReplaceRowVisible(bool visible);
     QToolButton* matchCase_;
     QToolButton* wholeWord_;
     QToolButton* regex_;

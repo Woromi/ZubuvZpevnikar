@@ -137,6 +137,10 @@ Použijte vestavěný.</translation>
 <context>
     <name>FindBar</name>
     <message>
+        <source>Find and replace (Ctrl+H)</source>
+        <translation>Najít a nahradit (Ctrl+H)</translation>
+    </message>
+    <message>
         <source>Find</source>
         <translation>Najít</translation>
     </message>

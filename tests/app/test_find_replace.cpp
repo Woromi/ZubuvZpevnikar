@@ -11,6 +11,7 @@
 #include <QLineEdit>
 #include <QTabWidget>
 #include <QTest>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <catch2/catch_test_macros.hpp>
 
@@ -371,4 +372,27 @@ TEST_CASE("Ctrl+F on the Songbooks page opens the LaTeX tab's bar", "[app][find]
     A::toggleLock(*page);
     CHECK(!A::replaceButton(*bar)->isEnabled());
     CHECK(!A::replaceAllButton(*bar)->isEnabled());
+}
+
+TEST_CASE("FindBar: the arrow opens and closes the replace row", "[app][find]") {
+    Bar b(QStringLiteral("abc abc"));
+    b.bar.open(false);
+    auto* arrow = b.bar.findChild<QToolButton*>(QStringLiteral("findExpand"));
+    auto* replace = b.bar.findChild<QLineEdit*>(QStringLiteral("replaceField"));
+    REQUIRE(arrow);
+    REQUIRE(replace);
+    CHECK(!b.bar.replaceMode());
+    CHECK(arrow->text() == QStringLiteral("▸"));
+    arrow->click();
+    CHECK(b.bar.replaceMode());
+    CHECK(replace->isVisible());
+    CHECK(replace->hasFocus());
+    CHECK(arrow->text() == QStringLiteral("▾"));
+    arrow->click();
+    CHECK(!b.bar.replaceMode());
+    CHECK(A::findField(b.bar)->hasFocus());
+    // Ctrl+H (replace mode) turns the arrow too.
+    b.bar.open(true);
+    CHECK(arrow->isChecked());
+    CHECK(arrow->text() == QStringLiteral("▾"));
 }

@@ -9,6 +9,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QShortcut>
+#include <QSignalBlocker>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTimer>
@@ -50,6 +51,13 @@ FindBar::FindBar(CodeTextEdit* edit, QWidget* parent) : QWidget(parent), edit_(e
     layout->setSpacing(4);
 
     auto* findRow = new QHBoxLayout;
+    // Like VSCodium's: the arrow left of the find field opens and closes the replace row.
+    expand_ = new QToolButton(this);
+    expand_->setObjectName(QStringLiteral("findExpand"));
+    expand_->setCheckable(true);
+    expand_->setAutoRaise(true);
+    expand_->setToolTip(tr("Find and replace (Ctrl+H)"));
+    findRow->addWidget(expand_);
     find_ = new QLineEdit(this);
     find_->setObjectName(QStringLiteral("findField"));
     find_->setPlaceholderText(tr("Find"));
@@ -78,6 +86,8 @@ FindBar::FindBar(CodeTextEdit* edit, QWidget* parent) : QWidget(parent), edit_(e
     replaceRow_ = new QWidget(this);
     auto* replaceLayout = new QHBoxLayout(replaceRow_);
     replaceLayout->setContentsMargins(0, 0, 0, 0);
+    // Under the find field, not under the arrow.
+    replaceLayout->addSpacing(expand_->sizeHint().width() + findRow->spacing());
     replace_ = new QLineEdit(replaceRow_);
     replace_->setObjectName(QStringLiteral("replaceField"));
     replace_->setPlaceholderText(tr("Replace"));
@@ -89,8 +99,12 @@ FindBar::FindBar(CodeTextEdit* edit, QWidget* parent) : QWidget(parent), edit_(e
     replaceLayout->addWidget(replaceButton_);
     replaceLayout->addWidget(replaceAllButton_);
     layout->addWidget(replaceRow_);
-    replaceRow_->hide();
+    setReplaceRowVisible(false);
     hide();
+    connect(expand_, &QToolButton::toggled, this, [this](bool on) {
+        setReplaceRowVisible(on);
+        (on ? replace_ : find_)->setFocus();
+    });
 
     find_->installEventFilter(this);
     replace_->installEventFilter(this);
@@ -179,7 +193,7 @@ void FindBar::open(bool replaceMode) {
                               !selected.contains(QChar::ParagraphSeparator) &&
                               !selected.contains(QChar::LineSeparator);
     // Ctrl+F on an open replace bar keeps the replace row.
-    replaceRow_->setVisible(replaceMode || !replaceRow_->isHidden());
+    setReplaceRowVisible(replaceMode || !replaceRow_->isHidden());
     show();
     updateEnabled();
     if (useSelection && find_->text() != selected)
@@ -188,6 +202,13 @@ void FindBar::open(bool replaceMode) {
         refresh();
     find_->setFocus();
     find_->selectAll();
+}
+
+void FindBar::setReplaceRowVisible(bool visible) {
+    replaceRow_->setVisible(visible);
+    const QSignalBlocker blocker(expand_);
+    expand_->setChecked(visible);
+    expand_->setText(visible ? QStringLiteral("▾") : QStringLiteral("▸"));
 }
 
 void FindBar::dismiss() {
