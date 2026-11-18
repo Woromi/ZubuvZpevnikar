@@ -28,6 +28,7 @@ add_executable(zub_core_tests
     test_songtidy.cpp
     test_songheader.cpp
     test_songtags.cpp
+    test_songdates.cpp
     test_songtodo.cpp
     test_textfile.cpp
     test_version.cpp

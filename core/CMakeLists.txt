@@ -26,6 +26,7 @@ add_library(zub_core STATIC
     src/songtidy.cpp
     src/songheader.cpp
     src/songtags.cpp
+    src/songdates.cpp
     src/songtodo.cpp
     src/song.cpp
     src/songcheck.cpp
