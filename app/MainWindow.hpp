@@ -122,6 +122,8 @@ private:
     void updateSongActions();
     void updateEditState(); // Undo, Redo, Cut, Copy, Paste: from the current editor
     void createEditMenu(); // Edit: chords and parts
+    // Ctrl+F / Ctrl+H: the search of the Songs page, or the find bar of the editor in view.
+    void showFind(bool replaceMode);
     void moveChord(int direction, zub::songedit::Step step);
     void showPartMenu(); // Edit → Insert Part…, at the cursor
 
@@ -222,6 +224,7 @@ private:
     QAction* cutAction_ = nullptr;
     QAction* copyAction_ = nullptr;
     QAction* pasteAction_ = nullptr;
+    QAction* findAction_ = nullptr; // Edit > Find (Ctrl+F), also on the song toolbar
     QString listTitle_; // window title on the list page
     // Syntax definitions and themes, shared by all editors (must outlive them).
     std::unique_ptr<KSyntaxHighlighting::Repository> repository_;

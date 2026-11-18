@@ -1,6 +1,7 @@
 #include "MainWindow.hpp"
 
 #include "DiffView.hpp"
+#include "FindBar.hpp"
 #include "ImportDialog.hpp"
 #include "LabelFilterBox.hpp"
 #include "LabelsDialog.hpp"
@@ -241,14 +242,6 @@ void MainWindow::createMenus() {
             ActivityBar::View::Songbooks);
 
     createEditMenu();
-
-    QAction* find = new QAction(this);
-    find->setShortcut(QKeySequence::Find);
-    connect(find, &QAction::triggered, this, [this] {
-        if (pages_->currentWidget() == listPage_) // no find & replace in the editor yet
-            listPage_->focusSearch();
-    });
-    addAction(find);
 }
 
 void MainWindow::createCentralWidget() {
@@ -900,6 +893,7 @@ void MainWindow::createSongToolBar() {
                              [](QPlainTextEdit* e) { e->copy(); });
     pasteAction_ = editAction(tr("Paste"), QStringLiteral("edit-paste"), tr("Paste (Ctrl+V)"),
                               [](QPlainTextEdit* e) { e->paste(); });
+    songToolBar_->addAction(findAction_);
     songToolBar_->addSeparator();
 
     for (QAction* action : {songActions_->tidyAction(), songActions_->makeSmallerAction(),
@@ -964,6 +958,15 @@ void MainWindow::createSongToolBar() {
 
 void MainWindow::createEditMenu() {
     QMenu* edit = menuBar()->addMenu(tr("Ed&it"));
+    // Find works on every page: the Songs page's search, or the find bar of the editor in view.
+    findAction_ = edit->addAction(QIcon::fromTheme(QStringLiteral("edit-find")), tr("&Find…"));
+    findAction_->setShortcut(QKeySequence::Find);
+    findAction_->setToolTip(tr("Find in the text (Ctrl+F)"));
+    connect(findAction_, &QAction::triggered, this, [this] { showFind(false); });
+    QAction* replaceAction = edit->addAction(tr("&Replace…"));
+    replaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_H));
+    connect(replaceAction, &QAction::triggered, this, [this] { showFind(true); });
+    edit->addSeparator();
     // songOnly: the action edits the song's text (chords, parts), not a score's.
     const auto add = [this, edit](const QString& text, const QList<QKeySequence>& keys,
                                   const std::function<void()>& run, bool songOnly = true) {
@@ -1041,6 +1044,19 @@ void MainWindow::createEditMenu() {
     add(tr("Insert Part…"), {QKeySequence(Qt::CTRL | Qt::Key_P)}, [this] { showPartMenu(); });
     edit->addSeparator();
     add(tr("New Score…"), {}, [this] { scores_->newScore(); });
+}
+
+void MainWindow::showFind(bool replaceMode) {
+    QWidget* page = pages_->currentWidget();
+    if (page == listPage_) {
+        if (!replaceMode)
+            listPage_->focusSearch();
+    } else if (page == songPage_) {
+        if (SongEditor* current = currentEditor())
+            current->findBar()->open(replaceMode);
+    } else if (page == songbooksPage_) {
+        songbooksPage_->showFind(replaceMode);
+    }
 }
 
 void MainWindow::moveChord(int direction, zub::songedit::Step step) {

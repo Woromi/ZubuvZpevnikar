@@ -48,6 +48,9 @@ public:
     // direction of the first one added, the other direction removes the last one added.
     void addCursorVertically(int direction);
     void clearExtraCursors();
+    // The find bar's matches: drawn after the marks of the selection's occurrences, under the
+    // multi-cursor selections.
+    void setSearchMarks(const QList<QTextEdit::ExtraSelection>& marks);
     // Runs `edit` (changes made through QTextCursors of the document) as one undo step, keeping
     // the extra cursors (they move with the text).
     void editKeepingCursors(const std::function<void()>& edit);
@@ -85,6 +88,7 @@ private:
     QList<QAction*> extraActions_;
     QList<QTextCursor> extraCursors_;
     QList<QTextEdit::ExtraSelection> occurrenceMarks_;
+    QList<QTextEdit::ExtraSelection> searchMarks_;
     QTimer* blinkTimer_ = nullptr;
     bool blinkOn_ = true;
     int ownCursorWidth_ = -1;     // Qt's cursor width while it is hidden, else -1

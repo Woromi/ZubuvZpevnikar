@@ -3,6 +3,7 @@
 #include "BookPreview.hpp"
 #include "CodeTextEdit.hpp"
 #include "CollectionTabs.hpp"
+#include "FindBar.hpp"
 #include "LabelFilterBox.hpp"
 #include "PageHeader.hpp"
 #include "SongEditor.hpp"
@@ -392,6 +393,8 @@ QWidget* SongbooksPage::buildLatexPane() {
     latex_->setLineWrapMode(QPlainTextEdit::NoWrap);
     latex_->setTabStopDistance(QFontMetricsF(font).horizontalAdvance(QLatin1Char(' ')) * 4);
     layout->addWidget(latex_, 1);
+    latexFind_ = new FindBar(latex_, pane);
+    layout->addWidget(latexFind_);
     auto* row = new QHBoxLayout;
     latexState_ = new QLabel(pane);
     latexRevert_ = new QPushButton(tr("Revert"), pane);
@@ -1223,6 +1226,13 @@ void SongbooksPage::refreshFileViews() {
     }
     const bool shown = !id_.isEmpty() && !text_.empty();
     preview_->setBook(id_, shown ? pathOf(id_) : std::filesystem::path(), text_);
+}
+
+bool SongbooksPage::showFind(bool replaceMode) {
+    if (bookTabs_->currentIndex() != 1 || !latexFind_)
+        return false;
+    latexFind_->open(replaceMode);
+    return true;
 }
 
 bool SongbooksPage::latexModified() const {

@@ -135,6 +135,89 @@ Použijte vestavěný.</translation>
     </message>
 </context>
 <context>
+    <name>FindBar</name>
+    <message>
+        <source>Find</source>
+        <translation>Najít</translation>
+    </message>
+    <message>
+        <source>Aa</source>
+        <translation>Aa</translation>
+    </message>
+    <message>
+        <source>Match case</source>
+        <translation>Rozlišovat velikost písmen</translation>
+    </message>
+    <message>
+        <source>ab</source>
+        <translation>ab</translation>
+    </message>
+    <message>
+        <source>Whole word</source>
+        <translation>Celá slova</translation>
+    </message>
+    <message>
+        <source>.*</source>
+        <translation>.*</translation>
+    </message>
+    <message>
+        <source>Regular expression</source>
+        <translation>Regulární výraz</translation>
+    </message>
+    <message>
+        <source>Previous match (Shift+Enter, Shift+F3)</source>
+        <translation>Předchozí výskyt (Shift+Enter, Shift+F3)</translation>
+    </message>
+    <message>
+        <source>Next match (Enter, F3)</source>
+        <translation>Další výskyt (Enter, F3)</translation>
+    </message>
+    <message>
+        <source>Close (Escape)</source>
+        <translation>Zavřít (Escape)</translation>
+    </message>
+    <message>
+        <source>Replace</source>
+        <translation>Nahradit</translation>
+    </message>
+    <message>
+        <source>Replace All</source>
+        <translation>Nahradit vše</translation>
+    </message>
+    <message>
+        <source>Invalid expression</source>
+        <translation>Neplatný výraz</translation>
+    </message>
+    <message>
+        <source>No results</source>
+        <translation>Nic nenalezeno</translation>
+    </message>
+    <message numerus="yes">
+        <source>%1 of %n match(es)</source>
+        <translation>
+            <numerusform>%1 z %n výskytu</numerusform>
+            <numerusform>%1 z %n výskytů</numerusform>
+            <numerusform>%1 z %n výskytů</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n match(es)</source>
+        <translation>
+            <numerusform>%n výskyt</numerusform>
+            <numerusform>%n výskyty</numerusform>
+            <numerusform>%n výskytů</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n replaced</source>
+        <translation>
+            <numerusform>Nahrazeno: %n</numerusform>
+            <numerusform>Nahrazeno: %n</numerusform>
+            <numerusform>Nahrazeno: %n</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>FretboardWidget</name>
     <message>
         <source>%1: click stages the note (one per string), double-click inserts everything staged. Insert: Ctrl+Return, Clear: Escape.</source>
@@ -525,6 +608,18 @@ Použijte vestavěný.</translation>
     <message>
         <source>Ed&amp;it</source>
         <translation>Úp&amp;ravy</translation>
+    </message>
+    <message>
+        <source>&amp;Find…</source>
+        <translation>&amp;Najít…</translation>
+    </message>
+    <message>
+        <source>Find in the text (Ctrl+F)</source>
+        <translation>Hledat v textu (Ctrl+F)</translation>
+    </message>
+    <message>
+        <source>&amp;Replace…</source>
+        <translation>Na&amp;hradit…</translation>
     </message>
     <message>
         <source>Insert Chord</source>

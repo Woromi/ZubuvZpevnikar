@@ -2,6 +2,30 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en">
 <context>
+    <name>FindBar</name>
+    <message numerus="yes">
+        <source>%1 of %n match(es)</source>
+        <translation>
+            <numerusform>%1 of %n match</numerusform>
+            <numerusform>%1 of %n matches</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n match(es)</source>
+        <translation>
+            <numerusform>%n match</numerusform>
+            <numerusform>%n matches</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n replaced</source>
+        <translation>
+            <numerusform>%n replaced</numerusform>
+            <numerusform>%n replaced</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message numerus="yes">
         <source>%n song(s)</source>

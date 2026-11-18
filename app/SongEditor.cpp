@@ -1,6 +1,7 @@
 #include "SongEditor.hpp"
 
 #include "CodeTextEdit.hpp"
+#include "FindBar.hpp"
 #include "convert.hpp"
 
 #include <KSyntaxHighlighting/Definition>
@@ -95,6 +96,8 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
             return keyAtCursor(cursor, event, plainEdit);
         });
     layout->addWidget(edit_);
+    findBar_ = new FindBar(codeEdit, this);
+    layout->addWidget(findBar_);
 
     const QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     edit_->setFont(font);

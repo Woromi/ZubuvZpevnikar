@@ -20,6 +20,7 @@ class Repository;
 class BookPreview;
 class CodeTextEdit;
 class CollectionTabs;
+class FindBar;
 class QAction;
 class QTabWidget;
 class QCheckBox;
@@ -61,6 +62,9 @@ public:
     bool confirmClose();
     // Lists the books again and reads the selected one (kept where possible) from disk.
     void reloadList();
+    // Ctrl+F / Ctrl+H: opens the find bar of the LaTeX tab when that tab is the current one;
+    // false otherwise.
+    bool showFind(bool replaceMode);
 
 signals:
     // The book check's Open Song: show that song (MainWindow opens it).
@@ -207,6 +211,7 @@ private:
     QPushButton* addSection_ = nullptr;
     QFormLayout* form_ = nullptr;
     CodeTextEdit* latex_ = nullptr;
+    FindBar* latexFind_ = nullptr;
     QPushButton* latexSave_ = nullptr;
     QPushButton* latexRevert_ = nullptr;
     QLabel* latexState_ = nullptr;

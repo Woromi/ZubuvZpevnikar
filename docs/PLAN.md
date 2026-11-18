@@ -222,7 +222,7 @@ Asked by the user 2026-11-11. Qt Linguist translations in `app/i18n/`.
 - Run the linters (`checksongs.py`, `checkkeys.py`) from the app and show the results inline.
 - Transpose a song, and an editor for chord diagrams.
 - Get the Songbook…: `git clone` the ZubuvZpevnik repo into a chosen folder, from the welcome page.
-- Find & replace in the editor (Ctrl+F / Ctrl+H), with a toolbar button.
+- [x] Find & replace in the editor (Ctrl+F / Ctrl+H), with a toolbar button. (`FindBar`, one per text editor: song, score tabs, the Songbooks LaTeX tab; `findmatches` is the pure matching helper.)
 - Packaging (AppImage / Flatpak), then Windows and macOS.
 - The score cursor as the play position (asked by the user 2026-11-16): Play starts from the note the score cursor is at, and the cursor follows the playback as a progress marker.
 - [x] (done 2026-11-18: `zub::songdates` + `SongDatesRunner`, the Added column, "Recently added" in the Show choice and "Only recently added" in the picker) Song dates and a "Recent" filter (idea, 2026-11-17): when a song is added, finding it quickly to put it into a songbook. Not inside the song files. File times are unreliable (a checkout or a pull sets the modification time to that moment; Linux keeps no portable creation time), so the dates would come from git: added = the commit that created the file (`git log --diff-filter=A --format=%aI -- <file>`), edited = its last commit, and uncommitted new or changed files count as "now". Read once per scan (one `git log --name-status` over songs/, not a process per song), shown as columns and a Show choice "Recently added" (e.g. the last 30 days, newest first) in the song list and the Songbooks picker.

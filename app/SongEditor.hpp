@@ -14,6 +14,7 @@ class QKeyEvent;
 #include <zub/core/scoreregion.hpp>
 #include <zub/core/songedit.hpp>
 
+class FindBar;
 class QAction;
 class QFileSystemWatcher;
 class QLabel;
@@ -89,6 +90,8 @@ public:
     // Puts the cursor at `byteOffset` of the editor text (UTF-8, LF line ends) and focuses it (unless `focus` is false).
     void setCursorByteOffset(std::size_t byteOffset, bool focus = true);
     QPlainTextEdit* textEdit() const { return edit_; }
+    // The find & replace bar below the editor (hidden until opened).
+    FindBar* findBar() const { return findBar_; }
 
     // A bar above the editor offering one change ("Measured: ... fits one page of A5." with the
     // change as `detail` and a button): `action` runs on a click of `button`, then the bar
@@ -200,6 +203,7 @@ private:
     std::filesystem::path path_;
     Kind kind_ = Kind::Song;
     QPlainTextEdit* edit_ = nullptr;
+    FindBar* findBar_ = nullptr;
     KSyntaxHighlighting::SyntaxHighlighter* highlighter_ = nullptr;
     QFileSystemWatcher* watcher_ = nullptr;
     std::string diskContent_; // bytes last loaded from or saved to disk

@@ -6,6 +6,7 @@
 #include "CodeTextEdit.hpp"
 #include "CollectionTabs.hpp"
 #include "ConverterRunner.hpp"
+#include "FindBar.hpp"
 #include "MainWindow.hpp"
 #include "PreviewPane.hpp"
 #include "ScorePreviewPane.hpp"
@@ -27,6 +28,7 @@
 #include <QStackedWidget>
 #include <QTabWidget>
 #include <QTimer>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <filesystem>
 #include <zub/core/songsuggest.hpp>
@@ -35,6 +37,15 @@ struct AppTestAccess {
     // ---- CodeTextEdit
     static bool& blinkOn(CodeTextEdit& e) { return e.blinkOn_; }
     static QTimer* blinkTimer(CodeTextEdit& e) { return e.blinkTimer_; }
+
+    // ---- FindBar
+    static QLineEdit* findField(FindBar& b) { return b.find_; }
+    static QLineEdit* replaceField(FindBar& b) { return b.replace_; }
+    static QToolButton* matchCaseButton(FindBar& b) { return b.matchCase_; }
+    static QToolButton* wholeWordButton(FindBar& b) { return b.wholeWord_; }
+    static QToolButton* regexButton(FindBar& b) { return b.regex_; }
+    static QPushButton* replaceButton(FindBar& b) { return b.replaceButton_; }
+    static QPushButton* replaceAllButton(FindBar& b) { return b.replaceAllButton_; }
 
     // ---- MainWindow
     // The songbook without remembering it (the app's settings would otherwise point at it).
@@ -47,6 +58,7 @@ struct AppTestAccess {
     static SongFilterProxy* proxy(MainWindow& w) { return w.proxy_; }
     static SongTableModel* model(MainWindow& w) { return w.model_; }
     static SongEditor* editor(MainWindow& w) { return w.editor_; }
+    static QAction* findAction(MainWindow& w) { return w.findAction_; }
     static QStackedWidget* pages(MainWindow& w) { return w.pages_; }
     static QWidget* songPage(MainWindow& w) { return w.songPage_; }
     static ActivityBar* activityBar(MainWindow& w) { return w.activityBar_; }
@@ -165,6 +177,7 @@ struct AppTestAccess {
     static int& section(SongbooksPage& p) { return p.section_; }
     static QTabWidget* bookTabs(SongbooksPage& p) { return p.bookTabs_; }
     static CodeTextEdit* latex(SongbooksPage& p) { return p.latex_; }
+    static FindBar* latexFind(SongbooksPage& p) { return p.latexFind_; }
     static QWidget* editPane(SongbooksPage& p) { return p.editPane_; }
     static QLabel* warning(SongbooksPage& p) { return p.warning_; }
     static QPushButton* addSectionButton(SongbooksPage& p) { return p.addSection_; }

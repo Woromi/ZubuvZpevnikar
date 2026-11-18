@@ -74,8 +74,14 @@ void CodeTextEdit::markOccurrences() {
     updateExtraSelections();
 }
 
+void CodeTextEdit::setSearchMarks(const QList<QTextEdit::ExtraSelection>& marks) {
+    searchMarks_ = marks;
+    updateExtraSelections();
+}
+
 void CodeTextEdit::updateExtraSelections() {
     QList<QTextEdit::ExtraSelection> all = occurrenceMarks_;
+    all.append(searchMarks_);
     QTextCharFormat format;
     format.setBackground(palette().color(QPalette::Highlight));
     format.setForeground(palette().color(QPalette::HighlightedText));

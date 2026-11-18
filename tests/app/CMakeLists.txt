@@ -10,6 +10,7 @@ add_executable(zub_app_tests
     Support.cpp
     test_resources.cpp
     test_codetextedit.cpp
+    test_find_replace.cpp
     test_songbooks_page.cpp
     test_collections.cpp
     test_song_dates.cpp
