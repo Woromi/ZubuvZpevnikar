@@ -1210,8 +1210,16 @@ Použijte vestavěný.</translation>
         <translation>Foukací harmonika</translation>
     </message>
     <message>
+        <source>Voice</source>
+        <translation>Hlas</translation>
+    </message>
+    <message>
         <source>Chord names</source>
         <translation>Akordy</translation>
+    </message>
+    <message>
+        <source>Melody (lyrics)</source>
+        <translation>Melodie (text)</translation>
     </message>
     <message>
         <source>Instruments…</source>
@@ -3109,6 +3117,14 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>The chord names make no sound</source>
         <translation>Akordy nehrají</translation>
+    </message>
+    <message>
+        <source>The instrument that plays the melody the lyrics follow (the hidden \new Devnull staff; the printed score stays as it is)</source>
+        <translation>Nástroj, který hraje melodii, podle níž jde text (skrytá osnova \new Devnull; vytištěné noty zůstanou, jak jsou)</translation>
+    </message>
+    <message>
+        <source>The melody makes no sound</source>
+        <translation>Melodie nezní</translation>
     </message>
     <message>
         <source>Automatic</source>

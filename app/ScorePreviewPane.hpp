@@ -49,15 +49,18 @@ public:
     // missing ones are "auto". Setting them emits nothing.
     // `chords`: the score's chord names get a row of their own after the staves, silent unless
     // `chordChoice` (an instrument id, "silent") picks an instrument; it has no "Save to file".
+    // `melody`: likewise a row for the hidden melody (`\new Devnull`, the notes the lyrics follow).
     struct StaffInfo {
         QString label;
         QString fileInstrument;
         bool operator==(const StaffInfo&) const = default;
     };
     void setStaves(const QList<StaffInfo>& staves, const QStringList& choices, bool chords = false,
-                   const QString& chordChoice = QStringLiteral("silent"));
+                   const QString& chordChoice = QStringLiteral("silent"), bool melody = false,
+                   const QString& melodyChoice = QStringLiteral("silent"));
     QStringList staffChoices() const; // by staff index
     QString chordChoice() const;      // "silent" without chord names
+    QString melodyChoice() const;     // "silent" without a hidden melody
     QWidget* playButton() const; // for tests
 
     // Where the note that LilyPond linked to `line` (1-based) and `column` (0-based) is drawn, in
@@ -129,7 +132,9 @@ private:
     QVBoxLayout* popupLayout_ = nullptr;
     QHBoxLayout* instrumentSlot_ = nullptr; // the toolbar's place of the single staff's row
     QList<StaffInfo> staves_;
-    bool chords_ = false; // the last row is the chord names'
+    bool chords_ = false; // a row after the staves is the chord names'
+    bool melody_ = false; // the last row is the hidden melody's
+    QString melodyChoice_ = QStringLiteral("silent");
     QStringList staffChoices_;
     QString chordChoice_ = QStringLiteral("silent");
     QList<StaffInstrumentRow*> staffRows_;

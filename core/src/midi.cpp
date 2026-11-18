@@ -168,6 +168,7 @@ const std::vector<Instrument>& instruments() {
         {"whistle", programWhistle, "whistle", false},
         {"flute", 73, "flute", false},
         {"harmonica", 22, "harmonica", false},
+        {"voice", 53, "voice oohs", false},
         {"bass", 33, "electric bass (finger)", false},
     };
     return all;

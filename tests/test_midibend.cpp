@@ -59,7 +59,7 @@ TEST_CASE("smoothBends leaves a file without markers byte for byte", "[midi][ben
 
 TEST_CASE("smoothBends turns a bend into one note that glides up", "[midi][bend]") {
     const auto t = trackOf(smooth(testmidi::build(bendScore(zub::midi::markerBend))));
-    CHECK(noteOns(t) == 2); // the grace note is gone
+    CHECK(noteOns(t) == 2);     // the grace note is gone
     CHECK(count(t, 0xc0) == 2); // and its marker: only the score's own program changes stay
 
     // The RPN setup of the pitch bend range comes first.
@@ -80,7 +80,7 @@ TEST_CASE("smoothBends turns a bend into one note that glides up", "[midi][bend]
         if (e.noteOff() && !off)
             off = &e;
         if (e.status == 0xe0 && e.tick < 384) {
-            CHECK(!off); // all of them while the note sounds
+            CHECK(!off);                       // all of them while the note sounds
             CHECK(semis(e) >= highest - 1e-9); // only upwards
             highest = semis(e);
             lastBend = e.tick;
@@ -201,7 +201,8 @@ TEST_CASE("smoothBends leaves marked chords and wide jumps alone", "[midi][bend]
     CHECK(count(t, 0xe0) == 0);
 }
 
-TEST_CASE("smoothBends reads running status and keeps meta, sysex and the other channels", "[midi][bend]") {
+TEST_CASE("smoothBends reads running status and keeps meta, sysex and the other channels",
+          "[midi][bend]") {
     const std::string midi = testmidi::build({{0, {0xff, 0x51, 3, 0x09, 0x27, 0xc0}},
                                               {0, {0xf0, 2, 0x7d, 0xf7}},
                                               {0, {0x91, 40, 90}},
@@ -276,4 +277,17 @@ TEST_CASE("smoothBends smooths what LilyPond writes for bends, pre-bends and sli
     // Every bend is undone before the end: the last bend of the channel is not above the
     // centre except at a note that is still sounding.
     CHECK(smooth(smooth(raw)) == smooth(raw)); // no marker left: a second pass changes nothing
+}
+
+TEST_CASE("smoothBends folds a note above MIDI's range down by octaves", "[midi][bend]") {
+    // LilyPond writes key 139 (b and beyond) as an out-of-range byte.
+    std::string midi = testmidi::build({{0, {0x90, 61, 90}}, {96, {0x90, 61, 0}}});
+    for (std::size_t i = 0; i + 1 < midi.size(); ++i)
+        if (static_cast<unsigned char>(midi[i]) == 0x90 && midi[i + 1] == 61)
+            midi[i + 1] = static_cast<char>(139);
+    const auto track = trackOf(smooth(midi));
+    REQUIRE(noteOns(track) == 1);
+    for (const auto& e : track)
+        if (e.status == 0x90)
+            CHECK(e.d1 == 127); // 139 - 12, the same note name
 }

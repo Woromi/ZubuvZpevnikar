@@ -250,3 +250,22 @@ TEST_CASE("New Score: asks for the part name and references the file", "[app][sc
         if (tab.editor)
             tab.editor->textEdit()->document()->setModified(false);
 }
+
+TEST_CASE("Instruments: a hidden melody gets a row of its own, silent by default",
+          "[app][score][melody]") {
+    ScoreWindow w("Lyr");
+    QTest::qWait(300); // the staves are read on a timer
+    ScorePreviewPane* pane = A::scorePreview(w.window);
+    REQUIRE(apptest::waitUntil([&] {
+        return !pane->findChildren<QComboBox*>(QStringLiteral("scoreInstrument")).isEmpty();
+    }));
+    const auto combos = pane->findChildren<QComboBox*>(QStringLiteral("scoreInstrument"));
+    REQUIRE(combos.size() == 2); // the staff, the melody
+    CHECK(pane->melodyChoice() == QStringLiteral("silent"));
+    QComboBox* melody = combos.back();
+    CHECK(melody->itemData(0).toString() == QStringLiteral("silent"));
+    const int voice = melody->findData(QStringLiteral("voice"));
+    REQUIRE(voice >= 0);
+    melody->setCurrentIndex(voice);
+    CHECK(pane->melodyChoice() == QStringLiteral("voice"));
+}

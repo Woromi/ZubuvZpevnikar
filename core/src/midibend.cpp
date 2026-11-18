@@ -5,12 +5,12 @@
 #include <cmath>
 #include <cstdlib>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <tuple>
-#include <vector>
-#include <optional>
 #include <utility>
+#include <vector>
 
 namespace zub::midi {
 
@@ -26,6 +26,7 @@ struct Event {
     long order = 0;    // within a tick: idx * 2 for the file's events, between them for ours
     std::string bytes; // the event without its delta time; channel events with their status byte
     bool removed = false;
+    bool folded = false; // a note number above 127 was folded into range: the file changes
     // Channel events:
     int status = 0; // high nibble, 0 for meta and sysex
     int channel = 0;
@@ -114,6 +115,13 @@ std::expected<std::vector<Event>, std::string> parseTrack(std::string_view body)
             e.channel = status & 0x0f;
             e.data1 = byteAt(first);
             e.data2 = count == 2 ? static_cast<int>(byteAt(first + 1)) : 0;
+            // A note above MIDI's range (LilyPond writes key 139 for a melody that climbs too
+            // high, e.g. a \relative dummy melody): folded down by octaves, the same note name.
+            if ((kind == 0x8 || kind == 0x9 || kind == 0xa) && e.data1 > 127 && e.data1 < 256)
+                while (e.data1 > 127) {
+                    e.data1 -= 12;
+                    e.folded = true;
+                }
             if (e.data1 > 127 || e.data2 > 127)
                 return std::unexpected("MIDI data byte out of range");
             e.bytes.push_back(static_cast<char>(status));
@@ -471,6 +479,8 @@ std::expected<std::string, std::string> smoothBends(std::string_view midi) {
     const Tick ticksPerStep = std::max<Tick>(1, std::llround(ticksPer10ms));
 
     bool changed = false;
+    for (const auto& track : tracks)
+        changed = changed || std::ranges::any_of(track, [](const Event& e) { return e.folded; });
     for (auto& track : tracks)
         changed = processTrack(track, ticksPerStep) || changed;
     if (!changed)

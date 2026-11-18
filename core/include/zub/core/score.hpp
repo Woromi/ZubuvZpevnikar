@@ -35,6 +35,11 @@ struct MidiOptions {
     // id; "", "silent" and unknown ids keep them silent (LilyPond would play them). "amp" plays
     // them in the amp's book like an amp staff.
     std::string chordInstrument;
+    // The instrument of the hidden melody (`\new Devnull`: the notes the lyrics follow, printed
+    // nowhere) as a zub::midi::Instrument id; "", "silent" and unknown ids keep it silent. It
+    // plays as a staff of its own in the MIDI copy only (the printed score is unchanged); "amp"
+    // in the amp's book like an amp staff.
+    std::string melodyInstrument;
     // Which staves sound; prepare sets it (a muted staff gets `\remove "Staff_performer"`).
     enum class Sounding { All, AmpOnly, WithoutAmp };
     Sounding sounding = Sounding::All;
@@ -151,6 +156,9 @@ std::optional<std::string> midiScore(std::string_view text, const MidiOptions& o
 // Does the first \score block have chord names (`\new ChordNames`, `\chords`)? Comments and
 // strings don't count.
 bool hasChordNames(std::string_view text);
+// Does the first \score block have a hidden melody (`\new Devnull`, the notes its lyrics
+// follow)? Comments and strings don't count.
+bool hasHiddenMelody(std::string_view text);
 
 inline constexpr std::size_t noPosition = static_cast<std::size_t>(-1);
 

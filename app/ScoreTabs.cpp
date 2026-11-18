@@ -205,6 +205,7 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
                 scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)].name;
             staffChoices_[name] = scorePreview_->staffChoices();
             chordChoices_[name] = scorePreview_->chordChoice();
+            melodyChoices_[name] = scorePreview_->melodyChoice();
         }
         scoreRunner_->cancel(); // a build under way has the old instrument
         forgetScoreMidi(); // the old MIDI file has the old instrument: no Play until the rebuild
@@ -923,6 +924,7 @@ void ScoreTabs::requestScorePreview(bool userAsked) {
     for (const QString& id : scorePreview_->staffChoices())
         midi.staffInstruments.push_back(toStdString(id));
     midi.chordInstrument = toStdString(scorePreview_->chordChoice());
+    midi.melodyInstrument = toStdString(scorePreview_->melodyChoice());
     if (const auto meta = zub::parseSong(song_->content())) {
         midi.tempo = zub::score::songTempo(meta->value("tem"));
         midi.transpose = zub::score::songCapo(meta->value("cap")); // sounds as with the capo on
@@ -959,9 +961,12 @@ void ScoreTabs::showStaves(SongEditor* editor, const std::string& name) {
         choices.removeLast();
     staffChoices_[name] = choices;
     const auto chordChoice = chordChoices_.find(name);
-    scorePreview_->setStaves(infos, choices, zub::score::hasChordNames(text),
-                             chordChoice != chordChoices_.end() ? chordChoice->second
-                                                                : QStringLiteral("silent"));
+    const auto melodyChoice = melodyChoices_.find(name);
+    scorePreview_->setStaves(
+        infos, choices, zub::score::hasChordNames(text),
+        chordChoice != chordChoices_.end() ? chordChoice->second : QStringLiteral("silent"),
+        zub::score::hasHiddenMelody(text),
+        melodyChoice != melodyChoices_.end() ? melodyChoice->second : QStringLiteral("silent"));
 }
 
 // "Save to file" of a staff: writes the chosen General MIDI instrument into the score as one edit.

@@ -97,6 +97,11 @@ std::expected<Command, std::string> prepare(const Request& request) {
             ++staffCount;
             ampStaves += chords->amp ? 1 : 0;
         }
+        if (const auto* melody = midi::findInstrument(options.melodyInstrument);
+            melody && hasHiddenMelody(content)) {
+            ++staffCount;
+            ampStaves += melody->amp ? 1 : 0;
+        }
         const bool mixed = ampStaves > 0 && ampStaves < staffCount;
         allAmp = ampStaves > 0 && ampStaves == staffCount;
         options.sounding = mixed ? MidiOptions::Sounding::WithoutAmp : MidiOptions::Sounding::All;

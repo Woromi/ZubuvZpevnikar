@@ -81,9 +81,8 @@ TEST_CASE("scoreMusic is the first score without its layout, header and midi", "
 }
 
 TEST_CASE("scoreMusic skips comments, strings and Scheme before the score", "[score][midi]") {
-    const std::string text =
-        "% \\score { c }\n%{ \\score { d } %}\n#(define x \"\\\\score {\")\n"
-        "text = \"\\\\score { e }\"\n\\score { { f4 } }\n\\score { { g4 } }\n";
+    const std::string text = "% \\score { c }\n%{ \\score { d } %}\n#(define x \"\\\\score {\")\n"
+                             "text = \"\\\\score { e }\"\n\\score { { f4 } }\n\\score { { g4 } }\n";
     const auto music = sc::scoreMusic(text);
     REQUIRE(music);
     CHECK(*music == " { f4 } ");
@@ -110,9 +109,11 @@ TEST_CASE("scoreMusic keeps layout blocks that are inside the music", "[score][m
 TEST_CASE("scaleTempo scales every form of \\tempo", "[score][midi]") {
     CHECK(sc::scaleTempo("\\tempo 4 = 100 c4", 0.5) == "\\tempo 4 = 50 c4");
     CHECK(sc::scaleTempo("\\tempo 4. = 60 c4", 1.25) == "\\tempo 4. = 75 c4");
-    CHECK(sc::scaleTempo("\\tempo \"Allegro\" 4 = 120 c4", 0.75) == "\\tempo \"Allegro\" 4 = 90 c4");
+    CHECK(sc::scaleTempo("\\tempo \"Allegro\" 4 = 120 c4", 0.75) ==
+          "\\tempo \"Allegro\" 4 = 90 c4");
     CHECK(sc::scaleTempo("\\tempo 4 = 100-120 c4", 0.5) == "\\tempo 4 = 50-60 c4");
-    CHECK(sc::scaleTempo("\\tempo 2=80 c4 \\tempo 8 = 200", 0.5) == "\\tempo 2=40 c4 \\tempo 8 = 100");
+    CHECK(sc::scaleTempo("\\tempo 2=80 c4 \\tempo 8 = 200", 0.5) ==
+          "\\tempo 2=40 c4 \\tempo 8 = 100");
     CHECK(sc::scaleTempo("\\tempo 4 = 1", 0.1) == "\\tempo 4 = 1"); // never below 1
     // Nothing to scale.
     CHECK(sc::scaleTempo("\\tempo \"Allegro\" c4", 0.5) == "\\tempo \"Allegro\" c4");
@@ -156,7 +157,8 @@ TEST_CASE("midiScore is a score that unfolds repeats and plays", "[score][midi]"
     CHECK(contains(*score, "\\tempo 4 = 75\n")); // 100 * 0.75
     CHECK(contains(*score, "\\context { \\ChordNames \\remove \"Staff_performer\" }"));
     CHECK(contains(*score, "\\context { \\Staff midiInstrument = \"acoustic guitar (steel)\" }"));
-    CHECK(contains(*score, "\\context { \\TabStaff midiInstrument = \"acoustic guitar (steel)\" }"));
+    CHECK(
+        contains(*score, "\\context { \\TabStaff midiInstrument = \"acoustic guitar (steel)\" }"));
     CHECK(contains(*score, "\\repeat volta 2 { a,16\\5"));
     CHECK_FALSE(contains(*score, "\\layout"));
     CHECK_FALSE(contains(*score, "\\header"));
@@ -190,7 +192,8 @@ TEST_CASE("songCapo reads the cap header", "[score][midi]") {
     CHECK(sc::songCapo("{2.5}") == 0);
 }
 
-TEST_CASE("midiScore scales the score's tempi and the factor sets the midi tempo", "[score][midi]") {
+TEST_CASE("midiScore scales the score's tempi and the factor sets the midi tempo",
+          "[score][midi]") {
     auto o = options();
     o.factor = 0.5;
     const auto score = sc::midiScore("melody = { c4 }\n\\score { \\tempo 4 = 80 \\melody }\n", o);
@@ -287,7 +290,8 @@ TEST_CASE("markBends marks the targets of bends, pre-bends, releases and slides"
     // The music itself is unchanged.
     std::string without = marked;
     for (const char* name : {"gunshot", "helicopter", "applause", "telephone ring", "seashore"})
-        for (auto at = without.find(set(name)); at != std::string::npos; at = without.find(set(name)))
+        for (auto at = without.find(set(name)); at != std::string::npos;
+             at = without.find(set(name)))
             without.erase(at, set(name).size());
     CHECK(without == music);
 }
@@ -365,10 +369,12 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
         sc::MidiOptions midi;
         midi.tempo = tempoOf.contains(name) ? tempoOf[name] : 100;
         midi.instrument = sc::midiInstrument(*content);
+        midi.melodyInstrument = "voice"; // a hidden melody must build as a sounding staff too
         request.midi = midi;
         const auto cmd = sc::prepare(request);
         REQUIRE(cmd);
-        std::string line = "cd '" + cmd->workingDirectory.string() + "' && LC_ALL=C " + cmd->program;
+        std::string line =
+            "cd '" + cmd->workingDirectory.string() + "' && LC_ALL=C " + cmd->program;
         for (const auto& a : cmd->arguments)
             line += " '" + a + "'";
         line += " >'" + (dir.path / "log").string() + "' 2>&1";
@@ -399,7 +405,8 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
                 int markers = 0;
                 for (const auto& e : raw[t]) {
                     before += e.noteOn() ? 1 : 0;
-                    markers += e.status == 0xc0 && e.d1 >= 122 && e.d1 != 123 && e.d1 <= 127 ? 1 : 0;
+                    markers +=
+                        e.status == 0xc0 && e.d1 >= 122 && e.d1 != 123 && e.d1 <= 127 ? 1 : 0;
                 }
                 for (const auto& e : after[t]) {
                     now += e.noteOn() ? 1 : 0;
@@ -414,6 +421,29 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
     }
     CHECK(count > 0);
 #endif
+}
+
+TEST_CASE("a hidden melody sounds only with an instrument of its own", "[score][midi]") {
+    const std::string text = "\\score {\n  <<\n    \\new Staff { c'4 }\n"
+                             "    % \\new Devnull in a comment\n"
+                             "    \\new Devnull = \"vocal\" { \\nullMelody }\n"
+                             "    \\new Lyrics \\lyricsto \"vocal\" { \\text }\n  >>\n}\n";
+    CHECK(sc::hasHiddenMelody(text));
+    CHECK_FALSE(sc::hasHiddenMelody("\\score { \\new Staff { c'4 } % \\new Devnull\n}"));
+    sc::MidiOptions options;
+    options.tempo = 100;
+    options.instrument = "acoustic grand";
+    const auto silent = sc::midiScore(text, options);
+    REQUIRE(silent);
+    CHECK(silent->find("\\new Devnull = \"vocal\"") != std::string::npos);
+    options.melodyInstrument = "voice";
+    const auto sung = sc::midiScore(text, options);
+    REQUIRE(sung);
+    CHECK(sung->find("\\new Staff \\with { midiInstrument = \"voice oohs\" } \\new Voice = "
+                     "\"vocal\" { \\nullMelody }") != std::string::npos);
+    CHECK(sung->find("% \\new Devnull in a comment") != std::string::npos);
+    // The printed score is the file itself: only the MIDI copy changes.
+    CHECK(zub::midi::findInstrument("voice")->program == 53);
 }
 
 TEST_CASE("errors in the appended playback score are dropped", "[score][midi]") {

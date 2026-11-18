@@ -612,6 +612,64 @@ std::string markBends(std::string_view music) {
     return out;
 }
 
+namespace {
+
+// The type of the context a `\new` at `wordEnd` makes: [typeBegin, typeEnd).
+std::pair<std::size_t, std::size_t> newType(std::string_view music, std::size_t wordEnd) {
+    const std::size_t typeBegin = skipSpace(music, wordEnd);
+    std::size_t typeEnd = typeBegin;
+    while (typeEnd < music.size() && isLetter(music[typeEnd]))
+        ++typeEnd;
+    return {typeBegin, typeEnd};
+}
+
+// `\new Devnull = "vocal" {...}` (a melody that times the lyrics and makes no sound) as a staff of
+// its own sounding `midiName`: `\new Staff \with { midiInstrument = "..." } \new Voice = "vocal"
+// {...}` (the Voice keeps the name \lyricsto looks for).
+std::string soundHiddenMelody(std::string_view music, std::string_view midiName) {
+    std::string out;
+    std::size_t copied = 0;
+    walk(
+        music, 0,
+        [&](std::size_t, std::size_t wordEnd, std::string_view word) {
+            if (word != "new")
+                return proceed;
+            const auto [typeBegin, typeEnd] = newType(music, wordEnd);
+            if (music.substr(typeBegin, typeEnd - typeBegin) != "Devnull")
+                return proceed;
+            out.append(music.substr(copied, typeBegin - copied));
+            out += "Staff \\with { midiInstrument = \"" + std::string(midiName) +
+                   "\" } \\new Voice";
+            copied = typeEnd;
+            return typeEnd;
+        },
+        [](std::size_t, char) { return true; });
+    out.append(music.substr(copied));
+    return out;
+}
+
+} // namespace
+
+bool hasHiddenMelody(std::string_view text) {
+    const auto block = firstScore(text);
+    if (!block)
+        return false;
+    const std::size_t from = block->open + 1;
+    const std::string_view music = text.substr(from, block->end - 1 - from);
+    bool found = false;
+    walk(
+        music, 0,
+        [&](std::size_t, std::size_t wordEnd, std::string_view word) {
+            if (word == "new") {
+                const auto [typeBegin, typeEnd] = newType(music, wordEnd);
+                found = music.substr(typeBegin, typeEnd - typeBegin) == "Devnull";
+            }
+            return found ? stop : proceed;
+        },
+        [](std::size_t, char) { return true; });
+    return found;
+}
+
 bool hasChordNames(std::string_view text) {
     const auto block = firstScore(text);
     if (!block)
@@ -730,9 +788,17 @@ std::optional<std::string> midiScore(std::string_view text, const MidiOptions& o
     const long beats =
         std::max(1L, std::lround(static_cast<double>(options.tempo) * options.factor));
 
-    std::string played = "\\unfoldRepeats {\n" +
-                         markBends(applyStaffChoices(scaleTempo(*music, options.factor), options)) +
-                         "\n  }";
+    using Sounding = MidiOptions::Sounding;
+    // The hidden melody sounds only with an instrument of its own, in the book of its group.
+    const auto* melody = midi::findInstrument(options.melodyInstrument);
+    if (melody && ((options.sounding == Sounding::AmpOnly && !melody->amp) ||
+                   (options.sounding == Sounding::WithoutAmp && melody->amp)))
+        melody = nullptr;
+    std::string staffMusic =
+        markBends(applyStaffChoices(scaleTempo(*music, options.factor), options));
+    if (melody)
+        staffMusic = soundHiddenMelody(staffMusic, melody->name);
+    std::string played = "\\unfoldRepeats {\n" + staffMusic + "\n  }";
     if (options.transpose > 0 && options.transpose <= 12)
         // c' up to the capo's pitch, in the note names of the score's language. The names assume
         // the wrapper's \language (zub::score::prepare); no real score sets its own.
@@ -740,7 +806,6 @@ std::optional<std::string> midiScore(std::string_view text, const MidiOptions& o
                  fretboard::pitchName(60 + options.transpose, options.germanNames, false) +
                  " {\n  " + played + "\n  }";
     // The chord names sound only with an instrument of their own, in the book of their group.
-    using Sounding = MidiOptions::Sounding;
     const auto* chords = midi::findInstrument(options.chordInstrument);
     if (chords && ((options.sounding == Sounding::AmpOnly && !chords->amp) ||
                    (options.sounding == Sounding::WithoutAmp && chords->amp)))
