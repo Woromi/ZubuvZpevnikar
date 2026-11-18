@@ -6,7 +6,10 @@
 #include "convert.hpp"
 
 #include <QCollator>
+#include <QLocale>
 #include <algorithm>
+#include <chrono>
+#include <limits>
 #include <set>
 #include <zub/core/latex.hpp>
 #include <zub/core/songtags.hpp>
@@ -71,20 +74,61 @@ SongTableModel::Row SongTableModel::makeRow(zub::SongEntry entry) {
     return row;
 }
 
+namespace {
+constexpr std::chrono::days kRecentWithin{30};
+}
+
+void SongTableModel::setDatesOf(Row& row, const zub::songdates::Dates& dates) {
+    row.dates = dates;
+    row.recent = zub::songdates::isRecent(
+        dates, std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()),
+        kRecentWithin);
+}
+
 void SongTableModel::setSongs(std::vector<zub::SongEntry> songs) {
+    const bool hadDates = hasDates_;
+    hasDates_ = false;
     beginResetModel();
     rows_.clear();
     rows_.reserve(songs.size());
     for (auto& entry : songs)
         rows_.push_back(makeRow(std::move(entry)));
     endResetModel();
+    if (hadDates)
+        emit datesChanged();
 }
 
 void SongTableModel::addSong(zub::SongEntry song) {
     const int row = static_cast<int>(rows_.size());
     beginInsertRows({}, row, row);
     rows_.push_back(makeRow(std::move(song)));
+    zub::songdates::Dates fresh;
+    fresh.uncommitted = true;
+    setDatesOf(rows_.back(), fresh);
     endInsertRows();
+}
+
+void SongTableModel::setDates(const std::filesystem::path& root,
+                              const std::map<std::string, zub::songdates::Dates>& dates) {
+    for (Row& row : rows_) {
+        const auto it = dates.find(row.entry.path.lexically_relative(root).generic_string());
+        setDatesOf(row, it == dates.end() ? zub::songdates::Dates{} : it->second);
+    }
+    hasDates_ = true;
+    if (!rows_.empty())
+        emit dataChanged(index(0, 0), index(rowCount() - 1, ColumnCount - 1));
+    emit datesChanged();
+}
+
+void SongTableModel::clearDates() {
+    const bool had = hasDates_;
+    hasDates_ = false;
+    for (Row& row : rows_)
+        setDatesOf(row, {});
+    if (!rows_.empty())
+        emit dataChanged(index(0, 0), index(rowCount() - 1, ColumnCount - 1));
+    if (had)
+        emit datesChanged();
 }
 
 bool SongTableModel::updateSong(const std::filesystem::path& path, zub::SongMetadata meta,
@@ -97,7 +141,11 @@ bool SongTableModel::updateSong(const std::filesystem::path& path, zub::SongMeta
     entry.meta = std::move(meta);
     entry.todos = std::move(todos);
     entry.scores = std::move(scores);
+    const auto dates = it->dates; // kept: they come from git, not from the text
+    const bool recent = it->recent;
     *it = makeRow(std::move(entry));
+    it->dates = dates;
+    it->recent = recent;
     const int row = static_cast<int>(it - rows_.begin());
     emit dataChanged(index(row, 0), index(row, ColumnCount - 1));
     return true;
@@ -191,6 +239,12 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
             return row.todo;
         case Changes:
             return row.changes;
+        case Added:
+            if (row.dates.added)
+                return QLocale().toString(toDateTime(*row.dates.added).date(),
+                                          QLocale::ShortFormat);
+            return row.dates.uncommitted ? tr("new", "a song not committed to git yet")
+                                         : QString();
         default:
             return {};
         }
@@ -209,6 +263,20 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
             return row.changesToolTip;
         if (index.column() == Tabs && !row.tabsToolTip.isEmpty())
             return row.tabsToolTip;
+        if (index.column() == Added) {
+            QStringList lines;
+            if (row.dates.added)
+                lines << tr("Added: %1").arg(QLocale().toString(toDateTime(*row.dates.added),
+                                                                QLocale::ShortFormat));
+            else if (row.dates.uncommitted)
+                lines << tr("Not committed to git yet");
+            if (row.dates.edited)
+                lines << tr("Last changed: %1")
+                             .arg(QLocale().toString(toDateTime(*row.dates.edited),
+                                                     QLocale::ShortFormat));
+            if (!lines.isEmpty())
+                return lines.join(QLatin1Char('\n'));
+        }
         if (index.column() == Favourite)
             return row.favourite ? tr("A favourite: click to unmark it")
                                  : tr("Click to mark it as a favourite");
@@ -231,7 +299,16 @@ QVariant SongTableModel::data(const QModelIndex& index, int role) const {
             return row.changeCount;
         if (index.column() == Tabs)
             return static_cast<int>(row.entry.scores.size());
+        // New and not committed: newest; unknown: oldest.
+        if (index.column() == Added)
+            return row.dates.added ? static_cast<qlonglong>(row.dates.added->time_since_epoch().count())
+                   : row.dates.uncommitted ? std::numeric_limits<qlonglong>::max()
+                                           : qlonglong{-1};
         return data(index, Qt::DisplayRole);
+    case AddedRole:
+        return row.dates.added ? QVariant(toDateTime(*row.dates.added)) : QVariant(QDateTime());
+    case RecentRole:
+        return row.recent;
     case HasChangesRole:
         return !row.changes.isEmpty();
     case HasTabsRole:
@@ -285,6 +362,8 @@ QVariant SongTableModel::headerData(int section, Qt::Orientation orientation, in
         return tr("TODO");
     case Changes:
         return tr("Possible changes");
+    case Added:
+        return tr("Added");
     default:
         return {};
     }

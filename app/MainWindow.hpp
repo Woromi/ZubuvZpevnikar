@@ -45,6 +45,7 @@ class PreviewRunner;
 class SongEditor;
 class SongbookExporter;
 class SongbookCheck;
+class SongDatesRunner;
 class SongbookSorter;
 class SongbooksPage;
 class WelcomePage;
@@ -207,6 +208,7 @@ private:
     QTimer* favouriteTimer_ = nullptr;     // syncs the ★ with the editor text after typing
     QAction* markCheckedAction_ = nullptr; // removes the import's "not checked yet" TODO line
     SongbookCheck* songbookCheck_ = nullptr; // Songs → Check Songs…
+    SongDatesRunner* songDates_ = nullptr;   // when the songs were added (git), for the Recent filter
     QAction* changesAction_ = nullptr;
     SongEditor* editor_ = nullptr;      // the open song, if any
     QLabel* inputLabel_ = nullptr;

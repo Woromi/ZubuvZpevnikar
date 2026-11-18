@@ -12,6 +12,7 @@ add_executable(zub_app_tests
     test_codetextedit.cpp
     test_songbooks_page.cpp
     test_collections.cpp
+    test_song_dates.cpp
     test_new_song.cpp
     test_main_window.cpp
     test_song_editor.cpp

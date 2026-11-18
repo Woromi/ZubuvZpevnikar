@@ -44,8 +44,9 @@ signals:
     void contextMenuRequested(const QPoint& viewportPosition); // of the table
 
 private:
-    enum Show { All, Favourites, Tabs, Todo, Changes };
+    enum Show { All, Favourites, Tabs, Todo, Recent, Changes };
     void applyShow();
+    void updateRecentChoice(); // enabled while the model knows the dates
 
     SongTableModel* model_;
     SongFilterProxy* proxy_;
@@ -56,4 +57,7 @@ private:
     LabelFilterBox* labelFilter_ = nullptr;
     QComboBox* show_ = nullptr;
     QTableView* table_ = nullptr;
+    bool recentShown_ = false;                    // the Recently added view is on
+    int sortColumnBefore_ = 0;                    // the sort to restore when it goes off
+    Qt::SortOrder sortOrderBefore_ = Qt::AscendingOrder;
 };

@@ -441,8 +441,14 @@ QWidget* SongbooksPage::buildPickerPane() {
     filters->addWidget(language_);
     favouritesOnly_ = new QCheckBox(tr("Only favourites"), pickerPane_);
     favouritesOnly_->setToolTip(tr("Songs marked with ★"));
+    recentOnly_ = new QCheckBox(tr("Only recently added"), pickerPane_);
+    recentOnly_->setObjectName(QStringLiteral("pickerRecentOnly"));
+    recentOnly_->setToolTip(tr("Songs added in the last 30 days or not committed yet (the dates "
+                               "come from git)"));
+    recentOnly_->setEnabled(model_->hasDates());
     labelFilter_ = new LabelFilterBox(model_, pickerPane_);
     filters->addWidget(favouritesOnly_);
+    filters->addWidget(recentOnly_);
     filters->addWidget(labelFilter_);
     layout->addLayout(filters);
     layout->addWidget(onlyInSection_);
@@ -470,7 +476,8 @@ QWidget* SongbooksPage::buildPickerPane() {
     pickerView_->verticalHeader()->hide();
     for (const int column :
          {SongTableModel::Tempo, SongTableModel::Meter, SongTableModel::Capo, SongTableModel::Tabs,
-          SongTableModel::Labels, SongTableModel::Todo, SongTableModel::Changes})
+          SongTableModel::Labels, SongTableModel::Todo, SongTableModel::Changes,
+          SongTableModel::Added})
         pickerView_->setColumnHidden(column, true);
     pickerView_->horizontalHeader()->setSectionResizeMode(SongTableModel::Title,
                                                           QHeaderView::Stretch);
@@ -483,6 +490,9 @@ QWidget* SongbooksPage::buildPickerPane() {
             [this] { pickerFilter_->setLanguage(language_->currentData().toString()); });
     connect(favouritesOnly_, &QCheckBox::toggled, pickerFilter_,
             &SongFilterProxy::setFavouritesOnly);
+    connect(recentOnly_, &QCheckBox::toggled, pickerFilter_, &SongFilterProxy::setRecentOnly);
+    connect(model_, &SongTableModel::datesChanged, recentOnly_,
+            [this] { recentOnly_->setEnabled(model_->hasDates()); });
     connect(labelFilter_, &LabelFilterBox::labelChanged, pickerFilter_, &SongFilterProxy::setLabel);
     connect(onlyInSection_, &QCheckBox::toggled, this, [this] { updatePicker(); });
     connect(pickerView_, &QTableView::clicked, this, &SongbooksPage::onPickerClicked);

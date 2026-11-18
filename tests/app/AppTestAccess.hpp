@@ -146,7 +146,11 @@ struct AppTestAccess {
     static CollectionTabs* collections(SongListPage& p) { return p.collections_; }
     static QComboBox* language(SongListPage& p) { return p.language_; }
 
+    static QComboBox* show(SongListPage& p) { return p.show_; }
+
     // ---- SongbooksPage
+    static SongFilterProxy* pickerFilter(SongbooksPage& p) { return p.pickerFilter_; }
+    static QCheckBox* recentOnly(SongbooksPage& p) { return p.recentOnly_; }
     static QTreeWidget* list(SongbooksPage& p) { return p.list_; }
     static QTreeWidgetItem* listItemOf(SongbooksPage& p, const QString& id) {
         return p.listItemOf(id);

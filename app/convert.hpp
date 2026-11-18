@@ -3,7 +3,9 @@
 // The only place where std types and Qt types are converted (see CLAUDE.md).
 
 #include <QByteArrayView>
+#include <QDateTime>
 #include <QString>
+#include <chrono>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -27,4 +29,8 @@ inline std::string toStdString(const QString& text) {
 
 inline std::filesystem::path toPath(const QString& path) {
     return std::filesystem::path{path.toStdU16String()};
+}
+
+inline QDateTime toDateTime(std::chrono::sys_seconds time) {
+    return QDateTime::fromSecsSinceEpoch(static_cast<qint64>(time.time_since_epoch().count()));
 }

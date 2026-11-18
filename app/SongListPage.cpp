@@ -13,6 +13,7 @@
 #include <QLabel>
 #include <QLayout>
 #include <QLineEdit>
+#include <QStandardItemModel>
 #include <QTableView>
 #include <QToolBar>
 #include <QVBoxLayout>
@@ -58,7 +59,13 @@ SongListPage::SongListPage(SongTableModel* model, SongFilterProxy* proxy, QWidge
     show_->addItem(tr("With TODOs"), Show::Todo);
     show_->setItemData(3, tr("Songs with a TODO comment, e.g. imported songs not checked yet"),
                        Qt::ToolTipRole);
+    show_->addItem(tr("Recently added"), Show::Recent);
+    show_->setItemData(4,
+                       tr("Songs added in the last 30 days or not committed yet (the dates come "
+                          "from git)"),
+                       Qt::ToolTipRole);
     connect(show_, &QComboBox::currentIndexChanged, this, &SongListPage::applyShow);
+    connect(model_, &SongTableModel::datesChanged, this, &SongListPage::updateRecentChoice);
     filters->addWidget(show_);
     filters->layout()->setSpacing(8);
     filters->setContentsMargins(6, 4, 6, 4);
@@ -80,6 +87,7 @@ SongListPage::SongListPage(SongTableModel* model, SongFilterProxy* proxy, QWidge
     columns->setSectionResizeMode(SongTableModel::Tabs, QHeaderView::ResizeToContents);
     columns->setMinimumSectionSize(28);                     // the ★ and Tabs columns stay narrow
     table_->setColumnHidden(SongTableModel::Changes, true); // until Check Songs
+    table_->setColumnHidden(SongTableModel::Added, true);   // until Recently added
     // Click the ★ to toggle the favourite; right-click for the labels.
     connect(table_, &QAbstractItemView::clicked, this, [this](const QModelIndex& index) {
         if (index.column() != SongTableModel::Favourite)
@@ -106,6 +114,7 @@ SongListPage::SongListPage(SongTableModel* model, SongFilterProxy* proxy, QWidge
     layout->addWidget(filters);
     layout->addWidget(table_);
     updateLanguages();
+    updateRecentChoice();
 }
 
 void SongListPage::setCollections(const std::vector<std::string>& collections) {
@@ -168,8 +177,31 @@ void SongListPage::selectSong(const std::filesystem::path& path) {
     table_->setFocus();
 }
 
+void SongListPage::updateRecentChoice() {
+    auto* items = qobject_cast<QStandardItemModel*>(show_->model());
+    const int index = show_->findData(Show::Recent);
+    if (!items || index < 0)
+        return;
+    items->item(index)->setEnabled(model_->hasDates());
+}
+
 void SongListPage::applyShow() {
     const int show = show_->currentData().toInt();
+    const bool recent = show == Show::Recent;
+    if (recent != recentShown_) {
+        QHeaderView* header = table_->horizontalHeader();
+        if (recent) { // newest first; the sort the user had comes back afterwards
+            sortColumnBefore_ = header->sortIndicatorSection();
+            sortOrderBefore_ = header->sortIndicatorOrder();
+            table_->setColumnHidden(SongTableModel::Added, false);
+            table_->sortByColumn(SongTableModel::Added, Qt::DescendingOrder);
+        } else {
+            table_->setColumnHidden(SongTableModel::Added, true);
+            table_->sortByColumn(sortColumnBefore_, sortOrderBefore_);
+        }
+        recentShown_ = recent;
+    }
+    proxy_->setRecentOnly(recent);
     proxy_->setFavouritesOnly(show == Show::Favourites);
     proxy_->setTabsOnly(show == Show::Tabs);
     proxy_->setTodoOnly(show == Show::Todo);

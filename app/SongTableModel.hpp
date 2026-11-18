@@ -1,10 +1,14 @@
 #pragma once
 
 #include <QAbstractTableModel>
+#include <QDateTime>
 #include <QString>
 #include <filesystem>
+#include <map>
+#include <string>
 #include <vector>
 #include <zub/core/library.hpp>
+#include <zub/core/songdates.hpp>
 
 // Table of the songs of a zub::Library: one row per song, display text already converted
 // from TeX.
@@ -25,6 +29,7 @@ public:
         Labels, // the tags except "fav"
         Todo,
         Changes,
+        Added, // when the song was added (git); last, so no other column moves
         ColumnCount
     };
     enum Role {
@@ -38,6 +43,8 @@ public:
         LabelsRole,                  // QStringList: the tags except "fav"
         HasTabsRole,                 // bool: the song includes a score
         CollectionRole,              // QString: the folder under songs/ ("chords", "tinwhistle")
+        AddedRole,  // QDateTime of the commit that added the song; invalid when unknown or new
+        RecentRole, // bool: added in the last 30 days, or new and not committed yet
     };
 
     explicit SongTableModel(QObject* parent = nullptr);
@@ -58,8 +65,15 @@ public:
     void clearScanResults();
     // Every label (tag except "fav") of any song, sorted for the current locale.
     QStringList labels() const;
-    // Adds a song (e.g. a newly imported one after its first save).
+    // Adds a song (e.g. a newly imported one after its first save): it counts as new and not
+    // committed.
     void addSong(zub::SongEntry song);
+    // The git dates by path relative to `root` ('/'); songs the map lacks stay unknown. Gives
+    // hasDates() = true (also after an empty map: git answered) and refilters.
+    void setDates(const std::filesystem::path& root, const std::map<std::string, zub::songdates::Dates>& dates);
+    // Without dates (no git, not a repository, or until they are read). setSongs does this.
+    void clearDates();
+    bool hasDates() const { return hasDates_; }
 
     int rowCount(const QModelIndex& parent = {}) const override;
     int columnCount(const QModelIndex& parent = {}) const override;
@@ -70,6 +84,9 @@ public:
     // Lower-cases, removes diacritics and spells ♭/♯ as b/#, so "uz" matches "Už" and
     // "eb" matches "E♭".
     static QString foldForSearch(const QString& text);
+
+signals:
+    void datesChanged(); // hasDates() or the dates changed
 
 private:
     struct Row {
@@ -83,7 +100,11 @@ private:
         QStringList languages;           // every language of lang={...}, the song's own first
         QString languagesText;           // the same, joined for the column
         int changeCount = 0;             // the items listed in changesToolTip
+        zub::songdates::Dates dates;
+        bool recent = false;
     };
     static Row makeRow(zub::SongEntry entry);
+    static void setDatesOf(Row& row, const zub::songdates::Dates& dates);
     std::vector<Row> rows_;
+    bool hasDates_ = false;
 };

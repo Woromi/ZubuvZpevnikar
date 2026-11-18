@@ -2072,6 +2072,14 @@ Použijte vestavěný.</translation>
         <translation>Písně s komentářem TODO, např. dosud nezkontrolované importované písně</translation>
     </message>
     <message>
+        <source>Recently added</source>
+        <translation>Nedávno přidané</translation>
+    </message>
+    <message>
+        <source>Songs added in the last 30 days or not committed yet (the dates come from git)</source>
+        <translation>Písně přidané za posledních 30 dní nebo ještě nezapsané do gitu (data jsou z gitu)</translation>
+    </message>
+    <message>
         <source>All languages</source>
         <translation>Všechny jazyky</translation>
     </message>
@@ -2093,6 +2101,23 @@ Použijte vestavěný.</translation>
 </context>
 <context>
     <name>SongTableModel</name>
+    <message>
+        <source>new</source>
+        <comment>a song not committed to git yet</comment>
+        <translation>nová</translation>
+    </message>
+    <message>
+        <source>Added: %1</source>
+        <translation>Přidáno: %1</translation>
+    </message>
+    <message>
+        <source>Not committed to git yet</source>
+        <translation>Ještě nezapsáno do gitu</translation>
+    </message>
+    <message>
+        <source>Last changed: %1</source>
+        <translation>Naposledy změněno: %1</translation>
+    </message>
     <message>
         <source>A favourite: click to unmark it</source>
         <translation>Oblíbená: kliknutím zrušíte</translation>
@@ -2149,6 +2174,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Possible changes</source>
         <translation>Možné změny</translation>
+    </message>
+    <message>
+        <source>Added</source>
+        <translation>Přidáno</translation>
     </message>
 </context>
 <context>
@@ -2843,6 +2872,14 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>LaTeX: write \&amp; for &amp;, \# for #</source>
         <translation>LaTeX: místo &amp; pište \&amp;, místo # \#</translation>
+    </message>
+    <message>
+        <source>Only recently added</source>
+        <translation>Jen nedávno přidané</translation>
+    </message>
+    <message>
+        <source>Songs added in the last 30 days or not committed yet (the dates come from git)</source>
+        <translation>Písně přidané za posledních 30 dní nebo ještě nezapsané do gitu (data jsou z gitu)</translation>
     </message>
     <message>
         <source>Unlock</source>

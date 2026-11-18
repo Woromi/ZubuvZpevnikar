@@ -15,6 +15,7 @@
 #include "SongListPage.hpp"
 #include "SongTableModel.hpp"
 #include "SongbookExporter.hpp"
+#include "SongDatesRunner.hpp"
 #include "SongbookCheck.hpp"
 #include "SongbookSorter.hpp"
 #include "SongbooksPage.hpp"
@@ -164,6 +165,8 @@ MainWindow::~MainWindow() {
     disconnect(scores_, nullptr, this, nullptr);
     disconnect(songActions_, nullptr, this, nullptr);
     disconnect(songbookCheck_, nullptr, this, nullptr);
+    songDates_->cancel();
+    disconnect(songDates_, nullptr, this, nullptr);
 }
 
 void MainWindow::createMenus() {
@@ -330,6 +333,18 @@ void MainWindow::createCentralWidget() {
     checkHooks.documentClass = [this] { return toStdString(preview_->documentClass()); };
     checkHooks.noPackageText = [this] { return noPackageText(); };
     checkHooks.openSong = [this] { return editor_; };
+    songDates_ = new SongDatesRunner(this);
+    connect(songDates_, &SongDatesRunner::datesReady, this,
+            [this](const std::filesystem::path& root, const auto& dates) {
+                if (root == songbookRoot_)
+                    model_->setDates(root, dates);
+            });
+    // No git, or no repository there: no dates, and nothing to tell the user (the Recently added
+    // choices stay disabled).
+    connect(songDates_, &SongDatesRunner::failed, this, [this](const std::filesystem::path& root) {
+        if (root == songbookRoot_)
+            model_->clearDates();
+    });
     songbookCheck_ = new SongbookCheck(this, model_, proxy_, listPage_, songActions_,
                                        std::move(checkHooks));
     connect(songbookCheck_, &SongbookCheck::statusMessage, this,
@@ -509,6 +524,7 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
     issuesLabel_->setToolTip(issueLines.join(QLatin1Char('\n')));
 
     model_->setSongs(std::move(library->songs));
+    songDates_->start(root); // the dates arrive later (git, in the background)
     const auto collections = zub::collections(root); // Chords, Tin whistle, …
     listPage_->setCollections(collections);
     songbooksPage_->setCollections(collections);

@@ -243,6 +243,7 @@ private:
     QLineEdit* search_ = nullptr;
     QComboBox* language_ = nullptr;
     QCheckBox* favouritesOnly_ = nullptr;
+    QCheckBox* recentOnly_ = nullptr;
     LabelFilterBox* labelFilter_ = nullptr;
     QCheckBox* onlyInSection_ = nullptr;
     SongFilterProxy* pickerFilter_ = nullptr;
