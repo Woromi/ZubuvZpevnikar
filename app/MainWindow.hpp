@@ -47,6 +47,7 @@ class SongbookExporter;
 class SongbookCheck;
 class SongbookSorter;
 class SongbooksPage;
+class WelcomePage;
 class SongFilterProxy;
 class SongTableModel;
 class SongActions;
@@ -76,6 +77,9 @@ private:
     void createMenus();
     void createCentralWidget();
     void chooseSongbookFolder();
+    // The welcome page instead of the song list: at the first start (`path` empty), or with
+    // why `path` cannot be opened.
+    void showWelcome(const QString& path = {});
     struct OpenOptions {
         bool showErrors = true;    // a message box when the folder is not a songbook
         bool remember = true;      // save it as the songbook for the next start
@@ -183,6 +187,7 @@ private:
     ActivityBar* activityBar_ = nullptr;
     QWidget* songPage_ = nullptr;
     SongbooksPage* songbooksPage_ = nullptr; // the songbook assembler
+    WelcomePage* welcomePage_ = nullptr;     // while no songbook is open
     SongbookSorter* songbookSorter_ = nullptr;
     SongbookExporter* songbookExporter_ = nullptr;
     QToolBar* songToolBar_ = nullptr;

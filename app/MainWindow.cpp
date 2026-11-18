@@ -18,6 +18,7 @@
 #include "SongbookCheck.hpp"
 #include "SongbookSorter.hpp"
 #include "SongbooksPage.hpp"
+#include "WelcomePage.hpp"
 #include "SoundTools.hpp"
 #include "convert.hpp"
 
@@ -394,6 +395,13 @@ void MainWindow::createCentralWidget() {
     pages_->addWidget(listPage_);
     pages_->addWidget(songPage_);
     pages_->addWidget(songbooksPage_);
+    welcomePage_ = new WelcomePage(pages_);
+    pages_->addWidget(welcomePage_);
+    connect(welcomePage_, &WelcomePage::chooseRequested, this, &MainWindow::chooseSongbookFolder);
+    connect(welcomePage_, &WelcomePage::retryRequested, this, [this](const QString& path) {
+        if (!openSongbook(toPath(path), {.showErrors = false}))
+            showWelcome(path); // the page says why
+    });
 
     // The activity bar at the left edge, like a code editor's: the views and Settings.
     activityBar_ = new ActivityBar(this);
@@ -417,18 +425,35 @@ void MainWindow::createCentralWidget() {
 
 void MainWindow::openInitialSongbook(const QString& commandLinePath) {
     if (!commandLinePath.isEmpty()) {
-        if (!openSongbook(toPath(commandLinePath), {}))
-            chooseSongbookFolder();
+        if (!openSongbook(toPath(commandLinePath), {.showErrors = false}))
+            showWelcome(commandLinePath);
         return;
     }
 
-    // Only the remembered folder: no guesses. If it is missing (e.g. an unplugged disk), say
-    // so; it stays remembered unless the user picks another one.
+    // Only the remembered folder: no guesses. If it is missing (e.g. an unplugged disk), the
+    // welcome page says so; it stays remembered unless the user picks another one.
     const QString remembered = QSettings{}.value(songbookPathKey).toString();
-    if (!remembered.isEmpty() &&
-        openSongbook(toPath(QDir::cleanPath(remembered)), {.showErrors = true, .remember = false}))
+    if (remembered.isEmpty()) {
+        showWelcome();
         return;
-    chooseSongbookFolder();
+    }
+    const QString path = QDir::cleanPath(remembered);
+    if (!openSongbook(toPath(path), {.showErrors = false, .remember = false}))
+        showWelcome(path);
+}
+
+void MainWindow::showWelcome(const QString& path) {
+    if (path.isEmpty()) {
+        welcomePage_->showFirstStart();
+    } else {
+        const auto library = zub::scanLibrary(toPath(path));
+        welcomePage_->showMissing(path, library ? QString() : toQString(library.error()));
+    }
+    if (songbookRoot_.empty()) {
+        pages_->setCurrentWidget(welcomePage_);
+        activityBar_->setCurrent(ActivityBar::View::Songs);
+        updateWindowTitle();
+    }
 }
 
 void MainWindow::chooseSongbookFolder() {
@@ -510,6 +535,8 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
                "copy."),
             15000);
     listTitle_ = QApplication::applicationDisplayName() + QStringLiteral(" — ") + toQString(root);
+    if (pages_->currentWidget() == welcomePage_)
+        showView(ActivityBar::View::Songs);
     updateWindowTitle();
     return true;
 }
@@ -535,6 +562,13 @@ void MainWindow::showView(ActivityBar::View view) {
         }
         if (pages_->currentWidget() != songbooksPage_)
             songbooksPage_->reloadList();
+    }
+    // No songbook yet: the welcome page stands in for the list.
+    if (songbookRoot_.empty() && view == View::Songs) {
+        pages_->setCurrentWidget(welcomePage_);
+        activityBar_->setCurrent(view);
+        updateWindowTitle();
+        return;
     }
     pages_->setCurrentWidget(view == View::Songs  ? static_cast<QWidget*>(listPage_)
                              : view == View::Song ? songPage_

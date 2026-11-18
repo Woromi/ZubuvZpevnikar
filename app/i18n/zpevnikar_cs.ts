@@ -3011,4 +3011,37 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Zapíše tento nástroj do souboru notové ukázky jako \set Staff.midiInstrument (jeden krok zpět; soubor uložte jako obvykle). PDF zpěvníku to ignoruje.</translation>
     </message>
 </context>
+<context>
+    <name>WelcomePage</name>
+    <message>
+        <source>Try Again</source>
+        <translation>Zkusit znovu</translation>
+    </message>
+    <message>
+        <source>Open the folder of your songbook: a ZubuvZpevnik checkout, the folder with songs/chords/ in it. It is remembered for the next start.</source>
+        <translation>Otevřete složku svého zpěvníku: kopii ZubuvZpevnik, složku, ve které je songs/chords/. Zapamatuje se pro příští spuštění.</translation>
+    </message>
+    <message>
+        <source>Open Songbook Folder…</source>
+        <translation>Otevřít složku zpěvníku…</translation>
+    </message>
+    <message>
+        <source>The songbook folder cannot be opened:
+%1
+
+%2
+
+If it is on a disk that is not connected, connect it and try again.</source>
+        <translation>Složku zpěvníku nelze otevřít:
+%1
+
+%2
+
+Pokud je na disku, který není připojený, připojte ho a zkuste to znovu.</translation>
+    </message>
+    <message>
+        <source>Choose Another…</source>
+        <translation>Vybrat jinou…</translation>
+    </message>
+</context>
 </TS>

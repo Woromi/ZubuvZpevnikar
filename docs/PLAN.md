@@ -40,7 +40,7 @@ Tick items as they're done. Use `/new-feature <item>` to work through one.
 - [x] app: build errors listed under the PDF; double-click jumps to the song line. Full log via "Log".
 - [x] Safety: songs using commands outside the allowlist are not built automatically (Rebuild asks first). Preview builds are cancelled with their tab; LilyPond children are killed with lualatex; each app instance has its own work dir.
 - [x] chords_converter: chord names keep only chord characters, comment text stays on one line (`src/printers/latex.rs`, approved by the user). Committed there as `c62d66d`.
-- [ ] Rebuild while typing (debounced) — easy now, since the preview already builds the editor text.
+- ~~Rebuild while typing (debounced)~~: not wanted (decided with the user 2026-11-18); the preview rebuilds on save and with Ctrl+R.
 
 ## 4. Import from a URL
 
@@ -70,7 +70,7 @@ editor tabs for several songs, a quick-open popup.
 - [x] Song page: editor and PDF preview side by side in a splitter (sizes remembered in QSettings); no editor tabs. The window title shows the song, with `*` when modified.
 - [x] Close Song (Ctrl+W and a toolbar button) returns to the list, asking Save/Discard/Cancel when modified. Opening or importing a song while one is open closes it first (same question). Reload when the file changes outside the app keeps working.
 - [x] Editor toolbar on the song page: Back to list (= Close Song), Save, Undo, Redo, Cut, Copy, Paste, and the song's "Artist/Title" on the right. Buttons are enabled only when they apply (undo/redo available, text selected, modified, not read-only). Rebuild stays in the preview pane's own bar (Ctrl+R). "Open Existing" on the song already open just keeps it. The song actions (§6) will add their buttons here.
-- [ ] Welcome page instead of the folder dialog at start: no songbook remembered → "Open Songbook Folder…"; the remembered one missing → say where it was, with Try Again / Choose Another….
+- [x] Welcome page instead of the folder dialog at start (`WelcomePage`, 2026-11-18): no songbook remembered → "Open Songbook Folder…"; the remembered (or `--songbook`) folder that cannot be opened → where it was and why, with Try Again / Choose Another…. It stands in for the song list while no songbook is open.
 - [ ] `--songbook` applies to that run only and is not remembered (today it overwrites the remembered songbook).
 - [x] Songbooks (§7) become a third page later; decide then how to reach it. Decided with the user 2026-11-15: an activity bar at the left edge like VSCodium's (`ActivityBar`): Songs, the open song, Songbooks, and Settings at the bottom; View → Songs / The Open Song / Songbooks (Ctrl+1/2/3, Ctrl+B). **The song stays open** while the list or the songbooks are shown (Back and the mouse's back button go to the list; Ctrl+W closes the song); opening another song still closes it (asking to save). The Songs view (`SongListPage`) has New Song and Import in its heading; the filter checkboxes became one Show choice (All / ★ Favourites / With tabs / With TODOs / With possible changes after a scan); ★ is the first column (☆ muted when not a favourite, a click toggles it); a Tabs column shows ♪ for songs with a score (`SongEntry::scores`). File → Settings… (Ctrl+,, the bar's gear): language, converter, soundfont, and the package in use.
 
