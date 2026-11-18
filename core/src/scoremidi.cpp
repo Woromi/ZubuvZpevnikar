@@ -591,14 +591,40 @@ std::string markBends(std::string_view music) {
                     ++end;
                 const std::string_view chunk = music.substr(note, end - note);
                 const std::size_t after = skipSpace(music, end);
+                // A grace note that slides on (`\grace g\3 \glissando e'4`) starts a slide,
+                // it is no bend target: the \glissando marks the slide's target instead.
+                if (chunk.find("\\glissando") != npos ||
+                    music.substr(after).starts_with("\\glissando")) {
+                    preBendEnd = npos;
+                    return proceed;
+                }
                 const bool release =
                     chunk.find("\\^") != npos || music.substr(after).starts_with("\\^");
                 inserts.emplace_back(begin, marker(pre ? (release ? "telephone ring" : "helicopter")
                                                        : (release ? "applause" : "gunshot")));
             } else if (word == "glissando") {
+                // The target: past bar checks, the end of a \grace { ... } and commands that
+                // take nothing (a slide from nowhere: \grace { \hideNotes g\3 \glissando
+                // \unHideNotes } e'4\3).
                 std::size_t next = skipSpace(music, wordEnd);
-                if (next < music.size() && music[next] == '|')
-                    next = skipSpace(music, next + 1);
+                for (bool moved = true; moved && next < music.size();) {
+                    moved = false;
+                    if (music[next] == '|' || music[next] == '}') {
+                        next = skipSpace(music, next + 1);
+                        moved = true;
+                    } else if (music[next] == '\\') {
+                        std::size_t end = next + 1;
+                        while (end < music.size() && isLetter(music[end]))
+                            ++end;
+                        const std::string_view command = music.substr(next + 1, end - next - 1);
+                        if (command == "unHideNotes" || command == "hideNotes" ||
+                            command == "cadenzaOff" || command == "cadenzaOn" ||
+                            command == "stemNeutral" || command == "oneVoice") {
+                            next = skipSpace(music, end);
+                            moved = true;
+                        }
+                    }
+                }
                 // A note or chord follows, not a rest or a skip.
                 if (next < music.size() && ((music[next] >= 'a' && music[next] <= 'z' &&
                                              music[next] != 'r' && music[next] != 's') ||

@@ -317,6 +317,24 @@ TEST_CASE("markBends marks the targets of bends, pre-bends, releases and slides"
     CHECK(without == music);
 }
 
+TEST_CASE("markBends finds a slide's target past \\unHideNotes and a grace's brace",
+          "[score][midi]") {
+    // A slide from nowhere: a hidden grace note slides into the note.
+    const std::string slide = "\\grace { \\hideNotes g\\3 \\glissando \\unHideNotes } e'4\\3";
+    const std::string marked = sc::markBends(slide);
+    CHECK(marked.find("\"seashore\" e'4") != std::string::npos);
+    // A grace note that slides on is no bend target (no bend marker before it).
+    for (const std::string text : {"f4\\4 \\hideNotes\\grace g4\\3\\glissando\\unHideNotes e'4\\3",
+                                    "g'4\\2 \\grace g'\\2 \\glissando a'8\\2"}) {
+        const std::string out = sc::markBends(text);
+        INFO(out);
+        CHECK(out.find("gunshot") == std::string::npos);
+        CHECK(out.find("seashore") != std::string::npos);
+    }
+    // Still nothing before a rest after the brace.
+    CHECK(sc::markBends("\\grace { g\\3 \\glissando } r4").find("seashore") == std::string::npos);
+}
+
 TEST_CASE("markBends leaves comments, strings, Scheme, rests and a plain \\grace shape alone",
           "[score][midi]") {
     const std::string music =
