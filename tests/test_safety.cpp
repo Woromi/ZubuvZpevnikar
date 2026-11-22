@@ -189,6 +189,22 @@ TEST_CASE("every real book passes the book check", "[.integration][safety][book]
     CHECK(count > 5);
 }
 
+TEST_CASE("books: \\transposesong takes a count and plain key options", "[safety][book]") {
+    const auto book = [](std::string_view s) { return zub::safety::unknownBookConstructs(s); };
+    CHECK(book("\\transposesong[key=G]{-5}\n\\input{A/B}").empty());
+    CHECK(book("\\transposesong[capo,key=F\\shrp m]{3} % fixed\n").empty());
+    CHECK(book("\\transposesong[key=B\\flt]{+11}").empty());
+    CHECK(book("\\transposesong{4}").empty());
+    CHECK(!book("\\transposesong[key=G]{12}").empty());
+    CHECK(!book("\\transposesong[key=G]{x}").empty());
+    CHECK(!book("\\transposesong[key=G]").empty());
+    CHECK(!book("\\transposesong[key=\\directlua]{1}").empty());
+    CHECK(!book("\\transposesong[key=G{}]{1}").empty());
+    CHECK(!book("\\transposesong[shell=1]{1}").empty());
+    CHECK(!book("\\transposesong[capo,]{1}").empty());
+    CHECK(!book("\\transposesong[key=]{1}").empty());
+}
+
 TEST_CASE("books: class, index and cover names are checked", "[safety][book]") {
     const auto book = [](std::string_view s) { return zub::safety::unknownBookConstructs(s); };
     CHECK(book("\\documentclass[chorded]{taborovyzpevnik}").empty());

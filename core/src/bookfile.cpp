@@ -360,6 +360,49 @@ std::optional<CommentedInput> commentedInput(string_view content) {
     return CommentedInput{string(name), pct, in};
 }
 
+// The song line of a book: code exactly `\transposesong[capo,key=K]{N}`, optionally a `% fixed`
+// comment. nullopt for anything else.
+std::optional<SongTranspose> parseTransposeLine(string_view content) {
+    const string code = latex::stripComments(content);
+    const auto t = trim(code);
+    if (!t.starts_with("\\transposesong") || (t.size() > 14 && isLetter(t[14])))
+        return std::nullopt;
+    size_t pos = 14;
+    SongTranspose out;
+    pos = t.find_first_not_of(" \t", pos);
+    if (pos != npos && t[pos] == '[') {
+        const auto close = latex::findMatching(t, pos);
+        if (!close)
+            return std::nullopt;
+        for (const auto& opt : splitNames(t.substr(pos + 1, *close - pos - 1))) {
+            if (opt == "capo")
+                out.capo = true;
+            else if (opt.starts_with("key=") && opt.size() > 4)
+                out.key = string(trim(string_view(opt).substr(4)));
+            else
+                return std::nullopt;
+        }
+        pos = *close + 1;
+    }
+    const auto arg = braceArg(t, pos == npos ? t.size() : pos);
+    if (!arg || arg->end != t.size())
+        return std::nullopt;
+    string_view n = trim(arg->value);
+    const bool negative = n.starts_with('-');
+    if (negative || n.starts_with('+'))
+        n.remove_prefix(1);
+    if (n.empty() || n.size() > 2 || n.find_first_not_of("0123456789") != npos)
+        return std::nullopt;
+    out.semitones = (n.size() == 2 ? (n[0] - '0') * 10 + (n[1] - '0') : n[0] - '0');
+    if (out.semitones > 11)
+        return std::nullopt;
+    if (negative)
+        out.semitones = -out.semitones;
+    const auto rest = trim(content.substr(code.size()));
+    out.fixed = rest.starts_with('%') && trim(rest.substr(1)) == "fixed";
+    return out;
+}
+
 } // namespace
 
 std::vector<string> Environment::songs() const {
@@ -529,6 +572,13 @@ std::expected<string, string> setSongs(string_view text, size_t environment,
             const auto line = string_view(work).substr(l.begin, l.end - l.begin);
             switch (l.kind) {
             case Kind::Plain:
+                // The song line of a removed input goes with it.
+                if (i + 1 < le && d.lines[i + 1].kind == Kind::Input &&
+                    !nameSet.contains(d.lines[i + 1].names[0]) &&
+                    parseTransposeLine(line.substr(0, l.contentEnd - l.begin)))
+                    break;
+                out += line;
+                break;
             case Kind::Odd:
                 out += line;
                 break;
@@ -1224,6 +1274,149 @@ string setLocked(string_view text, bool locked) {
         pos = l.end;
     }
     return out;
+}
+
+// ---- Transposing a book ----
+
+namespace {
+
+constexpr string_view kSettingsPrefix = "% zpevnikar: key=";
+
+bool isSettingsLine(string_view content) {
+    return trim(content).starts_with(kSettingsPrefix);
+}
+
+string settingsLine(const TransposeSettings& s) {
+    return string(kSettingsPrefix) + booktranspose::bookKeyName(*s.key) +
+           " transpose=" + (s.mode == TransposeSettings::Mode::Capo ? "capo" : "chords");
+}
+
+string songLine(const SongTranspose& t) {
+    string options;
+    if (t.capo)
+        options = "capo";
+    if (!t.key.empty())
+        options += (options.empty() ? "" : ",") + ("key=" + t.key);
+    return "\\transposesong" + (options.empty() ? string() : "[" + options + "]") + "{" +
+           std::to_string(t.semitones) + "}" + (t.fixed ? " % fixed" : "");
+}
+
+} // namespace
+
+TransposeSettings readTransposeSettings(string_view text) {
+    TransposeSettings out;
+    size_t pos = 0;
+    while (pos < text.size()) {
+        const auto l = lineAt(text, pos);
+        const auto content = trim(text.substr(l.begin, l.contentEnd - l.begin));
+        pos = l.end;
+        if (!content.starts_with(kSettingsPrefix))
+            continue;
+        const string_view rest = content.substr(kSettingsPrefix.size());
+        const auto space = rest.find_first_of(" \t");
+        out.key = booktranspose::bookKey(rest.substr(0, space));
+        if (space != npos && trim(rest.substr(space)) == "transpose=capo")
+            out.mode = TransposeSettings::Mode::Capo;
+        return out;
+    }
+    return out;
+}
+
+string setTransposeSettings(string_view text, const TransposeSettings& settings) {
+    const string eol = eolOf(text);
+    bool exists = false;
+    for (size_t pos = 0; pos < text.size();) {
+        const auto l = lineAt(text, pos);
+        exists = exists || isSettingsLine(text.substr(l.begin, l.contentEnd - l.begin));
+        pos = l.end;
+    }
+    string out;
+    if (!exists && settings.key) {
+        const auto first = lineAt(text, 0);
+        if (!text.empty() && trim(text.substr(0, first.contentEnd)) == kLockMark) {
+            out = string(text.substr(0, first.end));
+            if (first.end == first.contentEnd)
+                out += eol;
+            out += settingsLine(settings);
+            out += eol;
+            out += text.substr(first.end);
+        } else {
+            out = settingsLine(settings) + eol + string(text);
+        }
+        return out;
+    }
+    bool placed = false;
+    for (size_t pos = 0; pos < text.size();) {
+        const auto l = lineAt(text, pos);
+        const auto content = text.substr(l.begin, l.contentEnd - l.begin);
+        pos = l.end;
+        if (!isSettingsLine(content)) {
+            out += text.substr(l.begin, l.end - l.begin);
+        } else if (settings.key && !placed) {
+            out += settingsLine(settings);
+            out += text.substr(l.contentEnd, l.end - l.contentEnd);
+            placed = true;
+        }
+    }
+    return out;
+}
+
+std::vector<SongTranspose> readTransposes(string_view text) {
+    std::vector<SongTranspose> out;
+    const auto scanned = scan(text);
+    if (!scanned)
+        return out;
+    for (const auto& d : *scanned)
+        for (size_t i = 1; i < d.lines.size(); ++i) {
+            if (d.lines[i].kind != Kind::Input || d.lines[i - 1].kind != Kind::Plain)
+                continue;
+            const auto& p = d.lines[i - 1];
+            if (auto t = parseTransposeLine(text.substr(p.begin, p.contentEnd - p.begin))) {
+                t->inputName = d.lines[i].names[0];
+                out.push_back(std::move(*t));
+            }
+        }
+    return out;
+}
+
+std::expected<string, string> setTranspose(string_view text, string_view inputName,
+                                           const std::optional<SongTranspose>& transpose) {
+    const auto scanned = scan(text);
+    if (!scanned)
+        return std::unexpected(scanned.error());
+    for (const auto& d : *scanned) {
+        for (size_t i = 0; i < d.lines.size(); ++i) {
+            const auto& in = d.lines[i];
+            if (in.kind != Kind::Input || in.names[0] != inputName)
+                continue;
+            if (!d.env.readOnly.empty())
+                return std::unexpected("environment cannot be edited: " + d.env.readOnly);
+            const bool remove = !transpose || (transpose->semitones == 0 && !transpose->fixed);
+            const Line* old = nullptr;
+            if (i > 0 && d.lines[i - 1].kind == Kind::Plain &&
+                parseTransposeLine(text.substr(d.lines[i - 1].begin,
+                                               d.lines[i - 1].contentEnd - d.lines[i - 1].begin)))
+                old = &d.lines[i - 1];
+            string out(text);
+            if (remove) {
+                if (old)
+                    out.erase(old->begin, old->end - old->begin);
+                return out;
+            }
+            if (old) {
+                const auto content = text.substr(old->begin, old->contentEnd - old->begin);
+                const auto indent = content.substr(0, content.find_first_not_of(" \t"));
+                out.replace(old->begin, old->contentEnd - old->begin,
+                            string(indent) + songLine(*transpose));
+                return out;
+            }
+            const auto content = text.substr(in.begin, in.contentEnd - in.begin);
+            const auto indent = content.substr(0, content.find_first_not_of(" \t"));
+            out.insert(in.begin, string(indent) + songLine(*transpose) + eolOf(text));
+            return out;
+        }
+    }
+    return std::unexpected("no \\input{" + string(inputName) + "} in the book");
 }
 
 // ---- Sections ----

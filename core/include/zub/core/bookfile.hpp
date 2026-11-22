@@ -3,11 +3,13 @@
 #include <cstddef>
 #include <expected>
 #include <filesystem>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <zub/core/booktranspose.hpp>
 #include <zub/core/songbook.hpp>
 
 // Reading and editing the song lists of the hand-written LaTeX books of the songbook repo
@@ -116,10 +118,11 @@ std::vector<std::string> inputs(std::string_view text);
 // scripts/build.sh -i <indexes> (indexFiles), writing only to workDir. TEXINPUTS: the work dir,
 // the song folders, the package, then the book's own folder `bookDir` (a Tabor book's cover.pdf
 // and akordy.tex), the repo root (img/), and the defaults (the trailing ':').
-songbook::BuildCommand
-buildCommand(const std::filesystem::path& repoRoot, const std::filesystem::path& packageDir,
-             const std::filesystem::path& workDir, const std::filesystem::path& bookDir,
-             std::string_view bookName, const std::vector<std::string>& indexes);
+songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
+                                    const std::filesystem::path& packageDir,
+                                    const std::filesystem::path& workDir,
+                                    const std::filesystem::path& bookDir, std::string_view bookName,
+                                    const std::vector<std::string>& indexes);
 
 // ---- The settings of a book (the header and the cover/chart commands) ----
 //
@@ -179,6 +182,50 @@ std::string_view lockMark();
 // mark; unchanged when already so.
 std::string setLocked(std::string_view text, bool locked);
 
+// ---- Transposing a book ----
+//
+// The book's key is a comment line `% zpevnikar: key=G transpose=chords` (or `transpose=capo`; the
+// key as zub::booktranspose::bookKeyName writes it), like the lock mark. A song is transposed by a
+// line directly above its `\input` (the previous line of the file, not a blank or a wish):
+// `\transposesong[key=<key>]{N}` or `\transposesong[capo,key=<key>]{N}`, optionally followed by a
+// `% fixed` comment (a per-song choice that a change of the book's key leaves alone). It is a plain
+// line of its input's unit: setSongs moves it with the input and drops it with a removed input.
+
+struct TransposeSettings {
+    enum class Mode { Chords, Capo };
+    std::optional<booktranspose::Key> key; // nullopt: the book is not transposed
+    Mode mode = Mode::Chords;
+};
+
+// The first settings line of the text; a missing line, or one without a readable key, gives no key
+// (a missing or unknown transpose= means Chords).
+TransposeSettings readTransposeSettings(std::string_view text);
+// Writes the line: replaced in place when there is one (further ones go), else added after the lock
+// mark line when that is the first line, else as the first line. No key removes every such line.
+// Byte-exact otherwise, new lines get the file's line break.
+std::string setTransposeSettings(std::string_view text, const TransposeSettings& settings);
+
+struct SongTranspose {
+    std::string inputName;
+    int semitones = 0;  // -11..11
+    bool capo = false;  // `capo` option
+    std::string key;    // the `key=` option as written ("" none)
+    bool fixed = false; // `% fixed`
+};
+
+// Every song line in the song lists (code `\transposesong[...]{N}` alone on the line directly
+// above an `\input{name}` line, options only `capo` and `key=`, N an integer), in file order.
+std::vector<SongTranspose> readTransposes(std::string_view text);
+
+// Writes, replaces or removes the line above the song's `\input` (the first environment that has
+// it): `<indent of the \input>\transposesong[capo,key=K]{N}` plus ` % fixed`, with the file's line
+// break; a replaced line keeps its own indent. nullopt, or semitones 0 without `fixed`, removes
+// it (a `fixed` 0 stays: "do not transpose this song"). Errors: no such input, read-only
+// environment. `inputName` of the argument is ignored.
+std::expected<std::string, std::string> setTranspose(std::string_view text,
+                                                     std::string_view inputName,
+                                                     const std::optional<SongTranspose>& transpose);
+
 // ---- Sections (a \songsection, the \begin{songs} ... \end{songs} that follows) ----
 // `environment` is the index in parse(). The block of a section runs from the line of its
 // \songsection (else of its \begin{songs}) through its \end{songs} line, everything between
@@ -216,7 +263,6 @@ std::expected<NewBook, std::string> newBook(const Settings&, std::string_view na
 // indexes (indexFiles): for a copy of a book under a new name.
 std::string buildScriptFor(std::string_view name, songbook::BookClass bookClass,
                            const std::vector<std::string>& indexes,
-                           const std::vector<std::string>& collections = {"chords",
-                                                                          "tinwhistle"});
+                           const std::vector<std::string>& collections = {"chords", "tinwhistle"});
 
 } // namespace zub::bookfile

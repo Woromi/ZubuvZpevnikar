@@ -337,14 +337,16 @@ namespace {
 // Tabor book's akordy.tex uses. Sorted. \input and \newindex open files by name and \begin
 // starts any environment (luacode runs Lua): unknownBookConstructs checks their arguments.
 constexpr std::array kBookKnown = std::to_array<std::string_view>({
-    "author",          "begin",         "begingroup",  "beginkeeporder", "bindingleaf",
-    "campyear",        "centering",     "clearpage",   "documentclass",  "end",
-    "endgroup",        "endkeeporder",  "hfill",       "indexsongsas",   "input",
-    "insertallchords", "insertindex",   "large",       "makebackcover",  "makefrontcover",
-    "makeimprint",     "maketitlepage", "newindex",    "newpage",        "padbookletpages",
-    "padbookpages",    "pagebreak",     "pagestyle",   "renewcommand",   "section",
-    "setcounter",      "showindex",     "songsection", "subsection",     "texttt",
-    "thepage",         "title",         "url",
+    "author",          "begin",         "begingroup",    "beginkeeporder",
+    "bindingleaf",     "campyear",      "centering",     "clearpage",
+    "documentclass",   "end",           "endgroup",      "endkeeporder",
+    "hfill",           "indexsongsas",  "input",         "insertallchords",
+    "insertindex",     "large",         "makebackcover", "makefrontcover",
+    "makeimprint",     "maketitlepage", "newindex",      "newpage",
+    "padbookletpages", "padbookpages",  "pagebreak",     "pagestyle",
+    "renewcommand",    "section",       "setcounter",    "showindex",
+    "songsection",     "subsection",    "texttt",        "thepage",
+    "title",           "transposesong", "url",
 });
 
 std::vector<std::string> scanConstructs(std::string_view content,
@@ -453,6 +455,53 @@ bool plainName(std::string_view name) {
     });
 }
 
+// `capo` or `key=<key>`; the key is letters, digits, `#`, spaces and the macros \shrp and \flt.
+bool plainTransposeOption(std::string_view option) {
+    while (!option.empty() && (option.front() == ' ' || option.front() == '\t'))
+        option.remove_prefix(1);
+    while (!option.empty() && (option.back() == ' ' || option.back() == '\t'))
+        option.remove_suffix(1);
+    if (option == "capo")
+        return true;
+    if (!option.starts_with("key="))
+        return false;
+    option.remove_prefix(4);
+    if (option.empty())
+        return false;
+    for (std::size_t i = 0; i < option.size();) {
+        const char c = option[i];
+        if (c == '\\') {
+            const auto rest = option.substr(i);
+            if (rest.starts_with("\\shrp"))
+                i += 5;
+            else if (rest.starts_with("\\flt"))
+                i += 4;
+            else
+                return false;
+            if (i < option.size() && isLetter(option[i]))
+                return false;
+        } else if (isLetter(c) || isDigit(c) || c == '#' || c == ' ') {
+            ++i;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+// An integer -11..11, optionally signed.
+bool transposeCount(std::string_view value) {
+    while (!value.empty() && (value.front() == ' ' || value.front() == '\t'))
+        value.remove_prefix(1);
+    while (!value.empty() && (value.back() == ' ' || value.back() == '\t'))
+        value.remove_suffix(1);
+    if (!value.empty() && (value.front() == '-' || value.front() == '+'))
+        value.remove_prefix(1);
+    if (value.empty() || value.size() > 2 || !std::ranges::all_of(value, isDigit))
+        return false;
+    return std::stoi(std::string(value)) <= 11;
+}
+
 } // namespace
 
 std::vector<std::string> unknownConstructs(std::string_view songContent) {
@@ -494,6 +543,26 @@ std::vector<std::string> unknownBookConstructs(std::string_view bookContent) {
             if (!argument || !songbook::bookClassFromName(*argument))
                 report("\\documentclass" +
                        (argument ? "{" + std::string(*argument) + "}" : std::string()));
+        } else if (name == "transposesong") {
+            // \transposesong[capo,key=<key>]{N}: a count of semitones and plain key text.
+            std::size_t argAt = end;
+            bool ok = true;
+            if (const auto options = bracketArgument(text, argAt)) {
+                argAt = options->second;
+                std::string_view rest = options->first;
+                while (ok) {
+                    const auto comma = rest.find(',');
+                    ok = plainTransposeOption(rest.substr(0, comma));
+                    if (comma == std::string_view::npos)
+                        break;
+                    rest.remove_prefix(comma + 1);
+                }
+            }
+            const auto count = braceArgument(text, argAt);
+            if (!ok || !count || !transposeCount(*count)) {
+                const auto line = text.find('\n', at);
+                report(text.substr(at, std::min(line, at + 80) - at));
+            }
         } else if (name == "makefrontcover" || name == "maketitlepage") {
             // An image file name: \includegraphics with -shell-escape may convert it by a
             // command line made from the name.

@@ -374,6 +374,186 @@ TEST_CASE("findBooks lists the books with a \\documentclass", "[bookfile]") {
     fs::remove_all(dir);
 }
 
+// ---- Transposing ----
+
+namespace {
+
+SongTranspose tr(int n, const std::string& key = "G", bool capo = false, bool fixed = false) {
+    return SongTranspose{"", n, capo, key, fixed};
+}
+
+std::string transposed(const std::string& text, const std::string& name,
+                       const std::optional<SongTranspose>& t) {
+    auto r = setTranspose(text, name, t);
+    INFO((r ? "" : r.error()));
+    REQUIRE(r);
+    return *r;
+}
+
+} // namespace
+
+TEST_CASE("transpose settings: read, add, change, remove", "[bookfile][transpose]") {
+    const auto plain = wrap("    \\input{A/One}\n");
+    CHECK_FALSE(readTransposeSettings(plain).key);
+    TransposeSettings s;
+    s.key = zub::booktranspose::Key{7, false};
+    const auto added = setTransposeSettings(plain, s);
+    CHECK(added == "% zpevnikar: key=G transpose=chords\n" + plain);
+    CHECK(readTransposeSettings(added).key == s.key);
+    CHECK(readTransposeSettings(added).mode == TransposeSettings::Mode::Chords);
+    CHECK(setTransposeSettings(added, s) == added);
+
+    s.key = zub::booktranspose::Key{4, true};
+    s.mode = TransposeSettings::Mode::Capo;
+    const auto changed = setTransposeSettings(added, s);
+    CHECK(changed == "% zpevnikar: key=Em transpose=capo\n" + plain);
+    CHECK(readTransposeSettings(changed).mode == TransposeSettings::Mode::Capo);
+    CHECK(readTransposeSettings(changed).key == s.key);
+
+    CHECK(setTransposeSettings(changed, TransposeSettings{}) == plain);
+    CHECK(setTransposeSettings(plain, TransposeSettings{}) == plain);
+}
+
+TEST_CASE("transpose settings sit after the lock mark and keep CRLF", "[bookfile][transpose]") {
+    const std::string lock = std::string(lockMark());
+    const auto text = lock + "\n" + wrap("    \\input{A/One}\n");
+    TransposeSettings s;
+    s.key = zub::booktranspose::Key{10, false};
+    const auto out = setTransposeSettings(text, s);
+    CHECK(out == lock + "\n% zpevnikar: key=Bb transpose=chords\n" + wrap("    \\input{A/One}\n"));
+    CHECK(setTransposeSettings(out, TransposeSettings{}) == text);
+    CHECK(setLocked(out, false) ==
+          setLocked(text, false).insert(0, "% zpevnikar: key=Bb transpose=chords\n"));
+
+    std::string crlf;
+    for (const char c : wrap("    \\input{A/One}\n"))
+        crlf += c == '\n' ? std::string("\r\n") : std::string(1, c);
+    const auto withKey = setTransposeSettings(crlf, s);
+    CHECK(withKey.starts_with("% zpevnikar: key=Bb transpose=chords\r\n\\documentclass"));
+    CHECK(setTransposeSettings(withKey, TransposeSettings{}) == crlf);
+    // the lock mark and the book key do not disturb each other
+    CHECK(
+        setLocked(withKey, true).starts_with(std::string(lockMark()) + "\r\n% zpevnikar: key=Bb"));
+    CHECK(readSettings(out).locked);
+}
+
+TEST_CASE("setTranspose adds, replaces and removes the line above the input",
+          "[bookfile][transpose]") {
+    const auto text = wrap("    \\input{A/One}\n    \\input{B/Two}\n");
+    const auto added = transposed(text, "B/Two", tr(-5));
+    CHECK(added ==
+          wrap("    \\input{A/One}\n    \\transposesong[key=G]{-5}\n    \\input{B/Two}\n"));
+    const auto replaced = transposed(added, "B/Two", tr(3, "F\\shrp m", true, true));
+    CHECK(replaced ==
+          wrap("    \\input{A/One}\n    \\transposesong[capo,key=F\\shrp m]{3} % fixed\n"
+               "    \\input{B/Two}\n"));
+    CHECK(transposed(replaced, "B/Two", tr(3, "F\\shrp m", true, true)) == replaced);
+    CHECK(transposed(replaced, "B/Two", std::nullopt) == text);
+    CHECK(transposed(replaced, "B/Two", tr(0, "G")) == transposed(replaced, "B/Two", std::nullopt));
+    CHECK(transposed(text, "B/Two", std::nullopt) == text);
+    CHECK(transposed(text, "B/Two", tr(0)) == text);
+    // "do not transpose this song" is a fixed 0
+    CHECK(transposed(text, "B/Two", tr(0, "", false, true)) ==
+          wrap("    \\input{A/One}\n    \\transposesong{0} % fixed\n    \\input{B/Two}\n"));
+    CHECK(setTranspose(text, "X/Missing", tr(1)).error().find("X/Missing") != std::string::npos);
+}
+
+TEST_CASE("readTransposes", "[bookfile][transpose]") {
+    const auto text =
+        wrap("    \\input{A/One}\n    \\transposesong[capo,key=E\\flt]{-3} % fixed\n"
+             "    \\input{B/Two}\n    % \\transposesong[key=G]{2}\n    \\input{C/Three}\n"
+             "    \\transposesong[key=G]{2}\n\n    \\input{D/Four}\n"
+             "    \\transposesong[key=G]{+2}\n    \\input{E/Five}\n"
+             "    \\transposesong[bogus]{2}\n    \\input{F/Six}\n");
+    const auto all = readTransposes(text);
+    REQUIRE(all.size() == 2);
+    CHECK(all[0].inputName == "B/Two");
+    CHECK(all[0].semitones == -3);
+    CHECK(all[0].capo);
+    CHECK(all[0].key == "E\\flt");
+    CHECK(all[0].fixed);
+    CHECK(all[1].inputName == "E/Five");
+    CHECK(all[1].semitones == 2);
+    CHECK_FALSE(all[1].capo);
+    CHECK_FALSE(all[1].fixed);
+}
+
+TEST_CASE("setTranspose: indent, CRLF, keep-order blocks", "[bookfile][transpose]") {
+    const auto tabs = wrap("\t\\input{A/One}\n");
+    CHECK(transposed(tabs, "A/One", tr(2)) ==
+          wrap("\t\\transposesong[key=G]{2}\n\t\\input{A/One}\n"));
+    const auto blocked = wrap("    \\beginkeeporder\n      \\input{A/One}\n      \\input{A/Two}\n"
+                              "    \\endkeeporder\n    \\input{B/Three}\n");
+    const auto out = transposed(blocked, "A/Two", tr(-2));
+    CHECK(out ==
+          wrap("    \\beginkeeporder\n      \\input{A/One}\n      \\transposesong[key=G]{-2}\n"
+               "      \\input{A/Two}\n    \\endkeeporder\n    \\input{B/Three}\n"));
+    CHECK(readTransposes(out).size() == 1);
+    CHECK(parsed(out).songs() == parsed(blocked).songs());
+    CHECK(transposed(out, "A/Two", std::nullopt) == blocked);
+
+    std::string crlf;
+    for (const char c : wrap("    \\input{A/One}\n"))
+        crlf += c == '\n' ? std::string("\r\n") : std::string(1, c);
+    const auto withLine = transposed(crlf, "A/One", tr(1));
+    CHECK(withLine.find("    \\transposesong[key=G]{1}\r\n    \\input{A/One}\r\n") !=
+          std::string::npos);
+    CHECK(withLine.find("\n") == withLine.find("\r\n") + 1);
+    CHECK(readTransposes(withLine).size() == 1);
+    CHECK(transposed(withLine, "A/One", tr(2)).find("{2}\r\n") != std::string::npos);
+    CHECK(transposed(withLine, "A/One", std::nullopt) == crlf);
+}
+
+TEST_CASE("setSongs keeps the song line with its input", "[bookfile][transpose]") {
+    const auto text = wrap("    \\input{A/One}\n    % TODO: X/Wish\n    \\transposesong[key=G]{2}\n"
+                           "    \\input{B/Two}\n    \\transposesong[capo,key=G]{-1} % fixed\n"
+                           "    \\input{C/Three}\n");
+    CHECK(set(text, {"A/One", "B/Two", "C/Three"}) == text);
+    const auto moved = set(text, {"C/Three", "B/Two", "A/One"});
+    const auto lines = readTransposes(moved);
+    REQUIRE(lines.size() == 2);
+    CHECK(lines[0].inputName == "C/Three");
+    CHECK(lines[0].semitones == -1);
+    CHECK(lines[0].fixed);
+    CHECK(lines[1].inputName == "B/Two");
+    CHECK(lines[1].semitones == 2);
+    CHECK(moved.find("% TODO: X/Wish\n    \\transposesong[key=G]{2}\n    \\input{B/Two}") !=
+          std::string::npos);
+    // a removed input takes its line with it, a kept one keeps its own
+    const auto removed = set(text, {"A/One", "C/Three"});
+    CHECK(
+        removed ==
+        wrap("    \\input{A/One}\n    % TODO: X/Wish\n    \\transposesong[capo,key=G]{-1} % fixed\n"
+             "    \\input{C/Three}\n"));
+    const auto removedLast = set(text, {"A/One", "B/Two"});
+    CHECK(removedLast ==
+          wrap("    \\input{A/One}\n    % TODO: X/Wish\n    \\transposesong[key=G]{2}\n"
+               "    \\input{B/Two}\n"));
+    CHECK(readTransposes(set(text, {})).empty());
+    // a commented-out removed input keeps its note but not the line
+    const auto commented =
+        set(wrap("    \\transposesong[key=G]{2}\n    \\input{A/One} % hi\n"), {});
+    CHECK(commented == wrap("    % \\input{A/One} % hi\n"));
+}
+
+TEST_CASE("setSongs and blocks with song lines", "[bookfile][transpose]") {
+    const auto text =
+        wrap("    \\beginkeeporder\n    \\transposesong[key=G]{1}\n    \\input{A/One}\n"
+             "    \\transposesong[key=G]{2}\n    \\input{A/Two}\n    \\endkeeporder\n"
+             "    \\input{B/Three}\n");
+    CHECK(set(text, {"B/Three", "A/One", "A/Two"}) ==
+          wrap("    \\input{B/Three}\n    \\beginkeeporder\n    \\transposesong[key=G]{1}\n    "
+               "\\input{A/One}\n"
+               "    \\transposesong[key=G]{2}\n    \\input{A/Two}\n    \\endkeeporder\n"));
+    // one block song removed: its line goes, the other's stays
+    CHECK(set(text, {"A/Two", "B/Three"}) ==
+          wrap("    \\beginkeeporder\n    \\transposesong[key=G]{2}\n    \\input{A/Two}\n    "
+               "\\endkeeporder\n"
+               "    \\input{B/Three}\n"));
+    // the whole block removed
+    CHECK(set(text, {"B/Three"}) == wrap("    \\input{B/Three}\n"));
+}
+
 // Hidden: runs against the real ../ZubuvZpevnik checkout, which changes on its own.
 // Run with: build/debug/tests/zub_core_tests "[integration]"
 TEST_CASE("every real book parses and round-trips", "[.integration][bookfile]") {
@@ -397,6 +577,10 @@ TEST_CASE("every real book parses and round-trips", "[.integration][bookfile]") 
             REQUIRE(again);
             CHECK(*again == *text);
         }
+        // the book's own text has no transposing yet, and the edits give it back
+        for (const auto& t : readTransposes(*text))
+            CHECK_FALSE(t.inputName.empty());
+        CHECK(setTransposeSettings(*text, readTransposeSettings(*text)) == *text);
         for (const auto& name : b->songs()) {
             INFO(name);
             CHECK((fs::exists(repo / "songs" / "chords" / (name + ".tex")) ||
