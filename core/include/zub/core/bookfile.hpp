@@ -187,8 +187,8 @@ std::string setLocked(std::string_view text, bool locked);
 // The book's key is a comment line `% zpevnikar: key=G transpose=chords` (or `transpose=capo`; the
 // key as zub::booktranspose::bookKeyName writes it), like the lock mark. A song is transposed by a
 // line directly above its `\input` (the previous line of the file, not a blank or a wish):
-// `\transposesong[key=<key>]{N}` or `\transposesong[capo,key=<key>]{N}`, optionally followed by a
-// `% fixed` comment (a per-song choice that a change of the book's key leaves alone). It is a plain
+// `\transposesong[key=<key>]{N}` (re-shaping the chords; the package has no `capo` option: Capo mode
+// edits the song files instead), optionally followed by a `% fixed` comment (a per-song choice that a change of the book's key leaves alone). It is a plain
 // line of its input's unit: setSongs moves it with the input and drops it with a removed input.
 
 struct TransposeSettings {
@@ -208,20 +208,21 @@ std::string setTransposeSettings(std::string_view text, const TransposeSettings&
 struct SongTranspose {
     std::string inputName;
     int semitones = 0;  // -11..11
-    bool capo = false;  // `capo` option
+    bool capo = false;  // an old `capo` option: read only, setTranspose refuses it
     std::string key;    // the `key=` option as written ("" none)
     bool fixed = false; // `% fixed`
 };
 
 // Every song line in the song lists (code `\transposesong[...]{N}` alone on the line directly
-// above an `\input{name}` line, options only `capo` and `key=`, N an integer), in file order.
+// above an `\input{name}` line, options only `capo` (old books) and `key=`, N an integer), in file
+// order.
 std::vector<SongTranspose> readTransposes(std::string_view text);
 
 // Writes, replaces or removes the line above the song's `\input` (the first environment that has
-// it): `<indent of the \input>\transposesong[capo,key=K]{N}` plus ` % fixed`, with the file's line
+// it): `<indent of the \input>\transposesong[key=K]{N}` plus ` % fixed`, with the file's line
 // break; a replaced line keeps its own indent. nullopt, or semitones 0 without `fixed`, removes
 // it (a `fixed` 0 stays: "do not transpose this song"). Errors: no such input, read-only
-// environment. `inputName` of the argument is ignored.
+// environment, `capo` set. `inputName` of the argument is ignored.
 std::expected<std::string, std::string> setTranspose(std::string_view text,
                                                      std::string_view inputName,
                                                      const std::optional<SongTranspose>& transpose);

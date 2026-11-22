@@ -50,16 +50,17 @@ bool startsWithMacro(string_view s, string_view name) {
 
 } // namespace
 
-std::optional<Key> parseKey(string_view value, bool german) {
-    auto skipSpaces = [](string_view& s) {
-        while (!s.empty() && (s.front() == ' ' || s.front() == '\t'))
-            s.remove_prefix(1);
-    };
-    skipSpaces(value);
-    if (value.starts_with('{')) {
-        value.remove_prefix(1);
-        skipSpaces(value);
-    }
+namespace {
+
+struct ScannedKey {
+    Key key;
+    std::size_t end; // the key proper: letter, accidental, and a following `m` (with its space)
+};
+
+// The key at the start of `value` (no leading space or brace skipped); what follows must start a
+// new word (see parseKey).
+std::optional<ScannedKey> scanKey(string_view value, bool german) {
+    const string_view whole = value;
     if (value.empty())
         return std::nullopt;
     const auto base = letterPitch(value.front(), german);
@@ -85,6 +86,11 @@ std::optional<Key> parseKey(string_view value, bool german) {
         --pitch;
         value.remove_prefix(1);
     }
+    std::size_t end = whole.size() - value.size();
+    const string_view afterAccidental = value;
+    const auto endsWord = [](string_view rest) {
+        return rest.empty() || rest.starts_with("{}") || std::string_view(" \t,\\(-/~}").find(rest.front()) != string_view::npos;
+    };
     if (macro) {
         // "E\flt{}", "E\flt\ (B\flt\ whistle)", "F\shrp m": the macro's own terminators.
         for (bool again = true; again;) {
@@ -105,10 +111,64 @@ std::optional<Key> parseKey(string_view value, bool german) {
     if (value.starts_with('m') && (value.size() == 1 || !isLetter(value[1]))) {
         minor = true;
         value.remove_prefix(1);
+        end = whole.size() - value.size();
     }
-    if (!value.empty() && std::string_view(" \t,\\(-/~}").find(value.front()) == string_view::npos)
+    // "B\flt\ whistle": the macro's own `\ ` also ends the key.
+    if (!endsWord(value) && !(!minor && endsWord(afterAccidental)))
         return std::nullopt;
-    return Key{wrap12(pitch), minor};
+    return ScannedKey{Key{wrap12(pitch), minor}, end};
+}
+
+} // namespace
+
+std::optional<Key> parseKey(string_view value, bool german) {
+    auto skipSpaces = [](string_view& s) {
+        while (!s.empty() && (s.front() == ' ' || s.front() == '\t'))
+            s.remove_prefix(1);
+    };
+    skipSpaces(value);
+    if (value.starts_with('{')) {
+        value.remove_prefix(1);
+        skipSpaces(value);
+    }
+    const auto scanned = scanKey(value, german);
+    if (!scanned)
+        return std::nullopt;
+    return scanned->key;
+}
+
+std::string shiftKeys(string_view value, int semitones, bool german) {
+    std::string out;
+    std::size_t i = 0;
+    bool wordStart = true;
+    while (i < value.size()) {
+        const char c = value[i];
+        if (c == '\\') { // a macro: its name (or one character) is no key
+            std::size_t j = i + 1;
+            if (j < value.size() && isLetter(value[j]))
+                while (j < value.size() && isLetter(value[j]))
+                    ++j;
+            else if (j < value.size())
+                ++j;
+            out.append(value.substr(i, j - i));
+            i = j;
+            wordStart = true;
+            continue;
+        }
+        if (wordStart) {
+            if (const auto scanned = scanKey(value.substr(i), german)) {
+                const Key moved{wrap12(scanned->key.pitch + semitones), scanned->key.minor};
+                out += keyName(moved, german);
+                i += scanned->end;
+                wordStart = false;
+                continue;
+            }
+        }
+        out += c;
+        wordStart = std::string_view(" \t,{(/-~").find(c) != string_view::npos;
+        ++i;
+    }
+    return out;
 }
 
 int shift(Key from, Key target) {

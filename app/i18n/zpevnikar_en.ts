@@ -182,6 +182,19 @@
 <context>
     <name>SongbooksPage</name>
     <message numerus="yes">
+        <source>%n song file(s) will change: their capo, key and capo notes are raised so that the songs sound in %1. This affects every songbook that uses them.
+
+The chords stay as they are. None does not undo this; to go back, choose the old key again.</source>
+        <translation>
+            <numerusform>%n song file will change: its capo, key and capo notes are raised so that the songs sound in %1. This affects every songbook that uses them.
+
+The chords stay as they are. None does not undo this; to go back, choose the old key again.</numerusform>
+            <numerusform>%n song files will change: their capo, key and capo notes are raised so that the songs sound in %1. This affects every songbook that uses them.
+
+The chords stay as they are. None does not undo this; to go back, choose the old key again.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>%n song(s)</source>
         <translation>
             <numerusform>%n song</numerusform>

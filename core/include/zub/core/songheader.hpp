@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // Options of a song's \beginsong header (`key={value}`), edited byte-exact. `zub::tags::setTags`
 // and the `pap` helpers are built on it.
@@ -35,5 +36,14 @@ std::string measuredPapers(std::string_view currentPap, const std::optional<song
 // `songText` with its `pap` set to `pap` (the bare list, "a4,a5"; empty writes `pap={}`: "fits
 // nothing", as chords_converter spells it; checkpaper.py's set_pap removes the key instead).
 std::string setPap(std::string_view songText, std::string_view pap);
+
+// The count of every `\capo{n}` of the song's text in code (comments ignored), in order, n an
+// integer written with digits only (`\capo{}` and `\capo{x}` are skipped).
+std::vector<int> bodyCapos(std::string_view songText);
+
+// `songText` with every `\capo{n}` in code (comments untouched, also the header) written as
+// `\capo{n+semitones}`; the rest stays byte-identical (line endings included). No range check:
+// see bodyCapos. Used when a song is raised by capo (the chords stay, the song sounds higher).
+std::string shiftBodyCapos(std::string_view songText, int semitones);
 
 } // namespace zub::songheader

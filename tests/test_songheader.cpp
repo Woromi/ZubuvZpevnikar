@@ -159,3 +159,23 @@ TEST_CASE("only the converter's placeholder form is replaced, not a remark", "[s
     CHECK(setOption(remark, "key", "{D}") ==
           song("\\beginsong{T}[\n    by={X},\n    key={D},\n    % key=C was wrong, it is D\n]\n"));
 }
+
+TEST_CASE("bodyCapos and shiftBodyCapos change every \\capo{n} in code", "[songheader]") {
+    const std::string text =
+        "\\beginsong{A}[by={B}, cap={2}]\n\\capo{2}\n% \\capo{7}\n\\iflargepaper\\else\\capo{5}\\fi\n"
+        "\\capo{}\nx 50\\% \\capo{3}\n\\endsong\n";
+    CHECK(bodyCapos(text) == std::vector<int>{2, 5, 3});
+    const std::string shifted = shiftBodyCapos(text, 4);
+    CHECK(shifted ==
+          "\\beginsong{A}[by={B}, cap={2}]\n\\capo{6}\n% \\capo{7}\n\\iflargepaper\\else\\capo{9}"
+          "\\fi\n\\capo{}\nx 50\\% \\capo{7}\n\\endsong\n");
+    CHECK(shiftBodyCapos(shifted, -4) == text);
+
+    const std::string crlf = "\\capo{1}\r\nLa\r\n\\capo{3}\r\n";
+    CHECK(shiftBodyCapos(crlf, 2) == "\\capo{3}\r\nLa\r\n\\capo{5}\r\n");
+    CHECK(shiftBodyCapos(crlf, -1) == "\\capo{0}\r\nLa\r\n\\capo{2}\r\n");
+
+    const std::string none = "\\beginverse\nLa\n\\endverse\n";
+    CHECK(bodyCapos(none).empty());
+    CHECK(shiftBodyCapos(none, 3) == none);
+}

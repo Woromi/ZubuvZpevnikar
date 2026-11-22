@@ -178,3 +178,58 @@ TEST_CASE("every real song key parses, or is in the documented list",
     CHECK(seen.empty());
     CHECK(parsed > 100);
 }
+
+TEST_CASE("shiftKeys moves every key of a key= value", "[booktranspose]") {
+    CHECK(shiftKeys("G", 2, false) == "A");
+    CHECK(shiftKeys("{Am}", 3, false) == "{Cm}");
+    CHECK(shiftKeys("C\\shrp m", 1, false) == "Dm");
+    CHECK(shiftKeys("Cm\\rightarrow C", 2, false) == "Dm\\rightarrow D");
+    CHECK(shiftKeys("B\\flt m\\rightarrow G\\flt", -2, false) == "G\\shrp m\\rightarrow E");
+    CHECK(shiftKeys("A\\rightarrow Hm", 2, true) == "H\\rightarrow C\\shrp m");
+    CHECK(shiftKeys("Dm, F", 2, false) == "Em, G");
+    CHECK(shiftKeys("G (D whistle)", 2, false) == "A (E whistle)");
+    CHECK(shiftKeys("E\\flt\\ (B\\flt\\ whistle)", 2, false) == "F\\ (C\\ whistle)");
+    CHECK(shiftKeys("E\\flt{}", 1, false) == "E{}");
+    CHECK(shiftKeys("H", 1, true) == "C");
+    CHECK(shiftKeys("E\\flt", 11, true) == "D");
+    // Not keys: left alone
+    CHECK(shiftKeys("Bridge, Dmaj", 2, false) == "Bridge, Dmaj");
+    CHECK(shiftKeys("", 3, false) == "");
+    // Round trip for the spelling keyName writes
+    for (const char* value : {"G", "Am", "D\\shrp m", "Cm\\rightarrow C", "A\\shrp m\\rightarrow F\\shrp",
+                              "Dm, F", "F\\shrp m", "G (D whistle)"})
+        for (int n = -11; n <= 11; ++n)
+            CHECK(shiftKeys(shiftKeys(value, n, false), -n, false) == value);
+}
+
+TEST_CASE("shifting every real song key by N and back keeps its text",
+          "[.integration][booktranspose]") {
+    const fs::path repo{ZUB_REAL_SONGBOOK_DIR};
+    if (!fs::exists(repo / "songs"))
+        SKIP("no songbook checkout at " << repo);
+    int checked = 0, respelled = 0;
+    for (const auto& entry : fs::recursive_directory_iterator(repo / "songs")) {
+        if (!entry.is_regular_file() || entry.path().extension() != ".tex")
+            continue;
+        const auto text = zub::readTextFile(entry.path());
+        if (!text)
+            continue;
+        const auto song = zub::parseSong(*text);
+        if (!song)
+            continue;
+        const auto key = song->value("key");
+        const bool german = zub::score::germanNames(zub::mainLanguage(song->value("lang")));
+        if (!parseKey(key, german))
+            continue;
+        const auto normal = shiftKeys(key, 0, german);
+        if (normal != key)
+            ++respelled; // `A\shrp`, `D\shrp`...: keyName spells them as flats
+        for (const int n : {1, 2, 5, 7, -3, -11}) {
+            INFO(key << " by " << n << " in " << entry.path().string());
+            CHECK(shiftKeys(shiftKeys(key, n, german), -n, german) == normal);
+        }
+        ++checked;
+    }
+    CHECK(checked > 100);
+    std::cerr << respelled << " of " << checked << " keys are respelled by keyName\n";
+}

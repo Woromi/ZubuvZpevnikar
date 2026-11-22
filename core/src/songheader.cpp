@@ -496,4 +496,51 @@ std::string setPap(std::string_view songText, std::string_view pap) {
     return setOption(songText, "pap", value);
 }
 
+namespace {
+
+struct CapoAt {
+    std::size_t begin = 0, end = 0; // the digits inside the braces
+    int value = 0;
+};
+
+std::vector<CapoAt> findCapos(std::string_view text) {
+    const std::string masked = maskComments(text);
+    constexpr std::string_view command = "\\capo{";
+    std::vector<CapoAt> found;
+    for (std::size_t at = masked.find(command); at != npos; at = masked.find(command, at + 1)) {
+        const std::size_t begin = at + command.size();
+        std::size_t end = begin;
+        while (end < masked.size() && masked[end] >= '0' && masked[end] <= '9')
+            ++end;
+        if (end == begin || end - begin > 4 || end >= masked.size() || masked[end] != '}')
+            continue;
+        int value = 0;
+        for (std::size_t i = begin; i < end; ++i)
+            value = value * 10 + (masked[i] - '0');
+        found.push_back({begin, end, value});
+    }
+    return found;
+}
+
+} // namespace
+
+std::vector<int> bodyCapos(std::string_view songText) {
+    std::vector<int> values;
+    for (const auto& capo : findCapos(songText))
+        values.push_back(capo.value);
+    return values;
+}
+
+std::string shiftBodyCapos(std::string_view songText, int semitones) {
+    std::string out;
+    std::size_t copied = 0;
+    for (const auto& capo : findCapos(songText)) {
+        out.append(songText.substr(copied, capo.begin - copied));
+        out += std::to_string(capo.value + semitones);
+        copied = capo.end;
+    }
+    out.append(songText.substr(copied));
+    return out;
+}
+
 } // namespace zub::songheader

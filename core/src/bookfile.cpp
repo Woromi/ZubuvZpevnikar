@@ -360,7 +360,7 @@ std::optional<CommentedInput> commentedInput(string_view content) {
     return CommentedInput{string(name), pct, in};
 }
 
-// The song line of a book: code exactly `\transposesong[capo,key=K]{N}`, optionally a `% fixed`
+// The song line of a book: code exactly `\transposesong[key=K]{N}` (an old `capo` option is still read), optionally a `% fixed`
 // comment. nullopt for anything else.
 std::optional<SongTranspose> parseTransposeLine(string_view content) {
     const string code = latex::stripComments(content);
@@ -1293,10 +1293,8 @@ string settingsLine(const TransposeSettings& s) {
 
 string songLine(const SongTranspose& t) {
     string options;
-    if (t.capo)
-        options = "capo";
     if (!t.key.empty())
-        options += (options.empty() ? "" : ",") + ("key=" + t.key);
+        options = "key=" + t.key;
     return "\\transposesong" + (options.empty() ? string() : "[" + options + "]") + "{" +
            std::to_string(t.semitones) + "}" + (t.fixed ? " % fixed" : "");
 }
@@ -1381,6 +1379,8 @@ std::vector<SongTranspose> readTransposes(string_view text) {
 
 std::expected<string, string> setTranspose(string_view text, string_view inputName,
                                            const std::optional<SongTranspose>& transpose) {
+    if (transpose && transpose->capo)
+        return std::unexpected("the package has no capo option of \\transposesong");
     const auto scanned = scan(text);
     if (!scanned)
         return std::unexpected(scanned.error());

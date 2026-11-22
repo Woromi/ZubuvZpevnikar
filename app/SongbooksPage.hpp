@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 #include <QWidget>
 #include <expected>
 #include <filesystem>
@@ -61,6 +62,11 @@ public:
     // The package the books are built with: a book with a key needs one that defines
     // \transposesong (else a warning shows).
     void setPackageDir(const std::filesystem::path& packageDir);
+    // Whether the song file at a path is open in an editor with unsaved changes (set by
+    // MainWindow): Capo mode rewrites song files and skips those.
+    void setModifiedSongQuery(std::function<bool(const std::filesystem::path&)> query) {
+        songModified_ = std::move(query);
+    }
     // Before the app closes: asks to save unsaved LaTeX; false to keep the app open.
     bool confirmClose();
     // Lists the books again and reads the selected one (kept where possible) from disk.
@@ -127,6 +133,10 @@ private:
     // ---- Transposing the book (zub::booktranspose, zub::bookfile::setTranspose)
     // The Key / Transpose by form changed: the settings line and every song's line, one write.
     void onTransposeFormChanged();
+    // Capo mode: raises each of `paths` (song files) from its own key to `target`: cap=, every
+    // \capo{n} and key= (the chords stay). Returns what was skipped and why, for people.
+    QStringList moveSongsByCapo(const std::vector<std::filesystem::path>& paths,
+                                zub::booktranspose::Key target);
     // `text` with the \transposesong line of each of `names` (the book's own, `% fixed` ones
     // stay) computed from the book's settings in `text`.
     std::string withTransposes(std::string text, const std::vector<std::string>& names) const;
@@ -196,6 +206,7 @@ private:
     SongbookSorter* sorter_;
     SongbookExporter* exporter_;
     std::filesystem::path root_;
+    std::function<bool(const std::filesystem::path&)> songModified_;
 
     QString id_;                       // the selected songbook ("" = none)
     std::string text_;                 // its file as last read or written
@@ -245,6 +256,7 @@ private:
     QLabel* warning_ = nullptr;
     QComboBox* bookKey_ = nullptr;
     QComboBox* transposeMode_ = nullptr;
+    QString shownBook_; // the book whose transpose mode the form last showed
     QLabel* transposeWarning_ = nullptr;
     bool packageTransposes_ = false; // the package in use defines \transposesong
     QLabel* sorterWarning_ = nullptr;

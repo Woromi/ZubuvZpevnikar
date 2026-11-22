@@ -455,14 +455,12 @@ bool plainName(std::string_view name) {
     });
 }
 
-// `capo` or `key=<key>`; the key is letters, digits, `#`, spaces and the macros \shrp and \flt.
+// `key=<key>` (the package has no `capo` option: it is a LaTeX error); the key is letters, digits, `#`, spaces and the macros \shrp and \flt.
 bool plainTransposeOption(std::string_view option) {
     while (!option.empty() && (option.front() == ' ' || option.front() == '\t'))
         option.remove_prefix(1);
     while (!option.empty() && (option.back() == ' ' || option.back() == '\t'))
         option.remove_suffix(1);
-    if (option == "capo")
-        return true;
     if (!option.starts_with("key="))
         return false;
     option.remove_prefix(4);
@@ -544,7 +542,7 @@ std::vector<std::string> unknownBookConstructs(std::string_view bookContent) {
                 report("\\documentclass" +
                        (argument ? "{" + std::string(*argument) + "}" : std::string()));
         } else if (name == "transposesong") {
-            // \transposesong[capo,key=<key>]{N}: a count of semitones and plain key text.
+            // \transposesong[key=<key>]{N}: a count of semitones and plain key text.
             std::size_t argAt = end;
             bool ok = true;
             if (const auto options = bracketArgument(text, argAt)) {

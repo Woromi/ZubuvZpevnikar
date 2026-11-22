@@ -443,11 +443,13 @@ TEST_CASE("setTranspose adds, replaces and removes the line above the input",
     const auto added = transposed(text, "B/Two", tr(-5));
     CHECK(added ==
           wrap("    \\input{A/One}\n    \\transposesong[key=G]{-5}\n    \\input{B/Two}\n"));
-    const auto replaced = transposed(added, "B/Two", tr(3, "F\\shrp m", true, true));
+    const auto replaced = transposed(added, "B/Two", tr(3, "F\\shrp m", false, true));
     CHECK(replaced ==
-          wrap("    \\input{A/One}\n    \\transposesong[capo,key=F\\shrp m]{3} % fixed\n"
+          wrap("    \\input{A/One}\n    \\transposesong[key=F\\shrp m]{3} % fixed\n"
                "    \\input{B/Two}\n"));
-    CHECK(transposed(replaced, "B/Two", tr(3, "F\\shrp m", true, true)) == replaced);
+    CHECK(transposed(replaced, "B/Two", tr(3, "F\\shrp m", false, true)) == replaced);
+    // the package has no capo option: never written
+    CHECK_FALSE(setTranspose(text, "B/Two", tr(3, "G", true)));
     CHECK(transposed(replaced, "B/Two", std::nullopt) == text);
     CHECK(transposed(replaced, "B/Two", tr(0, "G")) == transposed(replaced, "B/Two", std::nullopt));
     CHECK(transposed(text, "B/Two", std::nullopt) == text);

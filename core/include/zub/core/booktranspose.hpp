@@ -22,6 +22,14 @@ struct Key {
 // value (`Fis`, `Dmaj`).
 std::optional<Key> parseKey(std::string_view value, bool german);
 
+// `value` (a `key=` value, with or without braces) with EVERY key it holds moved by `semitones`,
+// each written by keyName in its own minor/major (`Cm\rightarrow C`, `B\flt m\rightarrow G\flt`,
+// `Dm, F`, `E\flt\ (B\flt\ whistle)`). Everything else stays byte-identical: separators,
+// macros, parentheses and the macro terminators after a key (`{}`, `\ `). A key is rewritten in
+// keyName's spelling even by 0 (`C#` -> `C\shrp`, `A\shrp` -> `B\flt`), so +N then -N gives back
+// the text only where the original already is that spelling.
+std::string shiftKeys(std::string_view value, int semitones, bool german);
+
 // Semitones, in -5..+6, that move a song in `from` to the book's `target`. Keys are compared by
 // key signature: a minor song goes to the relative minor of a major target, a major song to the
 // relative major of a minor target (target G: Am songs go to Em, C songs to G; target Em: C songs

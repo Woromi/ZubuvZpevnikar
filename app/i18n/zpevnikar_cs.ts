@@ -2761,6 +2761,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Žádný</translation>
     </message>
     <message>
+        <source>Chords re-shapes the chords in this book (and the package transposes scores where it can). Capo changes the song files themselves (their capo, key and capo notes; the chords stay), which affects every songbook using them. It is relative to each song&apos;s current key, and None does not undo it.</source>
+        <translation>Akordy mění tvar akordů v tomto zpěvníku (a balíček transponuje i noty, kde to jde). Capo mění samotné soubory písní (capo, tóninu a značky capo; akordy zůstávají), což se týká všech zpěvníků, které je používají. Počítá se od aktuální tóniny každé písně a Žádný to nevrací.</translation>
+    </message>
+    <message>
         <source>Cover image</source>
         <translation>Obrázek obálky</translation>
     </message>
@@ -2892,10 +2896,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <source>Images (*.png *.jpg *.jpeg *.pdf)</source>
         <translation>Obrázky (*.png *.jpg *.jpeg *.pdf)</translation>
     </message>
-    <message>
-        <source>The capo would be %1: the chords of this song are re-shaped.</source>
-        <translation>Kapodastr by byl %1: akordy této písně se přeloží.</translation>
-    </message>
     <message numerus="yes">
         <source>%n song(s)</source>
         <translation>
@@ -3013,10 +3013,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Kapodastr</translation>
     </message>
     <message>
-        <source>Chords re-shapes the chords (and the package transposes scores where it can); Capo changes only the capo note.</source>
-        <translation>Akordy přetvoří akordy (a balíček transponuje noty, kde to jde); Kapodastr změní jen poznámku o kapodastru.</translation>
-    </message>
-    <message>
         <source>Key</source>
         <translation>Tónina</translation>
     </message>
@@ -3103,6 +3099,54 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Chosen when the songbook is made (New Songbook…); to change it, edit the LaTeX tab, including the cover and title page commands</source>
         <translation>Volí se při vytvoření zpěvníku (Nový zpěvník…); pro změnu upravte kartu LaTeX, včetně příkazů obálky a titulní strany</translation>
+    </message>
+    <message>
+        <source>Transpose by capo</source>
+        <translation>Transpozice kapodastrem</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n song file(s) will change: their capo, key and capo notes are raised so that the songs sound in %1. This affects every songbook that uses them.
+
+The chords stay as they are. None does not undo this; to go back, choose the old key again.</source>
+        <translation>
+            <numerusform>%n soubor písně se změní: jeho capo, tónina a značky capo se zvýší, aby písně zněly v tónině %1. Týká se to všech zpěvníků, které je používají.
+
+Akordy zůstávají, jak jsou. Žádný to nevrací; pro návrat zvolte původní tóninu.</numerusform>
+            <numerusform>%n soubory písní se změní: jejich capo, tónina a značky capo se zvýší, aby písně zněly v tónině %1. Týká se to všech zpěvníků, které je používají.
+
+Akordy zůstávají, jak jsou. Žádný to nevrací; pro návrat zvolte původní tóninu.</numerusform>
+            <numerusform>%n souborů písní se změní: jejich capo, tónina a značky capo se zvýší, aby písně zněly v tónině %1. Týká se to všech zpěvníků, které je používají.
+
+Akordy zůstávají, jak jsou. Žádný to nevrací; pro návrat zvolte původní tóninu.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Not changed:</source>
+        <translation>Nezměněno:</translation>
+    </message>
+    <message>
+        <source>%1: open in the editor with unsaved changes</source>
+        <translation>%1: otevřená v editoru s neuloženými změnami</translation>
+    </message>
+    <message>
+        <source>%1: %2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <source>%1: the file can&apos;t be rewritten safely</source>
+        <translation>%1: soubor nelze bezpečně přepsat</translation>
+    </message>
+    <message>
+        <source>%1: the song header has a problem: %2</source>
+        <translation>%1: problém v hlavičce písně: %2</translation>
+    </message>
+    <message>
+        <source>%1: the capo would leave 0..9</source>
+        <translation>%1: capo by vyšlo mimo 0..9</translation>
+    </message>
+    <message>
+        <source>%1: changed on disk meanwhile</source>
+        <translation>%1: mezitím se změnil na disku</translation>
     </message>
     <message>
         <source>Transpose %1</source>

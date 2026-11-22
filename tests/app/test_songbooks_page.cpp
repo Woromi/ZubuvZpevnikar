@@ -12,12 +12,15 @@
 #include <QDialogButtonBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
+#include <QPlainTextEdit>
 #include <QListWidget>
 #include <QPushButton>
 #include <QStackedWidget>
 #include <QTabWidget>
 #include <QTreeWidget>
 #include <catch2/catch_test_macros.hpp>
+#include <map>
 
 using apptest::has;
 using apptest::slurp;
@@ -435,26 +438,214 @@ TEST_CASE("Songbooks page: a book key writes each song's transpose line", "[app]
     CHECK(slurp(f.book()) == before);
 }
 
-TEST_CASE("Songbooks page: capo mode, with a song out of range", "[app][songbooks]") {
+namespace {
+
+// Capo mode asks first (Yes here); the confirmation is the only dialog.
+void setCapoMode(BooksWindow& w) {
+    auto yes = apptest::answerMessageBox(QMessageBox::Yes);
+    A::transposeMode(*w.page)->setCurrentIndex(1); // Capo
+}
+
+void setKeyYes(BooksWindow& w, const char* data) {
+    auto yes = apptest::answerMessageBox(QMessageBox::Yes);
+    setKey(w, data);
+}
+
+std::string replaced(std::string text, const std::string& from, const std::string& to) {
+    const auto at = text.find(from);
+    REQUIRE(at != std::string::npos);
+    return text.replace(at, from.size(), to);
+}
+
+const char* const keyedSongs[] = {"Abba/OurLastSummer", "Ayreon/EMc2", "Brontosauri/FrankyDlouhan",
+                                  "TheMamasAndThePapas/CaliforniaDreamin",
+                                  "WabiDanek/Montgomery"};
+
+} // namespace
+
+TEST_CASE("Songbooks page: capo mode edits the song files, a song out of range is re-shaped",
+          "[app][songbooks]") {
     KeyedFixture f;
+    const auto emc2 = f.fixture / "songs/chords/Ayreon/EMc2.tex";
+    // A song with a \capo in its body: raised too (code only, not the comment).
+    const std::string emc2Before =
+        replaced(slurp(emc2), "\\beginverse", "% \\capo{5}\n\\capo{5}\n\\beginverse");
+    apptest::writeFile(emc2, emc2Before);
     BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
     setKey(w, "B");
-    A::transposeMode(*w.page)->setCurrentIndex(1); // Capo
+    setCapoMode(w);
     const std::string text = slurp(f.book());
     INFO(text);
     CHECK(has(text, "% zpevnikar: key=B transpose=capo"));
-    // C with capo 5 to B: capo 4.
-    CHECK(has(text, "    \\transposesong[capo,key=B]{-1}\n    \\input{Ayreon/EMc2}"));
+    CHECK(!has(text, "[capo"));
+    // C with capo 5 to B: capo 4, key B, the \capo note too; the chords stay. No book line.
+    CHECK(slurp(emc2) == replaced(replaced(replaced(emc2Before, "key={C}", "key={B}"), "cap={5}",
+                                           "cap={4}"),
+                                  "\n\\capo{5}", "\n\\capo{4}"));
+    CHECK(!has(text, "{-1}\n    \\input{Ayreon/EMc2}")); // the chords-mode line is gone
     // D without a capo to B would be capo -3, E-flat with capo 3 capo -1: their chords are
-    // re-shaped instead (written so; the package would do the same).
+    // re-shaped instead by a plain book line, their files stay.
     CHECK(has(text, "    \\transposesong[key=B]{-3}\n    \\input{Abba/OurLastSummer}"));
+    CHECK(!has(slurp(f.fixture / "songs/chords/Abba/OurLastSummer.tex"), "key={B}"));
     CHECK(songItem(w, "Abba/OurLastSummer")
               ->text(0)
               .endsWith("D → B (capo would be -3: chords re-shaped)"));
     CHECK(songItem(w, "Brontosauri/FrankyDlouhan")
               ->text(0)
               .endsWith("E♭ → H (capo would be -1: chords re-shaped)")); // Czech: H
-    CHECK(songItem(w, "Ayreon/EMc2")->text(0).endsWith("C → B (capo -1)"));
+    // The tree now shows the new key of the moved song.
+    CHECK(songItem(w, "Ayreon/EMc2")->text(0).endsWith("  B"));
+}
+
+TEST_CASE("Songbooks page: capo mode writes cap, key and \\capo exactly, and only relative",
+          "[app][songbooks]") {
+    KeyedFixture f;
+    const auto song = [&](const char* name) {
+        return f.fixture / "songs/chords" / (std::string(name) + ".tex");
+    };
+    const std::string emc2Before =
+        replaced(slurp(song("Ayreon/EMc2")), "\\beginverse", "\\capo{5}\n\\beginverse");
+    apptest::writeFile(song("Ayreon/EMc2"), emc2Before);
+    std::map<std::string, std::string> before;
+    for (const char* name : keyedSongs)
+        before[name] = slurp(song(name));
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    setCapoMode(w); // no key yet: nothing to ask
+    setKeyYes(w, "G");
+
+    const std::string bookText = slurp(f.book());
+    INFO(bookText);
+    CHECK(has(bookText, "% zpevnikar: key=G transpose=capo"));
+    CHECK(!has(bookText, "\\transposesong")); // every song moved by capo: no book line
+
+    // C (capo 5) to G: down 5, capo 0: no cap= (as songs without a capo), \capo{0}.
+    CHECK(slurp(song("Ayreon/EMc2")) ==
+          replaced(replaced(replaced(emc2Before, "key={C}", "key={G}"), "    cap={5},\n", ""),
+                   "\\capo{5}", "\\capo{0}"));
+    // D (no capo) to G: capo 5 added, key G.
+    const std::string abba = slurp(song("Abba/OurLastSummer"));
+    CHECK(has(abba, "key={G}"));
+    CHECK(has(abba, "cap={5}"));
+    CHECK(!has(abba, "key={D}"));
+    CHECK(abba.size() == before["Abba/OurLastSummer"].size() + std::string("    cap={5},\n").size());
+    // E-flat (capo 3, Czech) to G: up 4, capo 7; C-sharp minor (capo 4) to E minor: up 3, capo 7.
+    CHECK(slurp(song("Brontosauri/FrankyDlouhan")) ==
+          replaced(replaced(before["Brontosauri/FrankyDlouhan"], "key={E\\flt}", "key={G}"),
+                   "cap={3}", "cap={7}"));
+    CHECK(has(slurp(song("TheMamasAndThePapas/CaliforniaDreamin")), "cap={7}"));
+    // The tin whistle song and the song without a key stay.
+    CHECK(has(slurp(f.fixture / "songs/tinwhistle/Imaginary/Pipe.tex"), "key={D}"));
+
+    // The song list shows the new key and capo.
+    const auto* entry = A::model(w.window)->song(A::model(w.window)->rowOf(song("Ayreon/EMc2")));
+    REQUIRE(entry != nullptr);
+    CHECK(entry->meta.value("key") == "G");
+    CHECK(entry->meta.value("cap").empty());
+    CHECK(songItem(w, "Abba/OurLastSummer")->text(0).endsWith("  G"));
+
+    // Re-applying is relative to the current keys: the same key again changes nothing.
+    std::map<std::string, std::string> after;
+    for (const char* name : keyedSongs)
+        after[name] = slurp(song(name));
+    setKey(w, ""); // None does not undo the songs; no dialog
+    CHECK(!has(slurp(f.book()), "zpevnikar:"));
+    for (const char* name : keyedSongs)
+        CHECK(slurp(song(name)) == after[name]);
+    setKey(w, "G"); // nothing to move: no confirmation (an unanswered one would block)
+    for (const char* name : keyedSongs)
+        CHECK(slurp(song(name)) == after[name]);
+    CHECK(has(slurp(f.book()), "% zpevnikar: key=G transpose=capo"));
+    CHECK(!has(slurp(f.book()), "\\transposesong"));
+}
+
+TEST_CASE("Songbooks page: capo mode moves every key of a modulating song", "[app][songbooks]") {
+    KeyedFixture f;
+    const auto emc2 = f.fixture / "songs/chords/Ayreon/EMc2.tex";
+    apptest::writeFile(emc2, replaced(slurp(emc2), "key={C}", "key={Cm\\rightarrow C}"));
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    setCapoMode(w);
+    setKeyYes(w, "G");
+    // Cm to the relative minor of G (Em): up 4, capo 5 + 4 = 9; the second key moves too.
+    const std::string text = slurp(emc2);
+    CHECK(has(text, "key={Em\\rightarrow E}"));
+    CHECK(has(text, "cap={9}"));
+}
+
+TEST_CASE("Songbooks page: a body capo out of reach re-shapes the song's chords",
+          "[app][songbooks]") {
+    KeyedFixture f;
+    const auto emc2 = f.fixture / "songs/chords/Ayreon/EMc2.tex";
+    const std::string original = replaced(slurp(emc2), "\\beginverse", "\\capo{0}\n\\beginverse");
+    apptest::writeFile(emc2, original);
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    setCapoMode(w);
+    setKeyYes(w, "B"); // C to B: header capo 5 -> 4 fits, but the body's capo 0 would be -1
+    CHECK(slurp(emc2) == original);
+    CHECK(has(slurp(f.book()), "    \\transposesong[key=B]{-1}\n    \\input{Ayreon/EMc2}"));
+    CHECK(songItem(w, "Ayreon/EMc2")
+              ->text(0)
+              .endsWith("C → B (capo would be -1: chords re-shaped)"));
+}
+
+TEST_CASE("Songbooks page: Cancel in capo mode changes nothing", "[app][songbooks]") {
+    KeyedFixture f;
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    setCapoMode(w);
+    const std::string bookBefore = slurp(f.book());
+    std::map<std::string, std::string> before;
+    for (const char* name : keyedSongs)
+        before[name] = slurp(f.fixture / "songs/chords" / (std::string(name) + ".tex"));
+    {
+        auto cancel = apptest::answerMessageBox(QMessageBox::Cancel);
+        setKey(w, "G");
+        CHECK(cancel.fired());
+    }
+    CHECK(slurp(f.book()) == bookBefore);
+    CHECK(A::bookKey(*w.page)->currentIndex() == 0); // back to what the file says
+    for (const char* name : keyedSongs)
+        CHECK(slurp(f.fixture / "songs/chords" / (std::string(name) + ".tex")) == before[name]);
+}
+
+TEST_CASE("Songbooks page: capo mode skips an open song with unsaved changes and reloads a saved one",
+          "[app][songbooks]") {
+    KeyedFixture f;
+    const auto abba = f.fixture / "songs/chords/Abba/OurLastSummer.tex";
+    const auto emc2 = f.fixture / "songs/chords/Ayreon/EMc2.tex";
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    setCapoMode(w);
+    const std::string abbaBefore = slurp(abba);
+
+    // Abba is open and modified: skipped and reported.
+    REQUIRE(A::openExistingSong(w.window, abba));
+    SongEditor* editor = A::editor(w.window);
+    REQUIRE(editor != nullptr);
+    editor->textEdit()->appendPlainText("% unsaved");
+    REQUIRE(editor->isModified());
+    const auto unsavedText = editor->textEdit()->toPlainText();
+    A::showView(w.window, ActivityBar::View::Songbooks);
+    setKeyYes(w, "G");
+    CHECK(slurp(abba) == abbaBefore);
+    CHECK(has(A::warning(*w.page)->text().toStdString(), "OurLastSummer.tex"));
+    CHECK(has(A::warning(*w.page)->text().toStdString(), "unsaved"));
+    CHECK(has(slurp(emc2), "key={G}")); // the others moved
+    CHECK(editor->textEdit()->toPlainText() == unsavedText); // not touched
+    editor->textEdit()->document()->setModified(false);      // let the next song replace it
+
+    // EMc2 is open and unmodified: the editor reloads what was written.
+    setKey(w, "");
+    REQUIRE(A::openExistingSong(w.window, emc2));
+    A::showView(w.window, ActivityBar::View::Songbooks);
+    SongEditor* open = A::editor(w.window);
+    REQUIRE(open != nullptr);
+    REQUIRE(open->path() == emc2);
+    REQUIRE(!open->isModified());
+    setKeyYes(w, "A"); // EMc2 (now G) goes up 2: capo 2
+    CHECK(has(slurp(emc2), "key={A}"));
+    CHECK(apptest::waitUntil([&] {
+        return A::editor(w.window) && A::editor(w.window)->content().find("key={A}") !=
+                                          std::string::npos;
+    }));
+    CHECK(has(A::editor(w.window)->content(), "cap={2}"));
 }
 
 TEST_CASE("Songbooks page: a song's own choice survives key changes", "[app][songbooks]") {
