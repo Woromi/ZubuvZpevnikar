@@ -62,6 +62,8 @@ class MainWindow : public QMainWindow {
     friend struct AppTestAccess;
 
 public:
+    // The syntax definitions and themes, shared by every editor of the app.
+    static KSyntaxHighlighting::Repository& sharedRepository();
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
@@ -227,7 +229,10 @@ private:
     QAction* findAction_ = nullptr; // Edit > Find (Ctrl+F), also on the song toolbar
     QString listTitle_; // window title on the list page
     // Syntax definitions and themes, shared by all editors (must outlive them).
-    std::unique_ptr<KSyntaxHighlighting::Repository> repository_;
+    // The app's one syntax repository (sharedRepository): it outlives every window and editor,
+    // also editors deleted later (a closed song, a closed score tab) and the child widgets that
+    // are destroyed after this window's members.
+    KSyntaxHighlighting::Repository* repository_;
     PreviewPane* preview_ = nullptr;
     PreviewRunner* previewRunner_ = nullptr;
     std::filesystem::path previewWorkDir_;

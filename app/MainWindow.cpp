@@ -110,7 +110,7 @@ const auto songSplitterKey = QStringLiteral("window/songSplitter");
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent), repository_(std::make_unique<KSyntaxHighlighting::Repository>()) {
+    : QMainWindow(parent), repository_(&sharedRepository()) {
     listTitle_ = QApplication::applicationDisplayName() + QLatin1Char(' ') +
                  QApplication::applicationVersion();
     setWindowTitle(listTitle_);
@@ -147,6 +147,15 @@ MainWindow::MainWindow(QWidget* parent)
     const QSettings settings;
     restoreGeometry(settings.value(geometryKey).toByteArray());
     songSplitter_->restoreState(settings.value(songSplitterKey).toByteArray());
+}
+
+KSyntaxHighlighting::Repository& MainWindow::sharedRepository() {
+    // Created once and never destroyed: a highlighter must never outlive its repository
+    // ("Repository got deleted while a highlighter is still active"), and editors can be deleted
+    // late (deleteLater) or after the window's members. KSyntaxHighlighting recommends one
+    // repository per application.
+    static auto* repository = new KSyntaxHighlighting::Repository();
+    return *repository;
 }
 
 MainWindow::~MainWindow() {
