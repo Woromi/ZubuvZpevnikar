@@ -223,6 +223,9 @@ void SongbookTree::showMenu(const QPoint& position) {
         if (uid == rootUid_)
             connect(menu.addAction(tr("Sort the Songs Outside Sections")), &QAction::triggered,
                     this, [this, uid] { emit sortSectionRequested(uid); });
+        const std::string name = toStdString(item->data(0, nameRole).toString());
+        connect(menu.addAction(tr("Transpose…")), &QAction::triggered, this,
+                [this, name] { emit transposeSongRequested(name); });
         connect(menu.addAction(tr("Remove from the Songbook")), &QAction::triggered, this,
                 [this] { emit removeSelectedRequested(); });
     }

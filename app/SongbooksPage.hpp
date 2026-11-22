@@ -58,6 +58,9 @@ public:
     void setSongbookRoot(const std::filesystem::path& root);
     // The song collections (folders under songs/) for the picker's tabs.
     void setCollections(const std::vector<std::string>& collections);
+    // The package the books are built with: a book with a key needs one that defines
+    // \transposesong (else a warning shows).
+    void setPackageDir(const std::filesystem::path& packageDir);
     // Before the app closes: asks to save unsaved LaTeX; false to keep the app open.
     bool confirmClose();
     // Lists the books again and reads the selected one (kept where possible) from disk.
@@ -121,6 +124,19 @@ private:
     void applyField(zub::bookfile::Field field, const std::string& value);
     void updateFormVisibility();
     void updateCoverLabel();
+    // ---- Transposing the book (zub::booktranspose, zub::bookfile::setTranspose)
+    // The Key / Transpose by form changed: the settings line and every song's line, one write.
+    void onTransposeFormChanged();
+    // `text` with the \transposesong line of each of `names` (the book's own, `% fixed` ones
+    // stay) computed from the book's settings in `text`.
+    std::string withTransposes(std::string text, const std::vector<std::string>& names) const;
+    std::vector<std::string> allSongNames() const; // each once, in book order
+    // The tree's Transpose…: asks, then setSongTranspose.
+    void chooseSongTranspose(const std::string& name);
+    // A per-song choice: `semitones` a fixed shift (0 = do not transpose), nullopt = follow the
+    // songbook (drops the `% fixed` line and computes the song's own). One write.
+    bool setSongTranspose(const std::string& name, std::optional<int> semitones);
+    void updateTransposeWarning();
     void chooseCover();
     // The LaTeX tab.
     void saveLatex();
@@ -227,6 +243,10 @@ private:
     QPushButton* coverChoose_ = nullptr;
     QPushButton* coverClear_ = nullptr;
     QLabel* warning_ = nullptr;
+    QComboBox* bookKey_ = nullptr;
+    QComboBox* transposeMode_ = nullptr;
+    QLabel* transposeWarning_ = nullptr;
+    bool packageTransposes_ = false; // the package in use defines \transposesong
     QLabel* sorterWarning_ = nullptr;
     SongbookTree* tree_ = nullptr;
     QPushButton* removeSection_ = nullptr;

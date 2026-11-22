@@ -16,4 +16,8 @@ bool isPackage(const std::filesystem::path& dir);
 // otherwise (the submodule is not checked out, or an older songbook).
 std::optional<std::filesystem::path> ofSongbook(const std::filesystem::path& songbookRoot);
 
+// Whether the package defines `\transposesong` (what a book with a key needs): a non-comment line
+// of zubuvzpevnik.sty or of feature/*.cfg that defines the command (\newcommand, \def, ...).
+bool definesTransposesong(const std::filesystem::path& dir);
+
 } // namespace zub::package

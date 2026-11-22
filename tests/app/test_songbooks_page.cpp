@@ -340,3 +340,205 @@ TEST_CASE("Songbooks page: Check lists the songs not marked as fitting, one can 
     CHECK(A::editor(w.window)->path() == fixture / "songs/chords/Test/En.tex");
     CHECK(A::pages(w.window)->currentWidget() == A::songPage(w.window));
 }
+
+// ---- Transposing a book ----
+
+namespace {
+
+const char* const keyedBook = R"(\documentclass[chorded]{velkyzpevnik}
+
+\title{Keyed}
+\author{Tester}
+
+\begin{document}
+
+\begin{songs}{obsah}
+
+    \input{Abba/OurLastSummer}
+    \input{Ayreon/EMc2}
+    \input{Brontosauri/FrankyDlouhan}
+    \input{Imaginary/Hum}
+    \input{Imaginary/Pipe}
+    \input{TheMamasAndThePapas/CaliforniaDreamin}
+    \input{WabiDanek/Montgomery}
+
+\end{songs}
+
+\end{document}
+)";
+
+// A copy of the fixture with the book songbooks/keyed/keyed.tex: songs in D, C (capo 5), E-flat
+// (capo 3, Czech), C-sharp minor (capo 4), no key (a whistle2 song) and a song of the tinwhistle
+// collection (D).
+struct KeyedFixture {
+    KeyedFixture() {
+        apptest::writeFile(fixture / "songbooks/keyed/keyed.tex", keyedBook);
+        apptest::writeFile(fixture / "songs/tinwhistle/Imaginary/Pipe.tex",
+                           "\\beginsong{Pipe}[by={Test}, key={D}]\n\\beginverse\n\\[D]La\n"
+                           "\\endverse\n\\endsong\n");
+    }
+    apptest::Fixture fixture;
+    std::filesystem::path book() const { return fixture / "songbooks/keyed/keyed.tex"; }
+};
+
+void setKey(BooksWindow& w, const char* data) {
+    auto* combo = A::bookKey(*w.page);
+    const int index = combo->findData(QString::fromUtf8(data));
+    REQUIRE(index >= 0);
+    combo->setCurrentIndex(index);
+}
+
+// The tree item of `name`.
+QTreeWidgetItem* songItem(BooksWindow& w, const char* name) {
+    for (QTreeWidgetItemIterator it(A::tree(*w.page)); *it; ++it)
+        if ((*it)->data(0, Qt::UserRole + 1).toString() == QString::fromUtf8(name))
+            return *it;
+    return nullptr;
+}
+
+} // namespace
+
+TEST_CASE("Songbooks page: a book key writes each song's transpose line", "[app][songbooks]") {
+    KeyedFixture f;
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    const std::string before = slurp(f.book());
+    CHECK(A::transposeWarning(*w.page)->isHidden()); // no key: nothing to build
+
+    setKey(w, "G");
+    const std::string text = slurp(f.book());
+    INFO(text);
+    CHECK(has(text, "% zpevnikar: key=G transpose=chords"));
+    CHECK(has(text, "    \\transposesong[key=G]{5}\n    \\input{Abba/OurLastSummer}"));
+    CHECK(has(text, "    \\transposesong[key=G]{-5}\n    \\input{Ayreon/EMc2}"));
+    CHECK(has(text, "    \\transposesong[key=G]{4}\n    \\input{Brontosauri/FrankyDlouhan}"));
+    CHECK(has(text, "    \\transposesong[key=Em]{3}\n    \\input{TheMamasAndThePapas/"));
+    CHECK(has(text, "    \\transposesong[key=G]{5}\n    \\input{WabiDanek/Montgomery}"));
+    // No key, and the tin whistle collection: no line.
+    CHECK(has(text, "    \\input{Imaginary/Hum}\n    \\input{Imaginary/Pipe}\n"));
+    CHECK(!has(text, "{0}"));
+
+    // The tree shows each key and where it goes, or why it stays.
+    CHECK(songItem(w, "Abba/OurLastSummer")->text(0).endsWith("D → G"));
+    CHECK(songItem(w, "TheMamasAndThePapas/CaliforniaDreamin")->text(0).endsWith("C♯m → Em"));
+    CHECK(songItem(w, "Brontosauri/FrankyDlouhan")->text(0).endsWith("E♭ → G"));
+    CHECK(songItem(w, "Imaginary/Hum")->text(0).endsWith("(no key)"));
+    CHECK(songItem(w, "Imaginary/Pipe")->text(0).endsWith("(D, tin whistle: not transposed)"));
+
+    // A second key replaces the lines; None removes the settings and every line.
+    setKey(w, "A");
+    CHECK(has(slurp(f.book()), "% zpevnikar: key=A transpose=chords"));
+    CHECK(has(slurp(f.book()), "    \\transposesong[key=A]{-3}\n    \\input{Ayreon/EMc2}"));
+    setKey(w, "");
+    CHECK(slurp(f.book()) == before);
+}
+
+TEST_CASE("Songbooks page: capo mode, with a song out of range", "[app][songbooks]") {
+    KeyedFixture f;
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    setKey(w, "B");
+    A::transposeMode(*w.page)->setCurrentIndex(1); // Capo
+    const std::string text = slurp(f.book());
+    INFO(text);
+    CHECK(has(text, "% zpevnikar: key=B transpose=capo"));
+    // C with capo 5 to B: capo 4.
+    CHECK(has(text, "    \\transposesong[capo,key=B]{-1}\n    \\input{Ayreon/EMc2}"));
+    // D without a capo to B would be capo -3, E-flat with capo 3 capo -1: no lines.
+    CHECK(!has(text, "{-3}"));
+    CHECK(!has(text, "FrankyDlouhan}\n    \\transposesong"));
+    CHECK(songItem(w, "Abba/OurLastSummer")->text(0).endsWith("(D, capo would be -3)"));
+    CHECK(songItem(w, "Brontosauri/FrankyDlouhan")->text(0).endsWith("(E♭, capo would be -1)"));
+    CHECK(songItem(w, "Ayreon/EMc2")->text(0).endsWith("C → B (capo -1)"));
+}
+
+TEST_CASE("Songbooks page: a song's own choice survives key changes", "[app][songbooks]") {
+    KeyedFixture f;
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    setKey(w, "G");
+    // Montgomery (D) is kept two semitones up.
+    REQUIRE(A::setSongTranspose(*w.page, "WabiDanek/Montgomery", 2));
+    CHECK(has(slurp(f.book()),
+              "    \\transposesong[key=E]{2} % fixed\n    \\input{WabiDanek/Montgomery}"));
+    CHECK(songItem(w, "WabiDanek/Montgomery")->text(0).endsWith("kept: E"));
+    // Abba is not transposed at all.
+    REQUIRE(A::setSongTranspose(*w.page, "Abba/OurLastSummer", 0));
+    CHECK(has(slurp(f.book()), "{0} % fixed\n    \\input{Abba/OurLastSummer}"));
+
+    setKey(w, "A");
+    std::string text = slurp(f.book());
+    CHECK(has(text, "{2} % fixed\n    \\input{WabiDanek/Montgomery}"));
+    CHECK(has(text, "{0} % fixed\n    \\input{Abba/OurLastSummer}"));
+    CHECK(has(text, "    \\transposesong[key=A]{-3}\n    \\input{Ayreon/EMc2}"));
+
+    // None drops the settings and the lines that follow the book; the song's own choices stay.
+    setKey(w, "");
+    text = slurp(f.book());
+    CHECK(!has(text, "zpevnikar:"));
+    CHECK(has(text, "{2} % fixed\n    \\input{WabiDanek/Montgomery}"));
+    CHECK(!has(text, "Ayreon/EMc2}\n    \\transposesong"));
+    CHECK(!has(text, "transposesong[key=A]"));
+
+    // Follow the songbook: the song's line is its own again.
+    setKey(w, "G");
+    REQUIRE(A::setSongTranspose(*w.page, "WabiDanek/Montgomery", std::nullopt));
+    CHECK(has(slurp(f.book()), "    \\transposesong[key=G]{5}\n    \\input{WabiDanek/Montgomery}"));
+    CHECK(!has(slurp(f.book()), "fixed\n    \\input{WabiDanek"));
+}
+
+TEST_CASE("Songbooks page: an added song of a keyed book gets its line in the same write",
+          "[app][songbooks]") {
+    KeyedFixture f;
+    std::string without = keyedBook;
+    const std::string abba = "    \\input{Abba/OurLastSummer}\n";
+    without.erase(without.find(abba), abba.size());
+    apptest::writeFile(f.book(), without);
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    setKey(w, "G");
+    CHECK(!has(slurp(f.book()), "Abba/OurLastSummer"));
+    A::addSongs(*w.page, 0, {"Abba/OurLastSummer"});
+    const std::string text = slurp(f.book());
+    INFO(text);
+    CHECK(has(text, "    \\transposesong[key=G]{5}\n    \\input{Abba/OurLastSummer}"));
+}
+
+TEST_CASE("Songbooks page: a locked book refuses a key", "[app][songbooks]") {
+    KeyedFixture f;
+    apptest::writeFile(f.book(), "% zpevnikar: locked\n" + std::string(keyedBook));
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    const std::string before = slurp(f.book());
+    CHECK(!A::bookKey(*w.page)->isEnabled());
+    setKey(w, "G");
+    CHECK(slurp(f.book()) == before);
+    CHECK(A::bookKey(*w.page)->currentIndex() == 0); // back to what the file says
+    CHECK(!A::setSongTranspose(*w.page, "Ayreon/EMc2", 2));
+    CHECK(slurp(f.book()) == before);
+}
+
+TEST_CASE("Songbooks page: the package must define \\transposesong", "[app][songbooks]") {
+    KeyedFixture f;
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    w.page->setPackageDir(f.fixture / "zubuvzpevnik"); // the fixture's package: no \transposesong
+    setKey(w, "G");
+    CHECK(!A::transposeWarning(*w.page)->isHidden());
+    CHECK(has(A::transposeWarning(*w.page)->text().toStdString(), "can't transpose yet"));
+
+    apptest::writeFile(f.fixture / "zubuvzpevnik/feature/transpozice.cfg",
+                       "\\newcommand\\transposesong[2][]{}\n");
+    w.page->setPackageDir(f.fixture / "zubuvzpevnik");
+    CHECK(A::transposeWarning(*w.page)->isHidden());
+    w.page->setPackageDir(f.fixture / "zubuvzpevnik/nope");
+    CHECK(!A::transposeWarning(*w.page)->isHidden());
+    setKey(w, "");
+    CHECK(A::transposeWarning(*w.page)->isHidden()); // no key: nothing to build
+}
+
+// Not run by default: ZUB_SCREENSHOT=<file.png> saves the page of a book with a key.
+TEST_CASE("Songbooks page: screenshot of a keyed book", "[.screenshot]") {
+    const char* file = std::getenv("ZUB_SCREENSHOT");
+    REQUIRE(file != nullptr);
+    KeyedFixture f;
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    w.page->setPackageDir(f.fixture / "zubuvzpevnik");
+    setKey(w, "G");
+    QTest::qWait(200);
+    REQUIRE(w.window.grab().save(QString::fromUtf8(file)));
+}

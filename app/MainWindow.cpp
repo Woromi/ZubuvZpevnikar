@@ -511,6 +511,7 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
     scores_->setSongbook(songbookRoot_, packageDir_);
     songActions_->setSongbook(songbookRoot_, packageDir_);
     songbookCheck_->setSongbook(songbookRoot_, packageDir_);
+    songbooksPage_->setPackageDir(packageDir_);
     songbooksPage_->setSongbookRoot(root);
     songbookExporter_->setSongbookRoot(root, packageDir_);
     songbookSorter_->setTools(packageDir_,

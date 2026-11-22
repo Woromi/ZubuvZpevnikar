@@ -22,3 +22,16 @@ TEST_CASE("a package checkout has the style file and scripts/build.sh", "[packag
     CHECK_FALSE(zub::package::ofSongbook(root / "nope"));
     fs::remove_all(root);
 }
+
+TEST_CASE("the package defines \\transposesong in its style or a feature file", "[package]") {
+    const fs::path dir = fs::temp_directory_path() / ("zub-package-tr-" + std::to_string(::getpid()));
+    fs::remove_all(dir);
+    fs::create_directories(dir / "feature");
+    CHECK_FALSE(zub::package::definesTransposesong(dir));
+    std::ofstream(dir / "zubuvzpevnik.sty") << "% \\transposesong is coming\n\\newcommand\\other{}\n";
+    CHECK_FALSE(zub::package::definesTransposesong(dir)); // a comment is not a definition
+    std::ofstream(dir / "feature" / "transpozice.cfg")
+        << "\\newcommand\\transposesong[2][]{%\n}\n";
+    CHECK(zub::package::definesTransposesong(dir));
+    fs::remove_all(dir);
+}

@@ -1059,6 +1059,22 @@ Použijte vestavěný.</translation>
         <source>Songbook (no section)</source>
         <translation>Zpěvník (bez sekce)</translation>
     </message>
+    <message>
+        <source>tin whistle: not transposed</source>
+        <translation>cínová píšťala: netransponuje se</translation>
+    </message>
+    <message>
+        <source>no key</source>
+        <translation>bez tóniny</translation>
+    </message>
+    <message>
+        <source>unreadable key: %1</source>
+        <translation>nečitelná tónina: %1</translation>
+    </message>
+    <message>
+        <source>capo would be %1</source>
+        <translation>kapodastr by byl %1</translation>
+    </message>
 </context>
 <context>
     <name>ScoreInputBar</name>
@@ -2662,6 +2678,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Seřadit písně mimo sekce</translation>
     </message>
     <message>
+        <source>Transpose…</source>
+        <translation>Transponovat…</translation>
+    </message>
+    <message>
         <source>Remove from the Songbook</source>
         <translation>Odebrat ze zpěvníku</translation>
     </message>
@@ -2981,6 +3001,30 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>LaTeX: místo &amp; pište \&amp;, místo # \#</translation>
     </message>
     <message>
+        <source>Transposes the songs to this key: each song moves the fewest semitones (minor songs to the relative minor). Names are English: B is the German H, B♭ is the German B.</source>
+        <translation>Transponuje písně do této tóniny: každá se posune o co nejméně půltónů (moll písně do paralelní moll). Názvy jsou anglické: B je české H, B♭ je české B.</translation>
+    </message>
+    <message>
+        <source>Capo</source>
+        <translation>Kapodastr</translation>
+    </message>
+    <message>
+        <source>Chords re-shapes the chords (and the package transposes scores where it can); Capo changes only the capo note.</source>
+        <translation>Akordy přetvoří akordy (a balíček transponuje noty, kde to jde); Kapodastr změní jen poznámku o kapodastru.</translation>
+    </message>
+    <message>
+        <source>Key</source>
+        <translation>Tónina</translation>
+    </message>
+    <message>
+        <source>Transpose by</source>
+        <translation>Transponovat pomocí</translation>
+    </message>
+    <message>
+        <source>The songbook&apos;s package can&apos;t transpose yet (\transposesong): the PDF will fail to build until it does.</source>
+        <translation>Balíček zpěvníku zatím neumí transponovat (\transposesong): PDF se nepodaří sestavit, dokud to neumí.</translation>
+    </message>
+    <message>
         <source>Only recently added</source>
         <translation>Jen nedávno přidané</translation>
     </message>
@@ -3057,6 +3101,26 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Volí se při vytvoření zpěvníku (Nový zpěvník…); pro změnu upravte kartu LaTeX, včetně příkazů obálky a titulní strany</translation>
     </message>
     <message>
+        <source>Transpose %1</source>
+        <translation>Transponovat %1</translation>
+    </message>
+    <message>
+        <source>Follow the songbook</source>
+        <translation>Podle zpěvníku</translation>
+    </message>
+    <message>
+        <source>Don&apos;t transpose</source>
+        <translation>Netransponovat</translation>
+    </message>
+    <message>
+        <source> semitones</source>
+        <translation> půltónů</translation>
+    </message>
+    <message>
+        <source>Not changed: the capo would be %1.</source>
+        <translation>Beze změny: kapodastr by byl %1.</translation>
+    </message>
+    <message>
         <source>Not found beside the songbook or in the repo</source>
         <translation>Nenalezeno vedle zpěvníku ani v repozitáři</translation>
     </message>
@@ -3071,6 +3135,14 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>%1 was changed outside the app since it was read. Your text is kept here; Revert shows the file as it is now.</source>
         <translation>%1 se od načtení změnil mimo aplikaci. Váš text zůstává zde; Vrátit ukáže soubor, jak je teď.</translation>
+    </message>
+    <message>
+        <source>kept: %1</source>
+        <translation>ponecháno: %1</translation>
+    </message>
+    <message>
+        <source>(capo %1)</source>
+        <translation>(kapodastr %1)</translation>
     </message>
     <message numerus="yes">
         <source>%n song(s) of this songbook not marked as fitting %1: nobody has checked them at that size. Open one to measure it (Make Smaller offers its pap), or take it out of the songbook.</source>

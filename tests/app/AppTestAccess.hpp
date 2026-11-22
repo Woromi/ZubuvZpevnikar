@@ -207,6 +207,13 @@ struct AppTestAccess {
     static FindBar* latexFind(SongbooksPage& p) { return p.latexFind_; }
     static QWidget* editPane(SongbooksPage& p) { return p.editPane_; }
     static QLabel* warning(SongbooksPage& p) { return p.warning_; }
+    static QComboBox* bookKey(SongbooksPage& p) { return p.bookKey_; }
+    static QComboBox* transposeMode(SongbooksPage& p) { return p.transposeMode_; }
+    static QLabel* transposeWarning(SongbooksPage& p) { return p.transposeWarning_; }
+    static bool setSongTranspose(SongbooksPage& p, const std::string& name,
+                                 std::optional<int> semitones) {
+        return p.setSongTranspose(name, semitones);
+    }
     static QPushButton* addSectionButton(SongbooksPage& p) { return p.addSection_; }
     static QAction* check(SongbooksPage& p) { return p.check_; }
     static bool canEdit(SongbooksPage& p) { return p.canEdit(); }
