@@ -175,15 +175,16 @@ planTranspose(const std::string& name, const zub::bookfile::TransposeSettings& s
     plan.semitones = bt::shift(*key, *settings.key);
     if (plan.semitones == 0)
         return plan;
-    if (capo && (plan.capo + plan.semitones < 0 || plan.capo + plan.semitones > 9)) {
-        plan.kind = TransposePlan::Kind::Note;
-        plan.note = QObject::tr("capo would be %1").arg(plan.capo + plan.semitones);
-        return plan;
-    }
+    // A capo outside 0..9 cannot be played: the chords are re-shaped instead (the package
+    // does the same with a warning; written so, the file says what happens).
+    const bool capoFits = plan.capo + plan.semitones >= 0 && plan.capo + plan.semitones <= 9;
     const Key moved{((key->pitch + plan.semitones) % 12 + 12) % 12, key->minor};
     plan.kind = TransposePlan::Kind::Moves;
     plan.newKey = displayKey(moved, german);
-    plan.line = zub::bookfile::SongTranspose{name, plan.semitones, capo,
+    if (capo && !capoFits)
+        plan.note = QObject::tr("capo would be %1: chords re-shaped")
+                        .arg(plan.capo + plan.semitones);
+    plan.line = zub::bookfile::SongTranspose{name, plan.semitones, capo && capoFits,
                                              bt::keyName(moved, german), false};
     return plan;
 }
@@ -1427,8 +1428,9 @@ bool SongbooksPage::setSongTranspose(const std::string& name, std::optional<int>
             const bool german = zub::score::germanNames(zub::mainLanguage(meta.value("lang")));
             const int cap = zub::score::songCapo(meta.value("cap"));
             if (capo && (cap + *semitones < 0 || cap + *semitones > 9)) {
-                showWarning(tr("Not changed: the capo would be %1.").arg(cap + *semitones));
-                return false;
+                line.capo = false; // the capo would be out of reach: the chords are re-shaped
+                showWarning(tr("The capo would be %1: the chords of this song are re-shaped.")
+                                .arg(cap + *semitones));
             }
             if (const auto key = zub::booktranspose::parseKey(meta.value("key"), german))
                 line.key = zub::booktranspose::keyName(
@@ -1696,6 +1698,8 @@ void SongbooksPage::rebuildTree() {
                                     tr("(capo %1)").arg(
                                         (plan.semitones > 0 ? QStringLiteral("+") : QString()) +
                                         QString::number(plan.semitones));
+                        else if (!plan.note.isEmpty())
+                            text += QStringLiteral(" (") + plan.note + QStringLiteral(")");
                     } else if (transposeSettings.key && plan.kind == Kind::Same) {
                         text += QStringLiteral("  ") + plan.songKey;
                     } else if (transposeSettings.key && plan.kind == Kind::Note) {

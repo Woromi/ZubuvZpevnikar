@@ -1,5 +1,10 @@
 // The Songbooks page (milestone 7): the books of the songbook repo, their form, sections, songs,
 // lock and LaTeX tab, New Songbook, Duplicate and Check.
+#include "AppTestAccess.hpp"
+#include "SongEditor.hpp"
+#include "SongTableModel.hpp"
+#include "Support.hpp"
+
 #include <QAbstractButton>
 #include <QCheckBox>
 #include <QComboBox>
@@ -13,11 +18,6 @@
 #include <QTabWidget>
 #include <QTreeWidget>
 #include <catch2/catch_test_macros.hpp>
-
-#include "AppTestAccess.hpp"
-#include "SongEditor.hpp"
-#include "SongTableModel.hpp"
-#include "Support.hpp"
 
 using apptest::has;
 using apptest::slurp;
@@ -53,8 +53,9 @@ std::string listing(QTreeWidget* tree) {
         int depth = 0;
         for (auto* p = (*it)->parent(); p; p = p->parent())
             ++depth;
-        out += std::string(static_cast<std::size_t>(depth) * 2, ' ') + (*it)->text(0).toStdString() +
-               "  [" + (*it)->data(0, Qt::UserRole).toString().toStdString() + "]\n";
+        out += std::string(static_cast<std::size_t>(depth) * 2, ' ') +
+               (*it)->text(0).toStdString() + "  [" +
+               (*it)->data(0, Qt::UserRole).toString().toStdString() + "]\n";
     }
     return out;
 }
@@ -195,7 +196,8 @@ TEST_CASE("Songbooks page: a locked book is not changed", "[app][songbooks]") {
     CHECK(A::canEdit(*w.page));
 }
 
-TEST_CASE("Songbooks page: the LaTeX tab saves, reverts and keeps the unsaved text", "[app][songbooks]") {
+TEST_CASE("Songbooks page: the LaTeX tab saves, reverts and keeps the unsaved text",
+          "[app][songbooks]") {
     apptest::Fixture fixture;
     BooksWindow w(fixture);
     const auto big = fixture / "songbooks/big/big.tex";
@@ -298,7 +300,8 @@ TEST_CASE("Songbooks page: Duplicate copies the book into a new folder", "[app][
     CHECK(A::id(*w.page) == "songbooks/camps/2026/camp2026.tex");
 }
 
-TEST_CASE("Songbooks page: Check lists the songs not marked as fitting, one can go", "[app][songbooks]") {
+TEST_CASE("Songbooks page: Check lists the songs not marked as fitting, one can go",
+          "[app][songbooks]") {
     apptest::Fixture fixture(apptest::Fixture::Extras::Yes);
     // A small book (A5) of three songs none of which has pap marked (the fixture's other songs do).
     apptest::writeFile(fixture / "songbooks/check/check.tex",
@@ -442,11 +445,15 @@ TEST_CASE("Songbooks page: capo mode, with a song out of range", "[app][songbook
     CHECK(has(text, "% zpevnikar: key=B transpose=capo"));
     // C with capo 5 to B: capo 4.
     CHECK(has(text, "    \\transposesong[capo,key=B]{-1}\n    \\input{Ayreon/EMc2}"));
-    // D without a capo to B would be capo -3, E-flat with capo 3 capo -1: no lines.
-    CHECK(!has(text, "{-3}"));
-    CHECK(!has(text, "FrankyDlouhan}\n    \\transposesong"));
-    CHECK(songItem(w, "Abba/OurLastSummer")->text(0).endsWith("(D, capo would be -3)"));
-    CHECK(songItem(w, "Brontosauri/FrankyDlouhan")->text(0).endsWith("(E♭, capo would be -1)"));
+    // D without a capo to B would be capo -3, E-flat with capo 3 capo -1: their chords are
+    // re-shaped instead (written so; the package would do the same).
+    CHECK(has(text, "    \\transposesong[key=B]{-3}\n    \\input{Abba/OurLastSummer}"));
+    CHECK(songItem(w, "Abba/OurLastSummer")
+              ->text(0)
+              .endsWith("D → B (capo would be -3: chords re-shaped)"));
+    CHECK(songItem(w, "Brontosauri/FrankyDlouhan")
+              ->text(0)
+              .endsWith("E♭ → H (capo would be -1: chords re-shaped)")); // Czech: H
     CHECK(songItem(w, "Ayreon/EMc2")->text(0).endsWith("C → B (capo -1)"));
 }
 

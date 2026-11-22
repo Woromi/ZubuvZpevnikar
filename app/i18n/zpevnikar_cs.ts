@@ -1072,8 +1072,8 @@ Použijte vestavěný.</translation>
         <translation>nečitelná tónina: %1</translation>
     </message>
     <message>
-        <source>capo would be %1</source>
-        <translation>kapodastr by byl %1</translation>
+        <source>capo would be %1: chords re-shaped</source>
+        <translation>kapodastr by byl %1: akordy přeloženy</translation>
     </message>
 </context>
 <context>
@@ -2892,6 +2892,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <source>Images (*.png *.jpg *.jpeg *.pdf)</source>
         <translation>Obrázky (*.png *.jpg *.jpeg *.pdf)</translation>
     </message>
+    <message>
+        <source>The capo would be %1: the chords of this song are re-shaped.</source>
+        <translation>Kapodastr by byl %1: akordy této písně se přeloží.</translation>
+    </message>
     <message numerus="yes">
         <source>%n song(s)</source>
         <translation>
@@ -3115,10 +3119,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source> semitones</source>
         <translation> půltónů</translation>
-    </message>
-    <message>
-        <source>Not changed: the capo would be %1.</source>
-        <translation>Beze změny: kapodastr by byl %1.</translation>
     </message>
     <message>
         <source>Not found beside the songbook or in the repo</source>
