@@ -230,6 +230,8 @@ private:
     QElapsedTimer seekGuard_;
     std::optional<std::size_t> followOffset_; // where following put the cursor
     QPointer<SongEditor> markedEditor_;       // the editor that has playback marks
+    std::vector<std::pair<std::size_t, std::size_t>> markedRanges_; // ... and which
+    std::string timelineText_; // the score text timeline_ was built for
     NoteSounds* noteSounds_ = nullptr;
     bool scoreAmp_ = false; // the latest preview build's MIDI file is for the amp instrument
     std::filesystem::path

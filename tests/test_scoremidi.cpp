@@ -331,6 +331,10 @@ TEST_CASE("markBends finds a slide's target past \\unHideNotes and a grace's bra
         CHECK(out.find("gunshot") == std::string::npos);
         CHECK(out.find("bird tweet") != std::string::npos);
     }
+    // A slide between two notes of one grace stays a slide from one to the other.
+    const std::string within = sc::markBends("\\grace { g16\\glissando a16 } b4");
+    CHECK(within.find("seashore") != std::string::npos);
+    CHECK(within.find("bird tweet") == std::string::npos);
     // Between two sounding notes it is still a slide from one to the other.
     CHECK(sc::markBends("c4\\3 \\glissando e4\\3").find("seashore") != std::string::npos);
     // Still nothing before a rest after the brace.
@@ -594,7 +598,7 @@ TEST_CASE("a hidden melody sounds only with an instrument of its own", "[score][
     const auto sung = sc::midiScore(text, options);
     REQUIRE(sung);
     CHECK(sung->find("\\new Staff \\with { midiInstrument = \"voice oohs\" } \\new Voice = "
-                     "\"vocal\" { \\nullMelody }") != std::string::npos);
+                     "\"vocal\" \\with { zubMelody = ##t } { \\nullMelody }") != std::string::npos);
     CHECK(sung->find("% \\new Devnull in a comment") != std::string::npos);
     // The printed score is the file itself: only the MIDI copy changes.
     CHECK(zub::midi::findInstrument("voice")->program == 53);

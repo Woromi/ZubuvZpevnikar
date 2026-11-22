@@ -328,10 +328,14 @@ bool processTrack(std::vector<Event>& events, Tick ticksPerStep) {
             const double from = x->key - y.key;
             if (std::abs(from) > bendRange)
                 continue;
-            if (Note* before = noteEndingAt(notes, x->channel, x->on, *x)) {
-                Event& off = events[before->offIdx];
-                off.tick = y.on;
-                before->off = y.on;
+            // Every note that ended where the grace note began (all notes of a chord).
+            for (Note& before : notes) {
+                if (&before == x || before.removed || !before.closed ||
+                    before.channel != x->channel || before.on >= x->on || before.off > x->on ||
+                    x->on - before.off > 2)
+                    continue;
+                events[before.offIdx].tick = y.on;
+                before.off = y.on;
             }
             x->removed = true;
             events[x->onIdx].removed = true;

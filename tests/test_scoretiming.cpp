@@ -411,8 +411,12 @@ TEST_CASE("prepare: the playback score lists its notes", "[scoretiming][score]")
     std::ifstream logger(work / "zub-playback.ily");
     std::stringstream ls;
     ls << logger.rdbuf();
-    CHECK(ls.str().find("zubNoteLogger = #(lambda") == 0);
-    CHECK(ls.str().find((work / "out" / "zub-playback.notes").string()) != std::string::npos);
+    CHECK(ls.str().find("zubNoteLogger = #(lambda") != std::string::npos);
+    // A relative name (lilypond works in out/), written as UTF-8: no path in the Scheme, so a
+    // work dir with a diacritic (under LC_ALL=C) cannot break it.
+    CHECK(ls.str().find("(open-file \"zub-playback.notes\" \"a\")") != std::string::npos);
+    CHECK(ls.str().find("set-port-encoding! port \"UTF-8\"") != std::string::npos);
+    CHECK(ls.str().find(work.filename().string()) == std::string::npos);
 
     // Without MIDI there is neither a logger nor a list.
     request.midi.reset();

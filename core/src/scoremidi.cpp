@@ -635,11 +635,13 @@ std::string markBends(std::string_view music) {
                 // A note or chord follows, not a rest or a skip.
                 if (next < music.size() && ((music[next] >= 'a' && music[next] <= 'z' &&
                                              music[next] != 'r' && music[next] != 's') ||
-                                            music[next] == '<'))
-                    // From a grace note: a slide into the note (the grace note is only there to
-                    // draw the slide), else from one sounding note to the next.
-                    inserts.emplace_back(next, marker(begin < graceEnd ? "bird tweet"
-                                                                       : "seashore"));
+                                            music[next] == '<')) {
+                    // From a grace note into the main note: a slide in (the grace note is only
+                    // there to draw the slide); else, also between two notes of one grace, from
+                    // one sounding note to the next.
+                    const bool slideIn = begin < graceEnd && next >= graceEnd;
+                    inserts.emplace_back(next, marker(slideIn ? "bird tweet" : "seashore"));
+                }
             }
             return proceed;
         },
@@ -684,8 +686,22 @@ std::string soundHiddenMelody(std::string_view music, std::string_view midiName)
             out.append(music.substr(copied, typeBegin - copied));
             out +=
                 "Staff \\with { midiInstrument = \"" + std::string(midiName) + "\" } \\new Voice";
-            copied = typeEnd;
-            return typeEnd;
+            // `= "name"` (what \lyricsto looks for) stays; then the Voice is marked as the lyrics'
+            // melody, so the note list logs it as such (no cue for the caret; lyric lengths).
+            std::size_t after = typeEnd;
+            if (const std::size_t eq = skipSpace(music, typeEnd);
+                eq < music.size() && music[eq] == '=') {
+                const std::size_t quote = skipSpace(music, eq + 1);
+                if (quote < music.size() && music[quote] == '"') {
+                    const std::size_t close = music.find('"', quote + 1);
+                    if (close != npos)
+                        after = close + 1;
+                }
+            }
+            out.append(music.substr(typeEnd, after - typeEnd));
+            out += " \\with { zubMelody = ##t }";
+            copied = after;
+            return after;
         },
         [](std::size_t, char) { return true; });
     out.append(music.substr(copied));

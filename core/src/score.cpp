@@ -55,25 +55,22 @@ bool appendIsNeutral(const std::string& content, const std::string& withPlayback
            safety::lilypondRisks(withPlayback) == risks;
 }
 
-// The Scheme of the playback score's note list: fixed text, only the path of the output file
-// varies. A \\layout of the playback score `\\consists` it in every Voice, TabVoice, ChordNames,
-// Devnull (a melody without sound) and Lyrics; for each note event (a lyric event in Lyrics) it
-// appends a line "<kind> <moment main num> <den> <moment grace num> <den> <line> <char> <length
-// num> <den> <file>" (the origin as in LilyPond's point-and-click links; kind n: a staff's voice,
-// c: chord names, m: Devnull, l: lyrics; the length is the event's duration) to `notes` and
-// flushes it.
-std::string loggerScheme(const fs::path& notes) {
-    std::string path;
-    for (const char c : utf8(notes)) {
-        if (c == '"' || c == '\\')
-            path += '\\';
-        path += c;
-    }
-    return "zubNoteLogger = #(lambda (context)\n"
+// The Scheme of the playback score's note list: fixed text. A \\layout of the playback score
+// `\\consists` it in every Voice, TabVoice, ChordNames, Devnull (a melody without sound) and
+// Lyrics; for each note event (a lyric event in Lyrics) it appends a line "<kind> <moment main
+// num> <den> <moment grace num> <den> <line> <char> <length num> <den> <file>" (the origin as in
+// LilyPond's point-and-click links; kind n: a staff's voice, c: chord names, m: the melody the
+// lyrics follow (a Devnull, or the Voice it sounds as: zubMelody), l: lyrics; the length is the
+// event's duration) and flushes it. The file is the relative playbackNotesName (lilypond works in
+// out/) and is written as UTF-8: with LC_ALL=C Guile can neither open nor write a non-ASCII path.
+std::string loggerScheme() {
+    return "#(set-object-property! 'zubMelody 'translation-type? boolean?)\n"
+           "zubNoteLogger = #(lambda (context)\n"
            "  (let* ((port #f)\n"
            "         (kind (case (ly:context-name context)\n"
-           "                 ((ChordNames) \"c\") ((Devnull) \"m\") ((Lyrics) \"l\") (else "
-           "\"n\")))\n"
+           "                 ((ChordNames) \"c\") ((Devnull) \"m\") ((Lyrics) \"l\")\n"
+           "                 (else (if (eq? #t (ly:context-property context 'zubMelody #f))\n"
+           "                           \"m\" \"n\"))))\n"
            "         (record (lambda (event)\n"
            "           (let* ((origin (ly:event-property event 'origin))\n"
            "                  (where (and (ly:input-location? origin)\n"
@@ -85,9 +82,11 @@ std::string loggerScheme(const fs::path& notes) {
            "                              (ly:make-moment 0))))\n"
            "             (if where\n"
            "               (begin\n"
-           "                 (if (not port) (set! port (open-file \"" +
-           path +
-           "\" \"a\")))\n"
+           "                 (if (not port)\n"
+           "                   (begin (set! port (open-file \"" +
+           std::string(playbackNotesName) +
+           "\" \"a\"))\n"
+           "                          (set-port-encoding! port \"UTF-8\")))\n"
            "                 (format port \"~a ~a ~a ~a ~a ~a ~a ~a ~a ~a\\n\"\n"
            "                   kind\n"
            "                   (ly:moment-main-numerator now) (ly:moment-main-denominator now)\n"
@@ -201,7 +200,7 @@ std::expected<Command, std::string> prepare(const Request& request) {
     if (withMidi) {
         wrapper += "\\include \"" + std::string(playbackLoggerName) + "\"\n";
         if (auto w = writeTextFileAtomic(work / std::string(playbackLoggerName),
-                                         loggerScheme(outDir / std::string(playbackNotesName)));
+                                         loggerScheme());
             !w)
             return std::unexpected(w.error());
     }

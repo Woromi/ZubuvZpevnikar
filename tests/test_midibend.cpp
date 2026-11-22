@@ -327,3 +327,21 @@ TEST_CASE("smoothBends: a grace note sliding in is a fast slide at the start of 
     CHECK(firstBend < -8.5);          // starts at the grace note's pitch (g3, 9 semitones down)
     CHECK(std::abs(lastBend) < 0.01); // then the E itself
 }
+
+TEST_CASE("smoothBends: a chord before a slide-in gets its time back, every note", "[midi][bend]") {
+    // <f3 a3> 0-340, the grace g3 340-383, the marked e4 384-768.
+    const std::string midi = testmidi::build({{0, {0xc0, 25}},
+                                              {0, {0x90, 53, 90}},
+                                              {0, {0x90, 57, 90}},
+                                              {340, {0x90, 53, 0}},
+                                              {340, {0x90, 57, 0}},
+                                              {340, {0x90, 55, 90}},
+                                              {383, {0x90, 55, 0}},
+                                              {384, {0xc0, 123}},
+                                              {384, {0x90, 64, 90}},
+                                              {768, {0x90, 64, 0}}});
+    const auto track = trackOf(smooth(midi));
+    for (const auto& e : track)
+        if (e.status == 0x90 && e.d2 == 0 && (e.d1 == 53 || e.d1 == 57))
+            CHECK(e.tick == 384);
+}

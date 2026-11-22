@@ -1112,8 +1112,10 @@ void ScoreTabs::buildTimeline(const ScoreResult& result) {
     const std::string text = editor->editorText();
     auto built = zub::scoretiming::buildTimeline(
         {*notes, *midi, *copy, text, result.scoreCopy, result.generatedFromLine});
-    if (built)
+    if (built) {
         timeline_ = std::move(*built);
+        timelineText_ = text; // for the sounding texts' widths
+    }
 }
 
 // Where Play starts: the cursor's note (the start of a selection), its first pass if it is
@@ -1145,13 +1147,15 @@ void ScoreTabs::stopFollowing() {
     if (markedEditor_)
         markedEditor_->setPlaybackMarks({});
     markedEditor_.clear();
+    markedRanges_.clear();
 }
 
 void ScoreTabs::followTick() {
     const qint64 position = scorePlayer_->positionMs();
     // Just after a seek the player may still report the old position (or 0): wait for it.
     if (seekMs_ >= 0) {
-        if (position >= seekMs_ - 50 || (seekGuard_.isValid() && seekGuard_.elapsed() > 500))
+        // The player reports the new position (also after a seek backwards), or it took too long.
+        if (std::abs(position - seekMs_) < 150 || (seekGuard_.isValid() && seekGuard_.elapsed() > 500))
             seekMs_ = -1;
         else
             return;
@@ -1193,12 +1197,16 @@ void ScoreTabs::followAt(double seconds) {
             const auto event = zub::scoreregion::eventAt(scoreEvents_, c.event.begin);
             return event && eventLink_.contains(*event);
         };
-        for (const auto* c = cue; c >= timeline_.cues.data() && std::abs(c->seconds - cue->seconds) < 1e-6;
-             --c)
-            if (shown(*c)) {
-                cue = c;
+        const auto first = static_cast<std::size_t>(cue - timeline_.cues.data());
+        for (std::size_t i = first + 1; i-- > 0;) {
+            const auto& c = timeline_.cues[i];
+            if (std::abs(c.seconds - cue->seconds) >= 1e-6)
+                break;
+            if (shown(c)) {
+                cue = &c;
                 break;
             }
+        }
     }
     if (!cue || followOffset_ == cue->event.end)
         return;
@@ -1225,13 +1233,20 @@ void ScoreTabs::showSounding(double seconds) {
                 sound.kind == zub::scoretiming::Kind::Melody)
                 notes.append(link->second);
             else
-                texts.append({link->second, static_cast<int>(sound.range.end - sound.range.begin)});
+                texts.append({link->second, static_cast<int>(
+                                                QString::fromUtf8(
+                                                    timelineText_.data() + sound.range.begin,
+                                                    static_cast<qsizetype>(sound.range.end -
+                                                                           sound.range.begin))
+                                                    .size())});
         }
     }
     scorePreview_->setSoundingNotes(notes, texts);
-    if (SongEditor* editor = currentEditor()) {
+    // Every 30 ms tick: the editor only when the sounding parts changed (it converts the text).
+    if (SongEditor* editor = currentEditor(); editor && (editor != markedEditor_ || ranges != markedRanges_)) {
         editor->setPlaybackMarks(ranges);
         markedEditor_ = editor;
+        markedRanges_ = ranges;
     }
 }
 

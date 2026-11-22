@@ -188,7 +188,32 @@ std::expected<Timeline, std::string> buildTimeline(const Source& source) {
         const auto from = copy.find(music, *generatedAt);
         if (from == std::string::npos)
             return std::unexpected("the playback score is missing");
-        const auto to = std::min(copy.find(ampBook, from), copy.size());
+        // The generated music only: up to the closing brace of \unfoldRepeats { ... } (not the
+        // \layout and \midi after it, whose words would count as lyrics or chord names).
+        std::size_t to = std::min(copy.find(ampBook, from), copy.size());
+        {
+            int depth = 1;
+            bool quoted = false;
+            for (std::size_t i = from + music.size(); i < to; ++i) {
+                const char c = copy[i];
+                if (quoted) {
+                    if (c == '\\')
+                        ++i;
+                    else if (c == '"')
+                        quoted = false;
+                } else if (c == '"') {
+                    quoted = true;
+                } else if (c == '%') {
+                    const auto nl = copy.find('\n', i);
+                    i = nl == std::string::npos ? to : nl;
+                } else if (c == '{') {
+                    ++depth;
+                } else if (c == '}' && --depth == 0) {
+                    to = i;
+                    break;
+                }
+            }
+        }
         generated = within(scoreregion::musicEvents(copy), from + music.size(), to);
         if (generated.size() != blockEvents.size())
             return std::unexpected("the playback score's notes do not match the score's");
