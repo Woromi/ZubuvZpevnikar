@@ -11,7 +11,7 @@
 class QBuffer;
 class QLabel;
 class QPdfDocument;
-class QPdfView;
+class PdfLinkView;
 class QPlainTextEdit;
 class QProcess;
 class QPushButton;
@@ -70,7 +70,7 @@ private:
     QLabel* status_ = nullptr;
     QPushButton* build_ = nullptr;
     QPushButton* cancel_ = nullptr;
-    QPdfView* view_ = nullptr;
+    PdfLinkView* view_ = nullptr;
     QPdfDocument* document_ = nullptr;
     QBuffer* buffer_ = nullptr;
     QPlainTextEdit* log_ = nullptr;

@@ -61,6 +61,8 @@ qt_add_library(zpevnikar_app STATIC
     WelcomePage.cpp
     SongbookExporter.hpp
     BookPreview.cpp
+    PdfLinkView.hpp
+    PdfLinkView.cpp
     SongbookExporter.cpp
     SongbookTree.hpp
     SongbookTree.cpp

@@ -10,7 +10,7 @@ class QComboBox;
 class QLabel;
 class QListWidget;
 class QPdfDocument;
-class QPdfView;
+class PdfLinkView;
 class QToolButton;
 
 // Shows the PDF of the latest successful preview build, the build status, and the first
@@ -44,7 +44,7 @@ private:
     QToolButton* rebuild_ = nullptr;
     QToolButton* logButton_ = nullptr;
     QLabel* status_ = nullptr;
-    QPdfView* view_ = nullptr;
+    PdfLinkView* view_ = nullptr;
     QPdfDocument* document_ = nullptr;
     // QPdfDocument reads from it, so it lives as long as the document
     QBuffer* pdfBuffer_ = nullptr;

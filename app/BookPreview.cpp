@@ -9,7 +9,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPdfDocument>
-#include <QPdfView>
+#include "PdfLinkView.hpp"
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
@@ -30,7 +30,7 @@ BookPreview::BookPreview(SongbookExporter* exporter, QWidget* parent)
     row->addWidget(build_);
     row->addWidget(cancel_);
     layout->addLayout(row);
-    view_ = new QPdfView(this);
+    view_ = new PdfLinkView(this);
     document_ = new QPdfDocument(this);
     view_->setDocument(document_);
     view_->setPageMode(QPdfView::PageMode::MultiPage);

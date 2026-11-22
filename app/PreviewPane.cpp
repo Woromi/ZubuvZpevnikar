@@ -13,7 +13,7 @@
 #include <QListWidget>
 #include <QPdfDocument>
 #include <QPdfPageNavigator>
-#include <QPdfView>
+#include "PdfLinkView.hpp"
 #include <QPlainTextEdit>
 #include <QShortcut>
 #include <QSignalBlocker>
@@ -23,7 +23,7 @@
 
 PreviewPane::PreviewPane(QWidget* parent)
     : QWidget(parent), classes_(new QComboBox), rebuild_(new QToolButton),
-      logButton_(new QToolButton), status_(new QLabel), view_(new QPdfView),
+      logButton_(new QToolButton), status_(new QLabel), view_(new PdfLinkView),
       document_(new QPdfDocument(this)), errors_(new QListWidget) {
     classes_->setToolTip(tr("Document class used for the preview"));
 
