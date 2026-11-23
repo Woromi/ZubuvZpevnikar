@@ -67,13 +67,22 @@ void BookPreview::setBook(const QString& id, const std::filesystem::path& file,
     updateView(); // the same PDF stays loaded (and scrolled): only the status line changes
 }
 
+void BookPreview::setVariant(const QString& variant, const std::string& signature) {
+    if (variant_ == variant && signature_ == signature)
+        return;
+    variant_ = variant;
+    signature_ = signature;
+    updateView();
+}
+
 bool BookPreview::building() const {
     return process_ != nullptr;
 }
 
 bool BookPreview::upToDate() const {
     const auto it = results_.find(id_);
-    return it != results_.end() && !it->second.pdf.isEmpty() && it->second.text == text_;
+    return it != results_.end() && !it->second.pdf.isEmpty() && it->second.text == text_ &&
+           it->second.signature == signature_;
 }
 
 QByteArray BookPreview::pdf() const {
@@ -89,11 +98,18 @@ QString BookPreview::report() const {
 bool BookPreview::build() {
     if (process_ || id_.isEmpty() || text_.empty())
         return false;
-    const auto command = exporter_->prepareRepoBuild(file_, text_);
+    std::optional<BuildInput> input = BuildInput{text_, {}};
+    if (composer_)
+        input = composer_(text_);
+    if (!input)
+        return false;
+    const auto command = exporter_->prepareRepoBuild(file_, input->text, input->songs);
     if (!command)
         return false;
     buildingId_ = id_;
     buildingText_ = text_;
+    buildingVariant_ = variant_;
+    buildingSignature_ = signature_;
     buildingPdf_ = command->pdf;
     buildingLog_ = command->log;
     output_.clear();
@@ -134,6 +150,8 @@ void BookPreview::onFinished(int exitCode, bool crashed) {
     if (ok) {
         result.pdf = pdf.readAll();
         result.text = buildingText_;
+        result.variant = buildingVariant_;
+        result.signature = buildingSignature_;
         result.log.clear();
         result.report = SongbookExporter::buildReport(output_, buildingLog_);
     } else if (cancelled_) {
@@ -194,6 +212,13 @@ void BookPreview::updateView() {
     else if (it->second.text != text_)
         status =
             tr("Out of date: the songbook changed since this preview. %1").arg(it->second.report);
+    else if (it->second.signature != signature_)
+        status = tr("Out of date: built %1. %2")
+                     .arg(it->second.variant.isEmpty() ? tr("without transposing")
+                                                       : it->second.variant,
+                          it->second.report);
+    else if (!variant_.isEmpty())
+        status = variant_ + QStringLiteral(". ") + it->second.report;
     else
         status = it->second.report;
     status_->setText(status);

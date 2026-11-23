@@ -18,6 +18,7 @@
 #include "SongListPage.hpp"
 #include "SongbookCheck.hpp"
 #include "SongbookTree.hpp"
+#include "SongbookExporter.hpp"
 #include "SongbooksPage.hpp"
 
 #include <QAction>
@@ -210,9 +211,24 @@ struct AppTestAccess {
     static QComboBox* bookKey(SongbooksPage& p) { return p.bookKey_; }
     static QComboBox* transposeMode(SongbooksPage& p) { return p.transposeMode_; }
     static QLabel* transposeWarning(SongbooksPage& p) { return p.transposeWarning_; }
-    static bool setSongTranspose(SongbooksPage& p, const std::string& name,
+    static void setSongTranspose(SongbooksPage& p, const std::string& name,
                                  std::optional<int> semitones) {
-        return p.setSongTranspose(name, semitones);
+        p.setSongTranspose(name, semitones);
+    }
+    static std::optional<BookPreview::BuildInput> composeBuild(SongbooksPage& p) {
+        return p.composeBuild(p.text_);
+    }
+    static SongbookExporter* exporter(SongbooksPage& p) { return p.exporter_; }
+    static BookPreview* bookPreview(SongbooksPage& p) { return p.preview_; }
+    static QLabel* bookPreviewStatus(BookPreview& b) { return b.status_; }
+    // Pretends the shown book was built (a PDF of its current text, without transposing).
+    static void fakeBookBuild(BookPreview& b, const std::string& signature = {}) {
+        auto& result = b.results_[b.id_];
+        result.pdf = "%PDF-1.4 not a real one";
+        result.text = b.text_;
+        result.signature = signature;
+        result.report = QStringLiteral("1 page");
+        b.updateView();
     }
     static QPushButton* addSectionButton(SongbooksPage& p) { return p.addSection_; }
     static QAction* check(SongbooksPage& p) { return p.check_; }

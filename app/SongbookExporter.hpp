@@ -6,6 +6,7 @@
 #include <optional>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <string>
 #include <string_view>
 #include <zub/core/songbook.hpp>
@@ -32,9 +33,12 @@ public:
     // safety checks of the book file, a Tabor book's akordy.tex, every \input (a song of the
     // songbook, then the song itself) and stray index files next to it (asking when something is
     // unknown), then the work dir CacheLocation/songbooks/repo-<hash>/ with the text as book.tex.
-    // nullopt (after a message) when it is not to be built.
-    std::optional<zub::songbook::BuildCommand> prepareRepoBuild(
-        const std::filesystem::path& bookFile, const std::string& text);
+    // `songs`: copies of songs of the book (input name -> text) for this build only, checked
+    // instead of the files and written to the work dir's override/ (ahead of the songs on
+    // TEXINPUTS). nullopt (after a message) when it is not to be built.
+    std::optional<zub::songbook::BuildCommand>
+    prepareRepoBuild(const std::filesystem::path& bookFile, const std::string& text,
+                     const std::map<std::string, std::string>& songs = {});
     // A process for `command` (environment, working dir, its own process group, stopped when the
     // app quits); startBuild runs it, stopBuild stops it and what it started.
     static QProcess* createBuildProcess(const zub::songbook::BuildCommand& command,
@@ -56,7 +60,9 @@ private:
     // read and the user does not want to build anyway. Checks the files zub::songbook::resolveSongs
     // finds.
     // `extra`: what the check of the book file itself found (shown first).
-    bool confirmSafety(const zub::songbook::Resolution& resolution, const QStringList& extra = {});
+    // `copies`: songs (input name -> text) checked instead of their files.
+    bool confirmSafety(const zub::songbook::Resolution& resolution, const QStringList& extra = {},
+                       const std::map<std::string, std::string>& copies = {});
 
     QWidget* window_;
     std::filesystem::path root_;

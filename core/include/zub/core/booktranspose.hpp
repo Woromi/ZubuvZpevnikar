@@ -48,4 +48,21 @@ std::string keyName(Key key, bool german);
 std::optional<Key> bookKey(std::string_view text);
 std::string bookKeyName(Key key);
 
+// ---- Transposing a book for one build ----
+//
+// Nothing of this is saved: the app applies it to its build copy of the book (and of the songs) in
+// the cache, the book file and the songs stay as they are.
+//
+// Chords: a song is re-shaped by a `\transposesong[key=K]{N}` line in the copy. Capo: a song keeps
+// its shapes and its capo rises by N (raiseCapo, a copy of the song shadows it on TEXINPUTS); a
+// song whose capo would leave 0..9 is re-shaped instead. NoCapo: the copy gets the class option
+// `transposecapos` (every cap= and \capo transposes the chords to sounding pitch instead of
+// printing "Capo n"), then the songs are re-shaped from their sounding key.
+enum class Mode { Chords, Capo, NoCapo };
+
+// The song text (a song file's) sounding `semitones` higher with the same shapes: `cap=` raised
+// (removed at 0: songs without a capo have none), every code `\capo{n}` raised, every key of
+// `key=` moved (shiftKeys). Nullopt when the header cannot be read or a capo would leave 0..9.
+std::optional<std::string> raiseCapo(std::string_view songText, int semitones, bool german);
+
 } // namespace zub::booktranspose

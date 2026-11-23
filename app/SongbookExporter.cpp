@@ -7,6 +7,7 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -95,14 +96,18 @@ QString SongbookExporter::noPackageText() const {
 }
 
 bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution,
-                                     const QStringList& extra) {
+                                     const QStringList& extra,
+                                     const std::map<std::string, std::string>& copies) {
     QStringList lines = extra;
     int unsafeSongs = static_cast<int>(extra.size());
     for (const auto& song : resolution.songs) {
         if (song.path.empty())
             continue;
         QString what;
-        const auto text = zub::readTextFile(song.path);
+        const auto copy = copies.find(song.inputName);
+        const auto text = copy != copies.end()
+                              ? std::expected<std::string, std::string>(copy->second)
+                              : zub::readTextFile(song.path);
         if (!text) {
             what = tr("cannot read the file");
         } else {
@@ -139,7 +144,8 @@ bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution
 }
 
 std::optional<zub::songbook::BuildCommand>
-SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const std::string& text) {
+SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const std::string& text,
+                                   const std::map<std::string, std::string>& songs) {
     if (package_.empty()) {
         QMessageBox::warning(window_, tr("Export PDF"), noPackageText());
         return std::nullopt;
@@ -193,8 +199,18 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
              folder.entryList({QStringLiteral("*.sbx"), QStringLiteral("*.sxd")}, QDir::Files))
             bookRisks << tr("%1: an index file the build would read").arg(folder.filePath(name));
     }
+    // A copy stands in only for a song of this book (whose name was checked above): anything
+    // else is refused, not asked about (its name becomes a path in the work dir).
+    for (const auto& [name, songText] : songs)
+        if (std::ranges::find(all.sections.front().songs, name) ==
+            all.sections.front().songs.end()) {
+            QMessageBox::warning(window_, tr("Export PDF"),
+                                 tr("%1: a song copy for a song the book does not have")
+                                     .arg(toQString(name)));
+            return std::nullopt;
+        }
     const auto resolution = zub::songbook::resolveSongs(all, root_);
-    if (!confirmSafety(resolution, bookRisks))
+    if (!confirmSafety(resolution, bookRisks, songs))
         return std::nullopt;
 
     // One work dir per book file: LilyPond's cache and the index files stay between builds.
@@ -214,13 +230,35 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
          work.entryList({QStringLiteral("*.sbx"), QStringLiteral("*.sxd"), QStringLiteral("book.*")},
                         QDir::Files))
         QFile::remove(work.filePath(name));
+    // The song copies of the last build go (files one by one, then the folders left empty).
+    const QString overrideDir = workDir + QStringLiteral("/override");
+    {
+        QDirIterator files(overrideDir, {QStringLiteral("*.tex")}, QDir::Files,
+                           QDirIterator::Subdirectories);
+        while (files.hasNext())
+            QFile::remove(files.next());
+        QDirIterator dirs(overrideDir, QDir::Dirs | QDir::NoDotAndDotDot);
+        while (dirs.hasNext())
+            QDir().rmdir(dirs.next());
+    }
     QString error;
     if (!writeFile(workDir + QStringLiteral("/book.tex"), text, &error)) {
         QMessageBox::warning(window_, tr("Build"), error);
         return std::nullopt;
     }
+    for (const auto& [name, songText] : songs) {
+        const QString path = overrideDir + QLatin1Char('/') + toQString(name) +
+                             QStringLiteral(".tex");
+        if (!QDir().mkpath(QFileInfo(path).path()) || !writeFile(path, songText, &error)) {
+            QMessageBox::warning(window_, tr("Build"),
+                                 error.isEmpty() ? tr("Cannot create %1").arg(path) : error);
+            return std::nullopt;
+        }
+    }
     return zub::bookfile::buildCommand(root_, package_, toPath(workDir), bookDir, "book",
-                                       zub::bookfile::indexFiles(*parsed));
+                                       zub::bookfile::indexFiles(*parsed),
+                                       songs.empty() ? std::filesystem::path()
+                                                     : toPath(overrideDir));
 }
 
 QProcess* SongbookExporter::createBuildProcess(const zub::songbook::BuildCommand& command,

@@ -5,14 +5,15 @@
 #include <QWidget>
 #include <expected>
 #include <filesystem>
-#include <functional>
 #include <map>
 #include <optional>
 #include <set>
 #include <string>
 #include <string_view>
 #include <vector>
+#include "BookPreview.hpp"
 #include <zub/core/bookfile.hpp>
+#include <zub/core/booktranspose.hpp>
 #include <zub/core/songbook.hpp>
 
 namespace KSyntaxHighlighting {
@@ -59,14 +60,9 @@ public:
     void setSongbookRoot(const std::filesystem::path& root);
     // The song collections (folders under songs/) for the picker's tabs.
     void setCollections(const std::vector<std::string>& collections);
-    // The package the books are built with: a book with a key needs one that defines
+    // The package the books are built with: transposing needs one that defines
     // \transposesong (else a warning shows).
     void setPackageDir(const std::filesystem::path& packageDir);
-    // Whether the song file at a path is open in an editor with unsaved changes (set by
-    // MainWindow): Capo mode rewrites song files and skips those.
-    void setModifiedSongQuery(std::function<bool(const std::filesystem::path&)> query) {
-        songModified_ = std::move(query);
-    }
     // Before the app closes: asks to save unsaved LaTeX; false to keep the app open.
     bool confirmClose();
     // Lists the books again and reads the selected one (kept where possible) from disk.
@@ -87,6 +83,7 @@ private:
     QWidget* buildEditPane();
     QWidget* buildPickerPane();
     QWidget* buildLatexPane();
+    QWidget* buildPreviewPane(); // the Preview tab: the transposition row and the preview
 
     void fillList(const QString& selectId);
     void onListRowChanged();
@@ -130,22 +127,32 @@ private:
     void applyField(zub::bookfile::Field field, const std::string& value);
     void updateFormVisibility();
     void updateCoverLabel();
-    // ---- Transposing the book (zub::booktranspose, zub::bookfile::setTranspose)
-    // The Key / Transpose by form changed: the settings line and every song's line, one write.
-    void onTransposeFormChanged();
-    // Capo mode: raises each of `paths` (song files) from its own key to `target`: cap=, every
-    // \capo{n} and key= (the chords stay). Returns what was skipped and why, for people.
-    QStringList moveSongsByCapo(const std::vector<std::filesystem::path>& paths,
-                                zub::booktranspose::Key target);
-    // `text` with the \transposesong line of each of `names` (the book's own, `% fixed` ones
-    // stay) computed from the book's settings in `text`.
-    std::string withTransposes(std::string text, const std::vector<std::string>& names) const;
+    // ---- Transposing a book for its preview and export (zub::booktranspose::Mode). Nothing is
+    // saved: each book's choice lives for the session and goes into the build copy only.
+    struct TransposeChoice {
+        std::optional<zub::booktranspose::Key> key; // nullopt: the songs keep their keys
+        zub::booktranspose::Mode mode = zub::booktranspose::Mode::Chords;
+        std::map<std::string, int> fixed; // a song's own shift (the tree's Transpose…), 0 = none
+        // Changes the build (Capo mode without a key does nothing).
+        bool active() const {
+            return key || mode == zub::booktranspose::Mode::NoCapo || !fixed.empty();
+        }
+        bool isDefault() const {
+            return !key && mode == zub::booktranspose::Mode::Chords && fixed.empty();
+        }
+    };
+    TransposeChoice transposeChoice() const; // the shown book's
+    void onTransposeChoiceChanged();         // the Key / mode combos
+    void showTransposeChoice();              // the combos and the preview from the choice
+    // The preview's composer: the book copy's text with a \transposesong line per moved song
+    // (and `transposecapos` without capo) and, in Capo mode, copies of the songs whose capo rises.
+    std::optional<BookPreview::BuildInput> composeBuild(const std::string& text);
     std::vector<std::string> allSongNames() const; // each once, in book order
     // The tree's Transpose…: asks, then setSongTranspose.
     void chooseSongTranspose(const std::string& name);
-    // A per-song choice: `semitones` a fixed shift (0 = do not transpose), nullopt = follow the
-    // songbook (drops the `% fixed` line and computes the song's own). One write.
-    bool setSongTranspose(const std::string& name, std::optional<int> semitones);
+    // A song's own choice for this session: `semitones` (0 = do not transpose), nullopt = follow
+    // the book.
+    void setSongTranspose(const std::string& name, std::optional<int> semitones);
     void updateTransposeWarning();
     void chooseCover();
     // The LaTeX tab.
@@ -206,7 +213,6 @@ private:
     SongbookSorter* sorter_;
     SongbookExporter* exporter_;
     std::filesystem::path root_;
-    std::function<bool(const std::filesystem::path&)> songModified_;
 
     QString id_;                       // the selected songbook ("" = none)
     std::string text_;                 // its file as last read or written
@@ -256,7 +262,7 @@ private:
     QLabel* warning_ = nullptr;
     QComboBox* bookKey_ = nullptr;
     QComboBox* transposeMode_ = nullptr;
-    QString shownBook_; // the book whose transpose mode the form last showed
+    std::map<QString, TransposeChoice> transposeChoices_; // by book id, this session only
     QLabel* transposeWarning_ = nullptr;
     bool packageTransposes_ = false; // the package in use defines \transposesong
     QLabel* sorterWarning_ = nullptr;

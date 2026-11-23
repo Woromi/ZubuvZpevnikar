@@ -727,7 +727,8 @@ songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& packageDir,
                                     const std::filesystem::path& workDir,
                                     const std::filesystem::path& bookDir, std::string_view bookName,
-                                    const std::vector<std::string>& indexes) {
+                                    const std::vector<std::string>& indexes,
+                                    const std::filesystem::path& overrideDir) {
     const auto utf8 = [](const std::filesystem::path& p) {
         const auto u8 = p.u8string();
         return std::string(u8.begin(), u8.end());
@@ -746,6 +747,8 @@ songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
     // a package file (class, .sty, .cfg, Lua; song names are Artist/Title), and nothing in the
     // book's folder or the repo root for a checked song.
     std::string texinputs = ".:" + utf8(workDir) + ":" + utf8(packageDir) + ":";
+    if (!overrideDir.empty())
+        texinputs += utf8(overrideDir) + ":";
     for (const auto& collection : collections(repoRoot))
         texinputs += root + "/songs/" + collection + ":";
     texinputs += utf8(bookDir) + ":" + root + ":";
@@ -1098,6 +1101,21 @@ void replaceGroup(string& text, const Group& g, string_view value) {
 
 Settings readSettings(string_view text) {
     return scanDoc(text).s;
+}
+
+std::expected<string, string> addClassOption(string_view textView, string_view option) {
+    const auto d = scanDoc(textView);
+    if (!d.hasClass)
+        return std::unexpected("the file has no \\documentclass");
+    if (d.s.notEditable.contains(Field::Chorded)) // the option list is in a broken form
+        return std::unexpected("the \\documentclass options are in a form the app cannot edit "
+                               "safely");
+    string text(textView);
+    for (const auto& token : d.tokens)
+        if (slice(d.masked, token.begin, token.end) == option)
+            return text;
+    addOption(text, d, option);
+    return text;
 }
 
 std::expected<string, string> setSetting(string_view textView, Field field, string_view value) {

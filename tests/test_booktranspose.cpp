@@ -233,3 +233,28 @@ TEST_CASE("shifting every real song key by N and back keeps its text",
     CHECK(checked > 100);
     std::cerr << respelled << " of " << checked << " keys are respelled by keyName\n";
 }
+
+TEST_CASE("raiseCapo raises cap, every \\capo and every key, nothing else", "[booktranspose]") {
+    const std::string song = "\\beginsong{T}[\r\n    by={A},\r\n    key={E\\flt},\r\n"
+                             "    cap={3},\r\n]\r\n\\beginverse\r\n\\iflargepaper\\else\\capo{5}"
+                             "\\fi\r\n    \\[C]la\r\n\\endverse\r\n\\endsong\r\n";
+    const auto raised = raiseCapo(song, 2, false);
+    REQUIRE(raised);
+    CHECK(*raised == "\\beginsong{T}[\r\n    by={A},\r\n    key={F},\r\n"
+                     "    cap={5},\r\n]\r\n\\beginverse\r\n\\iflargepaper\\else\\capo{7}"
+                     "\\fi\r\n    \\[C]la\r\n\\endverse\r\n\\endsong\r\n");
+    // Down to 0: cap= goes; a body capo would go below 0: nothing.
+    const std::string plain = "\\beginsong{T}[by={A}, key={Am}, cap={2}]\n\\[Am]la\n\\endsong\n";
+    CHECK(raiseCapo(plain, -2, false).value() ==
+          "\\beginsong{T}[by={A}, key={Gm}]\n\\[Am]la\n\\endsong\n");
+    CHECK_FALSE(raiseCapo(plain, -3, false));
+    CHECK_FALSE(raiseCapo(song, -4, false)); // cap 3 - 4
+    CHECK_FALSE(raiseCapo(song, 5, false));  // \capo{5} + 5 = 10
+    // No capo yet: one is added; Czech naming stays Czech.
+    const std::string czech = "\\beginsong{T}[by={A}, lang={czech}, key={H}]\n\\endsong\n";
+    const auto up = raiseCapo(czech, 1, true);
+    REQUIRE(up);
+    CHECK(up->contains("key={C}"));
+    CHECK(up->contains("cap={1}"));
+    CHECK_FALSE(raiseCapo("no song", 1, false));
+}

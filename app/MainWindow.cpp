@@ -404,9 +404,6 @@ void MainWindow::createCentralWidget() {
     songbookExporter_ = new SongbookExporter(this);
     songbooksPage_ =
         new SongbooksPage(model_, songbookSorter_, songbookExporter_, *repository_, pages_);
-    songbooksPage_->setModifiedSongQuery([this](const std::filesystem::path& path) {
-        return editor_ && editor_->path() == path && editor_->isModified();
-    });
     connect(songbooksPage_, &SongbooksPage::openSongRequested, this,
             [this](const std::filesystem::path& path) { openExistingSong(path); });
     connect(songbookExporter_, &SongbookExporter::finished, this,

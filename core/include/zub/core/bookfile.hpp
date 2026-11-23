@@ -117,12 +117,15 @@ std::vector<std::string> inputs(std::string_view text);
 // The build of a book of the repo from a copy <workDir>/<bookName>.tex, with the package's
 // scripts/build.sh -i <indexes> (indexFiles), writing only to workDir. TEXINPUTS: the work dir,
 // the song folders, the package, then the book's own folder `bookDir` (a Tabor book's cover.pdf
-// and akordy.tex), the repo root (img/), and the defaults (the trailing ':').
+// and akordy.tex), the repo root (img/), and the defaults (the trailing ':'). A non-empty
+// `overrideDir` (song copies `<Artist>/<Title>.tex` that differ for this build only) comes right
+// after the package, before the songs it shadows.
 songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& packageDir,
                                     const std::filesystem::path& workDir,
                                     const std::filesystem::path& bookDir, std::string_view bookName,
-                                    const std::vector<std::string>& indexes);
+                                    const std::vector<std::string>& indexes,
+                                    const std::filesystem::path& overrideDir = {});
 
 // ---- The settings of a book (the header and the cover/chart commands) ----
 //
@@ -176,6 +179,12 @@ Settings readSettings(std::string_view text);
 std::expected<std::string, std::string> setSetting(std::string_view text, Field field,
                                                    std::string_view value);
 
+// Adds `option` to the \documentclass options unless it is one of them (a build copy's
+// `transposecapos`), byte-exact otherwise. Errors: no \documentclass, options the app cannot
+// read safely.
+std::expected<std::string, std::string> addClassOption(std::string_view text,
+                                                       std::string_view option);
+
 // "% zpevnikar: locked"
 std::string_view lockMark();
 // Adds the mark as the first line (with the file's line break), or removes every line that is the
@@ -187,8 +196,10 @@ std::string setLocked(std::string_view text, bool locked);
 // The book's key is a comment line `% zpevnikar: key=G transpose=chords` (or `transpose=capo`; the
 // key as zub::booktranspose::bookKeyName writes it), like the lock mark. A song is transposed by a
 // line directly above its `\input` (the previous line of the file, not a blank or a wish):
-// `\transposesong[key=<key>]{N}` (re-shaping the chords; the package has no `capo` option: Capo mode
-// edits the song files instead), optionally followed by a `% fixed` comment (a per-song choice that a change of the book's key leaves alone). It is a plain
+// `\transposesong[key=<key>]{N}` (re-shaping the chords; the package has no `capo` option),
+// optionally followed by a `% fixed` comment (a per-song choice that a change of the book's key
+// leaves alone). The app writes these lines only into a build copy (zub::booktranspose::Mode);
+// the settings line and `% fixed` are read and written here but no longer used by the app. It is a plain
 // line of its input's unit: setSongs moves it with the input and drops it with a removed input.
 
 struct TransposeSettings {

@@ -119,52 +119,67 @@ QString displayKey(Key key, bool german) {
     return text;
 }
 
-// What the book's key does to one song.
+// What the book's transposition does to one song.
 struct TransposePlan {
     enum class Kind {
         Unknown, // not a song of the library
-        Same,    // stays as it is (no book key, or already in it)
-        Moves,   // gets `line`
+        Same,    // stays in its key (no book key, or already in it); `note` may say more
+        Moves,   // moves by `semitones` (`line`, or the capo)
         Note,    // cannot be transposed: `note` says why
-        Fixed    // has its own `% fixed` line
+        Fixed    // has its own choice (the tree's Transpose…)
     };
     Kind kind = Kind::Unknown;
     QString songKey; // for people, "" without a readable key
     QString newKey;  // Moves (and Fixed with a key)
     int semitones = 0;
     int capo = 0; // the song's own capo
+    bool german = false;
     QString note;
-    // Moves by raising the capo (Capo mode, the capo stays in 0..9): the song files change, the
-    // book gets no line.
+    // Moves by raising the capo (Capo mode, the capo stays in 0..9): a copy of the song, no line.
     bool viaCapo = false;
-    std::optional<zub::bookfile::SongTranspose> line; // Moves by re-shaping the chords
+    // The book copy's line (Moves and Fixed with semitones; also for a viaCapo song whose copy
+    // cannot be made).
+    std::optional<zub::bookfile::SongTranspose> line;
 };
 
-TransposePlan
-planTranspose(const std::string& name, const zub::bookfile::TransposeSettings& settings,
-              const std::map<std::string, zub::bookfile::SongTranspose>& fixed,
-              const zub::SongEntry* song) {
+TransposePlan planTranspose(const std::string& name, std::optional<zub::booktranspose::Key> target,
+                            zub::booktranspose::Mode mode, const std::map<std::string, int>& fixed,
+                            const zub::SongEntry* song) {
     namespace bt = zub::booktranspose;
     TransposePlan plan;
     if (!song)
         return plan;
     plan.kind = TransposePlan::Kind::Same;
     const std::string keyText = song->meta.value("key");
-    const bool german = zub::score::germanNames(zub::mainLanguage(song->meta.value("lang")));
+    plan.german = zub::score::germanNames(zub::mainLanguage(song->meta.value("lang")));
+    const bool german = plan.german;
     const auto key = bt::parseKey(keyText, german);
     plan.capo = zub::score::songCapo(song->meta.value("cap"));
     if (key)
         plan.songKey = displayKey(*key, german);
+    const auto moved = [&](int semitones) {
+        return Key{((key->pitch + semitones) % 12 + 12) % 12, key->minor};
+    };
+    const auto lineFor = [&](int semitones) {
+        return zub::bookfile::SongTranspose{name, semitones, false,
+                                            key ? bt::keyName(moved(semitones), german)
+                                                : std::string(),
+                                            false};
+    };
     if (const auto it = fixed.find(name); it != fixed.end()) {
         plan.kind = TransposePlan::Kind::Fixed;
-        plan.semitones = it->second.semitones;
+        plan.semitones = it->second;
         if (key)
-            plan.newKey = displayKey(
-                Key{((key->pitch + plan.semitones) % 12 + 12) % 12, key->minor}, german);
+            plan.newKey = displayKey(moved(plan.semitones), german);
         plan.note = plan.newKey.isEmpty() ? plan.songKey : plan.newKey;
+        if (plan.semitones != 0)
+            plan.line = lineFor(plan.semitones);
         return plan;
     }
-    if (!settings.key)
+    // Without capo the capo goes whether the key changes or not.
+    if (mode == bt::Mode::NoCapo && plan.capo > 0)
+        plan.note = QObject::tr("capo %1 dropped").arg(plan.capo);
+    if (!target)
         return plan;
     if (song->collection == "tinwhistle") {
         plan.kind = TransposePlan::Kind::Note;
@@ -177,33 +192,27 @@ planTranspose(const std::string& name, const zub::bookfile::TransposeSettings& s
                                     : QObject::tr("unreadable key: %1").arg(toQString(keyText));
         return plan;
     }
-    const bool capo = settings.mode == zub::bookfile::TransposeSettings::Mode::Capo;
-    plan.semitones = bt::shift(*key, *settings.key);
+    plan.semitones = bt::shift(*key, *target);
     if (plan.semitones == 0)
         return plan;
-    // A capo outside 0..9 cannot be played: the chords are re-shaped instead (a book line).
-    // The capos of the body count too (read from the file: only in Capo mode, only for a song
-    // that moves).
-    int lowest = plan.capo, highest = plan.capo;
-    if (capo) {
-        if (const auto text = zub::readTextFile(song->path))
-            for (const int body : zub::songheader::bodyCapos(*text)) {
-                lowest = std::min(lowest, body);
-                highest = std::max(highest, body);
-            }
-    }
-    const bool capoFits = lowest + plan.semitones >= 0 && highest + plan.semitones <= 9;
-    const Key moved{((key->pitch + plan.semitones) % 12 + 12) % 12, key->minor};
     plan.kind = TransposePlan::Kind::Moves;
-    plan.newKey = displayKey(moved, german);
-    if (capo && !capoFits)
+    plan.newKey = displayKey(moved(plan.semitones), german);
+    plan.line = lineFor(plan.semitones);
+    if (mode != bt::Mode::Capo)
+        return plan;
+    // A capo outside 0..9 cannot be played: the chords are re-shaped instead. The capos of the
+    // body count too (read from the file).
+    int lowest = plan.capo, highest = plan.capo;
+    if (const auto text = zub::readTextFile(song->path))
+        for (const int body : zub::songheader::bodyCapos(*text)) {
+            lowest = std::min(lowest, body);
+            highest = std::max(highest, body);
+        }
+    plan.viaCapo = lowest + plan.semitones >= 0 && highest + plan.semitones <= 9;
+    if (!plan.viaCapo)
         plan.note = QObject::tr("capo would be %1: chords re-shaped")
                         .arg(lowest + plan.semitones < 0 ? lowest + plan.semitones
                                                          : highest + plan.semitones);
-    plan.viaCapo = capo && capoFits;
-    if (!plan.viaCapo)
-        plan.line = zub::bookfile::SongTranspose{name, plan.semitones, false,
-                                                 bt::keyName(moved, german), false};
     return plan;
 }
 
@@ -213,14 +222,6 @@ std::map<std::string, const zub::SongEntry*> songIndex(const SongTableModel& mod
         if (const zub::SongEntry* song = model.song(row))
             index.emplace(song->inputName, song);
     return index;
-}
-
-std::map<std::string, zub::bookfile::SongTranspose> fixedLines(std::string_view text) {
-    std::map<std::string, zub::bookfile::SongTranspose> fixed;
-    for (auto& line : zub::bookfile::readTransposes(text))
-        if (line.fixed)
-            fixed.emplace(line.inputName, line);
-    return fixed;
 }
 
 } // namespace
@@ -308,8 +309,7 @@ void SongbooksPage::buildUi() {
     rightTabs_ = new QTabWidget(this);
     rightTabs_->setDocumentMode(true);
     rightTabs_->addTab(buildPickerPane(), tr("Add Songs"));
-    preview_ = new BookPreview(exporter_, this);
-    rightTabs_->addTab(preview_, tr("Preview"));
+    rightTabs_->addTab(buildPreviewPane(), tr("Preview"));
     connect(preview_, &BookPreview::built, this, [this](const QString& id, bool ok) {
         // Only a PDF of the book as it is now (it may have changed during the build).
         const bool exporting = ok && id == pendingExport_ && id == id_ && preview_->upToDate();
@@ -408,27 +408,6 @@ QWidget* SongbooksPage::buildEditPane() {
     form_->addRow(tr("Title"), title_);
     form_->addRow(tr("Author"), author_);
     form_->addRow(tr("Class"), class_);
-    bookKey_ = new QComboBox(editPane_);
-    bookKey_->addItem(tr("None"), QString());
-    for (const bool minor : {false, true})
-        for (int pitch = 0; pitch < 12; ++pitch) {
-            const Key key{pitch, minor};
-            bookKey_->addItem(displayKey(key, false),
-                              toQString(zub::booktranspose::bookKeyName(key)));
-        }
-    bookKey_->setToolTip(tr("Transposes the songs to this key: each song moves the fewest "
-                            "semitones (minor songs to the relative minor). Names are English: "
-                            "B is the German H, B♭ is the German B."));
-    transposeMode_ = new QComboBox(editPane_);
-    transposeMode_->addItem(tr("Chords"), QStringLiteral("chords"));
-    transposeMode_->addItem(tr("Capo"), QStringLiteral("capo"));
-    transposeMode_->setToolTip(
-        tr("Chords re-shapes the chords in this book (and the package transposes scores where it "
-           "can). Capo changes the song files themselves (their capo, key and capo notes; the "
-           "chords stay), which affects every songbook using them. It is relative to each "
-           "song's current key, and None does not undo it."));
-    form_->addRow(tr("Key"), bookKey_);
-    form_->addRow(tr("Transpose by"), transposeMode_);
     form_->addRow(chorded_);
     form_->addRow(twoColumns_);
     form_->addRow(shading_);
@@ -462,21 +441,9 @@ QWidget* SongbooksPage::buildEditPane() {
     onToggled(chordChart_, Field::ChordChart);
     connect(class_, &QComboBox::currentIndexChanged, this,
             [this] { applyField(Field::Class, toStdString(class_->currentData().toString())); });
-    connect(bookKey_, &QComboBox::currentIndexChanged, this,
-            [this] { onTransposeFormChanged(); });
-    connect(transposeMode_, &QComboBox::currentIndexChanged, this,
-            [this] { onTransposeFormChanged(); });
     connect(coverChoose_, &QPushButton::clicked, this, &SongbooksPage::chooseCover);
     connect(coverClear_, &QPushButton::clicked, this, [this] { applyField(Field::Cover, ""); });
 
-    transposeWarning_ = new QLabel(
-        tr("The songbook's package can't transpose yet (\\transposesong): the PDF will fail to "
-           "build until it does."),
-        editPane_);
-    transposeWarning_->setWordWrap(true);
-    transposeWarning_->setStyleSheet(QStringLiteral("color: #b36b00;"));
-    transposeWarning_->hide();
-    layout->addWidget(transposeWarning_);
     layout->addWidget(new QLabel(tr("Sections"), editPane_));
     warning_ = new QLabel(editPane_);
     warning_->setWordWrap(true);
@@ -540,6 +507,60 @@ QWidget* SongbooksPage::buildEditPane() {
     connect(tree_, &SongbookTree::removeSectionRequested, this,
             [this](quint64 uid) { removeSection(indexOfUid(uid)); });
     return editPane_;
+}
+
+QWidget* SongbooksPage::buildPreviewPane() {
+    namespace bt = zub::booktranspose;
+    auto* pane = new QWidget(this);
+    auto* layout = new QVBoxLayout(pane);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    auto* row = new QHBoxLayout;
+    row->setContentsMargins(6, 6, 6, 0);
+    bookKey_ = new QComboBox(pane);
+    bookKey_->addItem(tr("Keys as written"), QString());
+    for (const bool minor : {false, true})
+        for (int pitch = 0; pitch < 12; ++pitch) {
+            const Key key{pitch, minor};
+            bookKey_->addItem(displayKey(key, false), toQString(bt::bookKeyName(key)));
+        }
+    bookKey_->setToolTip(tr("Transposes the songs to this key for this preview and export only "
+                            "(nothing is saved): each song moves the fewest semitones (minor songs "
+                            "to the relative minor). Names are English: B is the German H, B♭ is "
+                            "the German B."));
+    transposeMode_ = new QComboBox(pane);
+    transposeMode_->addItem(tr("Re-shape the chords"), int(bt::Mode::Chords));
+    transposeMode_->addItem(tr("Move the capo"), int(bt::Mode::Capo));
+    transposeMode_->addItem(tr("Without capo"), int(bt::Mode::NoCapo));
+    transposeMode_->setToolTip(
+        tr("Re-shape the chords: new chords, the capo stays (scores are transposed too).\n"
+           "Move the capo: the chords stay, the capo moves (where it stays within 0 to 9).\n"
+           "Without capo: no capo anywhere, every chord as it sounds, in the key.\n"
+           "Only this preview and export change; the songbook and the songs stay as they are."));
+    auto* keyLabel = new QLabel(tr("Transpose to"), pane);
+    keyLabel->setBuddy(bookKey_);
+    row->addWidget(keyLabel);
+    row->addWidget(bookKey_);
+    row->addWidget(transposeMode_);
+    row->addStretch(1);
+    layout->addLayout(row);
+    transposeWarning_ = new QLabel(
+        tr("The songbook's package can't transpose yet (\\transposesong): the PDF will fail to "
+           "build until it does."),
+        pane);
+    transposeWarning_->setWordWrap(true);
+    transposeWarning_->setContentsMargins(6, 4, 6, 0);
+    transposeWarning_->setStyleSheet(QStringLiteral("color: #b36b00;"));
+    transposeWarning_->hide();
+    layout->addWidget(transposeWarning_);
+    preview_ = new BookPreview(exporter_, pane);
+    preview_->setComposer([this](const std::string& text) { return composeBuild(text); });
+    layout->addWidget(preview_, 1);
+    connect(bookKey_, &QComboBox::currentIndexChanged, this,
+            [this] { onTransposeChoiceChanged(); });
+    connect(transposeMode_, &QComboBox::currentIndexChanged, this,
+            [this] { onTransposeChoiceChanged(); });
+    return pane;
 }
 
 QWidget* SongbooksPage::buildLatexPane() {
@@ -905,18 +926,6 @@ bool SongbooksPage::saveSongs() {
         }
         text = std::move(*edited);
     }
-    // A book with a key: the songs that have no line yet (added ones) get theirs in this write.
-    if (zub::bookfile::readTransposeSettings(text).key) {
-        std::set<std::string> withLine;
-        for (const auto& line : zub::bookfile::readTransposes(text))
-            withLine.insert(line.inputName);
-        std::vector<std::string> fresh;
-        for (const auto& section : book_.sections)
-            for (const std::string& name : section.songs)
-                if (!withLine.contains(name) && std::ranges::find(fresh, name) == fresh.end())
-                    fresh.push_back(name);
-        text = withTransposes(std::move(text), fresh);
-    }
     return writeFile(text);
 }
 
@@ -944,7 +953,7 @@ void SongbooksPage::exportPdf() {
         exporter_->savePdf(preview_->pdf(), toQString(pathOf(id_).stem()), preview_->report());
         return;
     }
-    rightTabs_->setCurrentWidget(preview_);
+    rightTabs_->setCurrentWidget(preview_->parentWidget());
     if (preview_->building()) {
         showWarning(tr("A preview is being built: export when it is done."));
         return;
@@ -1284,22 +1293,6 @@ void SongbooksPage::loadBook() {
     twoColumns_->setChecked(settings_.twoColumns);
     shading_->setChecked(settings_.shading);
     chordChart_->setChecked(settings_.chordChart);
-    {
-        const auto transpose = zub::bookfile::readTransposeSettings(text_);
-        const int keyIndex =
-            transpose.key
-                ? bookKey_->findData(toQString(zub::booktranspose::bookKeyName(*transpose.key)))
-                : 0;
-        bookKey_->setCurrentIndex(std::max(keyIndex, 0));
-        // Without a key the file says nothing about the mode: the choice stays (and a new
-        // book starts in Chords).
-        if (transpose.key || shownBook_ != id_)
-            transposeMode_->setCurrentIndex(
-                transpose.mode == zub::bookfile::TransposeSettings::Mode::Capo ? 1 : 0);
-        shownBook_ = id_;
-        for (QWidget* widget : {static_cast<QWidget*>(bookKey_), static_cast<QWidget*>(transposeMode_)})
-            widget->setEnabled(canEdit());
-    }
     const std::pair<QWidget*, Field> fields[] = {
         {title_, Field::Title},           {author_, Field::Author},
         {campYear_, Field::CampYear},     {chorded_, Field::Chorded},
@@ -1323,7 +1316,7 @@ void SongbooksPage::loadBook() {
     refreshFileViews();
     updateCoverLabel();
     updateFormVisibility();
-    updateTransposeWarning();
+    showTransposeChoice();
     updateLatexState();
     rebuildTree();
     updatePicker();
@@ -1336,9 +1329,22 @@ void SongbooksPage::setPackageDir(const std::filesystem::path& packageDir) {
 }
 
 void SongbooksPage::updateTransposeWarning() {
-    const bool keyed = !id_.isEmpty() && !text_.empty() &&
-                       zub::bookfile::readTransposeSettings(text_).key.has_value();
-    transposeWarning_->setVisible(keyed && !packageTransposes_);
+    const auto choice = transposeChoice();
+    const bool lines = choice.key || !choice.fixed.empty();
+    transposeWarning_->setVisible(!id_.isEmpty() && lines && !packageTransposes_);
+}
+
+SongbooksPage::TransposeChoice SongbooksPage::transposeChoice() const {
+    const auto it = transposeChoices_.find(id_);
+    if (it == transposeChoices_.end())
+        return {};
+    // A song's own choice counts only while the song is in the book (it may have been removed).
+    TransposeChoice choice = it->second;
+    const auto names = allSongNames();
+    std::erase_if(choice.fixed, [&names](const auto& entry) {
+        return std::ranges::find(names, entry.first) == names.end();
+    });
+    return choice;
 }
 
 std::vector<std::string> SongbooksPage::allSongNames() const {
@@ -1350,152 +1356,110 @@ std::vector<std::string> SongbooksPage::allSongNames() const {
     return names;
 }
 
-std::string SongbooksPage::withTransposes(std::string text,
-                                          const std::vector<std::string>& names) const {
-    const auto settings = zub::bookfile::readTransposeSettings(text);
-    const auto songs = songIndex(*model_);
-    const auto fixed = fixedLines(text);
-    for (const std::string& name : names) {
-        const auto it = songs.find(name);
-        const auto plan = planTranspose(name, settings, fixed, it == songs.end() ? nullptr : it->second);
-        if (plan.kind == TransposePlan::Kind::Fixed)
-            continue; // the song's own choice
-        // A song that is not in the library (a wish, a typo) has no key to go by: no line.
-        if (auto edited = zub::bookfile::setTranspose(text, name, plan.line))
-            text = std::move(*edited);
-    }
-    return text;
-}
-
-void SongbooksPage::onTransposeFormChanged() {
-    if (loading_)
-        return;
-    if (!canEdit()) {
-        loadBook(); // back to what the file says
-        return;
-    }
-    zub::bookfile::TransposeSettings settings;
-    settings.key = zub::booktranspose::bookKey(toStdString(bookKey_->currentData().toString()));
-    settings.mode = transposeMode_->currentData().toString() == QStringLiteral("capo")
-                        ? zub::bookfile::TransposeSettings::Mode::Capo
-                        : zub::bookfile::TransposeSettings::Mode::Chords;
-    // Capo mode raises the capo in the song files themselves (they are shared by every songbook):
-    // ask first, then write them; the book keeps only the settings line (and a re-shape line
-    // for a song whose capo would leave 0..9).
-    QStringList notes;
-    if (settings.key && settings.mode == zub::bookfile::TransposeSettings::Mode::Capo) {
-        const auto songs = songIndex(*model_);
-        const auto fixed = fixedLines(text_);
-        std::vector<std::filesystem::path> paths;
-        for (const std::string& name : allSongNames()) {
-            const auto it = songs.find(name);
-            const auto plan =
-                planTranspose(name, settings, fixed, it == songs.end() ? nullptr : it->second);
-            if (plan.kind == TransposePlan::Kind::Moves && plan.viaCapo &&
-                std::ranges::find(paths, it->second->path) == paths.end())
-                paths.push_back(it->second->path);
-        }
-        if (!paths.empty()) {
-            const auto answer = QMessageBox::question(
-                this, tr("Transpose by capo"),
-                tr("%n song file(s) will change: their capo, key and capo notes are raised so "
-                   "that the songs sound in %1. This affects every songbook that uses them.\n\n"
-                   "The chords stay as they are. None does not undo this; to go back, choose the "
-                   "old key again.",
-                   nullptr, static_cast<int>(paths.size()))
-                    .arg(toQString(zub::booktranspose::bookKeyName(*settings.key))),
-                QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
-            if (answer != QMessageBox::Yes) {
-                loadBook(); // back to what the file says
-                return;
-            }
-            notes = moveSongsByCapo(paths, *settings.key);
-        }
-    }
-    // One write: the settings line, then each song's line from it (None drops every line that is
-    // not a song's own `% fixed` choice).
-    const std::string text =
-        withTransposes(zub::bookfile::setTransposeSettings(text_, settings), allSongNames());
-    showWarning({});
-    writeFile(text); // not written: the form shows what the file says
-    loadBook();
-    if (!notes.isEmpty())
-        showWarning(tr("Not changed:") + QLatin1Char('\n') + notes.join(QLatin1Char('\n')));
-}
-
-QStringList SongbooksPage::moveSongsByCapo(const std::vector<std::filesystem::path>& paths,
-                                           zub::booktranspose::Key target) {
+void SongbooksPage::showTransposeChoice() {
     namespace bt = zub::booktranspose;
-    QStringList skipped;
-    for (const auto& path : paths) {
-        const QString name = toQString(path.filename());
-        if (songModified_ && songModified_(path)) {
-            skipped << tr("%1: open in the editor with unsaved changes").arg(name);
-            continue;
-        }
-        auto content = zub::readTextFile(path);
-        if (!content) {
-            skipped << tr("%1: %2").arg(name, toQString(content.error()));
-            continue;
-        }
-        if (!SongEditor::roundTrips(*content)) {
-            skipped << tr("%1: the file can't be rewritten safely").arg(name);
-            continue;
-        }
-        const auto meta = zub::parseSong(*content);
-        if (!meta) {
-            skipped << tr("%1: the song header has a problem: %2")
-                           .arg(name, toQString(meta.error()));
-            continue;
-        }
-        const bool german = zub::score::germanNames(zub::mainLanguage(meta->value("lang")));
-        const auto key = bt::parseKey(meta->value("key"), german);
-        if (!key)
-            continue; // the file changed since the tree was built
-        const int semitones = bt::shift(*key, target);
-        if (semitones == 0)
-            continue;
-        const int cap = zub::score::songCapo(meta->value("cap")) + semitones;
-        bool fits = cap >= 0 && cap <= 9;
-        for (const int body : zub::songheader::bodyCapos(*content))
-            fits = fits && body + semitones >= 0 && body + semitones <= 9;
-        if (!fits) {
-            skipped << tr("%1: the capo would leave 0..9").arg(name);
-            continue;
-        }
-        // The shapes stay, the song sounds `semitones` higher: cap (none at 0, as songs without
-        // a capo have no cap=), each \capo{n} and the sounding key.
-        std::string updated = zub::songheader::shiftBodyCapos(*content, semitones);
-        updated = zub::songheader::setOption(
-            updated, "cap",
-            cap == 0 ? std::nullopt
-                     : std::optional<std::string>("{" + std::to_string(cap) + "}"));
-        // Every key of the value moves (`Cm\\rightarrow C`); the rest of the text stays.
-        if (const auto value = zub::songheader::option(updated, "key"))
-            updated = zub::songheader::setOption(
-                updated, "key", "{" + bt::shiftKeys(*value, semitones, german) + "}");
-        // Only if the file is still what was read.
-        const auto again = zub::readTextFile(path);
-        if (!again || *again != *content) {
-            skipped << tr("%1: changed on disk meanwhile").arg(name);
-            continue;
-        }
-        if (const auto written = zub::writeTextFileAtomic(path, updated); !written) {
-            skipped << tr("%1: %2").arg(name, toQString(written.error()));
-            continue;
-        }
-        if (auto newMeta = zub::parseSong(updated))
-            model_->updateSong(path, std::move(*newMeta), zub::todo::notes(updated),
-                               zub::songbook::referencedFiles(updated));
+    const auto choice = transposeChoice();
+    {
+        const QSignalBlocker keyBlocker(bookKey_);
+        const QSignalBlocker modeBlocker(transposeMode_);
+        const int keyIndex =
+            choice.key ? bookKey_->findData(toQString(bt::bookKeyName(*choice.key))) : 0;
+        bookKey_->setCurrentIndex(std::max(keyIndex, 0));
+        transposeMode_->setCurrentIndex(
+            std::max(transposeMode_->findData(int(choice.mode)), 0));
     }
-    return skipped;
+    const bool shown = !id_.isEmpty() && !text_.empty();
+    bookKey_->setEnabled(shown);
+    transposeMode_->setEnabled(shown);
+
+    // What the preview builds, for people, and the signature that tells builds apart.
+    QString variant;
+    if (choice.key) {
+        const QString key = displayKey(*choice.key, false);
+        variant = choice.mode == bt::Mode::Capo     ? tr("transposed to %1 by the capo").arg(key)
+                  : choice.mode == bt::Mode::NoCapo ? tr("transposed to %1 without capo").arg(key)
+                                                    : tr("transposed to %1").arg(key);
+    } else if (choice.mode == bt::Mode::NoCapo) {
+        variant = tr("without capo");
+    }
+    if (!choice.fixed.empty())
+        variant += (variant.isEmpty() ? QString() : QStringLiteral(", ")) +
+                   tr("%n song(s) with their own transposition", nullptr,
+                      static_cast<int>(choice.fixed.size()));
+    std::string signature;
+    if (choice.active()) {
+        // Capo mode without a key changes nothing: the mode counts only where it does.
+        const bool modeMatters = choice.key || choice.mode == bt::Mode::NoCapo;
+        signature = (choice.key ? bt::bookKeyName(*choice.key) : std::string("-")) + "/" +
+                    (modeMatters ? std::to_string(int(choice.mode)) : std::string("-"));
+        for (const auto& [name, semitones] : choice.fixed)
+            signature += "/" + name + "=" + std::to_string(semitones);
+    }
+    preview_->setVariant(variant, signature);
+    updateTransposeWarning();
+}
+
+void SongbooksPage::onTransposeChoiceChanged() {
+    if (loading_ || id_.isEmpty())
+        return;
+    TransposeChoice& choice = transposeChoices_[id_];
+    choice.key = zub::booktranspose::bookKey(toStdString(bookKey_->currentData().toString()));
+    choice.mode = static_cast<zub::booktranspose::Mode>(transposeMode_->currentData().toInt());
+    if (choice.isDefault())
+        transposeChoices_.erase(id_);
+    showTransposeChoice();
+    rebuildTree();
+}
+
+std::optional<BookPreview::BuildInput> SongbooksPage::composeBuild(const std::string& text) {
+    namespace bt = zub::booktranspose;
+    BookPreview::BuildInput input{text, {}};
+    const auto choice = transposeChoice();
+    if (!choice.active())
+        return input;
+    QStringList problems;
+    if (choice.mode == bt::Mode::NoCapo) {
+        if (auto edited = zub::bookfile::addClassOption(input.text, "transposecapos"))
+            input.text = std::move(*edited);
+        else
+            problems << toQString(edited.error());
+    }
+    const auto songs = songIndex(*model_);
+    for (const std::string& name : allSongNames()) {
+        const auto it = songs.find(name);
+        const auto plan = planTranspose(name, choice.key, choice.mode, choice.fixed,
+                                        it == songs.end() ? nullptr : it->second);
+        using Kind = TransposePlan::Kind;
+        // Without a key the book's own lines stay, except where a song has its own choice.
+        if (plan.kind == Kind::Unknown || (!choice.key && plan.kind != Kind::Fixed))
+            continue;
+        std::optional<zub::bookfile::SongTranspose> line = plan.line;
+        if (plan.kind == Kind::Moves && plan.viaCapo) {
+            const auto songText = zub::readTextFile(it->second->path);
+            if (songText)
+                if (auto raised = bt::raiseCapo(*songText, plan.semitones, plan.german)) {
+                    input.songs[name] = std::move(*raised);
+                    line.reset();
+                }
+        }
+        auto edited = zub::bookfile::setTranspose(input.text, name, line);
+        if (edited)
+            input.text = std::move(*edited);
+        else
+            problems << toQString(name) + QStringLiteral(": ") + toQString(edited.error());
+    }
+    if (!problems.isEmpty()) {
+        QMessageBox::warning(this, tr("Transpose"),
+                             tr("The songbook can't be transposed:\n\n%1")
+                                 .arg(problems.join(QLatin1Char('\n'))));
+        return std::nullopt;
+    }
+    return input;
 }
 
 void SongbooksPage::chooseSongTranspose(const std::string& name) {
-    if (!canEdit())
-        return;
-    const auto fixed = fixedLines(text_);
-    const auto current = fixed.find(name);
+    const auto choice = transposeChoice();
+    const auto current = choice.fixed.find(name);
 
     QDialog dialog(this);
     dialog.setWindowTitle(tr("Transpose %1").arg(toQString(name)));
@@ -1507,10 +1471,10 @@ void SongbooksPage::chooseSongTranspose(const std::string& name) {
     spin->setRange(-11, 11);
     spin->setSuffix(tr(" semitones"));
     spin->setSpecialValueText(QString());
-    if (current != fixed.end() && current->second.semitones != 0) {
+    if (current != choice.fixed.end() && current->second != 0) {
         shift->setChecked(true);
-        spin->setValue(current->second.semitones);
-    } else if (current != fixed.end()) {
+        spin->setValue(current->second);
+    } else if (current != choice.fixed.end()) {
         none->setChecked(true);
     } else {
         follow->setChecked(true);
@@ -1521,6 +1485,10 @@ void SongbooksPage::chooseSongTranspose(const std::string& name) {
     layout->addWidget(follow);
     layout->addLayout(shiftRow);
     layout->addWidget(none);
+    auto* hint = new QLabel(tr("For this songbook's preview and export only; nothing is saved."),
+                            &dialog);
+    hint->setWordWrap(true);
+    layout->addWidget(hint);
     connect(spin, &QSpinBox::valueChanged, shift, [shift] { shift->setChecked(true); });
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -1534,41 +1502,18 @@ void SongbooksPage::chooseSongTranspose(const std::string& name) {
         setSongTranspose(name, none->isChecked() ? 0 : spin->value());
 }
 
-bool SongbooksPage::setSongTranspose(const std::string& name, std::optional<int> semitones) {
-    if (!canEdit())
-        return false;
-    std::string text = text_;
-    if (!semitones) {
-        auto cleared = zub::bookfile::setTranspose(text, name, std::nullopt);
-        if (!cleared) {
-            showWarning(tr("Not saved: %1").arg(toQString(cleared.error())));
-            return false;
-        }
-        text = withTransposes(std::move(*cleared), {name});
-    } else {
-        const auto songs = songIndex(*model_);
-        const auto it = songs.find(name);
-        // An override is always a re-shape (the book's capo mode edits song files; this is one
-        // song's choice for this book only).
-        zub::bookfile::SongTranspose line{name, *semitones, false, {}, true};
-        if (it != songs.end()) {
-            const auto& meta = it->second->meta;
-            const bool german = zub::score::germanNames(zub::mainLanguage(meta.value("lang")));
-            if (const auto key = zub::booktranspose::parseKey(meta.value("key"), german))
-                line.key = zub::booktranspose::keyName(
-                    {((key->pitch + *semitones) % 12 + 12) % 12, key->minor}, german);
-        }
-        auto edited = zub::bookfile::setTranspose(text, name, line);
-        if (!edited) {
-            showWarning(tr("Not saved: %1").arg(toQString(edited.error())));
-            return false;
-        }
-        text = std::move(*edited);
-    }
-    showWarning({});
-    const bool written = writeFile(text);
-    loadBook();
-    return written;
+void SongbooksPage::setSongTranspose(const std::string& name, std::optional<int> semitones) {
+    if (id_.isEmpty())
+        return;
+    TransposeChoice& choice = transposeChoices_[id_];
+    if (semitones)
+        choice.fixed[name] = *semitones;
+    else
+        choice.fixed.erase(name);
+    if (choice.isDefault())
+        transposeChoices_.erase(id_);
+    showTransposeChoice();
+    rebuildTree();
 }
 
 void SongbooksPage::updateFormVisibility() {
@@ -1772,10 +1717,9 @@ void SongbooksPage::rebuildTree() {
     for (int row = 0; row < model_->rowCount(); ++row)
         if (const zub::SongEntry* song = model_->song(row))
             rowOfName.emplace(song->inputName, row);
-    // Songs show their key only in a book with a key (or a song with a line of its own).
-    const auto transposeSettings = zub::bookfile::readTransposeSettings(text_);
+    // Songs show their key only while the preview transposes (or a song has its own choice).
+    const auto choice = transposeChoice();
     const auto songs = songIndex(*model_);
-    const auto fixed = fixedLines(text_);
 
     const int selectedSection = currentSection();
     int total = 0;
@@ -1807,12 +1751,17 @@ void SongbooksPage::rebuildTree() {
                         model_->index(it->second, SongTableModel::Artist).data().toString();
                     QString text = title + QStringLiteral(" — ") + artist;
                     bool dim = false;
-                    const auto plan =
-                        planTranspose(name, transposeSettings, fixed, songs.at(name));
+                    const auto plan = planTranspose(name, choice.key, choice.mode, choice.fixed,
+                                                    songs.at(name));
                     using Kind = TransposePlan::Kind;
+                    const auto withNote = [&plan] {
+                        return plan.note.isEmpty()
+                                   ? QString()
+                                   : QStringLiteral(" (") + plan.note + QStringLiteral(")");
+                    };
                     if (plan.kind == Kind::Fixed) {
                         text += QStringLiteral("  ") + tr("kept: %1").arg(plan.note);
-                    } else if (transposeSettings.key && plan.kind == Kind::Moves) {
+                    } else if (plan.kind == Kind::Moves) {
                         text += QStringLiteral("  ") + plan.songKey + QStringLiteral(" → ") +
                                 plan.newKey;
                         if (plan.viaCapo)
@@ -1820,13 +1769,16 @@ void SongbooksPage::rebuildTree() {
                                     tr("(capo %1)").arg(
                                         (plan.semitones > 0 ? QStringLiteral("+") : QString()) +
                                         QString::number(plan.semitones));
-                        else if (!plan.note.isEmpty())
-                            text += QStringLiteral(" (") + plan.note + QStringLiteral(")");
-                    } else if (transposeSettings.key && plan.kind == Kind::Same) {
-                        text += QStringLiteral("  ") + plan.songKey;
-                    } else if (transposeSettings.key && plan.kind == Kind::Note) {
+                        else
+                            text += withNote();
+                    } else if (choice.key && plan.kind == Kind::Same) {
+                        text += QStringLiteral("  ") + plan.songKey + withNote();
+                    } else if (plan.kind == Kind::Same && !plan.note.isEmpty()) {
+                        text += QStringLiteral(" ") + withNote();
+                    } else if (choice.key && plan.kind == Kind::Note) {
                         text += QStringLiteral("  (") +
-                                (plan.songKey.isEmpty() ? QString() : plan.songKey + QStringLiteral(", ")) +
+                                (plan.songKey.isEmpty() ? QString()
+                                                        : plan.songKey + QStringLiteral(", ")) +
                                 plan.note + QStringLiteral(")");
                         dim = true;
                     }

@@ -1257,3 +1257,22 @@ TEST_CASE("a build.sh never gets an odd collection name", "[bookfile]") {
     CHECK(script.find("x$(id)") == std::string::npos);
     CHECK(script.find("a:b") == std::string::npos);
 }
+
+TEST_CASE("bookfile build TEXINPUTS puts song copies after the package", "[bookfile]") {
+    const auto command =
+        zub::bookfile::buildCommand("/sb", "/pkg", "/work", "/bd", "book", {}, "/work/override");
+    CHECK(command.environment[0].second == ".:/work:/pkg:/work/override:/bd:/sb:");
+}
+
+TEST_CASE("addClassOption adds a class option once, byte-exact", "[bookfile]") {
+    CHECK(addClassOption("\\documentclass{velkyzpevnik}\r\nX", "transposecapos").value() ==
+          "\\documentclass[transposecapos]{velkyzpevnik}\r\nX");
+    CHECK(addClassOption("\\documentclass[]{malyzpevnik}", "transposecapos").value() ==
+          "\\documentclass[transposecapos]{malyzpevnik}");
+    CHECK(addClassOption("\\documentclass[ lyric ,noshading]{v}", "transposecapos").value() ==
+          "\\documentclass[ lyric ,noshading, transposecapos]{v}");
+    const std::string already = "% \\documentclass{x}\n\\documentclass[transposecapos]{v}\n";
+    CHECK(addClassOption(already, "transposecapos").value() == already);
+    CHECK_FALSE(addClassOption("no class", "transposecapos").has_value());
+    CHECK_FALSE(addClassOption("\\documentclass[lyric{v}", "transposecapos").has_value());
+}

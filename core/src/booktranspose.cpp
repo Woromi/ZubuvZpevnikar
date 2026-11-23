@@ -1,6 +1,9 @@
 #include <array>
 #include <zub/core/booktranspose.hpp>
+#include <zub/core/score.hpp>
+#include <zub/core/song.hpp>
 #include <zub/core/songcheck.hpp>
+#include <zub/core/songheader.hpp>
 
 namespace zub::booktranspose {
 
@@ -217,6 +220,26 @@ std::string bookKeyName(Key key) {
                                                            "F#", "G",  "Ab", "A",  "Bb", "B"};
     const auto i = static_cast<std::size_t>(wrap12(key.pitch));
     return key.minor ? std::string(kSharpNames[i]) + "m" : std::string(majors[i]);
+}
+
+std::optional<std::string> raiseCapo(std::string_view songText, int semitones, bool german) {
+    const auto meta = parseSong(songText);
+    if (!meta)
+        return std::nullopt;
+    const int raised = score::songCapo(meta->value("cap")) + semitones;
+    bool fits = raised >= 0 && raised <= 9;
+    for (const int body : songheader::bodyCapos(songText))
+        fits = fits && body + semitones >= 0 && body + semitones <= 9;
+    if (!fits)
+        return std::nullopt;
+    std::string text = songheader::shiftBodyCapos(songText, semitones);
+    text = songheader::setOption(text, "cap",
+                                 raised == 0 ? std::nullopt
+                                             : std::optional<std::string>(
+                                                   "{" + std::to_string(raised) + "}"));
+    if (const auto key = songheader::option(text, "key"))
+        text = songheader::setOption(text, "key", "{" + shiftKeys(*key, semitones, german) + "}");
+    return text;
 }
 
 } // namespace zub::booktranspose
