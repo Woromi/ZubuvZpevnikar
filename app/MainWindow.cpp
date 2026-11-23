@@ -491,6 +491,10 @@ void MainWindow::createCentralWidget() {
     });
     connect(homePage_, &HomePage::wishImportRequested, this,
             [this](HomeWish wish) { importSongFor(wish); });
+    connect(homePage_, &HomePage::wishMoveRequested, this, [this](HomeWish wish) {
+        changeWish(wish, [&] { return moveWishToList(songbookRoot_, wish); });
+        refreshHome();
+    });
     connect(homePage_, &HomePage::wishNewSongRequested, this,
             [this](HomeWish wish) { newSongFor(wish); });
     connect(homePage_, &HomePage::wishDoneRequested, this, [this](HomeWish wish) {

@@ -81,7 +81,7 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     wishes_ = new QTreeWidget(wishesCard_);
     wishes_->setObjectName(QStringLiteral("homeWishes"));
     wishes_->setHeaderHidden(true);
-    wishes_->setRootIsDecorated(true);
+    wishes_->setRootIsDecorated(false); // one flat list
     wishes_->setMinimumHeight(200);
     wishes_->setMaximumHeight(360);
     wishLayout->addWidget(wishes_);
@@ -96,6 +96,9 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     wishDone_ = new QPushButton(tr("Done", "a wish is fulfilled"), wishesCard_);
     wishDone_->setToolTip(tr("The song is in the library: a book's wish becomes the song in that "
                              "book, a wish of the wish list goes"));
+    wishMove_ = new QPushButton(tr("Move to Wish List"), wishesCard_);
+    wishMove_->setToolTip(tr("Move this wish from its songbook (a % TODO: line) to the wish list "
+                             "(wishes.txt)"));
     wishRemove_ = new QPushButton(tr("Remove", "a wish"), wishesCard_);
     wishRemove_->setToolTip(tr("Remove the wish (its line)"));
     wishAdd_ = new QPushButton(tr("Add Wish…"), wishesCard_);
@@ -107,6 +110,7 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     wishButtons->addWidget(wishNew_);
     wishButtons->addWidget(wishOpen_);
     wishButtons->addWidget(wishDone_);
+    wishButtons->addWidget(wishMove_);
     wishButtons->addWidget(wishRemove_);
     wishButtons->addStretch(1);
     wishButtons->addWidget(wishAdd_);
@@ -155,6 +159,10 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     connect(wishDone_, &QPushButton::clicked, this, [this] {
         if (const HomeWish* wish = selectedWish(); wish && !wish->song.empty())
             emit wishDoneRequested(*wish);
+    });
+    connect(wishMove_, &QPushButton::clicked, this, [this] {
+        if (const HomeWish* wish = selectedWish(); wish && !wish->bookId.isEmpty())
+            emit wishMoveRequested(*wish);
     });
     connect(wishRemove_, &QPushButton::clicked, this, [this] {
         if (const HomeWish* wish = selectedWish())
@@ -266,8 +274,8 @@ void HomePage::setData(const HomeData& home) {
     }
     fitHeight(books_);
 
-    // Wishes, grouped by book (the order of the books, then of the lines). A refresh keeps the
-    // chosen wish (by its book and line) and where the page is scrolled.
+    // Wishes: one flat list, the wish list's then any still in a book (marked "in <book>"). A
+    // refresh keeps the chosen wish (by its book and line) and where the page is scrolled.
     std::optional<std::pair<QString, int>> chosen;
     if (const HomeWish* wish = selectedWish())
         chosen = std::pair(wish->bookId, wish->line);
@@ -275,31 +283,22 @@ void HomePage::setData(const HomeData& home) {
     const int wishesScrolled = wishes_->verticalScrollBar()->value();
     wishList_ = home.wishes;
     wishes_->clear();
-    QTreeWidgetItem* group = nullptr;
     for (std::size_t i = 0; i < wishList_.size(); ++i) {
         const HomeWish& wish = wishList_[i];
-        if (!group || group->data(0, idRole).toString() != wish.bookId) {
-            group = new QTreeWidgetItem(
-                wishes_, {wish.bookId.isEmpty() ? tr("Wish list") : wish.bookTitle});
-            group->setData(0, idRole, wish.bookId);
-            group->setData(0, wishRole, -1);
-            group->setFlags(Qt::ItemIsEnabled);
-            QFont bold = group->font(0);
-            bold.setBold(true);
-            group->setFont(0, bold);
-        }
         QString text = wishDisplayText(wish.text, wish.name);
+        if (!wish.bookId.isEmpty())
+            text += QStringLiteral("   ·  ") + tr("in %1").arg(wish.bookTitle);
         if (!wish.song.empty())
             text += QStringLiteral("   ·  ") + tr("in the library");
-        auto* item = new QTreeWidgetItem(group, {text});
+        auto* item = new QTreeWidgetItem(wishes_, {text});
         item->setData(0, wishRole, static_cast<int>(i));
-        item->setToolTip(0, tr("%1, line %2: %3").arg(wish.bookId).arg(wish.line).arg(wish.text));
+        const QString file = wish.bookId.isEmpty() ? QStringLiteral("wishes.txt") : wish.bookId;
+        item->setToolTip(0, tr("%1, line %2: %3").arg(file).arg(wish.line).arg(wish.text));
     }
-    wishes_->expandAll();
     if (chosen)
         for (QTreeWidgetItemIterator it(wishes_); *it; ++it) {
             const int index = (*it)->data(0, wishRole).toInt();
-            if (index >= 0 && (*it)->parent() &&
+            if (index >= 0 &&
                 wishList_[static_cast<std::size_t>(index)].bookId == chosen->first &&
                 wishList_[static_cast<std::size_t>(index)].line == chosen->second) {
                 wishes_->setCurrentItem(*it);
@@ -325,7 +324,7 @@ const HomeWish* HomePage::selectedWish() const {
     if (!item)
         return nullptr;
     const int index = item->data(0, wishRole).toInt();
-    if (index < 0 || index >= static_cast<int>(wishList_.size()) || !item->parent())
+    if (index < 0 || index >= static_cast<int>(wishList_.size()))
         return nullptr;
     return &wishList_[static_cast<std::size_t>(index)];
 }
@@ -338,6 +337,10 @@ void HomePage::updateWishButtons() {
     wishDone_->setEnabled(wish && !wish->song.empty());
     wishNew_->setEnabled(wish && wish->song.empty());
     wishRemove_->setEnabled(wish != nullptr);
+    wishMove_->setVisible(std::ranges::any_of(wishList_, [](const HomeWish& w) {
+        return !w.bookId.isEmpty();
+    })); // only while a book has wishes
+    wishMove_->setEnabled(wish && !wish->bookId.isEmpty());
 }
 
 void HomePage::placeCards() {

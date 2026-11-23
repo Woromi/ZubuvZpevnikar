@@ -370,3 +370,22 @@ std::expected<void, QString> addWish(const std::filesystem::path& root, const QS
     }
     return write(file, zub::wishlist::add(current, toStdString(text)));
 }
+
+std::expected<void, QString> moveWishToList(const std::filesystem::path& root,
+                                            const HomeWish& wish) {
+    if (wish.bookId.isEmpty())
+        return {};
+    auto read = readWishFile(root, wish);
+    if (!read)
+        return std::unexpected(read.error());
+    if (!lineNow(read->second, wish))
+        return std::unexpected(changedError(wish));
+    if (auto added = addWish(root, wish.text); !added)
+        return added;
+    if (auto removed = removeWish(root, wish); !removed)
+        return std::unexpected(
+            QCoreApplication::translate("HomeData",
+                                        "The wish is in the wish list now, but still in %1: %2")
+                .arg(wish.bookTitle, removed.error()));
+    return {};
+}

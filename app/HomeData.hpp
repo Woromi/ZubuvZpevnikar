@@ -76,6 +76,11 @@ std::expected<void, QString> fulfilWish(const std::filesystem::path& root, const
                                         const std::string& inputName);
 // The wish removed (a book's line, or the wish list's).
 std::expected<void, QString> removeWish(const std::filesystem::path& root, const HomeWish& wish);
+// A book's wish moved to the wish list: added there, then its line removed from the book (the
+// book is checked first; when only the second write fails, the wish is in both and the error says
+// so).
+std::expected<void, QString> moveWishToList(const std::filesystem::path& root,
+                                            const HomeWish& wish);
 // A new line in the wish list (the file is made when missing).
 std::expected<void, QString> addWish(const std::filesystem::path& root, const QString& text);
 

@@ -46,6 +46,7 @@ signals:
     void wishNewSongRequested(HomeWish wish); // New Song… (written by hand)
     void wishDoneRequested(HomeWish wish);   // Done (the song is in the library)
     void wishRemoveRequested(HomeWish wish); // Remove
+    void wishMoveRequested(HomeWish wish);   // Move to Wish List (a book's wish)
     void wishAddRequested();                 // Add Wish…
 
 protected:
@@ -84,6 +85,7 @@ private:
     QPushButton* wishDone_ = nullptr;
     QPushButton* wishNew_ = nullptr;
     QPushButton* wishRemove_ = nullptr;
+    QPushButton* wishMove_ = nullptr;
     QPushButton* wishAdd_ = nullptr;
     std::vector<HomeWish> wishList_;
     int columns_ = 0;

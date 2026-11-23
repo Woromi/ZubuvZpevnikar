@@ -103,7 +103,7 @@ TEST_CASE("Home: the app starts on Home with the songbook's cards", "[app][home]
     for (QTreeWidgetItemIterator it(wishes); *it; ++it) {
         if ((*it)->text(0).startsWith("Our Last Summer — Abba"))
             inLibrary = *it;
-        if ((*it)->text(0) == "Some Title Only")
+        if ((*it)->text(0).startsWith("Some Title Only"))
             titleOnly = *it;
     }
     REQUIRE(inLibrary != nullptr);
@@ -304,13 +304,13 @@ TEST_CASE("Home: a refresh keeps the chosen wish; a song that did not open is no
     QTreeWidget* wishes = A::homeWishes(*w.page);
     QTreeWidgetItem* chosen = nullptr;
     for (QTreeWidgetItemIterator it(wishes); *it; ++it)
-        if ((*it)->text(0) == "Some Title Only")
+        if ((*it)->text(0).startsWith("Some Title Only"))
             chosen = *it;
     REQUIRE(chosen != nullptr);
     wishes->setCurrentItem(chosen);
     A::refreshHome(w.window);
     REQUIRE(wishes->currentItem() != nullptr);
-    CHECK(wishes->currentItem()->text(0) == "Some Title Only");
+    CHECK(wishes->currentItem()->text(0).startsWith("Some Title Only"));
 
     // A missing file: no editor, nothing remembered.
     {

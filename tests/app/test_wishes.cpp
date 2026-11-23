@@ -65,9 +65,13 @@ TEST_CASE("Wishes: the wish list comes first; Add Wish and Remove edit wishes.tx
     apptest::writeFile(fixture / "wishes.txt", "# my wishes\nPavelDobes/NecoOLasce\n");
     WishWindow w(fixture);
     QTreeWidget* tree = A::homeWishes(*w.page);
-    REQUIRE(tree->topLevelItemCount() >= 1);
-    CHECK(tree->topLevelItem(0)->text(0) == "Wish list");
-    CHECK(wishItem(*w.page, "Neco O Lasce — Pavel Dobes") != nullptr);
+    // One flat list, no group headers: the wish list's wishes first (the fixture's big book has
+    // one wish of its own).
+    REQUIRE(tree->topLevelItemCount() == 2);
+    CHECK(tree->topLevelItem(0)->text(0) == "Neco O Lasce — Pavel Dobes");
+    CHECK(tree->topLevelItem(1)->text(0).contains("in Big Test Book"));
+    for (int i = 0; i < tree->topLevelItemCount(); ++i)
+        CHECK(tree->topLevelItem(i)->childCount() == 0);
 
     {
         auto typed = apptest::answerInputDialog("LodJohnB");
@@ -241,4 +245,23 @@ TEST_CASE("Wishes: New Song… writes a wish by hand, the first save fulfils it"
     A::saveCurrent(w.window);
     CHECK(slurp(fixture / "wishes.txt") == "Wabi/Montgomery\n");
     apptest::waitUntil([&] { return later.fired(); }, 2000);
+}
+
+TEST_CASE("Wishes: a book's wish is marked with its book and moves to the wish list",
+          "[app][wishes]") {
+    apptest::Fixture fixture;
+    const auto book = fixture / "songbooks/wish/wish.tex";
+    apptest::writeFile(book, wishBook);
+    apptest::writeFile(fixture / "wishes.txt", "A/First\n");
+    WishWindow w(fixture);
+    QTreeWidgetItem* wanted = wishItem(*w.page, "Wanted — Nobody");
+    REQUIRE(wanted != nullptr);
+    CHECK(wanted->text(0).contains("in Wish Book"));
+    CHECK(A::homeWishes(*w.page)->topLevelItem(0)->text(0) == "First — A"); // the list first
+
+    const auto data = buildHomeData(*A::model(w.window), fixture.root(), {});
+    emit w.page->wishMoveRequested(wishOf(data.wishes, "Nobody/Wanted"));
+    CHECK(slurp(fixture / "wishes.txt") == "A/First\nNobody/Wanted\n");
+    CHECK(!has(slurp(book), "Nobody/Wanted"));
+    CHECK(has(slurp(book), "% TODO: Abba/OurLastSummer"));
 }

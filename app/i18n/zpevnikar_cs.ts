@@ -321,6 +321,10 @@ Použijte vestavěný.</translation>
         <source>The wish &quot;%1&quot; is no longer in its file (or is there twice now). Nothing was written.</source>
         <translation>Přání „%1“ už v souboru není (nebo je tam teď dvakrát). Nic se nezapsalo.</translation>
     </message>
+    <message>
+        <source>The wish is in the wish list now, but still in %1: %2</source>
+        <translation>Přání už je v seznamu přání, ale zůstalo i v %1: %2</translation>
+    </message>
 </context>
 <context>
     <name>HomePage</name>
@@ -382,6 +386,14 @@ Použijte vestavěný.</translation>
         <source>Done</source>
         <comment>a wish is fulfilled</comment>
         <translation>Hotovo</translation>
+    </message>
+    <message>
+        <source>Move to Wish List</source>
+        <translation>Přesunout do seznamu přání</translation>
+    </message>
+    <message>
+        <source>Move this wish from its songbook (a % TODO: line) to the wish list (wishes.txt)</source>
+        <translation>Přesunout toto přání ze zpěvníku (řádek % TODO:) do seznamu přání (wishes.txt)</translation>
     </message>
     <message>
         <source>Remove</source>
@@ -474,8 +486,8 @@ Použijte vestavěný.</translation>
         <translation>Zatím žádné zpěvníky: vytvořte si ho na stránce Zpěvníky.</translation>
     </message>
     <message>
-        <source>Wish list</source>
-        <translation>Seznam přání</translation>
+        <source>in %1</source>
+        <translation>ve zpěvníku %1</translation>
     </message>
     <message>
         <source>in the library</source>
