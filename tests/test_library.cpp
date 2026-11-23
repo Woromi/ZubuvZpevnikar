@@ -2,6 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <fstream>
+#include <stdlib.h>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/safety.hpp>
@@ -209,4 +210,36 @@ TEST_CASE("scanLibrary records the scores a song includes", "[library]") {
     const auto* abba = find(*library, "Abba/OurLastSummer");
     REQUIRE(abba);
     CHECK(abba->scores.empty());
+}
+
+TEST_CASE("createSongbookRepo makes an empty songbook in a new or empty folder", "[library]") {
+    std::string pattern = (fs::temp_directory_path() / "zub-new-songbook-XXXXXX").string();
+    REQUIRE(::mkdtemp(pattern.data()) != nullptr);
+    const fs::path base = pattern;
+    const fs::path root = base / "Mine";
+    REQUIRE(zub::createSongbookRepo(root));
+    CHECK(zub::validateSongbookRepo(root));
+    CHECK(fs::is_regular_file(root / "songs/chords/.gitkeep"));
+    CHECK(fs::is_regular_file(root / "songbooks/.gitkeep"));
+    CHECK(zub::readTextFile(root / ".gitignore")->starts_with("build/\n"));
+    CHECK(zub::collections(root) == std::vector<std::string>{"chords"});
+    const auto library = zub::scanLibrary(root);
+    REQUIRE(library);
+    CHECK(library->songs.empty());
+    // Not again: the folder has something in it now; nor over a file.
+    CHECK_FALSE(zub::createSongbookRepo(root));
+    std::ofstream(base / "file") << "x";
+    CHECK_FALSE(zub::createSongbookRepo(base / "file"));
+    // An existing empty folder is fine.
+    fs::create_directory(base / "Empty");
+    CHECK(zub::createSongbookRepo(base / "Empty"));
+    // Clean up exactly what was made (no recursive delete of a computed path).
+    for (const fs::path& r : {root, base / "Empty"}) {
+        for (const char* f : {"songs/chords/.gitkeep", "songbooks/.gitkeep", "README.md", ".gitignore"})
+            fs::remove(r / f);
+        for (const char* d : {"songs/chords", "songs", "songbooks", ""})
+            fs::remove(r / d);
+    }
+    fs::remove(base / "file");
+    fs::remove(base);
 }

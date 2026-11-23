@@ -73,6 +73,35 @@ std::expected<void, std::string> validateSongbookRepo(const fs::path& root) {
     return {};
 }
 
+std::expected<void, std::string> createSongbookRepo(const fs::path& root) {
+    std::error_code ec;
+    if (fs::exists(root, ec)) {
+        if (!fs::is_directory(root, ec))
+            return std::unexpected("not a directory: " + utf8(root));
+        if (!fs::is_empty(root, ec) || ec)
+            return std::unexpected("not empty: " + utf8(root));
+    }
+    for (const fs::path& dir : {root / songsSubdir / chordsCollection, root / "songbooks"}) {
+        fs::create_directories(dir, ec);
+        if (ec)
+            return std::unexpected("cannot create " + utf8(dir) + ": " + ec.message());
+    }
+    const std::pair<fs::path, std::string_view> files[] = {
+        {root / songsSubdir / chordsCollection / ".gitkeep", ""},
+        {root / "songbooks" / ".gitkeep", ""},
+        {root / "README.md",
+         "# Songbook\n\nSongs in `songs/chords/<Artist>/<Title>.tex`, songbooks in "
+         "`songbooks/`. Made with Zpěvníkář (ZubuvZpevnikar); the LaTeX package that builds them "
+         "is zubuvzpevnik.\n"},
+        {root / ".gitignore", "build/\n*.aux\n*.log\n*.out\n*.toc\n*.sbx\n*.sxd\n*.sxc\n"
+                              "tmp-ly/\n"},
+    };
+    for (const auto& [path, text] : files)
+        if (auto written = writeTextFileAtomic(path, text); !written)
+            return std::unexpected(written.error());
+    return validateSongbookRepo(root);
+}
+
 bool validCollectionName(std::string_view name) {
     return !name.empty() && std::ranges::all_of(name, [](char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||

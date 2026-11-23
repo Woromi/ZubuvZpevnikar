@@ -63,8 +63,8 @@ qt_add_library(zpevnikar_app STATIC
     HomeData.cpp
     HomePage.hpp
     HomePage.cpp
-    CloneDialog.hpp
-    CloneDialog.cpp
+    LibraryDialog.hpp
+    LibraryDialog.cpp
     SongbookExporter.hpp
     BookPreview.cpp
     PdfLinkView.hpp

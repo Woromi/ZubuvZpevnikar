@@ -36,6 +36,12 @@ struct Library {
 // builds the songs may be the app's own copy, see zub::package).
 std::expected<void, std::string> validateSongbookRepo(const std::filesystem::path& root);
 
+// A new, empty songbook at `root` (which must not exist or be an empty directory): songs/chords/
+// and songbooks/ (each with a .gitkeep, so git keeps them), a README.md and a .gitignore (build/
+// and LaTeX's auxiliary files). It validates with validateSongbookRepo. Errors (English): `root`
+// is a file or a directory with something in it, a folder or file that cannot be created.
+std::expected<void, std::string> createSongbookRepo(const std::filesystem::path& root);
+
 // The song collections of a songbook: the directories directly under <root>/songs/ ("chords",
 // "tinwhistle", a future "<instrument>"), "chords" first, then the rest sorted by name (byte
 // order). Hidden ones (a leading '.') are skipped; empty when <root>/songs is missing.

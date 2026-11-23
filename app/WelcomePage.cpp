@@ -32,14 +32,13 @@ WelcomePage::WelcomePage(QWidget* parent) : QWidget(parent) {
     retry_->setObjectName(QStringLiteral("welcomeRetry"));
     choose_ = new QPushButton(box);
     choose_->setObjectName(QStringLiteral("welcomeChoose"));
-    clone_ = new QPushButton(tr("Get the Songbook…"), box);
-    clone_->setObjectName(QStringLiteral("welcomeClone"));
-    clone_->setToolTip(tr("Download the songbook repository (git clone) into a folder of your "
-                          "choice and open it"));
+    library_ = new QPushButton(tr("New Song Library…"), box);
+    library_->setObjectName(QStringLiteral("welcomeLibrary"));
+    library_->setToolTip(tr("Create an empty song library, or download one (git clone)"));
     buttons->addStretch(1);
     buttons->addWidget(retry_);
     buttons->addWidget(choose_);
-    buttons->addWidget(clone_);
+    buttons->addWidget(library_);
     buttons->addStretch(1);
     column->addWidget(title);
     column->addSpacing(12);
@@ -50,15 +49,16 @@ WelcomePage::WelcomePage(QWidget* parent) : QWidget(parent) {
     outer->addStretch(2);
     connect(choose_, &QPushButton::clicked, this, &WelcomePage::chooseRequested);
     connect(retry_, &QPushButton::clicked, this, [this] { emit retryRequested(path_); });
-    connect(clone_, &QPushButton::clicked, this, &WelcomePage::cloneRequested);
+    connect(library_, &QPushButton::clicked, this, &WelcomePage::newLibraryRequested);
     showFirstStart();
 }
 
 void WelcomePage::showFirstStart() {
     path_.clear();
-    message_->setText(tr("Open the folder of your songbook: a ZubuvZpevnik checkout, the folder "
-                         "with songs/chords/ in it. It is remembered for the next start. Without "
-                         "one yet, Get the Songbook… downloads it."));
+    message_->setText(tr("Open the folder of your song library: a ZubuvZpevnik checkout, the "
+                         "folder with songs/chords/ in it. It is remembered for the next start. "
+                         "Without one yet, New Song Library… creates an empty one or downloads "
+                         "one."));
     choose_->setText(tr("Open Songbook Folder…"));
     retry_->hide();
     choose_->setDefault(true);
@@ -74,9 +74,3 @@ void WelcomePage::showMissing(const QString& path, const QString& reason) {
     retry_->setDefault(true);
 }
 
-void WelcomePage::setCloneAvailable(bool available, const QString& why) {
-    clone_->setEnabled(available);
-    clone_->setToolTip(available ? tr("Download the songbook repository (git clone) into a folder "
-                                      "of your choice and open it")
-                                 : why);
-}

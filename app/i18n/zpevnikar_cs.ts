@@ -80,53 +80,6 @@
     </message>
 </context>
 <context>
-    <name>CloneDialog</name>
-    <message>
-        <source>Get the Songbook</source>
-        <translation>Získat zpěvník</translation>
-    </message>
-    <message>
-        <source>Repository</source>
-        <translation>Repozitář</translation>
-    </message>
-    <message>
-        <source>Choose…</source>
-        <translation>Vybrat…</translation>
-    </message>
-    <message>
-        <source>Into the folder</source>
-        <translation>Do složky</translation>
-    </message>
-    <message>
-        <source>The folder must be new or empty.</source>
-        <translation>Složka musí být nová nebo prázdná.</translation>
-    </message>
-    <message>
-        <source>Folder for the songbook</source>
-        <translation>Složka pro zpěvník</translation>
-    </message>
-    <message>
-        <source>git is not installed: install it and try again.</source>
-        <translation>git není nainstalovaný: nainstalujte ho a zkuste to znovu.</translation>
-    </message>
-    <message>
-        <source>%1 exists and is not an empty folder: choose another one.</source>
-        <translation>%1 existuje a není to prázdná složka: vyberte jinou.</translation>
-    </message>
-    <message>
-        <source>Downloading…</source>
-        <translation>Stahuji…</translation>
-    </message>
-    <message>
-        <source>Done.</source>
-        <translation>Hotovo.</translation>
-    </message>
-    <message>
-        <source>The download failed (see the output above). A private repository needs your access to it (a git credential helper or an SSH key). Nothing was opened; a partly downloaded folder is left as it is: choose another folder or empty it to try again.</source>
-        <translation>Stažení selhalo (viz výpis výše). Soukromý repozitář vyžaduje váš přístup (git credential helper nebo SSH klíč). Nic se neotevřelo; částečně stažená složka zůstává, jak je: zvolte jinou složku nebo ji vyprázdněte a zkuste to znovu.</translation>
-    </message>
-</context>
-<context>
     <name>CollectionTabs</name>
     <message>
         <source>Chords</source>
@@ -601,6 +554,93 @@ Použijte vestavěný.</translation>
     </message>
 </context>
 <context>
+    <name>LibraryDialog</name>
+    <message>
+        <source>New Song Library</source>
+        <translation>Nová knihovna písní</translation>
+    </message>
+    <message>
+        <source>A song library is the folder with your songs (songs/) and the songbooks made of them (songbooks/).</source>
+        <translation>Knihovna písní je složka s vašimi písněmi (songs/) a zpěvníky z nich sestavenými (songbooks/).</translation>
+    </message>
+    <message>
+        <source>Create a new, empty song library</source>
+        <translation>Vytvořit novou, prázdnou knihovnu písní</translation>
+    </message>
+    <message>
+        <source>Download a song library (git clone)</source>
+        <translation>Stáhnout knihovnu písní (git clone)</translation>
+    </message>
+    <message>
+        <source>git is not installed: install it to download a song library</source>
+        <translation>git není nainstalovaný: pro stažení knihovny písní ho nainstalujte</translation>
+    </message>
+    <message>
+        <source>Keep its history with git (git init)</source>
+        <translation>Uchovávat historii v gitu (git init)</translation>
+    </message>
+    <message>
+        <source>Lets the app show when songs were added; you can commit and push it with git later</source>
+        <translation>Aplikace pak ukáže, kdy písně přibyly; commitovat a pushovat můžete gitem později</translation>
+    </message>
+    <message>
+        <source>Repository</source>
+        <translation>Repozitář</translation>
+    </message>
+    <message>
+        <source>Choose…</source>
+        <translation>Vybrat…</translation>
+    </message>
+    <message>
+        <source>Folder</source>
+        <translation>Složka</translation>
+    </message>
+    <message>
+        <source>The folder must be new or empty.</source>
+        <translation>Složka musí být nová nebo prázdná.</translation>
+    </message>
+    <message>
+        <source>Create</source>
+        <translation>Vytvořit</translation>
+    </message>
+    <message>
+        <source>Folder for the song library</source>
+        <translation>Složka pro knihovnu písní</translation>
+    </message>
+    <message>
+        <source>Download</source>
+        <translation>Stáhnout</translation>
+    </message>
+    <message>
+        <source>%1 exists and is not an empty folder: choose another one.</source>
+        <translation>%1 existuje a není to prázdná složka: vyberte jinou.</translation>
+    </message>
+    <message>
+        <source>git is not installed: install it and try again.</source>
+        <translation>git není nainstalovaný: nainstalujte ho a zkuste to znovu.</translation>
+    </message>
+    <message>
+        <source>Downloading…</source>
+        <translation>Stahuji…</translation>
+    </message>
+    <message>
+        <source>The song library could not be created: %1</source>
+        <translation>Knihovnu písní nelze vytvořit: %1</translation>
+    </message>
+    <message>
+        <source>Setting up git…</source>
+        <translation>Nastavuji git…</translation>
+    </message>
+    <message>
+        <source>Done.</source>
+        <translation>Hotovo.</translation>
+    </message>
+    <message>
+        <source>The download failed (see the output above). A private repository needs your access to it (a git credential helper or an SSH key). Nothing was opened; a partly downloaded folder is left as it is: choose another folder or empty it to try again.</source>
+        <translation>Stažení selhalo (viz výpis výše). Soukromý repozitář vyžaduje váš přístup (git credential helper nebo SSH klíč). Nic se neotevřelo; částečně stažená složka zůstává, jak je: zvolte jinou složku nebo ji vyprázdněte a zkuste to znovu.</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
         <source>&amp;File</source>
@@ -763,10 +803,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>No song with possible changes was found.</source>
         <translation>Nenašla se žádná píseň s možnými změnami.</translation>
-    </message>
-    <message>
-        <source>git is not installed: install it to download the songbook</source>
-        <translation>git není nainstalovaný: pro stažení zpěvníku ho nainstalujte</translation>
     </message>
     <message>
         <source>Cannot save score</source>
@@ -3532,16 +3568,16 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         <translation>Zkusit znovu</translation>
     </message>
     <message>
-        <source>Get the Songbook…</source>
-        <translation>Získat zpěvník…</translation>
+        <source>New Song Library…</source>
+        <translation>Nová knihovna písní…</translation>
     </message>
     <message>
-        <source>Download the songbook repository (git clone) into a folder of your choice and open it</source>
-        <translation>Stáhnout repozitář zpěvníku (git clone) do zvolené složky a otevřít ho</translation>
+        <source>Create an empty song library, or download one (git clone)</source>
+        <translation>Vytvořit prázdnou knihovnu písní, nebo nějakou stáhnout (git clone)</translation>
     </message>
     <message>
-        <source>Open the folder of your songbook: a ZubuvZpevnik checkout, the folder with songs/chords/ in it. It is remembered for the next start. Without one yet, Get the Songbook… downloads it.</source>
-        <translation>Otevřete složku svého zpěvníku: checkout ZubuvZpevnik, složku, ve které je songs/chords/. Zapamatuje se pro příští spuštění. Pokud ji ještě nemáte, Získat zpěvník… ji stáhne.</translation>
+        <source>Open the folder of your song library: a ZubuvZpevnik checkout, the folder with songs/chords/ in it. It is remembered for the next start. Without one yet, New Song Library… creates an empty one or downloads one.</source>
+        <translation>Otevřete složku své knihovny písní: checkout ZubuvZpevnik, složku, ve které je songs/chords/. Zapamatuje se pro příští spuštění. Pokud ji ještě nemáte, Nová knihovna písní… vytvoří prázdnou nebo nějakou stáhne.</translation>
     </message>
     <message>
         <source>Open Songbook Folder…</source>

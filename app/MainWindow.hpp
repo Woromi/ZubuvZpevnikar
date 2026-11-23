@@ -84,7 +84,7 @@ private:
     // why `path` cannot be opened.
     void showWelcome(const QString& path = {});
     void refreshHome();       // Home's cards from the model, the books and the remembered songs
-    void getSongbook();       // Get the Songbook… (git clone), then opens it
+    void newLibrary();       // New Song Library… (create or git clone), then opens it
     struct OpenOptions {
         bool showErrors = true;    // a message box when the folder is not a songbook
         bool remember = true;      // save it as the songbook for the next start

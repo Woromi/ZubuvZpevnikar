@@ -12,7 +12,10 @@
 #include <QComboBox>
 #include <QListWidget>
 #include <QProcess>
+#include <QLineEdit>
 #include <QPushButton>
+#include <QRadioButton>
+#include <QTemporaryDir>
 #include <QSettings>
 #include <QStackedWidget>
 #include <QStandardPaths>
@@ -190,7 +193,7 @@ TEST_CASE("Home: a wish's web search uses the words of its name", "[app][home]")
     CHECK(wishDisplayText("LodJohnB", "") == "LodJohnB");
 }
 
-TEST_CASE("Home: without a songbook the welcome panel shows; no git, no download",
+TEST_CASE("Home: without a songbook the welcome panel shows; a new song library opens",
           "[app][home]") {
     QSettings{}.remove(QStringLiteral("songbook/path"));
     MainWindow w;
@@ -199,15 +202,37 @@ TEST_CASE("Home: without a songbook the welcome panel shows; no git, no download
     HomePage* page = A::homePage(w);
     CHECK(A::pages(w)->currentWidget() == static_cast<QWidget*>(page));
     CHECK(page->showsWelcome());
-    auto* clone = w.findChild<QPushButton*>(QStringLiteral("welcomeClone"));
-    REQUIRE(clone != nullptr);
-    CHECK(!clone->isEnabled()); // PATH has no git in the tests
+    auto* library = w.findChild<QPushButton*>(QStringLiteral("welcomeLibrary"));
+    REQUIRE(library != nullptr);
+    CHECK(library->isEnabled()); // creating needs no git
     // The Songs view without a songbook is Home too.
     A::activityBar(w)->button(ActivityBar::View::Songs)->click();
     CHECK(A::pages(w)->currentWidget() == static_cast<QWidget*>(page));
+
+    // New Song Library…: Create (the default) in a new folder; no git on PATH: no git init, and
+    // Download cannot be chosen. The library opens on Home.
+    QTemporaryDir parent;
+    const QString folder = parent.filePath(QStringLiteral("Mine"));
+    auto dialog = apptest::answerTitledDialog("New Song Library", [&](QDialog* d) {
+        auto* download = d->findChild<QRadioButton*>(QStringLiteral("libraryDownload"));
+        CHECK(!download->isEnabled());
+        CHECK(d->findChild<QRadioButton*>(QStringLiteral("libraryCreate"))->isChecked());
+        d->findChild<QLineEdit*>(QStringLiteral("cloneFolder"))->setText(folder);
+        for (auto* b : d->findChildren<QPushButton*>())
+            if (b->text() == "Create")
+                b->click();
+    });
+    library->click();
+    REQUIRE(dialog.fired());
+    CHECK(std::filesystem::is_directory(toPath(folder) / "songs/chords"));
+    CHECK(std::filesystem::exists(toPath(folder) / ".gitignore"));
+    CHECK(!std::filesystem::exists(toPath(folder) / ".git"));
+    CHECK(A::songbookRoot(w) == toPath(folder));
+    CHECK(!page->showsWelcome());
+    QSettings{}.remove(QStringLiteral("songbook/path")); // opening remembered it
 }
 
-TEST_CASE("Home: Get the Songbook clones a repository", "[.tools][home]") {
+TEST_CASE("Home: New Song Library downloads or creates a repository", "[.tools][home]") {
     const QString git = QStandardPaths::findExecutable(QStringLiteral("git"));
     if (git.isEmpty())
         SKIP("git not found");
@@ -225,7 +250,8 @@ TEST_CASE("Home: Get the Songbook clones a repository", "[.tools][home]") {
     QTemporaryDir target;
     const QString folder = target.filePath(QStringLiteral("Cloned"));
 
-    CloneDialog dialog;
+    LibraryDialog dialog;
+    dialog.findChild<QRadioButton*>(QStringLiteral("libraryDownload"))->setChecked(true);
     A::cloneUrl(dialog)->setText(toQString(fixture.root()));
     A::cloneFolder(dialog)->setText(folder);
     A::cloneStart(dialog);
@@ -233,12 +259,22 @@ TEST_CASE("Home: Get the Songbook clones a repository", "[.tools][home]") {
     CHECK(std::filesystem::exists(toPath(folder) / "songs/chords/Abba/OurLastSummer.tex"));
 
     // A folder that is not empty is refused: git does not run.
-    CloneDialog again;
+    LibraryDialog again;
+    again.findChild<QRadioButton*>(QStringLiteral("libraryDownload"))->setChecked(true);
     A::cloneUrl(again)->setText(toQString(fixture.root()));
     A::cloneFolder(again)->setText(folder);
     A::cloneStart(again);
     QTest::qWait(200);
     CHECK(again.result() != QDialog::Accepted);
+
+    // Create with git there: a repository.
+    LibraryDialog create;
+    const QString fresh = target.filePath(QStringLiteral("Fresh"));
+    A::cloneFolder(create)->setText(fresh);
+    A::cloneStart(create);
+    REQUIRE(apptest::waitUntil([&] { return create.result() == QDialog::Accepted; }, 30000));
+    CHECK(std::filesystem::is_directory(toPath(fresh) / ".git"));
+    CHECK(std::filesystem::exists(toPath(fresh) / "songbooks/.gitkeep"));
 }
 
 // Not run by default: ZUB_SCREENSHOT=<file.png> ZUB_SONGBOOK=<checkout> saves Home of a songbook

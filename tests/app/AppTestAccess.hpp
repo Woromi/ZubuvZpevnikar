@@ -18,7 +18,7 @@
 #include "SongListPage.hpp"
 #include "SongbookCheck.hpp"
 #include "SongbookTree.hpp"
-#include "CloneDialog.hpp"
+#include "LibraryDialog.hpp"
 #include "HomePage.hpp"
 #include "SongbookExporter.hpp"
 #include "SongbooksPage.hpp"
@@ -63,6 +63,7 @@ struct AppTestAccess {
     static SongbooksPage* songbooksPage(MainWindow& w) { return w.songbooksPage_; }
     static SongListPage* listPage(MainWindow& w) { return w.listPage_; }
     static HomePage* homePage(MainWindow& w) { return w.homePage_; }
+    static const std::filesystem::path& songbookRoot(MainWindow& w) { return w.songbookRoot_; }
     static void refreshHome(MainWindow& w) { w.refreshHome(); }
     // ---- HomePage
     static QListWidget* homeOpened(HomePage& p) { return p.opened_; }
@@ -73,10 +74,10 @@ struct AppTestAccess {
     static QPushButton* homeWishOpen(HomePage& p) { return p.wishOpen_; }
     static QWidget* homeAddedCard(HomePage& p) { return p.addedCard_; }
     static QLabel* homeSummary(HomePage& p) { return p.summary_; }
-    // ---- CloneDialog
-    static QLineEdit* cloneUrl(CloneDialog& d) { return d.url_; }
-    static QLineEdit* cloneFolder(CloneDialog& d) { return d.folder_; }
-    static void cloneStart(CloneDialog& d) { d.start(); }
+    // ---- LibraryDialog
+    static QLineEdit* cloneUrl(LibraryDialog& d) { return d.url_; }
+    static QLineEdit* cloneFolder(LibraryDialog& d) { return d.folder_; }
+    static void cloneStart(LibraryDialog& d) { d.start(); }
     static SongFilterProxy* proxy(MainWindow& w) { return w.proxy_; }
     static SongTableModel* model(MainWindow& w) { return w.model_; }
     static SongEditor* editor(MainWindow& w) { return w.editor_; }

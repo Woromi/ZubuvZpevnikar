@@ -20,7 +20,7 @@
 #include "SongbookCheck.hpp"
 #include "SongbookSorter.hpp"
 #include "SongbooksPage.hpp"
-#include "CloneDialog.hpp"
+#include "LibraryDialog.hpp"
 #include "HomeData.hpp"
 #include "HomePage.hpp"
 #include "WelcomePage.hpp"
@@ -452,7 +452,7 @@ void MainWindow::createCentralWidget() {
         else
             showView(ActivityBar::View::Home);
     });
-    connect(welcome, &WelcomePage::cloneRequested, this, &MainWindow::getSongbook);
+    connect(welcome, &WelcomePage::newLibraryRequested, this, &MainWindow::newLibrary);
     connect(homePage_, &HomePage::songRequested, this, [this](std::filesystem::path path) {
         if (openExistingSong(path))
             showView(ActivityBar::View::Song);
@@ -491,8 +491,6 @@ void MainWindow::createCentralWidget() {
     connect(model_, &QAbstractItemModel::rowsRemoved, homeTimer_, qOverload<>(&QTimer::start));
     connect(model_, &QAbstractItemModel::dataChanged, homeTimer_, qOverload<>(&QTimer::start));
     connect(model_, &SongTableModel::datesChanged, homeTimer_, qOverload<>(&QTimer::start));
-    welcome->setCloneAvailable(!CloneDialog::git().isEmpty(),
-                               tr("git is not installed: install it to download the songbook"));
 
     // The activity bar at the left edge, like a code editor's: the views and Settings.
     activityBar_ = new ActivityBar(this);
@@ -558,8 +556,8 @@ void MainWindow::refreshHome() {
     homePage_->setData(buildHomeData(*model_, songbookRoot_, rememberedSongs(songbookRoot_)));
 }
 
-void MainWindow::getSongbook() {
-    CloneDialog dialog(this);
+void MainWindow::newLibrary() {
+    LibraryDialog dialog(this);
     if (dialog.exec() != QDialog::Accepted)
         return;
     if (openSongbook(toPath(dialog.folder()), {.closeEditors = true}))
