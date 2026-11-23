@@ -20,6 +20,9 @@
 #include "SongbookCheck.hpp"
 #include "SongbookSorter.hpp"
 #include "SongbooksPage.hpp"
+#include "CloneDialog.hpp"
+#include "HomeData.hpp"
+#include "HomePage.hpp"
 #include "WelcomePage.hpp"
 #include "SoundTools.hpp"
 #include "convert.hpp"
@@ -28,6 +31,8 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDialog>
@@ -230,6 +235,20 @@ void MainWindow::createMenus() {
     connect(scan, &QAction::triggered, this, [this] { songbookCheck_->start(); });
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
+    // Home's actions row: the same actions.
+    QAction* newBook = new QAction(QIcon::fromTheme(QStringLiteral("document-new")),
+                                   tr("New Song&book…"), this);
+    newBook->setToolTip(tr("Make a new songbook on the Songbooks page"));
+    connect(newBook, &QAction::triggered, this, [this] {
+        showView(ActivityBar::View::Songbooks);
+        if (pages_->currentWidget() == songbooksPage_)
+            songbooksPage_->newSongbook();
+    });
+    QAction* another = new QAction(QIcon::fromTheme(QStringLiteral("document-open")),
+                                   tr("Open Another Songbook…"), this);
+    connect(another, &QAction::triggered, this, &MainWindow::chooseSongbookFolder);
+    for (QAction* action : {import, newSongAction, newBook, scan, another})
+        homePage_->addQuickAction(action);
     // The Songs view's heading has the same actions as buttons.
     listPage_->addHeaderAction(newSongAction);
     listPage_->addHeaderAction(import); // the scan is an occasional check: Songs menu only
@@ -243,6 +262,7 @@ void MainWindow::createMenus() {
         connect(action, &QAction::triggered, this, [this, target] { showView(target); });
         return action;
     };
+    addView(tr("&Home"), {QKeySequence(QStringLiteral("Alt+Home"))}, ActivityBar::View::Home);
     addView(tr("&Songs"), {QKeySequence(QStringLiteral("Ctrl+1"))}, ActivityBar::View::Songs);
     songViewAction_ = addView(tr("The Open S&ong"), {QKeySequence(QStringLiteral("Ctrl+2"))},
                               ActivityBar::View::Song);
@@ -412,13 +432,57 @@ void MainWindow::createCentralWidget() {
     pages_->addWidget(listPage_);
     pages_->addWidget(songPage_);
     pages_->addWidget(songbooksPage_);
-    welcomePage_ = new WelcomePage(pages_);
-    pages_->addWidget(welcomePage_);
-    connect(welcomePage_, &WelcomePage::chooseRequested, this, &MainWindow::chooseSongbookFolder);
-    connect(welcomePage_, &WelcomePage::retryRequested, this, [this](const QString& path) {
+    homePage_ = new HomePage(pages_);
+    pages_->addWidget(homePage_);
+    WelcomePage* welcome = homePage_->welcome();
+    connect(welcome, &WelcomePage::chooseRequested, this, &MainWindow::chooseSongbookFolder);
+    connect(welcome, &WelcomePage::retryRequested, this, [this](const QString& path) {
         if (!openSongbook(toPath(path), {.showErrors = false}))
             showWelcome(path); // the page says why
+        else
+            showView(ActivityBar::View::Home);
     });
+    connect(welcome, &WelcomePage::cloneRequested, this, &MainWindow::getSongbook);
+    connect(homePage_, &HomePage::songRequested, this, [this](std::filesystem::path path) {
+        if (openExistingSong(path))
+            showView(ActivityBar::View::Song);
+    });
+    connect(homePage_, &HomePage::showAllRequested, this, [this](HomePage::ShowAll which) {
+        showView(ActivityBar::View::Songs);
+        listPage_->setShow(which == HomePage::ShowAll::Added ? SongListPage::Recent
+                                                             : SongListPage::Todo);
+    });
+    connect(homePage_, &HomePage::bookRequested, this, [this](const QString& id) {
+        showView(ActivityBar::View::Songbooks);
+        songbooksPage_->showBook(id);
+    });
+    connect(homePage_, &HomePage::wishSearchRequested, this, [](HomeWish wish) {
+        // Only on the user's click: the browser searches, the app contacts nothing itself.
+        const QString text =
+            wishSearchText(wish.text, wish.name, tr("chords", "a word of a web search"));
+        QDesktopServices::openUrl(QUrl(QStringLiteral("https://www.google.com/search?q=") +
+                                       QString::fromLatin1(QUrl::toPercentEncoding(text))));
+    });
+    connect(homePage_, &HomePage::wishImportRequested, this, [this] { importSong(); });
+    homeTimer_ = new QTimer(this);
+    homeTimer_->setSingleShot(true);
+    homeTimer_->setInterval(200);
+    connect(homeTimer_, &QTimer::timeout, this, [this] {
+        if (pages_->currentWidget() != homePage_ || songbookRoot_.empty())
+            return;
+        if (QApplication::activeModalWidget()) { // later: a dialog may be acting on Home's lists
+            homeTimer_->start();
+            return;
+        }
+        refreshHome();
+    });
+    connect(model_, &QAbstractItemModel::modelReset, homeTimer_, qOverload<>(&QTimer::start));
+    connect(model_, &QAbstractItemModel::rowsInserted, homeTimer_, qOverload<>(&QTimer::start));
+    connect(model_, &QAbstractItemModel::rowsRemoved, homeTimer_, qOverload<>(&QTimer::start));
+    connect(model_, &QAbstractItemModel::dataChanged, homeTimer_, qOverload<>(&QTimer::start));
+    connect(model_, &SongTableModel::datesChanged, homeTimer_, qOverload<>(&QTimer::start));
+    welcome->setCloneAvailable(!CloneDialog::git().isEmpty(),
+                               tr("git is not installed: install it to download the songbook"));
 
     // The activity bar at the left edge, like a code editor's: the views and Settings.
     activityBar_ = new ActivityBar(this);
@@ -444,6 +508,8 @@ void MainWindow::openInitialSongbook(const QString& commandLinePath) {
     if (!commandLinePath.isEmpty()) {
         if (!openSongbook(toPath(commandLinePath), {.showErrors = false}))
             showWelcome(commandLinePath);
+        else
+            showView(ActivityBar::View::Home);
         return;
     }
 
@@ -457,21 +523,37 @@ void MainWindow::openInitialSongbook(const QString& commandLinePath) {
     const QString path = QDir::cleanPath(remembered);
     if (!openSongbook(toPath(path), {.showErrors = false, .remember = false}))
         showWelcome(path);
+    else
+        showView(ActivityBar::View::Home);
 }
 
 void MainWindow::showWelcome(const QString& path) {
+    WelcomePage* welcomePage = homePage_->welcome();
     if (path.isEmpty()) {
-        welcomePage_->showFirstStart();
+        welcomePage->showFirstStart();
     } else {
         // Why, from the quick check alone (a second full scan would only repeat the first).
         const auto valid = zub::validateSongbookRepo(toPath(path));
-        welcomePage_->showMissing(path, valid ? QString() : toQString(valid.error()));
+        welcomePage->showMissing(path, valid ? QString() : toQString(valid.error()));
     }
     if (songbookRoot_.empty()) {
-        pages_->setCurrentWidget(welcomePage_);
-        activityBar_->setCurrent(ActivityBar::View::Songs);
+        homePage_->showWelcome();
+        pages_->setCurrentWidget(homePage_);
+        activityBar_->setCurrent(ActivityBar::View::Home);
         updateWindowTitle();
     }
+}
+
+void MainWindow::refreshHome() {
+    homePage_->setData(buildHomeData(*model_, songbookRoot_, rememberedSongs(songbookRoot_)));
+}
+
+void MainWindow::getSongbook() {
+    CloneDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    if (openSongbook(toPath(dialog.folder()), {.closeEditors = true}))
+        showView(ActivityBar::View::Home);
 }
 
 void MainWindow::chooseSongbookFolder() {
@@ -479,8 +561,8 @@ void MainWindow::chooseSongbookFolder() {
     const QString dir =
         QFileDialog::getExistingDirectory(this, tr("Open Songbook Folder (ZubuvZpevnik)"), start);
     // Open editors belong to the old songbook; they are closed only once the new one is valid.
-    if (!dir.isEmpty())
-        openSongbook(toPath(dir), {.closeEditors = true});
+    if (!dir.isEmpty() && openSongbook(toPath(dir), {.closeEditors = true}))
+        showView(ActivityBar::View::Home);
 }
 
 bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions options) {
@@ -555,8 +637,8 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
                "copy."),
             15000);
     listTitle_ = QApplication::applicationDisplayName() + QStringLiteral(" — ") + toQString(root);
-    if (pages_->currentWidget() == welcomePage_)
-        showView(ActivityBar::View::Songs);
+    if (pages_->currentWidget() == homePage_)
+        showView(ActivityBar::View::Home); // the cards of this songbook
     updateWindowTitle();
     return true;
 }
@@ -576,16 +658,23 @@ void MainWindow::showView(ActivityBar::View view) {
         view = View::Songs;
     if (view == View::Songbooks) {
         if (songbookRoot_.empty()) { // nothing to assemble from: stay where we are
-            activityBar_->setCurrent(pages_->currentWidget() == songPage_ ? View::Song
-                                                                          : View::Songs);
+            activityBar_->setCurrent(pages_->currentWidget() == songPage_   ? View::Song
+                                     : pages_->currentWidget() == homePage_ ? View::Home
+                                                                            : View::Songs);
             return;
         }
         if (pages_->currentWidget() != songbooksPage_)
             songbooksPage_->reloadList();
     }
-    // No songbook yet: the welcome page stands in for the list.
-    if (songbookRoot_.empty() && view == View::Songs) {
-        pages_->setCurrentWidget(welcomePage_);
+    // No songbook yet: Home's welcome panel stands in for the list.
+    if (songbookRoot_.empty() && view == View::Songs)
+        view = View::Home;
+    if (view == View::Home) {
+        if (songbookRoot_.empty())
+            homePage_->showWelcome();
+        else
+            refreshHome();
+        pages_->setCurrentWidget(homePage_);
         activityBar_->setCurrent(view);
         updateWindowTitle();
         return;
@@ -1773,6 +1862,7 @@ void MainWindow::importSong() {
 bool MainWindow::openExistingSong(const std::filesystem::path& path) {
     // Already open: keep it as it is (edits, undo history, approvals).
     if (editor_ && editor_->path() == path) {
+        rememberSong(songbookRoot_, path); // for Home's Continue editing
         editor_->textEdit()->setFocus();
         return true;
     }
@@ -1785,6 +1875,7 @@ bool MainWindow::openExistingSong(const std::filesystem::path& path) {
         return false;
     }
     showSong(editor, {}, toQString(inputNameOf(editor)));
+    rememberSong(songbookRoot_, path); // for Home's Continue editing
     return true;
 }
 

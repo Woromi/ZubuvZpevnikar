@@ -48,7 +48,7 @@ class SongbookCheck;
 class SongDatesRunner;
 class SongbookSorter;
 class SongbooksPage;
-class WelcomePage;
+class HomePage;
 class SongFilterProxy;
 class SongTableModel;
 class SongActions;
@@ -83,6 +83,8 @@ private:
     // The welcome page instead of the song list: at the first start (`path` empty), or with
     // why `path` cannot be opened.
     void showWelcome(const QString& path = {});
+    void refreshHome();       // Home's cards from the model, the books and the remembered songs
+    void getSongbook();       // Get the Songbook… (git clone), then opens it
     struct OpenOptions {
         bool showErrors = true;    // a message box when the folder is not a songbook
         bool remember = true;      // save it as the songbook for the next start
@@ -192,7 +194,8 @@ private:
     ActivityBar* activityBar_ = nullptr;
     QWidget* songPage_ = nullptr;
     SongbooksPage* songbooksPage_ = nullptr; // the songbook assembler
-    WelcomePage* welcomePage_ = nullptr;     // while no songbook is open
+    HomePage* homePage_ = nullptr;           // Home: the start page (the welcome panel without a songbook)
+    QTimer* homeTimer_ = nullptr;            // refreshes Home a moment after the songs changed
     SongbookSorter* songbookSorter_ = nullptr;
     SongbookExporter* songbookExporter_ = nullptr;
     QToolBar* songToolBar_ = nullptr;

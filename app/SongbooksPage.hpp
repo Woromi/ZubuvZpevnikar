@@ -67,6 +67,10 @@ public:
     bool confirmClose();
     // Lists the books again and reads the selected one (kept where possible) from disk.
     void reloadList();
+    // Shows the book `id` (relative path; from Home), reading the list first; false if there is
+    // no such book.
+    bool showBook(const QString& id);
+    void newSongbook(); // New Songbook… (asks)
     // Ctrl+F / Ctrl+H: opens the find bar of the LaTeX tab when that tab is the current one;
     // false otherwise.
     bool showFind(bool replaceMode);
@@ -109,7 +113,6 @@ private:
     // keep-order block and the single songs (zub::bookfile::leaders); and that order back.
     std::vector<std::string> sortUnits(int s) const;
     std::vector<std::string> expandSorted(int s, const std::vector<std::string>& order) const;
-    void newSongbook();
     void duplicateSongbook();
     // How a book <stem> in `bookDir` names the cover `file`: its path from the book's folder or
     // the repo root, or, from elsewhere, "<stem>-cover.<ext>" (a free name) after copying it

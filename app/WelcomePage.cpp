@@ -32,9 +32,14 @@ WelcomePage::WelcomePage(QWidget* parent) : QWidget(parent) {
     retry_->setObjectName(QStringLiteral("welcomeRetry"));
     choose_ = new QPushButton(box);
     choose_->setObjectName(QStringLiteral("welcomeChoose"));
+    clone_ = new QPushButton(tr("Get the Songbook…"), box);
+    clone_->setObjectName(QStringLiteral("welcomeClone"));
+    clone_->setToolTip(tr("Download the songbook repository (git clone) into a folder of your "
+                          "choice and open it"));
     buttons->addStretch(1);
     buttons->addWidget(retry_);
     buttons->addWidget(choose_);
+    buttons->addWidget(clone_);
     buttons->addStretch(1);
     column->addWidget(title);
     column->addSpacing(12);
@@ -45,13 +50,15 @@ WelcomePage::WelcomePage(QWidget* parent) : QWidget(parent) {
     outer->addStretch(2);
     connect(choose_, &QPushButton::clicked, this, &WelcomePage::chooseRequested);
     connect(retry_, &QPushButton::clicked, this, [this] { emit retryRequested(path_); });
+    connect(clone_, &QPushButton::clicked, this, &WelcomePage::cloneRequested);
     showFirstStart();
 }
 
 void WelcomePage::showFirstStart() {
     path_.clear();
     message_->setText(tr("Open the folder of your songbook: a ZubuvZpevnik checkout, the folder "
-                         "with songs/chords/ in it. It is remembered for the next start."));
+                         "with songs/chords/ in it. It is remembered for the next start. Without "
+                         "one yet, Get the Songbook… downloads it."));
     choose_->setText(tr("Open Songbook Folder…"));
     retry_->hide();
     choose_->setDefault(true);
@@ -65,4 +72,11 @@ void WelcomePage::showMissing(const QString& path, const QString& reason) {
     choose_->setText(tr("Choose Another…"));
     retry_->show();
     retry_->setDefault(true);
+}
+
+void WelcomePage::setCloneAvailable(bool available, const QString& why) {
+    clone_->setEnabled(available);
+    clone_->setToolTip(available ? tr("Download the songbook repository (git clone) into a folder "
+                                      "of your choice and open it")
+                                 : why);
 }

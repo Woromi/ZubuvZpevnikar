@@ -11,7 +11,7 @@ class ActivityBar : public QWidget {
     Q_OBJECT
 
 public:
-    enum class View { Songs, Song, Songbooks };
+    enum class View { Home, Songs, Song, Songbooks };
 
     explicit ActivityBar(QWidget* parent = nullptr);
 

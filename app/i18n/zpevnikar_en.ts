@@ -26,6 +26,51 @@
     </message>
 </context>
 <context>
+    <name>HomePage</name>
+    <message numerus="yes">
+        <source>%n song(s)</source>
+        <translation>
+            <numerusform>%n song</numerusform>
+            <numerusform>%n songs</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n songbook(s)</source>
+        <translation>
+            <numerusform>%n songbook</numerusform>
+            <numerusform>%n songbooks</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n song(s) not committed yet</source>
+        <translation>
+            <numerusform>%n song not committed yet</numerusform>
+            <numerusform>%n songs not committed yet</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Show all %n recently added…</source>
+        <translation>
+            <numerusform>Show the %n recently added…</numerusform>
+            <numerusform>Show all %n recently added…</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Show all %n with TODOs…</source>
+        <translation>
+            <numerusform>Show the %n with TODOs…</numerusform>
+            <numerusform>Show all %n with TODOs…</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n wish(es)</source>
+        <translation>
+            <numerusform>%n wish</numerusform>
+            <numerusform>%n wishes</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message numerus="yes">
         <source>%n song(s)</source>

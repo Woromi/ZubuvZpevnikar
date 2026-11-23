@@ -711,6 +711,52 @@ std::vector<std::filesystem::path> findBooks(const std::filesystem::path& repoRo
     return out;
 }
 
+std::vector<Wish> wishes(std::string_view text) {
+    std::vector<Wish> out;
+    const auto book = parse(text);
+    if (!book)
+        return out;
+    const auto isSpace = [](char c) { return c == ' ' || c == '\t' || c == '\r'; };
+    for (const auto& environment : book->environments) {
+        std::size_t lineNumber = 1 + static_cast<std::size_t>(
+                                         std::count(text.begin(),
+                                                    text.begin() + static_cast<std::ptrdiff_t>(
+                                                                       environment.bodyBegin),
+                                                    '\n'));
+        for (std::size_t pos = environment.bodyBegin; pos < environment.bodyEnd; ++lineNumber) {
+            std::size_t end = text.find('\n', pos);
+            if (end == npos || end > environment.bodyEnd)
+                end = environment.bodyEnd;
+            string_view line = text.substr(pos, end - pos);
+            pos = end + 1;
+            while (!line.empty() && isSpace(line.front()))
+                line.remove_prefix(1);
+            while (!line.empty() && isSpace(line.back()))
+                line.remove_suffix(1);
+            if (!line.starts_with('%'))
+                continue;
+            line.remove_prefix(1);
+            while (!line.empty() && isSpace(line.front()))
+                line.remove_prefix(1);
+            if (!line.starts_with("TODO:"))
+                continue;
+            line.remove_prefix(5);
+            while (!line.empty() && isSpace(line.front()))
+                line.remove_prefix(1);
+            if (line.empty())
+                continue;
+            std::size_t nameEnd = 0;
+            while (nameEnd < line.size() && !isSpace(line[nameEnd]))
+                ++nameEnd;
+            string name(line.substr(0, nameEnd));
+            if (name.find('/') == npos || invalidInputName(name))
+                name.clear();
+            out.push_back({string(line), std::move(name), lineNumber});
+        }
+    }
+    return out;
+}
+
 std::vector<std::string> inputs(std::string_view text) {
     const string code = latex::stripComments(text);
     std::vector<string> names;

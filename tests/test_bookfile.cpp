@@ -579,6 +579,11 @@ TEST_CASE("every real book parses and round-trips", "[.integration][bookfile]") 
             REQUIRE(again);
             CHECK(*again == *text);
         }
+        for (const auto& wish : wishes(*text)) {
+            INFO(wish.text << " line " << wish.line);
+            CHECK(!wish.text.empty());
+            CHECK((wish.name.empty() || wish.text.starts_with(wish.name)));
+        }
         // the book's own text has no transposing yet, and the edits give it back
         for (const auto& t : readTransposes(*text))
             CHECK_FALSE(t.inputName.empty());
@@ -1275,4 +1280,50 @@ TEST_CASE("addClassOption adds a class option once, byte-exact", "[bookfile]") {
     CHECK(addClassOption(already, "transposecapos").value() == already);
     CHECK_FALSE(addClassOption("no class", "transposecapos").has_value());
     CHECK_FALSE(addClassOption("\\documentclass[lyric{v}", "transposecapos").has_value());
+}
+
+TEST_CASE("wishes lists the TODO lines of the song lists", "[bookfile]") {
+    const std::string text = "\\documentclass{velkyzpevnik}\r\n"
+                             "% TODO: Outside/Before\r\n"
+                             "\\begin{document}\r\n"
+                             "\\begin{songs}{obsah}\r\n"
+                             "    % TODO: A/One\r\n"
+                             "    \\input{A/Two}\r\n"
+                             "    %TODO:B/Three maybe later \r\n"
+                             "    \\input{A/Seven} % TODO: a note, no wish\r\n"
+                             "    % TODO: not a song name\r\n"
+                             "    % TODO:\r\n"
+                             "    % \\input{C/Four}\r\n"
+                             "    \\beginkeeporder\r\n"
+                             "    \\input{D/Five}\r\n"
+                             "    % TODO: D/Six\r\n"
+                             "    \\endkeeporder\r\n"
+                             "\\end{songs}\r\n"
+                             "% TODO: Outside/After\r\n"
+                             "\\end{document}\r\n";
+    const auto list = wishes(text);
+    REQUIRE(list.size() == 4);
+    CHECK(list[0].text == "A/One");
+    CHECK(list[0].name == "A/One");
+    CHECK(list[0].line == 5);
+    CHECK(list[1].text == "B/Three maybe later");
+    CHECK(list[1].name == "B/Three");
+    CHECK(list[1].line == 7);
+    CHECK(list[2].text == "not a song name"); // a title or a note: no input name
+    CHECK(list[2].name.empty());
+    CHECK(list[3].name == "D/Six");
+    CHECK(list[3].line == 14);
+    CHECK(wishes("\\begin{songs}{x}\n% TODO: A/B\n").empty()); // parse() refuses it
+
+    // Two song lists, LF: the lines count through the whole file; Czech text stays as it is;
+    // "%% TODO:" and "% TODO :" are no wishes.
+    const std::string two = "\\begin{songs}{a}\n% TODO: A/B\n\\end{songs}\n"
+                            "\\songsection{X}\n\\begin{songs}{b}\n%% TODO: C/D\n"
+                            "% TODO : E/F\n% TODO: Píseň o zemi\n\\end{songs}\n";
+    const auto both = wishes(two);
+    REQUIRE(both.size() == 2);
+    CHECK(both[0].line == 2);
+    CHECK(both[1].text == "Píseň o zemi");
+    CHECK(both[1].name.empty());
+    CHECK(both[1].line == 8);
 }

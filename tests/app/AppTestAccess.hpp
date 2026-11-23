@@ -18,6 +18,8 @@
 #include "SongListPage.hpp"
 #include "SongbookCheck.hpp"
 #include "SongbookTree.hpp"
+#include "CloneDialog.hpp"
+#include "HomePage.hpp"
 #include "SongbookExporter.hpp"
 #include "SongbooksPage.hpp"
 
@@ -25,8 +27,10 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFrame>
+#include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
 #include <QStackedWidget>
 #include <QTabWidget>
@@ -58,6 +62,21 @@ struct AppTestAccess {
     static void showView(MainWindow& w, ActivityBar::View view) { w.showView(view); }
     static SongbooksPage* songbooksPage(MainWindow& w) { return w.songbooksPage_; }
     static SongListPage* listPage(MainWindow& w) { return w.listPage_; }
+    static HomePage* homePage(MainWindow& w) { return w.homePage_; }
+    static void refreshHome(MainWindow& w) { w.refreshHome(); }
+    // ---- HomePage
+    static QListWidget* homeOpened(HomePage& p) { return p.opened_; }
+    static QListWidget* homeAdded(HomePage& p) { return p.added_; }
+    static QListWidget* homeTodo(HomePage& p) { return p.todo_; }
+    static QListWidget* homeBooks(HomePage& p) { return p.books_; }
+    static QTreeWidget* homeWishes(HomePage& p) { return p.wishes_; }
+    static QPushButton* homeWishOpen(HomePage& p) { return p.wishOpen_; }
+    static QWidget* homeAddedCard(HomePage& p) { return p.addedCard_; }
+    static QLabel* homeSummary(HomePage& p) { return p.summary_; }
+    // ---- CloneDialog
+    static QLineEdit* cloneUrl(CloneDialog& d) { return d.url_; }
+    static QLineEdit* cloneFolder(CloneDialog& d) { return d.folder_; }
+    static void cloneStart(CloneDialog& d) { d.start(); }
     static SongFilterProxy* proxy(MainWindow& w) { return w.proxy_; }
     static SongTableModel* model(MainWindow& w) { return w.model_; }
     static SongEditor* editor(MainWindow& w) { return w.editor_; }

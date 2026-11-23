@@ -789,6 +789,15 @@ void SongbooksPage::fillList(const QString& selectId) {
     latexKeepFor_.clear();
 }
 
+bool SongbooksPage::showBook(const QString& id) {
+    reloadList();
+    QTreeWidgetItem* item = listItemOf(id);
+    if (!item)
+        return false;
+    list_->setCurrentItem(item);
+    return id_ == id;
+}
+
 QTreeWidgetItem* SongbooksPage::listItemOf(const QString& id) const {
     if (id.isEmpty())
         return nullptr;

@@ -4,6 +4,10 @@
 <context>
     <name>ActivityBar</name>
     <message>
+        <source>Home (Alt+Home)</source>
+        <translation>Domů (Alt+Home)</translation>
+    </message>
+    <message>
         <source>Songs (Ctrl+1)</source>
         <translation>Písně (Ctrl+1)</translation>
     </message>
@@ -73,6 +77,53 @@
     <message>
         <source>without transposing</source>
         <translation>bez transpozice</translation>
+    </message>
+</context>
+<context>
+    <name>CloneDialog</name>
+    <message>
+        <source>Get the Songbook</source>
+        <translation>Získat zpěvník</translation>
+    </message>
+    <message>
+        <source>Repository</source>
+        <translation>Repozitář</translation>
+    </message>
+    <message>
+        <source>Choose…</source>
+        <translation>Vybrat…</translation>
+    </message>
+    <message>
+        <source>Into the folder</source>
+        <translation>Do složky</translation>
+    </message>
+    <message>
+        <source>The folder must be new or empty.</source>
+        <translation>Složka musí být nová nebo prázdná.</translation>
+    </message>
+    <message>
+        <source>Folder for the songbook</source>
+        <translation>Složka pro zpěvník</translation>
+    </message>
+    <message>
+        <source>git is not installed: install it and try again.</source>
+        <translation>git není nainstalovaný: nainstalujte ho a zkuste to znovu.</translation>
+    </message>
+    <message>
+        <source>%1 exists and is not an empty folder: choose another one.</source>
+        <translation>%1 existuje a není to prázdná složka: vyberte jinou.</translation>
+    </message>
+    <message>
+        <source>Downloading…</source>
+        <translation>Stahuji…</translation>
+    </message>
+    <message>
+        <source>Done.</source>
+        <translation>Hotovo.</translation>
+    </message>
+    <message>
+        <source>The download failed (see the output above). A private repository needs your access to it (a git credential helper or an SSH key). Nothing was opened; a partly downloaded folder is left as it is: choose another folder or empty it to try again.</source>
+        <translation>Stažení selhalo (viz výpis výše). Soukromý repozitář vyžaduje váš přístup (git credential helper nebo SSH klíč). Nic se neotevřelo; částečně stažená složka zůstává, jak je: zvolte jinou složku nebo ji vyprázdněte a zkuste to znovu.</translation>
     </message>
 </context>
 <context>
@@ -234,6 +285,142 @@ Použijte vestavěný.</translation>
     <message>
         <source>%1: click stages the note (one per string), double-click inserts everything staged. Insert: Ctrl+Return, Clear: Escape.</source>
         <translation>%1: klik připraví notu (jednu na strunu), dvojklik vloží vše připravené. Vložit: Ctrl+Return, Vymazat: Escape.</translation>
+    </message>
+</context>
+<context>
+    <name>HomeData</name>
+    <message>
+        <source>not committed yet</source>
+        <translation>zatím necommitnuto</translation>
+    </message>
+    <message>
+        <source>not checked yet (imported by the app)</source>
+        <translation>zatím nezkontrolováno (importováno aplikací)</translation>
+    </message>
+</context>
+<context>
+    <name>HomePage</name>
+    <message>
+        <source>Continue editing</source>
+        <translation>Pokračovat v úpravách</translation>
+    </message>
+    <message>
+        <source>Recently added</source>
+        <translation>Nedávno přidané</translation>
+    </message>
+    <message>
+        <source>Songbooks</source>
+        <translation>Zpěvníky</translation>
+    </message>
+    <message>
+        <source>Wishes</source>
+        <translation>Přání</translation>
+    </message>
+    <message>
+        <source>Songs wanted in the songbooks: the % TODO: lines of their song lists</source>
+        <translation>Písně, které mají ve zpěvnících být: řádky % TODO: v jejich seznamech písní</translation>
+    </message>
+    <message>
+        <source>Find Online</source>
+        <translation>Najít na webu</translation>
+    </message>
+    <message>
+        <source>Search the web for the song&apos;s chords (opens the browser)</source>
+        <translation>Vyhledat akordy písně na webu (otevře prohlížeč)</translation>
+    </message>
+    <message>
+        <source>To do</source>
+        <comment>Home: songs with TODO notes</comment>
+        <translation>K dodělání</translation>
+    </message>
+    <message>
+        <source>Import…</source>
+        <comment>Home: import a wished song</comment>
+        <translation>Importovat…</translation>
+    </message>
+    <message>
+        <source>Import the song from a chords website</source>
+        <translation>Importovat píseň z webu s akordy</translation>
+    </message>
+    <message>
+        <source>Open Song</source>
+        <translation>Otevřít píseň</translation>
+    </message>
+    <message>
+        <source>The song is in the library already: open it</source>
+        <translation>Píseň už v knihovně je: otevřít ji</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n song(s)</source>
+        <translation>
+            <numerusform>%n píseň</numerusform>
+            <numerusform>%n písně</numerusform>
+            <numerusform>%n písní</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n songbook(s)</source>
+        <translation>
+            <numerusform>%n zpěvník</numerusform>
+            <numerusform>%n zpěvníky</numerusform>
+            <numerusform>%n zpěvníků</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n song(s) not committed yet</source>
+        <translation>
+            <numerusform>%n píseň zatím necommitnutá</numerusform>
+            <numerusform>%n písně zatím necommitnuté</numerusform>
+            <numerusform>%n písní zatím necommitnutých</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Songs you open are listed here.</source>
+        <translation>Tady budou písně, které otevřete.</translation>
+    </message>
+    <message>
+        <source>No song added in the last 30 days.</source>
+        <translation>Za posledních 30 dní nepřibyla žádná píseň.</translation>
+    </message>
+    <message numerus="yes">
+        <source>Show all %n recently added…</source>
+        <translation>
+            <numerusform>Zobrazit všechny nedávno přidané (%n)…</numerusform>
+            <numerusform>Zobrazit všechny nedávno přidané (%n)…</numerusform>
+            <numerusform>Zobrazit všechny nedávno přidané (%n)…</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>No song has a TODO note.</source>
+        <translation>Žádná píseň nemá poznámku TODO.</translation>
+    </message>
+    <message numerus="yes">
+        <source>Show all %n with TODOs…</source>
+        <translation>
+            <numerusform>Zobrazit všechny s TODO (%n)…</numerusform>
+            <numerusform>Zobrazit všechny s TODO (%n)…</numerusform>
+            <numerusform>Zobrazit všechny s TODO (%n)…</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n wish(es)</source>
+        <translation>
+            <numerusform>%n přání</numerusform>
+            <numerusform>%n přání</numerusform>
+            <numerusform>%n přání</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>No songbooks yet: make one on the Songbooks page.</source>
+        <translation>Zatím žádné zpěvníky: vytvořte si ho na stránce Zpěvníky.</translation>
+    </message>
+    <message>
+        <source>in the library</source>
+        <translation>v knihovně</translation>
+    </message>
+    <message>
+        <source>%1, line %2: %3</source>
+        <translation>%1, řádek %2: %3</translation>
     </message>
 </context>
 <context>
@@ -542,8 +729,24 @@ Použijte vestavěný.</translation>
         <translation>Na&amp;stavení…</translation>
     </message>
     <message>
+        <source>New Song&amp;book…</source>
+        <translation>Nový &amp;zpěvník…</translation>
+    </message>
+    <message>
+        <source>Make a new songbook on the Songbooks page</source>
+        <translation>Vytvořit nový zpěvník na stránce Zpěvníky</translation>
+    </message>
+    <message>
+        <source>Open Another Songbook…</source>
+        <translation>Otevřít jiný zpěvník…</translation>
+    </message>
+    <message>
         <source>&amp;View</source>
         <translation>&amp;Zobrazit</translation>
+    </message>
+    <message>
+        <source>&amp;Home</source>
+        <translation>&amp;Domů</translation>
     </message>
     <message>
         <source>The Open S&amp;ong</source>
@@ -552,6 +755,18 @@ Použijte vestavěný.</translation>
     <message>
         <source>Song&amp;books</source>
         <translation>&amp;Zpěvníky</translation>
+    </message>
+    <message>
+        <source>Check Songs</source>
+        <translation>Zkontrolovat písně</translation>
+    </message>
+    <message>
+        <source>No song with possible changes was found.</source>
+        <translation>Nenašla se žádná píseň s možnými změnami.</translation>
+    </message>
+    <message>
+        <source>git is not installed: install it to download the songbook</source>
+        <translation>git není nainstalovaný: pro stažení zpěvníku ho nainstalujte</translation>
     </message>
     <message>
         <source>Cannot save score</source>
@@ -772,6 +987,11 @@ Použijte vestavěný.</translation>
     <message>
         <source>Check every song (or the ones shown): what Tidy, Check Song or Make Smaller would change, keys, metadata</source>
         <translation>Zkontrolovat všechny písně (nebo zobrazené): co by změnilo Učesat, Zkontrolovat píseň nebo Zmenšit, tóniny, metadata</translation>
+    </message>
+    <message>
+        <source>chords</source>
+        <comment>a word of a web search</comment>
+        <translation>akordy</translation>
     </message>
     <message>
         <source>The songbook&apos;s zubuvzpevnik/ has the older layout (no scripts/ inside): building with the app&apos;s copy of the package.</source>
@@ -3312,8 +3532,16 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         <translation>Zkusit znovu</translation>
     </message>
     <message>
-        <source>Open the folder of your songbook: a ZubuvZpevnik checkout, the folder with songs/chords/ in it. It is remembered for the next start.</source>
-        <translation>Otevřete složku svého zpěvníku: kopii ZubuvZpevnik, složku, ve které je songs/chords/. Zapamatuje se pro příští spuštění.</translation>
+        <source>Get the Songbook…</source>
+        <translation>Získat zpěvník…</translation>
+    </message>
+    <message>
+        <source>Download the songbook repository (git clone) into a folder of your choice and open it</source>
+        <translation>Stáhnout repozitář zpěvníku (git clone) do zvolené složky a otevřít ho</translation>
+    </message>
+    <message>
+        <source>Open the folder of your songbook: a ZubuvZpevnik checkout, the folder with songs/chords/ in it. It is remembered for the next start. Without one yet, Get the Songbook… downloads it.</source>
+        <translation>Otevřete složku svého zpěvníku: checkout ZubuvZpevnik, složku, ve které je songs/chords/. Zapamatuje se pro příští spuštění. Pokud ji ještě nemáte, Získat zpěvník… ji stáhne.</translation>
     </message>
     <message>
         <source>Open Songbook Folder…</source>

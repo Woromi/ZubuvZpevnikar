@@ -185,6 +185,16 @@ void SongListPage::updateRecentChoice() {
     items->item(index)->setEnabled(model_->hasDates());
 }
 
+void SongListPage::setShow(Show show) {
+    const int index = show_->findData(show);
+    if (index < 0)
+        return;
+    search_->clear();
+    language_->setCurrentIndex(0);
+    show_->setCurrentIndex(index);
+    applyShow(); // also when it was the choice already
+}
+
 void SongListPage::applyShow() {
     const int show = show_->currentData().toInt();
     const bool recent = show == Show::Recent;

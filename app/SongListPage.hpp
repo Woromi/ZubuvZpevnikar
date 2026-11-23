@@ -37,6 +37,10 @@ public:
     void selectSong(const std::filesystem::path& path);
     // The song collections (folders under songs/) as tabs over the list; hidden with one.
     void setCollections(const std::vector<std::string>& collections);
+    // The Show choice (e.g. from Home's "Show all"); the search and the language filter are
+    // cleared so that all of them show.
+    enum Show { All, Favourites, Tabs, Todo, Recent, Changes };
+    void setShow(Show show);
 
 signals:
     void songActivated(const QModelIndex& proxyIndex);         // double-click or Enter
@@ -44,7 +48,6 @@ signals:
     void contextMenuRequested(const QPoint& viewportPosition); // of the table
 
 private:
-    enum Show { All, Favourites, Tabs, Todo, Recent, Changes };
     void applyShow();
     void updateRecentChoice(); // enabled while the model knows the dates
 

@@ -110,6 +110,19 @@ std::vector<std::filesystem::path> findBooks(const std::filesystem::path& repoRo
 // checkout that has only that (where new books go too).
 std::filesystem::path booksFolder(const std::filesystem::path& repoRoot);
 
+// A wish: a comment line `% TODO: <text>` inside a `songs` environment, a song wanted in the
+// book. Usually an input name (`% TODO: Artist/Title`), sometimes only a title or a note.
+struct Wish {
+    std::string text;     // everything after "TODO:", trimmed (never empty)
+    std::string name;     // `text`'s first word when that is an input name (zub::invalidInputName
+                          // passes and it has a '/'), else ""
+    std::size_t line = 0; // 1-based line of the file
+};
+// The wishes of a book, in file order: lines that are only a comment starting `TODO:` (after
+// optional whitespace and `%`). A TODO after code on a line is a note, no wish; lines outside the
+// `songs` environments do not count. LF or CRLF; empty for a text parse() refuses.
+std::vector<Wish> wishes(std::string_view text);
+
 // Every \input{name} of `text` (comments ignored, anywhere, trimmed, once each, in order); "" for
 // an \input without a brace argument.
 std::vector<std::string> inputs(std::string_view text);

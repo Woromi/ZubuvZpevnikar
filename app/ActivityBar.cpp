@@ -28,6 +28,7 @@ ActivityBar::ActivityBar(QWidget* parent) : QWidget(parent), group_(new QButtonG
     layout->setSpacing(4);
     group_->setExclusive(true);
 
+    addButton(View::Home, icon(this, "go-home", QStyle::SP_DirHomeIcon), tr("Home (Alt+Home)"));
     addButton(View::Songs, icon(this, "view-list-details", QStyle::SP_FileDialogListView),
               tr("Songs (Ctrl+1)"));
     addButton(View::Song, icon(this, "document-edit", QStyle::SP_FileIcon),
