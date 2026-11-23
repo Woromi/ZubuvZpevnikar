@@ -69,6 +69,13 @@
             <numerusform>%n wishes</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%n to fix</source>
+        <translation>
+            <numerusform>%n to fix</numerusform>
+            <numerusform>%n to fix</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>MainWindow</name>
@@ -255,10 +262,17 @@
         </translation>
     </message>
     <message numerus="yes">
-        <source>%n song(s) of this songbook not marked as fitting %1: nobody has checked them at that size. Open one to measure it (Make Smaller offers its pap), or take it out of the songbook.</source>
+        <source>%n to fix before printing</source>
         <translation>
-            <numerusform>%n song of this songbook not marked as fitting %1: nobody has checked it at that size. Open it to measure it (Make Smaller offers its pap), or take it out of the songbook.</numerusform>
-            <numerusform>%n songs of this songbook not marked as fitting %1: nobody has checked them at that size. Open one to measure it (Make Smaller offers its pap), or take it out of the songbook.</numerusform>
+            <numerusform>%n to fix before printing</numerusform>
+            <numerusform>%n to fix before printing</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n note(s)</source>
+        <translation>
+            <numerusform>%n note</numerusform>
+            <numerusform>%n notes</numerusform>
         </translation>
     </message>
 </context>

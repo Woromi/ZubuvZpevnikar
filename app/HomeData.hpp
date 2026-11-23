@@ -4,6 +4,12 @@
 #include <QString>
 #include <QStringList>
 #include <expected>
+#include <map>
+#include <optional>
+#include <functional>
+#include <string_view>
+#include <zub/core/bookfile.hpp>
+#include <zub/core/songbook.hpp>
 #include <string>
 #include <filesystem>
 #include <utility>
@@ -25,6 +31,7 @@ struct HomeBook {
     int songs = 0;
     int wishes = 0;
     bool locked = false;
+    int toFix = -1; // zub::songbook::Readiness::toFix (-1: the book could not be read)
 };
 
 struct HomeWish {
@@ -50,6 +57,25 @@ struct HomeData {
     std::vector<HomeWish> wishes;
     static constexpr int kListed = 10;
 };
+
+// The model row of each input name (a name in two collections: the chords song), as the facts
+// below and the Overview's song texts use it.
+std::map<std::string, int> songRows(const SongTableModel& model);
+
+// The facts of the library's songs for zub::songbook::readiness, by input name: from the model,
+// and the song file read once (when first asked) for what a build would ask about. Use it at
+// once: it keeps `model`'s rows of this moment (and a reference to it).
+std::function<zub::songbook::SongFacts(std::string_view)>
+songFacts(const SongTableModel& model, const std::filesystem::path& root);
+
+// Is the book `file` (its `text`) ready to print? Its songs (readiness), plus what a build would
+// ask about the book's own files: the .tex and a camp book's chord chart (akordy.tex beside it)
+// and the chart's songs. nullopt when the book cannot be read (zub::bookfile::parse refuses it).
+std::optional<zub::songbook::Readiness>
+checkSongbook(const std::filesystem::path& file, const std::string& text,
+              const std::function<zub::songbook::SongFacts(std::string_view)>& facts);
+// A book file's songs as a Songbook (its sections, class, title) for readiness.
+zub::songbook::Songbook songbookOf(const zub::bookfile::Book& book);
 
 // `opened`: the remembered songs (rememberedSongs), newest first; songs no longer in the model
 // are left out.

@@ -19,12 +19,14 @@
 namespace KSyntaxHighlighting {
 class Repository;
 }
+class BookOverview;
 class BookPreview;
 class CodeTextEdit;
 class CollectionTabs;
 class FindBar;
 class QAction;
 class QTabWidget;
+class QTimer;
 class QCheckBox;
 class QComboBox;
 class QFormLayout;
@@ -73,6 +75,7 @@ public:
     void newSongbook(); // New Songbook… (asks)
     // The book (id) whose LaTeX tab has unsaved edits, "" none: others must not write it.
     QString bookWithUnsavedLatex() const;
+    void showOverview(); // the Overview tab of the shown book
     // Ctrl+F / Ctrl+H: opens the find bar of the LaTeX tab when that tab is the current one;
     // false otherwise.
     bool showFind(bool replaceMode);
@@ -83,8 +86,9 @@ signals:
 
 private:
     void buildUi();
-    // Check…: the book's songs not marked as fitting its paper, with Open Song and Remove.
-    void checkBook();
+    void checkBook(); // Check…: the Overview tab
+    // The Overview tab of the shown book again (only while it is shown).
+    void refreshOverview();
     QWidget* buildListPane();
     QWidget* buildEditPane();
     QWidget* buildPickerPane();
@@ -282,6 +286,9 @@ private:
 
     QTabWidget* rightTabs_ = nullptr; // Add Songs | Preview
     BookPreview* preview_ = nullptr;
+    BookOverview* overview_ = nullptr;
+    QWidget* latexPane_ = nullptr; // the LaTeX tab
+    QTimer* overviewTimer_ = nullptr; // refreshes the Overview a moment after the songs changed
     QString pendingExport_; // the book whose preview build ends in Export PDF
     QWidget* pickerPane_ = nullptr;
     QLabel* pickerHeader_ = nullptr;

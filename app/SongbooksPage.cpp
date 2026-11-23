@@ -1,6 +1,8 @@
 #include "SongbooksPage.hpp"
 
 #include "BookAdder.hpp"
+#include "BookOverview.hpp"
+#include "HomeData.hpp"
 #include "BookPreview.hpp"
 #include "CodeTextEdit.hpp"
 #include "CollectionTabs.hpp"
@@ -56,6 +58,7 @@
 #include <QStyle>
 #include <QStyleOptionViewItem>
 #include <QTabWidget>
+#include <QTimer>
 #include <QTableView>
 #include <QToolBar>
 #include <QTreeWidget>
@@ -300,7 +303,7 @@ void SongbooksPage::buildUi() {
     bar->addSeparator();
     check_ = bar->addAction(QIcon::fromTheme(QStringLiteral("tools-check-spelling")), tr("Check…"));
     check_->setObjectName(QStringLiteral("songbookCheck"));
-    check_->setToolTip(tr("Songs of this songbook not marked as fitting its paper (their pap)"));
+    check_->setToolTip(tr("Is the songbook ready to print? (the Overview tab)"));
     exportPdf_ =
         bar->addAction(QIcon::fromTheme(QStringLiteral("application-pdf")), tr("Export PDF…"));
     outer->addWidget(bar);
@@ -313,7 +316,32 @@ void SongbooksPage::buildUi() {
     bookTabs_ = new QTabWidget(this);
     bookTabs_->setDocumentMode(true);
     bookTabs_->addTab(buildEditPane(), tr("Songbook"));
-    bookTabs_->addTab(buildLatexPane(), tr("LaTeX"));
+    overview_ = new BookOverview(this);
+    bookTabs_->addTab(overview_, tr("Overview", "is the songbook ready to print"));
+    latexPane_ = buildLatexPane();
+    bookTabs_->addTab(latexPane_, tr("LaTeX"));
+    connect(bookTabs_, &QTabWidget::currentChanged, this, [this] { refreshOverview(); });
+    connect(overview_, &BookOverview::openSongRequested, this, &SongbooksPage::openSongRequested);
+    connect(overview_, &BookOverview::refreshRequested, this, &SongbooksPage::refreshOverview);
+    connect(overview_, &BookOverview::removeRequested, this,
+            [this](const std::vector<std::string>& names) {
+                if (!canEdit())
+                    return;
+                bool removed = false;
+                for (const std::string& name : names)
+                    removed |= zub::songbook::removeSong(book_, name);
+                if (removed)
+                    commit();
+                refreshOverview();
+            });
+    overviewTimer_ = new QTimer(this);
+    overviewTimer_->setSingleShot(true);
+    overviewTimer_->setInterval(300);
+    connect(overviewTimer_, &QTimer::timeout, this, &SongbooksPage::refreshOverview);
+    connect(model_, &QAbstractItemModel::dataChanged, overviewTimer_, qOverload<>(&QTimer::start));
+    connect(model_, &QAbstractItemModel::modelReset, overviewTimer_, qOverload<>(&QTimer::start));
+    connect(model_, &QAbstractItemModel::rowsInserted, overviewTimer_, qOverload<>(&QTimer::start));
+    connect(model_, &QAbstractItemModel::rowsRemoved, overviewTimer_, qOverload<>(&QTimer::start));
     rightTabs_ = new QTabWidget(this);
     rightTabs_->setDocumentMode(true);
     rightTabs_->addTab(buildPickerPane(), tr("Add Songs"));
@@ -870,12 +898,7 @@ bool SongbooksPage::loadFile() {
         return false;
     }
     file_ = std::move(*parsed);
-    book_.title = zub::latex::toDisplayText(file_.title);
-    book_.author = zub::latex::toDisplayText(file_.author);
-    book_.bookClass =
-        zub::songbook::bookClassFromName(file_.documentClass).value_or(BookClass::Velky);
-    for (const auto& environment : file_.environments)
-        book_.sections.push_back({environment.section, songsOf(environment)});
+    book_ = songbookOf(file_); // as Home reads it
     editable_ = true;
     for (const auto& environment : file_.environments) {
         if (!environment.readOnly.empty()) {
@@ -1342,6 +1365,7 @@ void SongbooksPage::loadBook() {
     rebuildTree();
     updatePicker();
     updateButtons();
+    refreshOverview();
 }
 
 void SongbooksPage::setPackageDir(const std::filesystem::path& packageDir) {
@@ -1631,7 +1655,7 @@ void SongbooksPage::refreshFileViews() {
 }
 
 bool SongbooksPage::showFind(bool replaceMode) {
-    if (bookTabs_->currentIndex() != 1 || !latexFind_)
+    if (bookTabs_->currentWidget() != latexPane_ || !latexFind_)
         return false;
     latexFind_->open(replaceMode);
     return true;
@@ -1653,7 +1677,7 @@ void SongbooksPage::updateLatexState() {
                                        "is saved or reverted.")
                                   : QString());
     latexState_->setStyleSheet(QStringLiteral("color: #b36b00;"));
-    bookTabs_->setTabText(1, modified ? tr("LaTeX ●") : tr("LaTeX"));
+    bookTabs_->setTabText(bookTabs_->indexOf(latexPane_), modified ? tr("LaTeX ●") : tr("LaTeX"));
     // One writer at a time: the other edits wait for the LaTeX.
     editPane_->setEnabled(shown && !modified);
     pickerPane_->setEnabled(canEdit());
@@ -1700,7 +1724,7 @@ void SongbooksPage::saveLatex() {
     latexBase_ = rawText(latex_); // saved: the file says the same now
     loadBook();
     if (!editable_ || text_.empty())
-        bookTabs_->setCurrentIndex(1); // keep showing what needs fixing
+        bookTabs_->setCurrentWidget(latexPane_); // keep showing what needs fixing
 }
 
 void SongbooksPage::revertLatex() {
@@ -2020,98 +2044,96 @@ void SongbooksPage::removeSelectedSongs() {
 }
 
 void SongbooksPage::checkBook() {
-    if (id_.isEmpty() || book_.sections.empty())
-        return;
-    // The songs of the library by input name: their pap and file.
-    std::map<std::string, const zub::SongEntry*> byName;
-    for (int row = 0; row < model_->rowCount(); ++row)
-        if (const auto* song = model_->song(row))
-            byName.emplace(song->inputName, song);
-    const auto papOf = [&](std::string_view name) -> std::optional<std::string> {
-        const auto it = byName.find(std::string(name));
-        if (it == byName.end())
-            return std::nullopt;
-        return it->second->meta.value("pap");
-    };
-    const QString paper = toQString(zub::songbook::paperName(book_.bookClass)).toUpper();
-    const auto unfit = zub::songbook::notMarkedFitting(book_, papOf);
-    if (unfit.empty()) {
-        QMessageBox::information(
-            this, tr("Check"),
-            tr("Every song of this songbook is marked as fitting %1.").arg(paper));
+    showOverview();
+}
+
+void SongbooksPage::showOverview() {
+    bookTabs_->setCurrentWidget(overview_);
+    refreshOverview();
+}
+
+void SongbooksPage::refreshOverview() {
+    if (!overview_ || bookTabs_->currentWidget() != overview_)
+        return; // computed when shown (it reads the songs' files)
+    overview_->setRemoveEnabled(canEdit());
+    if (id_.isEmpty() || text_.empty()) {
+        overview_->setChecks(id_, {}, false, {});
         return;
     }
-
-    QDialog dialog(this);
-    dialog.setWindowTitle(tr("Check: %1").arg(toQString(book_.title)));
-    auto* layout = new QVBoxLayout(&dialog);
-    auto* label = new QLabel(&dialog);
-    label->setWordWrap(true);
-    layout->addWidget(label);
-    auto* list = new QListWidget(&dialog);
-    list->setObjectName(QStringLiteral("songbookCheckList"));
-    list->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    const auto fill = [&] {
-        list->clear();
-        const auto now = zub::songbook::notMarkedFitting(book_, papOf);
-        for (const std::string& name : now) {
-            const auto* song = byName.at(name);
-            const QString pap = toQString(song->meta.value("pap"));
-            auto* item = new QListWidgetItem(
-                tr("%1 — %2  (pap: %3)")
-                    .arg(toQString(zub::latex::toDisplayText(song->meta.title)),
-                         toQString(zub::latex::toDisplayText(song->meta.value("by"))),
-                         pap.isEmpty() ? tr("none") : pap),
-                list);
-            item->setData(Qt::UserRole, toQString(name));
+    const auto facts = songFacts(*model_, root_);
+    const auto checked = checkSongbook(pathOf(id_), text_, facts);
+    if (!checked) {
+        overview_->setChecks(id_, tr("The songbook cannot be read: see the LaTeX tab."), false, {});
+        return;
+    }
+    if (book_.sections.empty() ||
+        std::ranges::all_of(book_.sections, [](const auto& s) { return s.songs.empty(); })) {
+        overview_->setChecks(id_, tr("No songs in this songbook yet."), false, {});
+        return;
+    }
+    const auto& r = *checked;
+    const auto rows = songRows(*model_);
+    using Severity = BookOverview::Severity;
+    const auto songsOf = [&](const std::vector<std::string>& names,
+                             const std::function<QString(const zub::songbook::SongFacts&)>& detail) {
+        std::vector<BookOverview::Song> out;
+        for (const std::string& name : names) {
+            BookOverview::Song song{name, {}, toQString(name)};
+            if (const auto it = rows.find(name); it != rows.end()) {
+                song.path = model_->song(it->second)->path;
+                song.text = model_->index(it->second, SongTableModel::Title).data().toString() +
+                            QStringLiteral(" — ") +
+                            model_->index(it->second, SongTableModel::Artist).data().toString();
+            }
+            if (detail) {
+                const QString more = detail(facts(name));
+                if (!more.isEmpty())
+                    song.text += QStringLiteral("   ·  ") + more;
+            }
+            out.push_back(std::move(song));
         }
-        label->setText(tr("%n song(s) of this songbook not marked as fitting %1: nobody has "
-                          "checked them at that size. Open one to measure it (Make Smaller "
-                          "offers its pap), or take it out of the songbook.",
-                          nullptr, static_cast<int>(now.size()))
-                           .arg(paper));
-        list->setCurrentRow(0);
+        return out;
     };
-    fill();
-    layout->addWidget(list, 1);
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
-    QPushButton* open = buttons->addButton(tr("Open Song"), QDialogButtonBox::ActionRole);
-    QPushButton* remove =
-        buttons->addButton(tr("Remove from the Songbook"), QDialogButtonBox::ActionRole);
-    layout->addWidget(buttons);
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    connect(list, &QListWidget::itemSelectionChanged, &dialog, [=, this] {
-        open->setEnabled(list->selectedItems().size() == 1);
-        remove->setEnabled(canEdit() && !list->selectedItems().isEmpty());
-    });
-    connect(open, &QPushButton::clicked, &dialog, [&] {
-        const auto items = list->selectedItems();
-        if (items.size() != 1)
-            return;
-        const auto* song = byName.at(toStdString(items.front()->data(Qt::UserRole).toString()));
-        const std::filesystem::path path = song->path;
-        dialog.accept();
-        emit openSongRequested(path);
-    });
-    open->setEnabled(list->selectedItems().size() == 1);
-    remove->setEnabled(canEdit() && !list->selectedItems().isEmpty());
-    connect(remove, &QPushButton::clicked, &dialog, [&] {
-        if (!canEdit())
-            return; // locked, or the LaTeX tab holds unsaved text
-        bool removed = false;
-        for (QListWidgetItem* item : list->selectedItems())
-            removed |=
-                zub::songbook::removeSong(book_, toStdString(item->data(Qt::UserRole).toString()));
-        if (!removed)
-            return;
-        commit();
-        if (zub::songbook::notMarkedFitting(book_, papOf).empty())
-            dialog.accept();
-        else
-            fill();
-    });
-    dialog.resize(560, 360);
-    dialog.exec();
+    const QString paper = toQString(zub::songbook::paperName(book_.bookClass)).toUpper();
+    std::vector<BookOverview::Check> checks;
+    {
+        std::vector<BookOverview::Song> files;
+        for (const std::string& problem : r.files)
+            files.push_back({{}, {}, toQString(problem)});
+        checks.push_back(
+            {Severity::Blocker, tr("The build would ask about the songbook's files"), files});
+    }
+    checks.push_back({Severity::Blocker, tr("Not in the song library"),
+                      songsOf(r.missing, [](const auto&) { return QString(); })});
+    checks.push_back({Severity::Blocker, tr("The build would ask about these"),
+                      songsOf(r.unsafe, [](const zub::songbook::SongFacts& f) {
+                          QStringList what;
+                          for (const std::string& risk : f.risks)
+                              what << toQString(risk);
+                          return what.join(QStringLiteral(", "));
+                      })});
+    checks.push_back({Severity::ToFix, tr("Not marked as fitting %1").arg(paper),
+                      songsOf(r.notFitting, [this](const zub::songbook::SongFacts& f) {
+                          return tr("pap: %1").arg(f.pap.empty() ? tr("none") : toQString(f.pap));
+                      })});
+    checks.push_back({Severity::ToFix, tr("Imported, not checked yet"), songsOf(r.notChecked, {})});
+    checks.push_back({Severity::Note, tr("TODO notes"),
+                      songsOf(r.todo, [](const zub::songbook::SongFacts& f) {
+                          return f.todos.empty() ? QString() : toQString(f.todos.front());
+                      })});
+    checks.push_back({Severity::Note, tr("Possible changes (Check Songs)"),
+                      songsOf(r.changes, [](const zub::songbook::SongFacts& f) {
+                          return toQString(f.changes);
+                      })});
+    checks.push_back({Severity::Note, tr("No key", "musical key"), songsOf(r.noKey, {})});
+
+    QString heading =
+        r.ready() ? tr("Ready to print")
+                  : tr("%n to fix before printing", nullptr, static_cast<int>(r.toFix()));
+    if (r.notes() > 0)
+        heading += QStringLiteral("  ·  ") +
+                   tr("%n note(s)", nullptr, static_cast<int>(r.notes()));
+    overview_->setChecks(id_, heading, r.ready(), checks);
 }
 
 // ---- The picker ----

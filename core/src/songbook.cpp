@@ -3,6 +3,7 @@
 #include <cctype>
 #include <charconv>
 #include <cstddef>
+#include <map>
 #include <set>
 #include <system_error>
 #include <zub/core/json.hpp>
@@ -407,6 +408,53 @@ notMarkedFitting(const Songbook& book,
                 out.push_back(name);
         }
     }
+    return out;
+}
+
+std::size_t Readiness::toFix() const {
+    std::set<std::string> songs;
+    for (const auto* list : {&missing, &unsafe, &notFitting, &notChecked})
+        songs.insert(list->begin(), list->end());
+    return songs.size() + files.size();
+}
+
+std::size_t Readiness::notes() const {
+    std::set<std::string> songs;
+    for (const auto* list : {&todo, &changes, &noKey})
+        songs.insert(list->begin(), list->end());
+    return songs.size();
+}
+
+Readiness readiness(const Songbook& book,
+                    const std::function<SongFacts(std::string_view inputName)>& facts) {
+    Readiness out;
+    std::map<std::string, SongFacts> known;
+    std::set<std::string> seen;
+    for (const Section& section : book.sections)
+        for (const std::string& name : section.songs) {
+            if (!seen.insert(name).second)
+                continue;
+            SongFacts f = facts(name);
+            if (!f.exists) {
+                out.missing.push_back(name);
+                continue;
+            }
+            if (!f.risks.empty())
+                out.unsafe.push_back(name);
+            if (f.notChecked)
+                out.notChecked.push_back(name);
+            if (!f.todos.empty())
+                out.todo.push_back(name);
+            if (!f.changes.empty())
+                out.changes.push_back(name);
+            if (!f.hasKey)
+                out.noKey.push_back(name);
+            known.emplace(name, std::move(f));
+        }
+    out.notFitting = notMarkedFitting(book, [&known](std::string_view name) {
+        const auto it = known.find(std::string(name));
+        return it == known.end() ? std::nullopt : std::optional<std::string>(it->second.pap);
+    });
     return out;
 }
 

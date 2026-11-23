@@ -84,6 +84,26 @@
     </message>
 </context>
 <context>
+    <name>BookOverview</name>
+    <message>
+        <source>Open Song</source>
+        <translation>Otevřít píseň</translation>
+    </message>
+    <message>
+        <source>Remove from the Songbook</source>
+        <translation>Odebrat ze zpěvníku</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <comment>check the songbook again</comment>
+        <translation>Obnovit</translation>
+    </message>
+    <message>
+        <source>Check the songbook again (songs edited outside the app)</source>
+        <translation>Zkontrolovat zpěvník znovu (písně upravené mimo aplikaci)</translation>
+    </message>
+</context>
+<context>
     <name>BookPreview</name>
     <message>
         <source>Build Preview</source>
@@ -325,6 +345,10 @@ Použijte vestavěný.</translation>
         <source>The wish is in the wish list now, but still in %1: %2</source>
         <translation>Přání už je v seznamu přání, ale zůstalo i v %1: %2</translation>
     </message>
+    <message>
+        <source>is not in the song library</source>
+        <translation>není v knihovně písní</translation>
+    </message>
 </context>
 <context>
     <name>HomePage</name>
@@ -479,6 +503,19 @@ Použijte vestavěný.</translation>
             <numerusform>%n přání</numerusform>
             <numerusform>%n přání</numerusform>
             <numerusform>%n přání</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>ready ✓</source>
+        <comment>a songbook ready to print</comment>
+        <translation>připraven ✓</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n to fix</source>
+        <translation>
+            <numerusform>%n k opravě</numerusform>
+            <numerusform>%n k opravě</numerusform>
+            <numerusform>%n k opravě</numerusform>
         </translation>
     </message>
     <message>
@@ -3163,6 +3200,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Nový zpěvník ve složce songbooks/ knihovny písní</translation>
     </message>
     <message>
+        <source>Is the songbook ready to print? (the Overview tab)</source>
+        <translation>Je zpěvník připravený k tisku? (karta Přehled)</translation>
+    </message>
+    <message>
         <source>Preview</source>
         <translation>Náhled</translation>
     </message>
@@ -3341,16 +3382,77 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         <translation>Písně označené ★</translation>
     </message>
     <message>
+        <source>The songbook cannot be read: see the LaTeX tab.</source>
+        <translation>Zpěvník nejde přečíst: podívejte se na kartu LaTeX.</translation>
+    </message>
+    <message>
+        <source>No songs in this songbook yet.</source>
+        <translation>Ve zpěvníku zatím nejsou žádné písně.</translation>
+    </message>
+    <message>
+        <source>The build would ask about the songbook&apos;s files</source>
+        <translation>Na soubory zpěvníku se sestavení zeptá</translation>
+    </message>
+    <message>
+        <source>Not in the song library</source>
+        <translation>Chybí v knihovně písní</translation>
+    </message>
+    <message>
+        <source>The build would ask about these</source>
+        <translation>Na tyto se sestavení zeptá</translation>
+    </message>
+    <message>
+        <source>Not marked as fitting %1</source>
+        <translation>Neoznačeno, že se vejde na %1</translation>
+    </message>
+    <message>
+        <source>pap: %1</source>
+        <translation>pap: %1</translation>
+    </message>
+    <message>
+        <source>Imported, not checked yet</source>
+        <translation>Importováno, zatím nezkontrolováno</translation>
+    </message>
+    <message>
+        <source>TODO notes</source>
+        <translation>Poznámky TODO</translation>
+    </message>
+    <message>
+        <source>Possible changes (Check Songs)</source>
+        <translation>Možné změny (Kontrola písní)</translation>
+    </message>
+    <message>
+        <source>No key</source>
+        <comment>musical key</comment>
+        <translation>Bez tóniny</translation>
+    </message>
+    <message>
+        <source>Ready to print</source>
+        <translation>Připraven k tisku</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n to fix before printing</source>
+        <translation>
+            <numerusform>%n k opravě před tiskem</numerusform>
+            <numerusform>%n k opravě před tiskem</numerusform>
+            <numerusform>%n k opravě před tiskem</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n note(s)</source>
+        <translation>
+            <numerusform>%n poznámka</numerusform>
+            <numerusform>%n poznámky</numerusform>
+            <numerusform>%n poznámek</numerusform>
+        </translation>
+    </message>
+    <message>
         <source>Check…</source>
         <translation>Zkontrolovat…</translation>
     </message>
     <message>
         <source>New Songbook…</source>
         <translation>Nový zpěvník…</translation>
-    </message>
-    <message>
-        <source>Songs of this songbook not marked as fitting its paper (their pap)</source>
-        <translation>Písně tohoto zpěvníku, které nemají označeno, že se vejdou na jeho papír (jejich pap)</translation>
     </message>
     <message>
         <source>Export PDF…</source>
@@ -3473,22 +3575,6 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         </translation>
     </message>
     <message>
-        <source>Check</source>
-        <translation>Kontrola</translation>
-    </message>
-    <message>
-        <source>Every song of this songbook is marked as fitting %1.</source>
-        <translation>Všechny písně tohoto zpěvníku mají označeno, že se vejdou na %1.</translation>
-    </message>
-    <message>
-        <source>Check: %1</source>
-        <translation>Kontrola: %1</translation>
-    </message>
-    <message>
-        <source>%1 — %2  (pap: %3)</source>
-        <translation>%1 — %2  (pap: %3)</translation>
-    </message>
-    <message>
         <source>none</source>
         <translation>žádný</translation>
     </message>
@@ -3543,6 +3629,11 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
     <message>
         <source>The songbook&apos;s package can&apos;t transpose yet (\transposesong): the PDF will fail to build until it does.</source>
         <translation>Balíček zpěvníku zatím neumí transponovat (\transposesong): PDF se nepodaří sestavit, dokud to neumí.</translation>
+    </message>
+    <message>
+        <source>Overview</source>
+        <comment>is the songbook ready to print</comment>
+        <translation>Přehled</translation>
     </message>
     <message>
         <source>Only recently added</source>
@@ -3651,22 +3742,6 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
     <message>
         <source>(capo %1)</source>
         <translation>(kapodastr %1)</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n song(s) of this songbook not marked as fitting %1: nobody has checked them at that size. Open one to measure it (Make Smaller offers its pap), or take it out of the songbook.</source>
-        <translation>
-            <numerusform>%n píseň tohoto zpěvníku nemá označeno, že se vejde na %1: na tomto rozměru ji nikdo nezkontroloval. Otevřete ji a změřte (Zmenšit nabídne její pap), nebo ji ze zpěvníku odeberte.</numerusform>
-            <numerusform>%n písně tohoto zpěvníku nemají označeno, že se vejdou na %1: na tomto rozměru je nikdo nezkontroloval. Otevřete některou a změřte ji (Zmenšit nabídne její pap), nebo je ze zpěvníku odeberte.</numerusform>
-            <numerusform>%n písní tohoto zpěvníku nemá označeno, že se vejdou na %1: na tomto rozměru je nikdo nezkontroloval. Otevřete některou a změřte ji (Zmenšit nabídne její pap), nebo je ze zpěvníku odeberte.</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>Open Song</source>
-        <translation>Otevřít píseň</translation>
-    </message>
-    <message>
-        <source>Remove from the Songbook</source>
-        <translation>Odebrat ze zpěvníku</translation>
     </message>
 </context>
 <context>

@@ -11,6 +11,9 @@
 #include <optional>
 #include <map>
 #include <zub/core/bookfile.hpp>
+#include <memory>
+#include <zub/core/latex.hpp>
+#include <zub/core/safety.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/songtodo.hpp>
 #include <zub/core/textfile.hpp>
@@ -148,6 +151,7 @@ HomeData buildHomeData(const SongTableModel& model, const std::filesystem::path&
             w.song = librarySong(wish);
             data.wishes.push_back(std::move(w));
         }
+    const auto facts = songFacts(model, root);
     for (const auto& relative : zub::bookfile::findBooks(root)) {
         const auto text = zub::readTextFile(root / relative);
         if (!text)
@@ -159,8 +163,12 @@ HomeData buildHomeData(const SongTableModel& model, const std::filesystem::path&
         book.title = !settings.title.empty() ? toQString(settings.title)
                                              : toQString(relative.stem().string());
         book.locked = settings.locked;
-        if (parsed)
+        if (parsed) {
             book.songs = static_cast<int>(parsed->songs().size());
+            // An empty book is not "ready": no status.
+            if (const auto r = checkSongbook(root / relative, *text, facts); r && book.songs > 0)
+                book.toFix = static_cast<int>(r->toFix());
+        }
         for (const auto& wish : zub::bookfile::wishes(*text)) {
             HomeWish w;
             w.bookId = book.id;
@@ -388,4 +396,105 @@ std::expected<void, QString> moveWishToList(const std::filesystem::path& root,
                                         "The wish is in the wish list now, but still in %1: %2")
                 .arg(wish.bookTitle, removed.error()));
     return {};
+}
+
+std::map<std::string, int> songRows(const SongTableModel& model) {
+    std::map<std::string, int> rows;
+    for (int row = 0; row < model.rowCount(); ++row)
+        if (const zub::SongEntry* song = model.song(row))
+            if (!rows.contains(song->inputName) || song->collection == "chords")
+                rows[song->inputName] = row;
+    return rows;
+}
+
+std::optional<zub::songbook::Readiness>
+checkSongbook(const std::filesystem::path& file, const std::string& text,
+              const std::function<zub::songbook::SongFacts(std::string_view)>& facts) {
+    const auto parsed = zub::bookfile::parse(text);
+    if (!parsed)
+        return std::nullopt;
+    auto r = zub::songbook::readiness(songbookOf(*parsed), facts);
+    const auto addFileRisks = [&r](const std::string& name, const std::string& content) {
+        const auto unknown = zub::safety::unknownBookConstructs(content);
+        if (unknown.empty())
+            return;
+        std::string what;
+        for (const std::string& command : unknown)
+            what += (what.empty() ? "" : ", ") + command;
+        r.files.push_back(name + ": " + what);
+    };
+    addFileRisks(file.filename().string(), text);
+    // A camp book's chord chart is LaTeX the build runs too, and its songs are built.
+    if (const auto akordy = zub::readTextFile(file.parent_path() / "akordy.tex")) {
+        addFileRisks("akordy.tex", *akordy);
+        const auto inBook = parsed->songs();
+        for (const std::string& name : zub::bookfile::inputs(*akordy)) {
+            if (std::ranges::find(inBook, name) != inBook.end())
+                continue; // checked with the book's songs
+            const auto f = facts(name);
+            if (!f.exists) {
+                r.files.push_back("akordy.tex: " + name + " " +
+                                  toStdString(QCoreApplication::translate(
+                                      "HomeData", "is not in the song library")));
+            } else if (!f.risks.empty()) {
+                std::string what;
+                for (const std::string& risk : f.risks)
+                    what += (what.empty() ? "" : ", ") + risk;
+                r.files.push_back("akordy.tex → " + name + ": " + what);
+            }
+        }
+    }
+    return r;
+}
+
+std::function<zub::songbook::SongFacts(std::string_view)>
+songFacts(const SongTableModel& model, const std::filesystem::path& root) {
+    struct Cache {
+        std::map<std::string, int> rows; // input name -> model row (chords first)
+        std::map<std::string, zub::songbook::SongFacts> facts;
+    };
+    auto cache = std::make_shared<Cache>();
+    cache->rows = songRows(model);
+    return [cache, &model, root](std::string_view inputName) {
+        const std::string name(inputName);
+        if (const auto it = cache->facts.find(name); it != cache->facts.end())
+            return it->second;
+        zub::songbook::SongFacts f;
+        if (const auto row = cache->rows.find(name); row != cache->rows.end()) {
+            const zub::SongEntry* song = model.song(row->second);
+            f.exists = song != nullptr;
+            if (song) {
+                f.pap = song->meta.value("pap");
+                f.hasKey = !song->meta.value("key").empty();
+                for (const std::string& todo : song->todos) {
+                    if (todo == zub::todo::kNotChecked)
+                        f.notChecked = true;
+                    else
+                        f.todos.push_back(todo);
+                }
+                f.changes = toStdString(
+                    model.index(row->second, SongTableModel::Changes).data().toString());
+                if (const auto text = zub::readTextFile(song->path)) {
+                    f.risks = zub::safety::unknownConstructs(*text);
+                    for (std::string& risk : zub::songbook::scoreRisks(root, song->path, *text))
+                        f.risks.push_back(std::move(risk));
+                } else {
+                    f.risks.push_back(text.error());
+                }
+            }
+        }
+        cache->facts.emplace(name, f);
+        return f;
+    };
+}
+
+zub::songbook::Songbook songbookOf(const zub::bookfile::Book& book) {
+    zub::songbook::Songbook out;
+    out.title = zub::latex::toDisplayText(book.title);
+    out.author = zub::latex::toDisplayText(book.author);
+    out.bookClass = zub::songbook::bookClassFromName(book.documentClass)
+                        .value_or(zub::songbook::BookClass::Velky);
+    for (const auto& environment : book.environments)
+        out.sections.push_back({environment.section, environment.songs()});
+    return out;
 }

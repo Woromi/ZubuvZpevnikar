@@ -1,6 +1,9 @@
 // The Songbooks page (milestone 7): the books of the songbook repo, their form, sections, songs,
 // lock and LaTeX tab, New Songbook, Duplicate and Check.
 #include "AppTestAccess.hpp"
+#include "HomePage.hpp"
+#include "ActivityBar.hpp"
+#include "HomeData.hpp"
 #include "SongEditor.hpp"
 #include "SongTableModel.hpp"
 #include "Support.hpp"
@@ -205,7 +208,7 @@ TEST_CASE("Songbooks page: the LaTeX tab saves, reverts and keeps the unsaved te
     apptest::Fixture fixture;
     BooksWindow w(fixture);
     const auto big = fixture / "songbooks/big/big.tex";
-    A::bookTabs(*w.page)->setCurrentIndex(1);
+    A::bookTabs(*w.page)->setCurrentWidget(A::latexPane(*w.page));
     auto* latex = A::latex(*w.page);
 
     latex->moveCursor(QTextCursor::End);
@@ -304,48 +307,138 @@ TEST_CASE("Songbooks page: Duplicate copies the book into a new folder", "[app][
     CHECK(A::id(*w.page) == "songbooks/camps/2026/camp2026.tex");
 }
 
-TEST_CASE("Songbooks page: Check lists the songs not marked as fitting, one can go",
-          "[app][songbooks]") {
+namespace {
+
+// The overview's row whose text starts with `title`, and the texts of its songs.
+QTreeWidgetItem* overviewRow(SongbooksPage& page, const QString& title) {
+    QTreeWidget* tree = A::overviewTree(*A::overview(page));
+    for (int i = 0; i < tree->topLevelItemCount(); ++i)
+        if (tree->topLevelItem(i)->text(0).mid(3).startsWith(title))
+            return tree->topLevelItem(i);
+    return nullptr;
+}
+QStringList childTexts(QTreeWidgetItem* row) {
+    QStringList out;
+    for (int i = 0; row && i < row->childCount(); ++i)
+        out << row->child(i)->text(0);
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("Songbooks page: the Overview says what keeps a book from printing", "[app][songbooks]") {
     apptest::Fixture fixture(apptest::Fixture::Extras::Yes);
-    // A small book (A5) of three songs none of which has pap marked (the fixture's other songs do).
+    // Test/Cz, Test/En: no pap. Hum: imported, not checked, no key. Montgomery: a TODO, an
+    // unknown command. Gone/Missing: no such song.
+    const auto hum = fixture / "songs/whistle2/Imaginary/Hum.tex";
+    const auto montgomery = fixture / "songs/chords/WabiDanek/Montgomery.tex";
+    REQUIRE(std::filesystem::exists(hum));
+    apptest::writeFile(hum, slurp(hum) + "% TODO: not checked yet (imported by the app)\n");
+    apptest::writeFile(montgomery, slurp(montgomery) + "% TODO: the bridge\n\\directlua{}\n");
     apptest::writeFile(fixture / "songbooks/check/check.tex",
                        "\\documentclass[chorded]{malyzpevnik}\n\n\\title{Check test}\n\n"
                        "\\begin{document}\n\n\\begin{songs}{obsah}\n"
                        "    \\input{Test/Cz}\n    \\input{Test/En}\n    \\input{Imaginary/Hum}\n"
+                       "    \\input{WabiDanek/Montgomery}\n    \\input{Gone/Missing}\n"
                        "\\end{songs}\n\n\\end{document}\n");
     BooksWindow w(fixture, "songbooks/check/check.tex");
     REQUIRE(A::check(*w.page)->isEnabled());
+    A::checkBook(*w.page); // Check… shows the Overview tab
+    BookOverview* overview = A::overview(*w.page);
+    REQUIRE(A::bookTabs(*w.page)->currentWidget() == static_cast<QWidget*>(overview));
+    CHECK(A::bookTabs(*w.page)->tabText(1) == "Overview");
+    CHECK(A::bookTabs(*w.page)->tabText(2) == "LaTeX");
 
-    std::size_t listed = 0, left = 0;
-    auto answer = apptest::answerDialog<QDialog>([&](QDialog* d) {
-        auto* list = d->findChild<QListWidget*>("songbookCheckList");
-        if (!list) {
-            d->reject(); // not the Check dialog; the checks below fail
-            return;
-        }
-        listed = static_cast<std::size_t>(list->count());
-        list->setCurrentRow(0);
-        for (auto* b : d->findChildren<QPushButton*>())
-            if (b->text() == "Remove from the Songbook")
-                b->click();
-        left = static_cast<std::size_t>(list->count());
-        list->setCurrentRow(0);
-        for (auto* b : d->findChildren<QPushButton*>())
-            if (b->text() == "Open Song")
-                b->click();
-    });
-    A::checkBook(*w.page);
-    REQUIRE(answer.fired());
-    CHECK(listed == 3);
-    CHECK(left == 2);
-    const std::string text = slurp(fixture / "songbooks/check/check.tex");
-    CHECK(!has(text, "\\input{Test/Cz}"));
-    CHECK(has(text, "\\input{Test/En}"));
-    CHECK(has(text, "\\input{Imaginary/Hum}"));
-    // Open Song went to the song page with the next song.
+    CHECK(childTexts(overviewRow(*w.page, "Not in the song library")) ==
+          QStringList{"Gone/Missing"});
+    const QStringList risky = childTexts(overviewRow(*w.page, "The build would ask about these"));
+    REQUIRE(risky.size() == 1);
+    CHECK(risky.front().contains("\\directlua"));
+    const QStringList unfit = childTexts(overviewRow(*w.page, "Not marked as fitting A5"));
+    CHECK(unfit.size() == 3); // Cz, En, Hum (Montgomery has a5)
+    CHECK(childTexts(overviewRow(*w.page, "Imported, not checked yet")).size() == 1);
+    const QStringList todos = childTexts(overviewRow(*w.page, "TODO notes"));
+    REQUIRE(todos.size() == 1);
+    CHECK(todos.front().endsWith("the bridge"));
+    CHECK(childTexts(overviewRow(*w.page, "No key")).size() >= 1);
+    // Songs, each once: Gone, Montgomery (unsafe), Cz, En, Hum (unfit and not checked).
+    CHECK(A::overviewHeading(*overview)->text().startsWith("5 to fix"));
+
+    // Remove from the Songbook: the missing song goes; the overview follows.
+    QTreeWidgetItem* missingRow = overviewRow(*w.page, "Not in the song library");
+    A::overviewTree(*overview)->setCurrentItem(missingRow->child(0));
+    REQUIRE(A::overviewRemove(*overview)->isEnabled());
+    A::overviewRemove(*overview)->click();
+    CHECK(!has(slurp(fixture / "songbooks/check/check.tex"), "Gone/Missing"));
+    CHECK(childTexts(overviewRow(*w.page, "Not in the song library")).isEmpty());
+    CHECK(A::overviewHeading(*overview)->text().startsWith("4 to fix"));
+
+    // A row the user collapsed stays so on a refresh of the same book.
+    QTreeWidgetItem* unfitRow = overviewRow(*w.page, "Not marked as fitting A5");
+    REQUIRE(unfitRow->isExpanded());
+    unfitRow->setExpanded(false);
+    A::overviewTree(*overview)->setCurrentItem(nullptr);
+    emit overview->refreshRequested();
+    CHECK(!overviewRow(*w.page, "Not marked as fitting A5")->isExpanded());
+    CHECK(overviewRow(*w.page, "TODO notes")->isExpanded());
+
+    // Open Song: the song page with that song.
+    QTreeWidgetItem* todoRow = overviewRow(*w.page, "TODO notes");
+    A::overviewTree(*overview)->setCurrentItem(todoRow->child(0));
+    A::overviewOpen(*overview)->click();
     REQUIRE(A::editor(w.window) != nullptr);
-    CHECK(A::editor(w.window)->path() == fixture / "songs/chords/Test/En.tex");
+    CHECK(A::editor(w.window)->path() == montgomery);
     CHECK(A::pages(w.window)->currentWidget() == A::songPage(w.window));
+}
+
+TEST_CASE("Songbooks page: a book with nothing to fix is ready to print", "[app][songbooks]") {
+    apptest::Fixture fixture;
+    apptest::writeFile(fixture / "songbooks/ready/ready.tex",
+                       "\\documentclass[chorded]{velkyzpevnik}\n\\title{Ready}\n"
+                       "\\begin{document}\n\\begin{songs}{obsah}\n"
+                       "    \\input{WabiDanek/Montgomery}\n\\end{songs}\n\\end{document}\n");
+    BooksWindow w(fixture, "songbooks/ready/ready.tex");
+    A::checkBook(*w.page);
+    CHECK(A::overviewHeading(*A::overview(*w.page))->text().startsWith("Ready to print"));
+    // Home says so too.
+    const auto data = buildHomeData(*A::model(w.window), fixture.root(), {});
+    const auto ready = std::ranges::find(data.books, QStringLiteral("songbooks/ready/ready.tex"),
+                                         &HomeBook::id);
+    REQUIRE(ready != data.books.end());
+    CHECK(ready->toFix == 0);
+    A::activityBar(w.window)->button(ActivityBar::View::Home)->click();
+    bool shown = false;
+    QListWidget* books = A::homeBooks(*A::homePage(w.window));
+    for (int i = 0; i < books->count(); ++i)
+        if (books->item(i)->text().startsWith("Ready"))
+            shown = books->item(i)->text().contains("ready ✓");
+    CHECK(shown);
+}
+
+TEST_CASE("Songbooks page: the Overview of an unreadable, an empty and a risky book",
+          "[app][songbooks]") {
+    apptest::Fixture fixture;
+    apptest::writeFile(fixture / "songbooks/broken/broken.tex",
+                       "\\documentclass{velkyzpevnik}\n\\begin{document}\n\\begin{songs}\n"
+                       "\\end{document}\n");
+    apptest::writeFile(fixture / "songbooks/empty/empty.tex",
+                       "\\documentclass{velkyzpevnik}\n\\begin{document}\n"
+                       "\\begin{songs}{obsah}\n\\end{songs}\n\\end{document}\n");
+    apptest::writeFile(fixture / "songbooks/risky/risky.tex",
+                       "\\documentclass{velkyzpevnik}\n\\directlua{}\n\\begin{document}\n"
+                       "\\begin{songs}{obsah}\n    \\input{WabiDanek/Montgomery}\n"
+                       "\\end{songs}\n\\end{document}\n");
+    BooksWindow w(fixture, "songbooks/broken/broken.tex");
+    A::checkBook(*w.page);
+    BookOverview* overview = A::overview(*w.page);
+    CHECK(A::overviewHeading(*overview)->text().startsWith("The songbook cannot be read"));
+    w.select("songbooks/empty/empty.tex");
+    CHECK(A::overviewHeading(*overview)->text().startsWith("No songs"));
+    w.select("songbooks/risky/risky.tex");
+    CHECK(A::overviewHeading(*overview)->text().startsWith("1 to fix"));
+    const QStringList files = childTexts(overviewRow(*w.page, "The build would ask about the"));
+    REQUIRE(files.size() == 1);
+    CHECK(files.front().startsWith("risky.tex: \\directlua"));
 }
 
 // ---- Transposing a book ----
@@ -436,6 +529,7 @@ std::map<std::string, std::string> songFiles(const KeyedFixture& f) {
 }
 
 } // namespace
+
 
 TEST_CASE("Songbooks page: a key transposes the build copy, never the book", "[app][songbooks]") {
     KeyedFixture f;

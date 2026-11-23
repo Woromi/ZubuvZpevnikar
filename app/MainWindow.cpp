@@ -483,7 +483,8 @@ void MainWindow::createCentralWidget() {
     });
     connect(homePage_, &HomePage::bookRequested, this, [this](const QString& id) {
         showView(ActivityBar::View::Songbooks);
-        songbooksPage_->showBook(id);
+        if (songbooksPage_->showBook(id))
+            songbooksPage_->showOverview(); // what the card's "N to fix" is about
     });
     connect(homePage_, &HomePage::wishSearchRequested, this, [this](HomeWish wish) {
         // Only on the user's click: the browser searches, the app contacts nothing itself.

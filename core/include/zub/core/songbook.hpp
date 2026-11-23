@@ -138,6 +138,38 @@ std::vector<std::string>
 notMarkedFitting(const Songbook& book,
                  const std::function<std::optional<std::string>(std::string_view)>& papOf);
 
+// What readiness needs to know of one song of a book (the app gathers it: the library, the file).
+struct SongFacts {
+    bool exists = false;            // a song of the library has this input name
+    std::string pap;                // its `pap` value ("" none)
+    bool notChecked = false;        // the import's "not checked yet" line (zub::todo)
+    std::vector<std::string> todos; // its other TODO notes
+    bool hasKey = false;            // a non-empty `key=`
+    std::vector<std::string> risks; // what a build would ask about (unknown commands, scores)
+    std::string changes;            // what the last Check Songs found ("" nothing)
+};
+
+// Is a book ready to print? Per category the songs (input names, book order, once each).
+struct Readiness {
+    // Blockers: the build fails or stops. `files`: problems of the book's own files (its .tex, a
+    // camp book's chord chart), as text; readiness leaves it empty, the caller adds them.
+    std::vector<std::string> missing, unsafe, files;
+    // To fix.
+    std::vector<std::string> notFitting, notChecked;
+    // Notes: worth a look, they do not block.
+    std::vector<std::string> todo, changes, noKey;
+
+    // Songs (each once, however many problems it has) plus the file problems.
+    std::size_t toFix() const;
+    std::size_t notes() const; // songs with notes, each once
+    bool ready() const { return toFix() == 0; }
+};
+
+// A missing song is only `missing`; the rest go into every category they meet (notFitting as
+// notMarkedFitting: the book's paper or <paper>x2 in `pap`). `facts` is asked once per song.
+Readiness readiness(const Songbook& book,
+                    const std::function<SongFacts(std::string_view inputName)>& facts);
+
 // Removes `inputName` from every section of `book`; false if it was in none.
 bool removeSong(Songbook& book, std::string_view inputName);
 

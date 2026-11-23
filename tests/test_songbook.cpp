@@ -3,6 +3,7 @@
 #include <fstream>
 #include <map>
 #include <unistd.h>
+#include <zub/core/bookfile.hpp>
 #include <zub/core/json.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/songbook.hpp>
@@ -303,4 +304,83 @@ TEST_CASE("scoreRisks checks every collection's copy of a score", "[songbook]") 
     REQUIRE(risks.size() == 1);
     CHECK(risks[0].starts_with("A/X.ly: #(system"));
     fs::remove_all(root);
+}
+
+TEST_CASE("readiness sorts a book's songs into blockers, to fix and notes", "[songbook]") {
+    zub::songbook::Songbook book;
+    book.bookClass = zub::songbook::BookClass::Velky; // a4
+    book.sections = {{"", {"A/Ok", "B/Gone", "C/Risky", "D/Small"}},
+                     {"Two", {"E/New", "A/Ok", "F/Notes"}}};
+    int asked = 0;
+    const auto facts = [&](std::string_view name) {
+        ++asked;
+        zub::songbook::SongFacts f;
+        f.exists = name != "B/Gone";
+        f.pap = name == "D/Small" ? "a5" : "a4,a5";
+        f.hasKey = name != "F/Notes";
+        if (name == "C/Risky")
+            f.risks = {"\\directlua"};
+        if (name == "E/New")
+            f.notChecked = true;
+        if (name == "F/Notes") {
+            f.todos = {"Solo"};
+            f.changes = "Tidy 2";
+        }
+        return f;
+    };
+    const auto r = zub::songbook::readiness(book, facts);
+    CHECK(asked == 6); // A/Ok once
+    CHECK(r.missing == std::vector<std::string>{"B/Gone"});
+    CHECK(r.unsafe == std::vector<std::string>{"C/Risky"});
+    CHECK(r.notFitting == std::vector<std::string>{"D/Small"}); // not the missing one
+    CHECK(r.notChecked == std::vector<std::string>{"E/New"});
+    CHECK(r.todo == std::vector<std::string>{"F/Notes"});
+    CHECK(r.changes == std::vector<std::string>{"F/Notes"});
+    CHECK(r.noKey == std::vector<std::string>{"F/Notes"});
+    CHECK(r.toFix() == 4);  // four songs
+    CHECK(r.notes() == 1);  // F/Notes, three notes
+    auto withFile = r;
+    withFile.files.push_back("akordy.tex: \\foo");
+    CHECK(withFile.toFix() == 5);
+    CHECK(!r.ready());
+
+    zub::songbook::Songbook fine;
+    fine.bookClass = zub::songbook::BookClass::Maly; // a5
+    fine.sections = {{"", {"D/Small", "F/Notes"}}};
+    const auto ok = zub::songbook::readiness(fine, facts);
+    CHECK(ok.ready());
+    CHECK(ok.notes() == 1);
+}
+
+// Hidden: runs against the real ../ZubuvZpevnik checkout.
+TEST_CASE("readiness of every real book", "[.integration][songbook]") {
+    const std::filesystem::path repo{ZUB_REAL_SONGBOOK_DIR};
+    const auto library = zub::scanLibrary(repo);
+    if (!library)
+        SKIP("no songbook checkout at " << repo);
+    std::map<std::string, const zub::SongEntry*> byName;
+    for (const auto& song : library->songs)
+        byName.emplace(song.inputName, &song);
+    for (const auto& rel : zub::bookfile::findBooks(repo)) {
+        INFO(rel.string());
+        const auto text = zub::readTextFile(repo / rel);
+        REQUIRE(text);
+        const auto parsed = zub::bookfile::parse(*text);
+        REQUIRE(parsed);
+        Songbook book;
+        book.bookClass = bookClassFromName(parsed->documentClass).value_or(BookClass::Velky);
+        for (const auto& environment : parsed->environments)
+            book.sections.push_back({environment.section, environment.songs()});
+        const auto r = readiness(book, [&](std::string_view name) {
+            SongFacts f;
+            if (const auto it = byName.find(std::string(name)); it != byName.end()) {
+                f.exists = true;
+                f.pap = it->second->meta.value("pap");
+                f.hasKey = !it->second->meta.value("key").empty();
+            }
+            return f;
+        });
+        CHECK(r.missing.empty()); // every input of a real book is a song
+        CHECK(r.notes() <= parsed->songs().size());
+    }
 }

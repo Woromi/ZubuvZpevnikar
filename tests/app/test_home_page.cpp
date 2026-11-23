@@ -350,3 +350,23 @@ TEST_CASE("Home: Back and Close Song return to where the song was opened from", 
     REQUIRE(A::closeSong(w.window));
     CHECK(pages->currentWidget() == A::listPage(w.window));
 }
+
+// Not run by default: ZUB_SCREENSHOT=<file.png> ZUB_SONGBOOK=<checkout> ZUB_BOOK=<book id> saves
+// that book's Overview tab (read only).
+TEST_CASE("Overview: screenshot with the tools", "[.screenshot]") {
+    const char* file = std::getenv("ZUB_SCREENSHOT");
+    const char* songbook = std::getenv("ZUB_SONGBOOK");
+    const char* bookId = std::getenv("ZUB_BOOK");
+    REQUIRE(file != nullptr);
+    REQUIRE(songbook != nullptr);
+    REQUIRE(bookId != nullptr);
+    MainWindow w;
+    w.resize(1400, 1000);
+    w.show();
+    REQUIRE(A::openSongbook(w, songbook));
+    A::activityBar(w)->button(ActivityBar::View::Songbooks)->click();
+    REQUIRE(A::songbooksPage(w)->showBook(QString::fromUtf8(bookId)));
+    A::songbooksPage(w)->showOverview();
+    QTest::qWait(300);
+    REQUIRE(w.grab().save(QString::fromUtf8(file)));
+}

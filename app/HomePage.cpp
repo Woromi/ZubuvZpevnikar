@@ -261,6 +261,10 @@ void HomePage::setData(const HomeData& home) {
             book.title + QStringLiteral("   ·  ") + tr("%n song(s)", nullptr, book.songs);
         if (book.wishes > 0)
             text += QStringLiteral(", ") + tr("%n wish(es)", nullptr, book.wishes);
+        if (book.toFix == 0)
+            text += QStringLiteral("  ·  ") + tr("ready ✓", "a songbook ready to print");
+        else if (book.toFix > 0)
+            text += QStringLiteral("  ·  ") + tr("%n to fix", nullptr, book.toFix);
         if (book.locked)
             text += QStringLiteral("  🔒");
         auto* item = new QListWidgetItem(text, books_);

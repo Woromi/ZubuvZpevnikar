@@ -356,7 +356,7 @@ TEST_CASE("Ctrl+F on the Songbooks page opens the LaTeX tab's bar", "[app][find]
     QTest::keyClick(&w, Qt::Key_F, Qt::ControlModifier);
     CHECK(!bar->isVisible());
 
-    A::bookTabs(*page)->setCurrentIndex(1);
+    A::bookTabs(*page)->setCurrentWidget(A::latexPane(*page));
     QTest::keyClick(&w, Qt::Key_F, Qt::ControlModifier);
     CHECK(bar->isVisible());
     A::findField(*bar)->setText(QStringLiteral("Beta/Bravo"));

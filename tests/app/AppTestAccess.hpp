@@ -21,6 +21,7 @@
 #include "LibraryDialog.hpp"
 #include "AddToBooksDialog.hpp"
 #include "BookAdder.hpp"
+#include "BookOverview.hpp"
 #include "HomePage.hpp"
 #include "SongbookExporter.hpp"
 #include "SongbooksPage.hpp"
@@ -261,6 +262,12 @@ struct AppTestAccess {
     }
     static QPushButton* addSectionButton(SongbooksPage& p) { return p.addSection_; }
     static QAction* check(SongbooksPage& p) { return p.check_; }
+    static BookOverview* overview(SongbooksPage& p) { return p.overview_; }
+    static QWidget* latexPane(SongbooksPage& p) { return p.latexPane_; }
+    static QTreeWidget* overviewTree(BookOverview& o) { return o.tree_; }
+    static QLabel* overviewHeading(BookOverview& o) { return o.heading_; }
+    static QPushButton* overviewOpen(BookOverview& o) { return o.open_; }
+    static QPushButton* overviewRemove(BookOverview& o) { return o.remove_; }
     static bool canEdit(SongbooksPage& p) { return p.canEdit(); }
     static int currentSection(SongbooksPage& p) { return p.currentSection(); }
     static bool latexModified(SongbooksPage& p) { return p.latexModified(); }
