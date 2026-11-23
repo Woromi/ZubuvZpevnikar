@@ -26,7 +26,7 @@ NewSongDialog::NewSongDialog(const std::map<QString, QString>& artistFolders,
     for (const auto& [name, folder] : artistFolders_)
         artist_->addItem(name);
     artist_->setCurrentIndex(-1);
-    artist_->setToolTip(tr("An artist of the songbook keeps their folder; a new one gets a folder "
+    artist_->setToolTip(tr("An artist of the song library keeps their folder; a new one gets a folder "
                            "named after them"));
 
     // Read-only and frameless: the whole path, however long (a label would wrap and be cut off).

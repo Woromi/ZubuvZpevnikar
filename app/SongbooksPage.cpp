@@ -284,7 +284,7 @@ void SongbooksPage::buildUi() {
     auto* bar = createPageHeader(tr("Songbooks"), this);
     QAction* add = newBook_ =
         bar->addAction(QIcon::fromTheme(QStringLiteral("document-new")), tr("New Songbook…"));
-    add->setToolTip(tr("A new songbook in the songbook folder (songbooks/)"));
+    add->setToolTip(tr("A new songbook in the song library's songbooks/ folder"));
     duplicate_ = bar->addAction(QIcon::fromTheme(QStringLiteral("edit-copy")), tr("Duplicate…"));
     duplicate_->setToolTip(tr("A copy of this songbook under another name, e.g. next year's camp"));
     lock_ = bar->addAction(QIcon::fromTheme(QStringLiteral("object-locked")), tr("Lock"));
@@ -1051,7 +1051,7 @@ void SongbooksPage::newSongbook() {
     form->addRow(tr("Cover image"), coverRow);
     layout->addLayout(form);
     auto* note = new QLabel(tr("Writes <file>.tex and a build.sh into the folder. To build it in "
-                               "the songbook's CI as well, add it to .github/workflows."),
+                               "the song library's CI as well, add it to .github/workflows."),
                             &dialog);
     note->setWordWrap(true);
     note->setStyleSheet(QStringLiteral("color: gray;"));
@@ -1546,7 +1546,7 @@ void SongbooksPage::updateCoverLabel() {
             found = found || std::filesystem::is_regular_file(dir / (settings_.cover + extension));
     coverName_->setText(toQString(settings_.cover));
     coverName_->setStyleSheet(found ? QString() : QStringLiteral("color: red;"));
-    coverName_->setToolTip(found ? QString() : tr("Not found beside the songbook or in the repo"));
+    coverName_->setToolTip(found ? QString() : tr("Not found beside the songbook or in the song library"));
 }
 
 void SongbooksPage::chooseCover() {

@@ -6,7 +6,7 @@
 class QLabel;
 class QPushButton;
 
-// The Home view's panel while no songbook is open: at the first start (Open Songbook Folder…,
+// The Home view's panel while no song library is open: at the first start (Open Song Library…,
 // New Song Library…), or when the remembered or given folder cannot be opened (where it was and
 // why, with Try Again and Choose Another…).
 class WelcomePage : public QWidget {
@@ -21,7 +21,7 @@ public:
     QString path() const { return path_; } // the folder Try Again opens ("" at the first start)
 
 signals:
-    void chooseRequested();                   // Open Songbook Folder… / Choose Another…
+    void chooseRequested();                   // Open Song Library… / Choose Another…
     void retryRequested(const QString& path); // Try Again
     void newLibraryRequested();               // New Song Library…
 

@@ -91,7 +91,7 @@ QString lastExportDir() {
 SongbookExporter::SongbookExporter(QWidget* parentWindow) : QObject(parentWindow), window_(parentWindow) {}
 
 QString SongbookExporter::noPackageText() const {
-    return tr("There is no package to build the songbook with: the songbook's zubuvzpevnik/ is not "
+    return tr("There is no package to build the songbook with: the song library's zubuvzpevnik/ is not "
               "checked out (git submodule update --init), and this app has no copy of its own.");
 }
 
@@ -190,7 +190,7 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
         if (song)
             all.sections.front().songs.push_back(name);
         else
-            bookRisks << tr("\\input{%1}: not a song of the songbook").arg(toQString(name));
+            bookRisks << tr("\\input{%1}: not a song of the song library").arg(toQString(name));
     }
     // An index file lying in the book's folder or the repo root would be read by the first run.
     for (const auto& dir : {bookDir, root_}) {

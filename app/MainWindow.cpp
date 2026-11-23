@@ -187,7 +187,7 @@ MainWindow::~MainWindow() {
 void MainWindow::createMenus() {
     QMenu* file = menuBar()->addMenu(tr("&File"));
 
-    QAction* open = file->addAction(tr("&Open Songbook Folder…"));
+    QAction* open = file->addAction(tr("&Open Song Library…"));
     open->setShortcut(QKeySequence::Open);
     connect(open, &QAction::triggered, this, &MainWindow::chooseSongbookFolder);
 
@@ -245,7 +245,7 @@ void MainWindow::createMenus() {
             songbooksPage_->newSongbook();
     });
     QAction* another = new QAction(QIcon::fromTheme(QStringLiteral("document-open")),
-                                   tr("Open Another Songbook…"), this);
+                                   tr("Open Another Song Library…"), this);
     connect(another, &QAction::triggered, this, &MainWindow::chooseSongbookFolder);
     for (QAction* action : {import, newSongAction, newBook, scan, another})
         homePage_->addQuickAction(action);
@@ -567,7 +567,7 @@ void MainWindow::newLibrary() {
 void MainWindow::chooseSongbookFolder() {
     const QString start = songbookRoot_.empty() ? QDir::homePath() : toQString(songbookRoot_);
     const QString dir =
-        QFileDialog::getExistingDirectory(this, tr("Open Songbook Folder (ZubuvZpevnik)"), start);
+        QFileDialog::getExistingDirectory(this, tr("Open Song Library (ZubuvZpevnik)"), start);
     // Open editors belong to the old songbook; they are closed only once the new one is valid.
     if (!dir.isEmpty() && openSongbook(toPath(dir), {.closeEditors = true}))
         showView(ActivityBar::View::Home);
@@ -586,8 +586,8 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
     if (!library) {
         if (options.showErrors) {
             QMessageBox::warning(
-                this, tr("Not a songbook folder"),
-                tr("Cannot open the songbook:\n%1").arg(toQString(library.error())));
+                this, tr("Not a song library"),
+                tr("Cannot open the song library:\n%1").arg(toQString(library.error())));
         }
         return false;
     }
@@ -636,12 +636,12 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
         statusBar()->showMessage(noPackageText(), 20000);
     else if (olderLayout)
         statusBar()->showMessage(
-            tr("The songbook's zubuvzpevnik/ has the older layout (no scripts/ inside): building "
+            tr("The song library's zubuvzpevnik/ has the older layout (no scripts/ inside): building "
                "with the app's copy of the package."),
             15000);
     else if (!ownPackage)
         statusBar()->showMessage(
-            tr("The songbook has no package of its own in zubuvzpevnik/: building with the app's "
+            tr("The song library has no package of its own in zubuvzpevnik/: building with the app's "
                "copy."),
             15000);
     listTitle_ = QApplication::applicationDisplayName() + QStringLiteral(" — ") + toQString(root);
@@ -704,7 +704,7 @@ void MainWindow::updateLanguageFilter() {
 
 void MainWindow::updateStatus() {
     if (songbookRoot_.empty()) {
-        countLabel_->setText(tr("No songbook open. Use File → Open Songbook Folder…"));
+        countLabel_->setText(tr("No song library open. Use File → Open Song Library…"));
         issuesLabel_->clear();
         return;
     }
@@ -1011,7 +1011,7 @@ void MainWindow::createSongToolBar() {
     markCheckedAction_ =
         new QAction(QIcon::fromTheme(QStringLiteral("checkmark")), tr("Mark Checked"), this);
     markCheckedAction_->setToolTip(
-        tr("The song is ready for the songbook: remove its \"not checked yet\" TODO line "
+        tr("The song is checked: remove its \"not checked yet\" TODO line "
            "(one undo step; save to keep it)"));
     connect(markCheckedAction_, &QAction::triggered, this, [this] {
         if (!editor_ || editor_->textEdit()->isReadOnly())
@@ -1711,7 +1711,7 @@ std::filesystem::path MainWindow::builtInConverter() const {
 }
 
 QString MainWindow::noPackageText() const {
-    return tr("No package to build the songs with: the songbook's zubuvzpevnik/ is not checked "
+    return tr("No package to build the songs with: the song library's zubuvzpevnik/ is not checked "
               "out (git submodule update --init), and this app has no copy of its own.");
 }
 
@@ -1799,7 +1799,7 @@ std::filesystem::path MainWindow::findConverter() const {
 
 void MainWindow::importSong() {
     if (songbookRoot_.empty()) {
-        QMessageBox::information(this, tr("Import Song"), tr("Open a songbook folder first."));
+        QMessageBox::information(this, tr("Import Song"), tr("Open a song library first."));
         return;
     }
     const auto builtIn = builtInConverter();
@@ -1820,7 +1820,7 @@ void MainWindow::importSong() {
     std::filesystem::path target = dest.path;
     if (const auto existing = zub::songimport::existingSong(songbookRoot_, imported.inputName)) {
         QMessageBox box(QMessageBox::Question, tr("Song already exists"),
-                        tr("The songbook already has %1.")
+                        tr("The song library already has %1.")
                             .arg(toQString(existing->lexically_relative(songbookRoot_))),
                         QMessageBox::Cancel, this);
         box.setInformativeText(tr("Open the existing song, or open the import in its place "
@@ -1889,7 +1889,7 @@ bool MainWindow::openExistingSong(const std::filesystem::path& path) {
 
 void MainWindow::newSong() {
     if (songbookRoot_.empty()) {
-        QMessageBox::information(this, tr("New Song"), tr("Open a songbook folder first."));
+        QMessageBox::information(this, tr("New Song"), tr("Open a song library first."));
         return;
     }
     // The songbook's artists keep their folders (some are named by hand: "SuchySlitr").
@@ -1909,7 +1909,7 @@ void MainWindow::newSong() {
     const std::string inputName = toStdString(dialog.inputName());
     if (const auto existing = zub::songimport::existingSong(songbookRoot_, inputName)) {
         QMessageBox box(QMessageBox::Question, tr("Song already exists"),
-                        tr("The songbook already has %1.")
+                        tr("The song library already has %1.")
                             .arg(toQString(existing->lexically_relative(songbookRoot_))),
                         QMessageBox::Cancel, this);
         QPushButton* openExisting = box.addButton(tr("Open Existing"), QMessageBox::AcceptRole);

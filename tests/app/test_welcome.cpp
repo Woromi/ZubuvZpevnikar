@@ -28,7 +28,7 @@ TEST_CASE("Welcome: the first start shows it, no folder dialog", "[app][welcome]
     w.openInitialSongbook({});
     CHECK(welcomeShown(w));
     CHECK(message(w).contains("songs/chords/"));
-    CHECK(button(w, "welcomeChoose")->text() == "Open Songbook Folder…");
+    CHECK(button(w, "welcomeChoose")->text() == "Open Song Library…");
     CHECK_FALSE(button(w, "welcomeRetry")->isVisible());
 }
 

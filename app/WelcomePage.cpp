@@ -59,14 +59,14 @@ void WelcomePage::showFirstStart() {
                          "folder with songs/chords/ in it. It is remembered for the next start. "
                          "Without one yet, New Song Library… creates an empty one or downloads "
                          "one."));
-    choose_->setText(tr("Open Songbook Folder…"));
+    choose_->setText(tr("Open Song Library…"));
     retry_->hide();
     choose_->setDefault(true);
 }
 
 void WelcomePage::showMissing(const QString& path, const QString& reason) {
     path_ = path;
-    message_->setText(tr("The songbook folder cannot be opened:\n%1\n\n%2\n\nIf it is on a disk "
+    message_->setText(tr("The song library cannot be opened:\n%1\n\n%2\n\nIf it is on a disk "
                          "that is not connected, connect it and try again.")
                           .arg(path, reason));
     choose_->setText(tr("Choose Another…"));

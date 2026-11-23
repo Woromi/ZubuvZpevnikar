@@ -61,7 +61,7 @@ void SongbookCheck::start() {
         tr("Check Song: typos, apostrophes typed two ways, a chorus typed as a verse"), &dialog);
     auto* shrink = new QCheckBox(
         tr("Make Smaller: songs that don't fit %1 (the preview's paper). Typesets every song: "
-           "about 2 seconds each, some 8 minutes for the whole songbook.")
+           "about 2 seconds each, some 8 minutes for the whole song library.")
             .arg(paperName),
         &dialog);
     QSettings settings;

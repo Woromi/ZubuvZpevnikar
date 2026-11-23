@@ -100,9 +100,9 @@ SettingsDialog::SettingsDialog(const State& state, QWidget* parent)
     auto* package = pathLine(this);
     package->setObjectName(QStringLiteral("settingsPackage"));
     package->setText(state.package);
-    package->setPlaceholderText(tr("none: the songbook's zubuvzpevnik/ is not checked out"));
+    package->setPlaceholderText(tr("none: the song library's zubuvzpevnik/ is not checked out"));
     auto* packageNote = new QLabel(state.package.isEmpty() ? QString()
-                                   : state.ownPackage      ? tr("the songbook's own")
+                                   : state.ownPackage      ? tr("the song library's own")
                                                            : tr("the app's copy"),
                                    this);
     form->addRow(tr("Package:"), row(this, {package, packageNote}));

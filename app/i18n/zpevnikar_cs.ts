@@ -647,10 +647,6 @@ Použijte vestavěný.</translation>
         <translation>&amp;Soubor</translation>
     </message>
     <message>
-        <source>&amp;Open Songbook Folder…</source>
-        <translation>&amp;Otevřít složku zpěvníku…</translation>
-    </message>
-    <message>
         <source>&amp;Reload</source>
         <translation>&amp;Načíst znovu</translation>
     </message>
@@ -675,6 +671,14 @@ Použijte vestavěný.</translation>
         <translation>&amp;Písně</translation>
     </message>
     <message>
+        <source>Open Another Song Library…</source>
+        <translation>Otevřít jinou knihovnu písní…</translation>
+    </message>
+    <message>
+        <source>The song is checked: remove its &quot;not checked yet&quot; TODO line (one undo step; save to keep it)</source>
+        <translation>Píseň je zkontrolovaná: odstranit její řádek TODO „zatím nezkontrolováno“ (jeden krok zpět; uložením se změna zachová)</translation>
+    </message>
+    <message>
         <source>Language</source>
         <translation>Jazyk</translation>
     </message>
@@ -689,24 +693,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>Hide this list</source>
         <translation>Skrýt tento seznam</translation>
-    </message>
-    <message>
-        <source>Open Songbook Folder (ZubuvZpevnik)</source>
-        <translation>Otevřít složku zpěvníku (ZubuvZpevnik)</translation>
-    </message>
-    <message>
-        <source>Not a songbook folder</source>
-        <translation>Toto není složka zpěvníku</translation>
-    </message>
-    <message>
-        <source>Cannot open the songbook:
-%1</source>
-        <translation>Zpěvník nelze otevřít:
-%1</translation>
-    </message>
-    <message>
-        <source>No songbook open. Use File → Open Songbook Folder…</source>
-        <translation>Není otevřen žádný zpěvník. Použijte Soubor → Otevřít složku zpěvníku…</translation>
     </message>
     <message numerus="yes">
         <source>%n song(s)</source>
@@ -757,6 +743,10 @@ Použijte vestavěný.</translation>
         <translation>Píseň</translation>
     </message>
     <message>
+        <source>&amp;Open Song Library…</source>
+        <translation>&amp;Otevřít knihovnu písní…</translation>
+    </message>
+    <message>
         <source>Close the song (Ctrl+W)</source>
         <translation>Zavřít píseň (Ctrl+W)</translation>
     </message>
@@ -775,10 +765,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>Make a new songbook on the Songbooks page</source>
         <translation>Vytvořit nový zpěvník na stránce Zpěvníky</translation>
-    </message>
-    <message>
-        <source>Open Another Songbook…</source>
-        <translation>Otevřít jiný zpěvník…</translation>
     </message>
     <message>
         <source>&amp;View</source>
@@ -803,6 +789,32 @@ Použijte vestavěný.</translation>
     <message>
         <source>No song with possible changes was found.</source>
         <translation>Nenašla se žádná píseň s možnými změnami.</translation>
+    </message>
+    <message>
+        <source>Open Song Library (ZubuvZpevnik)</source>
+        <translation>Otevřít knihovnu písní (ZubuvZpevnik)</translation>
+    </message>
+    <message>
+        <source>Not a song library</source>
+        <translation>Není to knihovna písní</translation>
+    </message>
+    <message>
+        <source>Cannot open the song library:
+%1</source>
+        <translation>Knihovnu písní nelze otevřít:
+%1</translation>
+    </message>
+    <message>
+        <source>The song library&apos;s zubuvzpevnik/ has the older layout (no scripts/ inside): building with the app&apos;s copy of the package.</source>
+        <translation>Složka zubuvzpevnik/ knihovny písní má starší uspořádání (bez scripts/): sestavuje se kopií balíčku z aplikace.</translation>
+    </message>
+    <message>
+        <source>The song library has no package of its own in zubuvzpevnik/: building with the app&apos;s copy.</source>
+        <translation>Knihovna písní nemá vlastní balíček v zubuvzpevnik/: sestavuje se kopií z aplikace.</translation>
+    </message>
+    <message>
+        <source>No song library open. Use File → Open Song Library…</source>
+        <translation>Není otevřená žádná knihovna písní. Použijte Soubor → Otevřít knihovnu písní…</translation>
     </message>
     <message>
         <source>Cannot save score</source>
@@ -851,10 +863,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>Mark Checked</source>
         <translation>Označit jako zkontrolované</translation>
-    </message>
-    <message>
-        <source>The song is ready for the songbook: remove its &quot;not checked yet&quot; TODO line (one undo step; save to keep it)</source>
-        <translation>Píseň je připravená do zpěvníku: odstranit z ní řádek TODO „zatím nezkontrolováno“ (jeden krok zpět; změna se zachová uložením)</translation>
     </message>
     <message>
         <source>Marked as checked. Save to keep it.</source>
@@ -997,16 +1005,16 @@ Použijte vestavěný.</translation>
         <translation>Žádné neuložené změny</translation>
     </message>
     <message>
+        <source>Open a song library first.</source>
+        <translation>Nejdřív otevřete knihovnu písní.</translation>
+    </message>
+    <message>
+        <source>The song library already has %1.</source>
+        <translation>Knihovna písní už obsahuje %1.</translation>
+    </message>
+    <message>
         <source>%1: the song header has a problem: %2</source>
         <translation>%1: problém v hlavičce písně: %2</translation>
-    </message>
-    <message>
-        <source>No package to build the songs with: the songbook&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
-        <translation>Písně není čím sestavit: složka zubuvzpevnik/ zpěvníku není stažená (git submodule update --init) a aplikace nemá vlastní kopii balíčku.</translation>
-    </message>
-    <message>
-        <source>The songbook has no package of its own in zubuvzpevnik/: building with the app&apos;s copy.</source>
-        <translation>Zpěvník nemá ve složce zubuvzpevnik/ vlastní balíček: sestavuje se kopií z aplikace.</translation>
     </message>
     <message>
         <source>&amp;New Song…</source>
@@ -1028,10 +1036,6 @@ Použijte vestavěný.</translation>
         <source>chords</source>
         <comment>a word of a web search</comment>
         <translation>akordy</translation>
-    </message>
-    <message>
-        <source>The songbook&apos;s zubuvzpevnik/ has the older layout (no scripts/ inside): building with the app&apos;s copy of the package.</source>
-        <translation>Složka zubuvzpevnik/ zpěvníku má starší uspořádání (bez scripts/): sestavuje se kopií balíčku z aplikace.</translation>
     </message>
     <message>
         <source>Favourite: add or remove the label &quot;fav&quot; (one undo step; save to keep it)</source>
@@ -1098,6 +1102,10 @@ Použijte vestavěný.</translation>
         <translation>Tato píseň používá příkazy, které písně běžně nepoužívají: %1</translation>
     </message>
     <message>
+        <source>No package to build the songs with: the song library&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
+        <translation>Chybí balíček pro sestavení písní: zubuvzpevnik/ knihovny písní není stažený (git submodule update --init) a aplikace nemá vlastní kopii.</translation>
+    </message>
+    <message>
         <source>Settings</source>
         <translation>Nastavení</translation>
     </message>
@@ -1110,16 +1118,8 @@ Použijte vestavěný.</translation>
         <translation>Importovat píseň</translation>
     </message>
     <message>
-        <source>Open a songbook folder first.</source>
-        <translation>Nejdřív otevřete složku zpěvníku.</translation>
-    </message>
-    <message>
         <source>Song already exists</source>
         <translation>Píseň už existuje</translation>
-    </message>
-    <message>
-        <source>The songbook already has %1.</source>
-        <translation>Zpěvník už obsahuje %1.</translation>
     </message>
     <message>
         <source>Open the existing song, or open the import in its place (nothing is overwritten until you save, and saving asks)?</source>
@@ -1161,8 +1161,8 @@ Použijte vestavěný.</translation>
         <translation>Nová píseň</translation>
     </message>
     <message>
-        <source>An artist of the songbook keeps their folder; a new one gets a folder named after them</source>
-        <translation>Interpret ze zpěvníku zůstane ve své složce; nový dostane složku podle svého jména</translation>
+        <source>An artist of the song library keeps their folder; a new one gets a folder named after them</source>
+        <translation>Interpret z knihovny písní si ponechá svou složku; nový dostane složku pojmenovanou po něm</translation>
     </message>
     <message>
         <source>&amp;Title:</source>
@@ -1887,12 +1887,12 @@ Použijte vestavěný.</translation>
         <translation>&amp;Soundfont:</translation>
     </message>
     <message>
-        <source>none: the songbook&apos;s zubuvzpevnik/ is not checked out</source>
-        <translation>žádný: složka zubuvzpevnik/ zpěvníku není stažená</translation>
+        <source>none: the song library&apos;s zubuvzpevnik/ is not checked out</source>
+        <translation>žádný: zubuvzpevnik/ knihovny písní není stažený</translation>
     </message>
     <message>
-        <source>the songbook&apos;s own</source>
-        <translation>vlastní balíček zpěvníku</translation>
+        <source>the song library&apos;s own</source>
+        <translation>vlastní balíček knihovny písní</translation>
     </message>
     <message>
         <source>the app&apos;s copy</source>
@@ -2594,8 +2594,8 @@ Použijte vestavěný.</translation>
         <translation>Zkontrolovat píseň: překlepy, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
     </message>
     <message>
-        <source>Make Smaller: songs that don&apos;t fit %1 (the preview&apos;s paper). Typesets every song: about 2 seconds each, some 8 minutes for the whole songbook.</source>
-        <translation>Zmenšit: písně, které se nevejdou na %1 (papír náhledu). Vysází každou píseň: asi 2 sekundy na píseň, celý zpěvník zhruba 8 minut.</translation>
+        <source>Make Smaller: songs that don&apos;t fit %1 (the preview&apos;s paper). Typesets every song: about 2 seconds each, some 8 minutes for the whole song library.</source>
+        <translation>Zmenšit: písně, které se nevejdou na %1 (papír náhledu). Vysází každou píseň: asi 2 sekundy na píseň, zhruba 8 minut pro celou knihovnu písní.</translation>
     </message>
     <message>
         <source>Keys: a key for the songs that have none (from their chords)</source>
@@ -2717,16 +2717,16 @@ Použijte vestavěný.</translation>
 <context>
     <name>SongbookExporter</name>
     <message>
-        <source>There is no package to build the songbook with: the songbook&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
-        <translation>Zpěvník není čím sestavit: složka zubuvzpevnik/ zpěvníku není stažená (git submodule update --init) a aplikace nemá vlastní kopii balíčku.</translation>
-    </message>
-    <message>
         <source>Cannot create %1</source>
         <translation>Nelze vytvořit %1</translation>
     </message>
     <message>
         <source>cannot read the file</source>
         <translation>soubor nelze přečíst</translation>
+    </message>
+    <message>
+        <source>There is no package to build the songbook with: the song library&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
+        <translation>Chybí balíček pro sestavení zpěvníku: zubuvzpevnik/ knihovny písní není stažený (git submodule update --init) a aplikace nemá vlastní kopii.</translation>
     </message>
     <message numerus="yes">
         <source>… and %n more</source>
@@ -2761,6 +2761,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Exportovat PDF</translation>
     </message>
     <message>
+        <source>\input{%1}: not a song of the song library</source>
+        <translation>\input{%1}: není to píseň z knihovny písní</translation>
+    </message>
+    <message>
         <source>%1: a song copy for a song the book does not have</source>
         <translation>%1: kopie písně, kterou zpěvník nemá</translation>
     </message>
@@ -2787,10 +2791,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Exported %1 (%2)</source>
         <translation>Exportováno %1 (%2)</translation>
-    </message>
-    <message>
-        <source>\input{%1}: not a song of the songbook</source>
-        <translation>\input{%1}: není píseň zpěvníku</translation>
     </message>
     <message>
         <source>%1: an index file the build would read</source>
@@ -2975,6 +2975,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Open Folder</source>
         <translation>Otevřít složku</translation>
+    </message>
+    <message>
+        <source>A new songbook in the song library&apos;s songbooks/ folder</source>
+        <translation>Nový zpěvník ve složce songbooks/ knihovny písní</translation>
     </message>
     <message>
         <source>Preview</source>
@@ -3195,6 +3199,10 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         <translation>Neuloženo: %1</translation>
     </message>
     <message>
+        <source>Writes &lt;file&gt;.tex and a build.sh into the folder. To build it in the song library&apos;s CI as well, add it to .github/workflows.</source>
+        <translation>Zapíše do složky &lt;soubor&gt;.tex a build.sh. Aby se sestavoval i v CI knihovny písní, přidejte ho do .github/workflows.</translation>
+    </message>
+    <message>
         <source>Images (*.png *.jpg *.jpeg *.pdf)</source>
         <translation>Obrázky (*.png *.jpg *.jpeg *.pdf)</translation>
     </message>
@@ -3237,6 +3245,10 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
     <message>
         <source>For this songbook&apos;s preview and export only; nothing is saved.</source>
         <translation>Jen pro náhled a export tohoto zpěvníku; nic se neukládá.</translation>
+    </message>
+    <message>
+        <source>Not found beside the songbook or in the song library</source>
+        <translation>Nenalezeno vedle zpěvníku ani v knihovně písní</translation>
     </message>
     <message numerus="yes">
         <source>%n song(s)</source>
@@ -3297,10 +3309,6 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
     <message>
         <source>none</source>
         <translation>žádný</translation>
-    </message>
-    <message>
-        <source>A new songbook in the songbook folder (songbooks/)</source>
-        <translation>Nový zpěvník ve složce zpěvníku (songbooks/)</translation>
     </message>
     <message>
         <source>Duplicate…</source>
@@ -3395,10 +3403,6 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         <translation>Název souboru</translation>
     </message>
     <message>
-        <source>Writes &lt;file&gt;.tex and a build.sh into the folder. To build it in the songbook&apos;s CI as well, add it to .github/workflows.</source>
-        <translation>Zapíše do složky &lt;soubor&gt;.tex a build.sh. Aby se sestavoval i v CI zpěvníku, přidejte ho do .github/workflows.</translation>
-    </message>
-    <message>
         <source>The folder and the file name may only use letters, digits, - and _ (folders separated by /).</source>
         <translation>Složka a název souboru smí obsahovat jen písmena, číslice, - a _ (složky oddělené /).</translation>
     </message>
@@ -3445,10 +3449,6 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
     <message>
         <source> semitones</source>
         <translation> půltónů</translation>
-    </message>
-    <message>
-        <source>Not found beside the songbook or in the repo</source>
-        <translation>Nenalezeno vedle zpěvníku ani v repozitáři</translation>
     </message>
     <message>
         <source>Not saved: the Songbook tab and Add Songs wait until it is saved or reverted.</source>
@@ -3580,17 +3580,17 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         <translation>Otevřete složku své knihovny písní: checkout ZubuvZpevnik, složku, ve které je songs/chords/. Zapamatuje se pro příští spuštění. Pokud ji ještě nemáte, Nová knihovna písní… vytvoří prázdnou nebo nějakou stáhne.</translation>
     </message>
     <message>
-        <source>Open Songbook Folder…</source>
-        <translation>Otevřít složku zpěvníku…</translation>
+        <source>Open Song Library…</source>
+        <translation>Otevřít knihovnu písní…</translation>
     </message>
     <message>
-        <source>The songbook folder cannot be opened:
+        <source>The song library cannot be opened:
 %1
 
 %2
 
 If it is on a disk that is not connected, connect it and try again.</source>
-        <translation>Složku zpěvníku nelze otevřít:
+        <translation>Knihovnu písní nelze otevřít:
 %1
 
 %2

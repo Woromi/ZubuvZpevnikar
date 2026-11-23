@@ -52,12 +52,13 @@ int main(int argc, char* argv[]) {
 
     QCommandLineParser parser;
     parser.setApplicationDescription(
-        QStringLiteral("Editor and assembler for the ZubuvZpevnik songbook"));
+        QStringLiteral("Song editor and songbook assembler for a ZubuvZpevnik song library"));
     parser.addHelpOption();
     parser.addVersionOption();
-    const QCommandLineOption songbookOption(QStringLiteral("songbook"),
-                                            QStringLiteral("Path to the ZubuvZpevnik checkout."),
-                                            QStringLiteral("dir"));
+    // --songbook: the option's older name, still read.
+    const QCommandLineOption songbookOption(
+        QStringList{QStringLiteral("library"), QStringLiteral("songbook")},
+        QStringLiteral("Path to the song library (a ZubuvZpevnik checkout)."), QStringLiteral("dir"));
     parser.addOption(songbookOption);
     parser.process(app);
     QTranslator appTranslator;
