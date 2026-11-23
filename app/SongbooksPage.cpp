@@ -1,5 +1,6 @@
 #include "SongbooksPage.hpp"
 
+#include "BookAdder.hpp"
 #include "BookPreview.hpp"
 #include "CodeTextEdit.hpp"
 #include "CollectionTabs.hpp"
@@ -241,8 +242,15 @@ SongbooksPage::SongbooksPage(SongTableModel* model, SongbookSorter* sorter,
                                 QColor::fromRgba(theme.editorColor(Theme::LineNumbers)),
                                 QColor::fromRgba(theme.editorColor(Theme::CurrentLineNumber)));
 
-    connect(sorter_, &SongbookSorter::sorted, this, &SongbooksPage::onSorted);
-    connect(sorter_, &SongbookSorter::failed, this, [this](const QString&, const QString& message) {
+    // The sorter is shared (Add to Songbooks… sorts with keys "add:N"): only this page's keys.
+    connect(sorter_, &SongbookSorter::sorted, this,
+            [this](const QString& key, const std::vector<std::string>& names) {
+                if (!key.startsWith(QStringLiteral("add:")))
+                    onSorted(key, names);
+            });
+    connect(sorter_, &SongbookSorter::failed, this, [this](const QString& key, const QString& message) {
+        if (key.startsWith(QStringLiteral("add:")))
+            return;
         sortError_ = tr("Not sorted: %1").arg(message);
         updateSorterWarning();
     });
@@ -787,6 +795,10 @@ void SongbooksPage::fillList(const QString& selectId) {
     id_.clear(); // force loadBook() to read the selected book
     onListRowChanged();
     latexKeepFor_.clear();
+}
+
+QString SongbooksPage::bookWithUnsavedLatex() const {
+    return latexModified() ? id_ : QString();
 }
 
 bool SongbooksPage::showBook(const QString& id) {
@@ -2270,23 +2282,7 @@ void SongbooksPage::requestSort(int sectionIndex, SortMode mode,
         existing->second.pending.insert(pending.begin(), pending.end());
     } // else: a pending Replace sorts everything anyway
 
-    std::map<std::string, const zub::SongEntry*> byName;
-    for (int row = 0; row < model_->rowCount(); ++row)
-        if (const zub::SongEntry* song = model_->song(row))
-            byName.emplace(song->inputName, song);
-    std::vector<zub::songbook::SortEntry> entries;
-    for (const auto& name : units) {
-        zub::songbook::SortEntry entry;
-        const auto it = byName.find(name);
-        if (it != byName.end()) {
-            entry.title = it->second->meta.title;
-            entry.lang = zub::mainLanguage(it->second->meta.value("lang")); // the first of a list
-        } else {
-            const auto slash = name.rfind('/');
-            entry.title = slash == std::string::npos ? name : name.substr(slash + 1);
-        }
-        entries.push_back(std::move(entry));
-    }
+    auto entries = sortEntriesFor(*model_, units);
     sorter_->sort(key, units, std::move(entries));
 }
 

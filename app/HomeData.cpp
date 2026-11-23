@@ -8,11 +8,13 @@
 #include <QLocale>
 #include <QSettings>
 #include <algorithm>
+#include <optional>
 #include <map>
 #include <zub/core/bookfile.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/songtodo.hpp>
 #include <zub/core/textfile.hpp>
+#include <zub/core/wishlist.hpp>
 
 namespace {
 
@@ -122,6 +124,30 @@ HomeData buildHomeData(const SongTableModel& model, const std::filesystem::path&
                 : toQString(note)));
     }
 
+    // The wish list first, then the books' wishes; a wish is matched to a library song by its
+    // name, else by the one song with that file name (an artist folder spelled otherwise, a wish
+    // of only the title: "LodJohnB").
+    const auto librarySong = [&](const zub::bookfile::Wish& wish) -> std::filesystem::path {
+        if (const auto it = byName.find(wish.name); !wish.name.empty() && it != byName.end())
+            return it->second;
+        const std::string stem =
+            wish.name.empty() ? (wish.text.find(' ') == std::string::npos ? wish.text
+                                                                           : std::string())
+                              : wish.name.substr(wish.name.rfind('/') + 1);
+        if (const auto found = byStem.find(stem);
+            !stem.empty() && found != byStem.end() && found->second.size() == 1)
+            return found->second.front();
+        return {};
+    };
+    if (const auto list = zub::readTextFile(root / zub::wishlist::kFileName))
+        for (const auto& wish : zub::wishlist::parse(*list)) {
+            HomeWish w;
+            w.text = toQString(wish.text);
+            w.name = toQString(wish.name);
+            w.line = static_cast<int>(wish.line);
+            w.song = librarySong(wish);
+            data.wishes.push_back(std::move(w));
+        }
     for (const auto& relative : zub::bookfile::findBooks(root)) {
         const auto text = zub::readTextFile(root / relative);
         if (!text)
@@ -142,19 +168,7 @@ HomeData buildHomeData(const SongTableModel& model, const std::filesystem::path&
             w.text = toQString(wish.text);
             w.name = toQString(wish.name);
             w.line = static_cast<int>(wish.line);
-            // The song of that name; else the one song with that file name (an artist folder
-            // spelled otherwise, a wish of only the title: "LodJohnB").
-            if (const auto it = byName.find(wish.name); !wish.name.empty() && it != byName.end()) {
-                w.song = it->second;
-            } else {
-                const std::string stem =
-                    wish.name.empty()
-                        ? (wish.text.find(' ') == std::string::npos ? wish.text : std::string())
-                        : wish.name.substr(wish.name.rfind('/') + 1);
-                if (const auto found = byStem.find(stem);
-                    !stem.empty() && found != byStem.end() && found->second.size() == 1)
-                    w.song = found->second.front();
-            }
+            w.song = librarySong(wish);
             data.wishes.push_back(std::move(w));
             ++book.wishes;
         }
@@ -257,4 +271,102 @@ QString wishSearchText(const QString& text, const QString& name, const QString& 
         return text.simplified() + QLatin1Char(' ') + suffix;
     const WishParts parts = wishParts(text, name);
     return parts.artist + QLatin1Char(' ') + parts.title + QLatin1Char(' ') + suffix;
+}
+
+namespace {
+
+QString fileError(const std::filesystem::path& file, const std::string& why) {
+    return QCoreApplication::translate("HomeData", "%1: %2")
+        .arg(toQString(file.filename()), toQString(why));
+}
+
+// The wish's file, read now; for a book also refused when locked.
+std::expected<std::pair<std::filesystem::path, std::string>, QString>
+readWishFile(const std::filesystem::path& root, const HomeWish& wish) {
+    const std::filesystem::path file = wish.bookId.isEmpty()
+                                           ? root / zub::wishlist::kFileName
+                                           : root / toPath(wish.bookId);
+    auto text = zub::readTextFile(file);
+    if (!text)
+        return std::unexpected(fileError(file, text.error()));
+    if (!wish.bookId.isEmpty() && zub::bookfile::readSettings(*text).locked)
+        return std::unexpected(QCoreApplication::translate(
+                                   "HomeData", "%1 is locked (released): its wishes stay.")
+                                   .arg(wish.bookTitle));
+    return std::pair{file, std::move(*text)};
+}
+
+// The wish's line in the file now: its own line when it still says the same, else the one line
+// that says the same (lines above it were added or removed meanwhile); nullopt when gone or
+// ambiguous.
+std::optional<std::size_t> lineNow(const std::string& text, const HomeWish& wish) {
+    const auto all = wish.bookId.isEmpty() ? zub::wishlist::parse(text) : zub::bookfile::wishes(text);
+    std::optional<std::size_t> found;
+    int same = 0;
+    for (const auto& w : all) {
+        if (toQString(w.text) != wish.text)
+            continue;
+        if (static_cast<int>(w.line) == wish.line)
+            return w.line;
+        found = w.line;
+        ++same;
+    }
+    return same == 1 ? found : std::nullopt;
+}
+
+std::expected<void, QString> write(const std::filesystem::path& file,
+                                   const std::expected<std::string, std::string>& edited) {
+    if (!edited)
+        return std::unexpected(fileError(file, edited.error()));
+    if (auto written = zub::writeTextFileAtomic(file, *edited); !written)
+        return std::unexpected(fileError(file, written.error()));
+    return {};
+}
+
+QString changedError(const HomeWish& wish) {
+    return QCoreApplication::translate("HomeData",
+                                       "The wish \"%1\" is no longer in its file (or is there "
+                                       "twice now). Nothing was written.")
+        .arg(wish.text);
+}
+
+} // namespace
+
+std::expected<void, QString> fulfilWish(const std::filesystem::path& root, const HomeWish& wish,
+                                        const std::string& inputName) {
+    auto read = readWishFile(root, wish);
+    if (!read)
+        return std::unexpected(read.error());
+    const auto& [file, text] = *read;
+    const auto line = lineNow(text, wish);
+    if (!line)
+        return std::unexpected(changedError(wish));
+    if (wish.bookId.isEmpty())
+        return write(file, zub::wishlist::remove(text, *line, toStdString(wish.text)));
+    return write(file, zub::bookfile::fulfillWish(text, *line, inputName));
+}
+
+std::expected<void, QString> removeWish(const std::filesystem::path& root, const HomeWish& wish) {
+    auto read = readWishFile(root, wish);
+    if (!read)
+        return std::unexpected(read.error());
+    const auto& [file, text] = *read;
+    const auto line = lineNow(text, wish);
+    if (!line)
+        return std::unexpected(changedError(wish));
+    if (wish.bookId.isEmpty())
+        return write(file, zub::wishlist::remove(text, *line, toStdString(wish.text)));
+    return write(file, zub::bookfile::removeWish(text, *line));
+}
+
+std::expected<void, QString> addWish(const std::filesystem::path& root, const QString& text) {
+    const std::filesystem::path file = root / zub::wishlist::kFileName;
+    std::string current;
+    if (std::filesystem::exists(file)) {
+        auto read = zub::readTextFile(file);
+        if (!read)
+            return std::unexpected(fileError(file, read.error()));
+        current = std::move(*read);
+    }
+    return write(file, zub::wishlist::add(current, toStdString(text)));
 }

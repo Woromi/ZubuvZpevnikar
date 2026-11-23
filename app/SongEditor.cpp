@@ -212,6 +212,7 @@ std::expected<SongEditor::SaveResult, QString> SongEditor::save() {
         return std::unexpected(toQString(written.error()));
     }
     diskContent_ = bytes;
+    const bool first = isNew_;
     isNew_ = false;
     if (missing_) {
         missing_ = false;
@@ -223,6 +224,8 @@ std::expected<SongEditor::SaveResult, QString> SongEditor::save() {
     edit_->document()->setModified(false);
     watch();
     emit saved(bytes);
+    if (first)
+        emit firstSaved();
     return SaveResult::Saved;
 }
 

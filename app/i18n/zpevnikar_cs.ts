@@ -25,6 +25,65 @@
     </message>
 </context>
 <context>
+    <name>AddToBooksDialog</name>
+    <message>
+        <source>Add to Songbooks</source>
+        <translation>Přidat do zpěvníků</translation>
+    </message>
+    <message>
+        <source>Which songbooks should %1 be in? It goes where the index puts it (by title).</source>
+        <translation>Do kterých zpěvníků má %1 patřit? Zařadí se tam, kam ji dá rejstřík (podle názvu).</translation>
+    </message>
+    <message>
+        <source>Songs before the first section</source>
+        <translation>Písně před první sekcí</translation>
+    </message>
+    <message>
+        <source>has it</source>
+        <translation>už ji má</translation>
+    </message>
+    <message>
+        <source>locked</source>
+        <translation>zamčený</translation>
+    </message>
+    <message>
+        <source>unsaved LaTeX edits on the Songbooks page</source>
+        <translation>neuložené úpravy LaTeXu na stránce Zpěvníky</translation>
+    </message>
+    <message>
+        <source>read-only: %1</source>
+        <translation>jen pro čtení: %1</translation>
+    </message>
+    <message>
+        <source>No songbooks yet: make one on the Songbooks page.</source>
+        <translation>Zatím žádné zpěvníky: vytvořte si ho na stránce Zpěvníky.</translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <comment>add the song to the checked songbooks</comment>
+        <translation>Přidat</translation>
+    </message>
+    <message>
+        <source>Not Now</source>
+        <translation>Teď ne</translation>
+    </message>
+</context>
+<context>
+    <name>BookAdder</name>
+    <message>
+        <source>the section is gone</source>
+        <translation>sekce už neexistuje</translation>
+    </message>
+    <message>
+        <source>changed meanwhile, not added</source>
+        <translation>mezitím se změnil, nepřidáno</translation>
+    </message>
+    <message>
+        <source>added at the end of the section (%1)</source>
+        <translation>přidáno na konec sekce (%1)</translation>
+    </message>
+</context>
+<context>
     <name>BookPreview</name>
     <message>
         <source>Build Preview</source>
@@ -250,6 +309,18 @@ Použijte vestavěný.</translation>
         <source>not checked yet (imported by the app)</source>
         <translation>zatím nezkontrolováno (importováno aplikací)</translation>
     </message>
+    <message>
+        <source>%1: %2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <source>%1 is locked (released): its wishes stay.</source>
+        <translation>%1 je zamčený (vydaný): jeho přání zůstávají.</translation>
+    </message>
+    <message>
+        <source>The wish &quot;%1&quot; is no longer in its file (or is there twice now). Nothing was written.</source>
+        <translation>Přání „%1“ už v souboru není (nebo je tam teď dvakrát). Nic se nezapsalo.</translation>
+    </message>
 </context>
 <context>
     <name>HomePage</name>
@@ -302,6 +373,32 @@ Použijte vestavěný.</translation>
     <message>
         <source>The song is in the library already: open it</source>
         <translation>Píseň už v knihovně je: otevřít ji</translation>
+    </message>
+    <message>
+        <source>The song is in the library: a book&apos;s wish becomes the song in that book, a wish of the wish list goes</source>
+        <translation>Píseň už v knihovně je: přání ve zpěvníku se změní na tu píseň v něm, přání ze seznamu přání zmizí</translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <comment>a wish is fulfilled</comment>
+        <translation>Hotovo</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <comment>a wish</comment>
+        <translation>Odebrat</translation>
+    </message>
+    <message>
+        <source>Remove the wish (its line)</source>
+        <translation>Odebrat přání (jeho řádek)</translation>
+    </message>
+    <message>
+        <source>Add Wish…</source>
+        <translation>Přidat přání…</translation>
+    </message>
+    <message>
+        <source>A song you want: a new line of the wish list (wishes.txt in the song library)</source>
+        <translation>Píseň, kterou chcete: nový řádek seznamu přání (wishes.txt v knihovně písní)</translation>
     </message>
     <message numerus="yes">
         <source>%n song(s)</source>
@@ -368,12 +465,20 @@ Použijte vestavěný.</translation>
         <translation>Zatím žádné zpěvníky: vytvořte si ho na stránce Zpěvníky.</translation>
     </message>
     <message>
+        <source>Wish list</source>
+        <translation>Seznam přání</translation>
+    </message>
+    <message>
         <source>in the library</source>
         <translation>v knihovně</translation>
     </message>
     <message>
         <source>%1, line %2: %3</source>
         <translation>%1, řádek %2: %3</translation>
+    </message>
+    <message>
+        <source>No wishes: Add Wish… writes one.</source>
+        <translation>Žádná přání: Přidat přání… nějaké zapíše.</translation>
     </message>
 </context>
 <context>
@@ -437,6 +542,14 @@ Použijte vestavěný.</translation>
     <message>
         <source>Import</source>
         <translation>Importovat</translation>
+    </message>
+    <message>
+        <source>Find Online</source>
+        <translation>Najít na webu</translation>
+    </message>
+    <message>
+        <source>Search the web for the song&apos;s chords (opens the browser)</source>
+        <translation>Vyhledat akordy písně na webu (otevře prohlížeč)</translation>
     </message>
     <message>
         <source>Web address or saved page:</source>
@@ -517,6 +630,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>The import failed.</source>
         <translation>Import se nezdařil.</translation>
+    </message>
+    <message>
+        <source>For the wish: %1</source>
+        <translation>Pro přání: %1</translation>
     </message>
 </context>
 <context>
@@ -791,6 +908,30 @@ Použijte vestavěný.</translation>
         <translation>Nenašla se žádná píseň s možnými změnami.</translation>
     </message>
     <message>
+        <source>Added to %1.</source>
+        <translation>Přidáno do: %1.</translation>
+    </message>
+    <message>
+        <source>Add to Songbooks</source>
+        <translation>Přidat do zpěvníků</translation>
+    </message>
+    <message>
+        <source>Wishes</source>
+        <translation>Přání</translation>
+    </message>
+    <message>
+        <source>Remove the wish &quot;%1&quot;?</source>
+        <translation>Odebrat přání „%1“?</translation>
+    </message>
+    <message>
+        <source>Add Wish</source>
+        <translation>Přidat přání</translation>
+    </message>
+    <message>
+        <source>The song you want, e.g. Artist/Title (a note may follow), or any text:</source>
+        <translation>Píseň, kterou chcete, např. Interpret/Název (může následovat poznámka), nebo libovolný text:</translation>
+    </message>
+    <message>
         <source>Open Song Library (ZubuvZpevnik)</source>
         <translation>Otevřít knihovnu písní (ZubuvZpevnik)</translation>
     </message>
@@ -819,6 +960,14 @@ Použijte vestavěný.</translation>
     <message>
         <source>Cannot save score</source>
         <translation>Nelze uložit notovou ukázku</translation>
+    </message>
+    <message>
+        <source>Add to Songbooks…</source>
+        <translation>Přidat do zpěvníků…</translation>
+    </message>
+    <message>
+        <source>Put the song into songbooks (where their index puts it)</source>
+        <translation>Zařadit píseň do zpěvníků (tam, kam ji dá jejich rejstřík)</translation>
     </message>
     <message>
         <source>Undo</source>
@@ -1003,6 +1152,18 @@ Použijte vestavěný.</translation>
     <message>
         <source>No unsaved changes</source>
         <translation>Žádné neuložené změny</translation>
+    </message>
+    <message>
+        <source>The wish %1 is done.</source>
+        <translation>Přání %1 je splněné.</translation>
+    </message>
+    <message>
+        <source>%1 has unsaved LaTeX edits on the Songbooks page: save or revert them first.</source>
+        <translation>%1 má neuložené úpravy LaTeXu na stránce Zpěvníky: nejdřív je uložte nebo vraťte.</translation>
+    </message>
+    <message>
+        <source>Still adding a song to songbooks: try Add to Songbooks… again in a moment.</source>
+        <translation>Píseň se ještě přidává do zpěvníků: zkuste Přidat do zpěvníků… za chvíli znovu.</translation>
     </message>
     <message>
         <source>Open a song library first.</source>

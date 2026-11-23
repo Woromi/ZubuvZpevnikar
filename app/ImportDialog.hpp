@@ -11,6 +11,7 @@ class QCheckBox;
 class QDialogButtonBox;
 class QGroupBox;
 class QLabel;
+class QUrl;
 class QLineEdit;
 class QPlainTextEdit;
 class QProcess;
@@ -42,6 +43,9 @@ public:
     bool converterReset() const { return converterReset_; }
     // The "Tidy the song" box (remembered in the settings): run tidy on the imported song.
     bool tidy() const;
+    // Importing a wish: "For the wish: <display>" above the address, with a Find Online button
+    // that opens `search` in the browser (only when clicked).
+    void setWish(const QString& display, const QUrl& search);
 
 protected:
     void reject() override; // Cancel/Esc: stops a running conversion first
@@ -71,6 +75,9 @@ private:
     QLineEdit* cookie_ = nullptr;
     QLineEdit* userAgent_ = nullptr;
     QLabel* status_ = nullptr;
+    QWidget* wishRow_ = nullptr;
+    QLabel* wishLabel_ = nullptr;
+    QPushButton* wishSearch_ = nullptr;
     QPlainTextEdit* details_ = nullptr; // the converter's message on failure
     QDialogButtonBox* buttons_ = nullptr;
     QPushButton* importButton_ = nullptr;

@@ -177,6 +177,8 @@ signals:
     void modificationChanged(bool modified);
     // After a successful save(); `content` is the UTF-8 that was written.
     void saved(const std::string& content);
+    // After saved(): the first save of a song opened with openNew() (a new or imported song).
+    void firstSaved();
     // The file was reloaded because it changed outside the app.
     void reloadedFromDisk();
 

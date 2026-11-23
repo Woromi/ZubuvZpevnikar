@@ -60,6 +60,10 @@ qt_add_library(zpevnikar_app STATIC
     SongbookSorter.cpp
     WelcomePage.cpp
     HomeData.hpp
+    BookAdder.hpp
+    BookAdder.cpp
+    AddToBooksDialog.hpp
+    AddToBooksDialog.cpp
     HomeData.cpp
     HomePage.hpp
     HomePage.cpp

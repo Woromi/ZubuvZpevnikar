@@ -757,6 +757,73 @@ std::vector<Wish> wishes(std::string_view text) {
     return out;
 }
 
+namespace {
+
+// The byte range of a 1-based line: [begin, contentEnd) without its line break ("\n" or "\r\n"),
+// [begin, end) with it. nullopt past the end.
+struct LineRange {
+    std::size_t begin, contentEnd, end;
+};
+std::optional<LineRange> lineRange(string_view text, std::size_t line) {
+    if (line == 0)
+        return std::nullopt;
+    std::size_t begin = 0;
+    for (std::size_t n = 1; n < line; ++n) {
+        const auto next = text.find('\n', begin);
+        if (next == npos)
+            return std::nullopt;
+        begin = next + 1;
+    }
+    if (begin >= text.size())
+        return std::nullopt;
+    std::size_t end = text.find('\n', begin);
+    std::size_t contentEnd = end == npos ? text.size() : end;
+    end = end == npos ? text.size() : end + 1;
+    if (contentEnd > begin && text[contentEnd - 1] == '\r')
+        --contentEnd;
+    return LineRange{begin, contentEnd, end};
+}
+
+bool isWishLine(string_view text, std::size_t line) {
+    return std::ranges::any_of(wishes(text), [line](const Wish& w) { return w.line == line; });
+}
+
+} // namespace
+
+std::expected<string, string> fulfillWish(string_view text, std::size_t line,
+                                          string_view inputName) {
+    if (auto why = invalidInputName(inputName))
+        return std::unexpected(*why);
+    if (!isWishLine(text, line))
+        return std::unexpected("no wish on line " + std::to_string(line));
+    const auto range = lineRange(text, line);
+    if (!range)
+        return std::unexpected("no line " + std::to_string(line));
+    const auto known = inputs(text);
+    string out(text);
+    if (std::ranges::find(known, string(inputName)) != known.end()) {
+        out.erase(range->begin, range->end - range->begin);
+        return out;
+    }
+    std::size_t indentEnd = range->begin;
+    while (indentEnd < range->contentEnd && (text[indentEnd] == ' ' || text[indentEnd] == '\t'))
+        ++indentEnd;
+    out.replace(indentEnd, range->contentEnd - indentEnd,
+                "\\input{" + string(inputName) + "}");
+    return out;
+}
+
+std::expected<string, string> removeWish(string_view text, std::size_t line) {
+    if (!isWishLine(text, line))
+        return std::unexpected("no wish on line " + std::to_string(line));
+    const auto range = lineRange(text, line);
+    if (!range)
+        return std::unexpected("no line " + std::to_string(line));
+    string out(text);
+    out.erase(range->begin, range->end - range->begin);
+    return out;
+}
+
 std::vector<std::string> inputs(std::string_view text) {
     const string code = latex::stripComments(text);
     std::vector<string> names;

@@ -93,9 +93,20 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     wishOpen_ = new QPushButton(tr("Open Song"), wishesCard_);
     wishOpen_->setToolTip(tr("The song is in the library already: open it"));
     wishButtons->addWidget(wishSearch_);
+    wishDone_ = new QPushButton(tr("Done", "a wish is fulfilled"), wishesCard_);
+    wishDone_->setToolTip(tr("The song is in the library: a book's wish becomes the song in that "
+                             "book, a wish of the wish list goes"));
+    wishRemove_ = new QPushButton(tr("Remove", "a wish"), wishesCard_);
+    wishRemove_->setToolTip(tr("Remove the wish (its line)"));
+    wishAdd_ = new QPushButton(tr("Add Wish…"), wishesCard_);
+    wishAdd_->setToolTip(tr("A song you want: a new line of the wish list (wishes.txt in the song "
+                            "library)"));
     wishButtons->addWidget(wishImport_);
     wishButtons->addWidget(wishOpen_);
+    wishButtons->addWidget(wishDone_);
+    wishButtons->addWidget(wishRemove_);
     wishButtons->addStretch(1);
+    wishButtons->addWidget(wishAdd_);
     wishLayout->addLayout(wishButtons);
 
     grid_ = new QGridLayout;
@@ -134,6 +145,15 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
         if (const HomeWish* wish = selectedWish())
             emit wishImportRequested(*wish);
     });
+    connect(wishDone_, &QPushButton::clicked, this, [this] {
+        if (const HomeWish* wish = selectedWish(); wish && !wish->song.empty())
+            emit wishDoneRequested(*wish);
+    });
+    connect(wishRemove_, &QPushButton::clicked, this, [this] {
+        if (const HomeWish* wish = selectedWish())
+            emit wishRemoveRequested(*wish);
+    });
+    connect(wishAdd_, &QPushButton::clicked, this, &HomePage::wishAddRequested);
     connect(wishOpen_, &QPushButton::clicked, this, [this] {
         if (const HomeWish* wish = selectedWish(); wish && !wish->song.empty())
             emit songRequested(wish->song);
@@ -252,7 +272,8 @@ void HomePage::setData(const HomeData& home) {
     for (std::size_t i = 0; i < wishList_.size(); ++i) {
         const HomeWish& wish = wishList_[i];
         if (!group || group->data(0, idRole).toString() != wish.bookId) {
-            group = new QTreeWidgetItem(wishes_, {wish.bookTitle});
+            group = new QTreeWidgetItem(
+                wishes_, {wish.bookId.isEmpty() ? tr("Wish list") : wish.bookTitle});
             group->setData(0, idRole, wish.bookId);
             group->setData(0, wishRole, -1);
             group->setFlags(Qt::ItemIsEnabled);
@@ -278,7 +299,11 @@ void HomePage::setData(const HomeData& home) {
                 break;
             }
         }
-    wishesCard_->setVisible(!wishList_.empty());
+    if (wishList_.empty()) {
+        auto* item = new QTreeWidgetItem(wishes_, {tr("No wishes: Add Wish… writes one.")});
+        item->setData(0, wishRole, -1);
+        item->setFlags(Qt::NoItemFlags);
+    }
     updateWishButtons();
     stack_->setCurrentIndex(1);
     // Once the new lists are laid out (a value set before would be clamped to the old range).
@@ -303,6 +328,8 @@ void HomePage::updateWishButtons() {
     wishSearch_->setEnabled(wish != nullptr);
     wishImport_->setEnabled(wish != nullptr);
     wishOpen_->setEnabled(wish && !wish->song.empty());
+    wishDone_->setEnabled(wish && !wish->song.empty());
+    wishRemove_->setEnabled(wish != nullptr);
 }
 
 void HomePage::placeCards() {

@@ -3,6 +3,8 @@
 #include <QDateTime>
 #include <QString>
 #include <QStringList>
+#include <expected>
+#include <string>
 #include <filesystem>
 #include <utility>
 #include <vector>
@@ -26,7 +28,7 @@ struct HomeBook {
 };
 
 struct HomeWish {
-    QString bookId, bookTitle;
+    QString bookId, bookTitle; // "" for the wish list (wishes.txt)
     QString text;               // what the line says after "TODO:"
     QString name;               // the input name it holds ("" none)
     std::filesystem::path song; // the library song of that name ("" not in the library)
@@ -65,6 +67,18 @@ QString splitWords(const QString& part);
 // A wish as the list shows it: "Title — Artist" with the words split (and what the line says
 // after the name in parentheses); a wish without an input name as it is written.
 QString wishDisplayText(const QString& text, const QString& name);
+// ---- Writing wishes. Each reads the file anew and changes it only when the wish is still on its
+// line (the file may have changed since Home read it); the error says why not, for people.
+
+// A wish is done: in a book its line becomes \input{inputName} (zub::bookfile::fulfillWish), in
+// the wish list it goes. A locked book is not changed.
+std::expected<void, QString> fulfilWish(const std::filesystem::path& root, const HomeWish& wish,
+                                        const std::string& inputName);
+// The wish removed (a book's line, or the wish list's).
+std::expected<void, QString> removeWish(const std::filesystem::path& root, const HomeWish& wish);
+// A new line in the wish list (the file is made when missing).
+std::expected<void, QString> addWish(const std::filesystem::path& root, const QString& text);
+
 // What to search the web for, for a wish: the artist's and the title's words ("PavelDobes/
 // NecoOLasce" -> "Pavel Dobes Neco O Lasce"), other text as it is, plus `suffix` ("chords").
 QString wishSearchText(const QString& text, const QString& name, const QString& suffix);

@@ -123,6 +123,14 @@ struct Wish {
 // `songs` environments do not count. LF or CRLF; empty for a text parse() refuses.
 std::vector<Wish> wishes(std::string_view text);
 
+// A wish is done: its line (1-based, a wish of wishes()) becomes `<its indent>\input{inputName}`
+// in its line break; when the book has that input already the line only goes. Byte-exact
+// otherwise. Errors: no wish on that line, an invalid input name.
+std::expected<std::string, std::string> fulfillWish(std::string_view text, std::size_t line,
+                                                    std::string_view inputName);
+// The wish line (1-based, a wish of wishes()) removed, its line break with it.
+std::expected<std::string, std::string> removeWish(std::string_view text, std::size_t line);
+
 // Every \input{name} of `text` (comments ignored, anywhere, trimmed, once each, in order); "" for
 // an \input without a brace argument.
 std::vector<std::string> inputs(std::string_view text);

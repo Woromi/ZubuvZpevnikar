@@ -71,6 +71,8 @@ public:
     // no such book.
     bool showBook(const QString& id);
     void newSongbook(); // New Songbook… (asks)
+    // The book (id) whose LaTeX tab has unsaved edits, "" none: others must not write it.
+    QString bookWithUnsavedLatex() const;
     // Ctrl+F / Ctrl+H: opens the find bar of the LaTeX tab when that tab is the current one;
     // false otherwise.
     bool showFind(bool replaceMode);

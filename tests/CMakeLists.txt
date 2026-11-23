@@ -9,6 +9,7 @@ add_executable(zub_core_tests
     test_json.cpp
     test_latex.cpp
     test_library.cpp
+    test_wishlist.cpp
     test_linediff.cpp
     test_midi.cpp
     test_midibend.cpp

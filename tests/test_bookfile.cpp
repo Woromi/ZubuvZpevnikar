@@ -583,6 +583,15 @@ TEST_CASE("every real book parses and round-trips", "[.integration][bookfile]") 
             INFO(wish.text << " line " << wish.line);
             CHECK(!wish.text.empty());
             CHECK((wish.name.empty() || wish.text.starts_with(wish.name)));
+            // Removing or fulfilling it changes that line only, and the book still parses.
+            const auto removed = removeWish(*text, wish.line);
+            REQUIRE(removed);
+            CHECK(removed->size() < text->size());
+            CHECK(parse(*removed).has_value());
+            const auto done = fulfillWish(*text, wish.line, "Zz/WishedSong");
+            REQUIRE(done);
+            CHECK(std::ranges::count(inputs(*done), std::string("Zz/WishedSong")) == 1);
+            CHECK(parse(*done).has_value());
         }
         // the book's own text has no transposing yet, and the edits give it back
         for (const auto& t : readTransposes(*text))
@@ -1326,4 +1335,43 @@ TEST_CASE("wishes lists the TODO lines of the song lists", "[bookfile]") {
     CHECK(both[1].text == "Píseň o zemi");
     CHECK(both[1].name.empty());
     CHECK(both[1].line == 8);
+}
+
+namespace {
+std::string replaceOnce(std::string text, const std::string& from, const std::string& to) {
+    const auto at = text.find(from);
+    REQUIRE(at != std::string::npos);
+    return text.replace(at, from.size(), to);
+}
+} // namespace
+
+TEST_CASE("fulfillWish and removeWish change only the wish line", "[bookfile]") {
+    const std::string text = "\\begin{songs}{a}\r\n"
+                             "    % TODO: A/One\r\n"
+                             "    % a note about Two\r\n"
+                             "    % TODO: Some Title\r\n"
+                             "    \\input{B/Two}\r\n"
+                             "    \\beginkeeporder\r\n"
+                             "    \\input{C/Three}\r\n"
+                             "    % TODO: C/Four\r\n"
+                             "    \\endkeeporder\r\n"
+                             "    % TODO: B/Two\r\n"
+                             "\\end{songs}\r\n";
+    const auto done = fulfillWish(text, 2, "A/One");
+    REQUIRE(done);
+    CHECK(*done == replaceOnce(text, "    % TODO: A/One\r\n", "    \\input{A/One}\r\n"));
+    CHECK(parse(*done).has_value());
+    // A wish of a title only becomes the song it was imported as; the note above Two stays.
+    CHECK(fulfillWish(text, 4, "D/Title").value() ==
+          replaceOnce(text, "    % TODO: Some Title\r\n", "    \\input{D/Title}\r\n"));
+    // In a keep-order block: there.
+    CHECK(fulfillWish(text, 8, "C/Four").value() ==
+          replaceOnce(text, "    % TODO: C/Four\r\n", "    \\input{C/Four}\r\n"));
+    // The book has the song already: the wish only goes.
+    CHECK(fulfillWish(text, 10, "B/Two").value() ==
+          replaceOnce(text, "    % TODO: B/Two\r\n", ""));
+    CHECK(removeWish(text, 4).value() == replaceOnce(text, "    % TODO: Some Title\r\n", ""));
+    CHECK_FALSE(fulfillWish(text, 3, "A/One")); // a note, no wish
+    CHECK_FALSE(fulfillWish(text, 2, "../x"));
+    CHECK_FALSE(removeWish(text, 5));
 }

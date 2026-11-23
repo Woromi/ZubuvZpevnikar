@@ -21,6 +21,8 @@
 #include "SongbookSorter.hpp"
 #include "SongbooksPage.hpp"
 #include "LibraryDialog.hpp"
+#include "AddToBooksDialog.hpp"
+#include "BookAdder.hpp"
 #include "HomeData.hpp"
 #include "HomePage.hpp"
 #include "WelcomePage.hpp"
@@ -431,6 +433,23 @@ void MainWindow::createCentralWidget() {
     songLayout->addWidget(songSplitter_);
 
     songbookSorter_ = new SongbookSorter(this);
+    bookAdder_ = new BookAdder(songbookSorter_, model_, this);
+    connect(bookAdder_, &BookAdder::finished, this,
+            [this](const QStringList& added, const QStringList& notes) {
+                QStringList parts;
+                if (!added.isEmpty())
+                    parts << tr("Added to %1.").arg(added.join(QStringLiteral(", ")));
+                parts << notes;
+                if (!parts.isEmpty())
+                    statusBar()->showMessage(parts.join(QLatin1Char(' ')), 15000);
+                if (!notes.isEmpty() && added.isEmpty())
+                    QMessageBox::warning(this, tr("Add to Songbooks"),
+                                         notes.join(QLatin1Char('\n')));
+                // The page reads the books again (not over unsaved LaTeX: that book was skipped).
+                if (songbooksPage_->bookWithUnsavedLatex().isEmpty())
+                    songbooksPage_->reloadList();
+                homeTimer_->start();
+            });
     songbookExporter_ = new SongbookExporter(this);
     songbooksPage_ =
         new SongbooksPage(model_, songbookSorter_, songbookExporter_, *repository_, pages_);
@@ -466,14 +485,37 @@ void MainWindow::createCentralWidget() {
         showView(ActivityBar::View::Songbooks);
         songbooksPage_->showBook(id);
     });
-    connect(homePage_, &HomePage::wishSearchRequested, this, [](HomeWish wish) {
+    connect(homePage_, &HomePage::wishSearchRequested, this, [this](HomeWish wish) {
         // Only on the user's click: the browser searches, the app contacts nothing itself.
-        const QString text =
-            wishSearchText(wish.text, wish.name, tr("chords", "a word of a web search"));
-        QDesktopServices::openUrl(QUrl(QStringLiteral("https://www.google.com/search?q=") +
-                                       QString::fromLatin1(QUrl::toPercentEncoding(text))));
+        QDesktopServices::openUrl(wishSearchUrl(wish));
     });
-    connect(homePage_, &HomePage::wishImportRequested, this, [this] { importSong(); });
+    connect(homePage_, &HomePage::wishImportRequested, this,
+            [this](HomeWish wish) { importSongFor(wish); });
+    connect(homePage_, &HomePage::wishDoneRequested, this, [this](HomeWish wish) {
+        changeWish(wish, [&] { return fulfilWish(songbookRoot_, wish, inputNameOfPath(wish.song)); });
+        refreshHome();
+    });
+    connect(homePage_, &HomePage::wishRemoveRequested, this, [this](HomeWish wish) {
+        const auto answer = QMessageBox::question(
+            this, tr("Wishes"),
+            tr("Remove the wish \"%1\"?").arg(wishDisplayText(wish.text, wish.name)));
+        if (answer != QMessageBox::Yes)
+            return;
+        changeWish(wish, [&] { return removeWish(songbookRoot_, wish); });
+        refreshHome();
+    });
+    connect(homePage_, &HomePage::wishAddRequested, this, [this] {
+        bool ok = false;
+        const QString text = QInputDialog::getText(
+            this, tr("Add Wish"),
+            tr("The song you want, e.g. Artist/Title (a note may follow), or any text:"),
+            QLineEdit::Normal, {}, &ok);
+        if (!ok || text.trimmed().isEmpty())
+            return;
+        if (auto added = addWish(songbookRoot_, text); !added)
+            QMessageBox::warning(this, tr("Wishes"), added.error());
+        refreshHome();
+    });
     homeTimer_ = new QTimer(this);
     homeTimer_->setSingleShot(true);
     homeTimer_->setInterval(200);
@@ -514,7 +556,8 @@ void MainWindow::createCentralWidget() {
 
 void MainWindow::openInitialSongbook(const QString& commandLinePath) {
     if (!commandLinePath.isEmpty()) {
-        if (!openSongbook(toPath(commandLinePath), {.showErrors = false}))
+        // For this run only: the remembered library stays for the next start.
+        if (!openSongbook(toPath(commandLinePath), {.showErrors = false, .remember = false}))
             showWelcome(commandLinePath);
         else
             showView(ActivityBar::View::Home);
@@ -808,6 +851,15 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
         updateWindowTitle();
         updateSongActions();
     });
+    connect(
+        editor, &SongEditor::firstSaved, this,
+        [this, path = editor->path()] {
+            // The wish at once (also while the window closes), the question afterwards.
+            fulfilPendingWish(path);
+            QMetaObject::invokeMethod(
+                this, [this, path, root = songbookRoot_] { onFirstSave(path, root); },
+                Qt::QueuedConnection);
+        });
     connect(editor, &SongEditor::saved, this, [this, editor](const std::string& content) {
         changesAction_->setChecked(false);
         refreshSongMetadata(editor, content);
@@ -975,6 +1027,9 @@ bool MainWindow::closeSong() {
     if (!confirmCloseAll())
         return false;
     const std::filesystem::path path = editor->path();
+    // Closed without saving: its wish stays a wish.
+    if (pendingWish_ && pendingWish_->song == path && editor->isNew())
+        pendingWish_.reset();
     songActions_->cancelRun();
     clearTidyChanges();
     changesAction_->setChecked(false);
@@ -1008,7 +1063,9 @@ bool MainWindow::closeSong() {
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
+    closing_ = true; // a song saved now asks nothing more (Add to Songbooks)
     if (!songbooksPage_->confirmClose() || !confirmCloseAll()) {
+        closing_ = false;
         event->ignore();
         return;
     }
@@ -1039,6 +1096,14 @@ void MainWindow::createSongToolBar() {
 
     songToolBar_->addAction(closeSongAction_);
     songToolBar_->addAction(saveAction_);
+    addToBooksAction_ = new QAction(QIcon::fromTheme(QStringLiteral("list-add")),
+                                    tr("Add to Songbooks…"), this);
+    addToBooksAction_->setToolTip(tr("Put the song into songbooks (where their index puts it)"));
+    connect(addToBooksAction_, &QAction::triggered, this, [this] {
+        if (editor_ && !editor_->isNew())
+            addToSongbooks(editor_->path(), false);
+    });
+    songToolBar_->addAction(addToBooksAction_);
     songToolBar_->addSeparator();
     undoAction_ = editAction(tr("Undo"), QStringLiteral("edit-undo"), tr("Undo (Ctrl+Z)"),
                              [](QPlainTextEdit* e) { e->undo(); });
@@ -1292,6 +1357,7 @@ void MainWindow::updateSongActions() {
     SongEditor* current = currentEditor();
     const bool songTab = onSongTab();
     closeSongAction_->setEnabled(open);
+    addToBooksAction_->setEnabled(open && !editor_->isNew() && !songbookRoot_.empty());
     activityBar_->setSongEnabled(open);
     songViewAction_->setEnabled(open); // like the bar's button
     saveAction_->setEnabled(current && current->isModified());
@@ -1587,13 +1653,89 @@ void MainWindow::createPreview() {
 }
 
 std::string MainWindow::inputNameOf(const SongEditor* editor) const {
+    return inputNameOfPath(editor->path());
+}
+
+std::string MainWindow::inputNameOfPath(const std::filesystem::path& path) const {
     // songs/<collection>/Artist/Title.tex -> "Artist/Title"
-    const std::string collection =
-        zub::collectionOf(songbookRoot_, editor->path()).value_or("chords");
+    const std::string collection = zub::collectionOf(songbookRoot_, path).value_or("chords");
     const auto relative =
-        editor->path().lexically_relative(songbookRoot_ / "songs" / collection).replace_extension();
+        path.lexically_relative(songbookRoot_ / "songs" / collection).replace_extension();
     const auto u8 = relative.generic_u8string();
     return {u8.begin(), u8.end()};
+}
+
+QUrl MainWindow::wishSearchUrl(const HomeWish& wish) const {
+    const QString text = wishSearchText(wish.text, wish.name, tr("chords", "a word of a web search"));
+    return QUrl(QStringLiteral("https://www.google.com/search?q=") +
+                QString::fromLatin1(QUrl::toPercentEncoding(text)));
+}
+
+void MainWindow::fulfilPendingWish(const std::filesystem::path& path) {
+    if (!pendingWish_ || pendingWish_->song != path || songbookRoot_.empty())
+        return;
+    const HomeWish wish = pendingWish_->wish;
+    pendingWish_.reset();
+    if (auto done = changeWish(wish, [&] {
+            return fulfilWish(songbookRoot_, wish, inputNameOfPath(path));
+        });
+        done)
+        statusBar()->showMessage(
+            tr("The wish %1 is done.").arg(wishDisplayText(wish.text, wish.name)), 10000);
+}
+
+std::expected<void, QString>
+MainWindow::changeWish(const HomeWish& wish,
+                       const std::function<std::expected<void, QString>()>& change) {
+    // One writer at a time: not a book with unsaved LaTeX edits on the Songbooks page.
+    const QString busy = songbooksPage_->bookWithUnsavedLatex();
+    std::expected<void, QString> result;
+    if (!wish.bookId.isEmpty() && wish.bookId == busy)
+        result = std::unexpected(tr("%1 has unsaved LaTeX edits on the Songbooks page: save or "
+                                    "revert them first.")
+                                     .arg(wish.bookTitle));
+    else
+        result = change();
+    if (!result)
+        QMessageBox::warning(this, tr("Wishes"), result.error());
+    else if (!wish.bookId.isEmpty() && busy.isEmpty())
+        songbooksPage_->reloadList(); // its book changed
+    homeTimer_->start();
+    return result;
+}
+
+void MainWindow::onFirstSave(const std::filesystem::path& path,
+                             const std::filesystem::path& root) {
+    updateSongActions();
+    // Not while closing, nor for a song of a library left meanwhile.
+    if (closing_ || songbookRoot_.empty() || root != songbookRoot_ ||
+        !zub::collectionOf(songbookRoot_, path))
+        return;
+    addToSongbooks(path, true);
+}
+
+void MainWindow::addToSongbooks(const std::filesystem::path& path, bool afterNew) {
+    if (songbookRoot_.empty())
+        return;
+    if (bookAdder_->busy()) {
+        statusBar()->showMessage(
+            tr("Still adding a song to songbooks: try Add to Songbooks… again in a moment."),
+            10000);
+        return;
+    }
+    const int row = model_->rowOf(path);
+    const QString title = row >= 0 ? model_->index(row, SongTableModel::Title).data().toString()
+                                   : toQString(path.stem());
+    const std::string name = inputNameOfPath(path);
+    AddToBooksDialog dialog(songbookRoot_, name, title, songbooksPage_->bookWithUnsavedLatex(),
+                            this);
+    if (afterNew && !dialog.anyAvailable())
+        return;
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+    const auto targets = dialog.targets();
+    if (!targets.empty())
+        bookAdder_->add(name, targets);
 }
 
 void MainWindow::requestPreview(bool userAsked) {
@@ -1847,13 +1989,15 @@ std::filesystem::path MainWindow::findConverter() const {
     return {};
 }
 
-void MainWindow::importSong() {
+void MainWindow::importSongFor(const std::optional<HomeWish>& wish) {
     if (songbookRoot_.empty()) {
         QMessageBox::information(this, tr("Import Song"), tr("Open a song library first."));
         return;
     }
     const auto builtIn = builtInConverter();
     ImportDialog dialog(findConverter(), builtIn, this);
+    if (wish)
+        dialog.setWish(wishDisplayText(wish->text, wish->name), wishSearchUrl(*wish));
     const int result = dialog.exec();
     // Remember only a converter the user picked, and never the built-in one: a remembered
     // automatic find would shadow the built-in converter after an update.
@@ -1903,6 +2047,8 @@ void MainWindow::importSong() {
     const QString title =
         meta ? toQString(zub::latex::toDisplayText(meta->title)) : toQString(target.stem());
     showSong(editor, title, toQString(dest.inputName) + tr(" (imported, not saved)"));
+    if (wish)
+        pendingWish_ = PendingWish{target, *wish}; // fulfilled by the first save
     QStringList notes;
     for (const std::string& warning : imported.warnings)
         notes << toQString(warning);

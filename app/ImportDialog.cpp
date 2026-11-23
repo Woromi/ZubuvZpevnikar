@@ -10,6 +10,8 @@
 #include <QFontDatabase>
 #include <QFontMetrics>
 #include <QFormLayout>
+#include <QUrl>
+#include <QDesktopServices>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -107,6 +109,17 @@ ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::pat
     importButton_->setDefault(true);
 
     auto* layout = new QVBoxLayout(this);
+    wishRow_ = new QWidget(this);
+    auto* wishLayout = new QHBoxLayout(wishRow_);
+    wishLayout->setContentsMargins(0, 0, 0, 0);
+    wishLabel_ = new QLabel(wishRow_);
+    wishLabel_->setWordWrap(true);
+    wishSearch_ = new QPushButton(tr("Find Online"), wishRow_);
+    wishSearch_->setToolTip(tr("Search the web for the song's chords (opens the browser)"));
+    wishLayout->addWidget(wishLabel_, 1);
+    wishLayout->addWidget(wishSearch_);
+    wishRow_->hide();
+    layout->addWidget(wishRow_);
     layout->addWidget(new QLabel(tr("Web address or saved page:")));
     layout->addLayout(sourceRow);
     layout->addWidget(hint);
@@ -378,4 +391,12 @@ void ImportDialog::reject() {
         return;
     }
     QDialog::reject();
+}
+
+void ImportDialog::setWish(const QString& display, const QUrl& search) {
+    wishLabel_->setText(tr("For the wish: %1").arg(display));
+    wishSearch_->disconnect(this);
+    connect(wishSearch_, &QPushButton::clicked, this,
+            [search] { QDesktopServices::openUrl(search); });
+    wishRow_->show();
 }

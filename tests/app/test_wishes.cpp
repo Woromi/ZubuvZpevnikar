@@ -1,0 +1,217 @@
+// Wishes: the wish list (wishes.txt), wishes done and removed from Home, a wish fulfilled by the
+// first save of its imported song; Add to Songbooks after the first save of a new song.
+#include "AppTestAccess.hpp"
+#include "HomeData.hpp"
+#include "HomePage.hpp"
+#include "NewSongDialog.hpp"
+#include "Support.hpp"
+
+#include <QComboBox>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QSettings>
+#include <QTreeWidget>
+#include <catch2/catch_test_macros.hpp>
+
+using A = AppTestAccess;
+using apptest::has;
+using apptest::slurp;
+
+namespace {
+
+const char* const wishBook = R"(\documentclass[chorded]{velkyzpevnik}
+\title{Wish Book}
+\begin{document}
+\begin{songs}{obsah}
+    % TODO: Abba/OurLastSummer
+    \input{WabiDanek/Montgomery}
+    % TODO: Nobody/Wanted
+\end{songs}
+\end{document}
+)";
+
+struct WishWindow {
+    explicit WishWindow(apptest::Fixture& fixture) {
+        window.resize(1300, 900);
+        window.show();
+        REQUIRE(A::openSongbook(window, fixture.root()));
+        A::activityBar(window)->button(ActivityBar::View::Home)->click();
+        page = A::homePage(window);
+    }
+    MainWindow window;
+    HomePage* page = nullptr;
+};
+
+QTreeWidgetItem* wishItem(HomePage& page, const QString& start) {
+    for (QTreeWidgetItemIterator it(A::homeWishes(page)); *it; ++it)
+        if ((*it)->text(0).startsWith(start))
+            return *it;
+    return nullptr;
+}
+
+HomeWish wishOf(const std::vector<HomeWish>& wishes, const QString& text) {
+    for (const HomeWish& w : wishes)
+        if (w.text == text)
+            return w;
+    FAIL("no wish " << text.toStdString());
+    return {};
+}
+
+} // namespace
+
+TEST_CASE("Wishes: the wish list comes first; Add Wish and Remove edit wishes.txt",
+          "[app][wishes]") {
+    apptest::Fixture fixture;
+    apptest::writeFile(fixture / "wishes.txt", "# my wishes\nPavelDobes/NecoOLasce\n");
+    WishWindow w(fixture);
+    QTreeWidget* tree = A::homeWishes(*w.page);
+    REQUIRE(tree->topLevelItemCount() >= 1);
+    CHECK(tree->topLevelItem(0)->text(0) == "Wish list");
+    CHECK(wishItem(*w.page, "Neco O Lasce — Pavel Dobes") != nullptr);
+
+    {
+        auto typed = apptest::answerInputDialog("LodJohnB");
+        emit w.page->wishAddRequested();
+        REQUIRE(typed.fired());
+    }
+    CHECK(slurp(fixture / "wishes.txt") == "# my wishes\nPavelDobes/NecoOLasce\nLodJohnB\n");
+    REQUIRE(wishItem(*w.page, "LodJohnB") != nullptr);
+
+    const auto data = buildHomeData(*A::model(w.window), fixture.root(), {});
+    {
+        auto yes = apptest::answerMessageBox(QMessageBox::Yes);
+        emit w.page->wishRemoveRequested(wishOf(data.wishes, "PavelDobes/NecoOLasce"));
+        REQUIRE(yes.fired());
+    }
+    CHECK(slurp(fixture / "wishes.txt") == "# my wishes\nLodJohnB\n");
+}
+
+TEST_CASE("Wishes: Done puts a library song in its book; a changed file is left alone",
+          "[app][wishes]") {
+    apptest::Fixture fixture;
+    const auto book = fixture / "songbooks/wish/wish.tex";
+    apptest::writeFile(book, wishBook);
+    WishWindow w(fixture);
+    const auto data = buildHomeData(*A::model(w.window), fixture.root(), {});
+    const HomeWish summer = wishOf(data.wishes, "Abba/OurLastSummer");
+    REQUIRE(!summer.song.empty());
+    emit w.page->wishDoneRequested(summer);
+    CHECK(has(slurp(book), "\\begin{songs}{obsah}\n    \\input{Abba/OurLastSummer}\n"
+                           "    \\input{WabiDanek/Montgomery}\n    % TODO: Nobody/Wanted\n"));
+
+    // Remove the other wish (Done kept the line count; a moved line is tested with the save).
+    const HomeWish moved = wishOf(data.wishes, "Nobody/Wanted");
+    {
+        auto yes = apptest::answerMessageBox(QMessageBox::Yes);
+        emit w.page->wishRemoveRequested(moved);
+        REQUIRE(yes.fired());
+    }
+    CHECK(!has(slurp(book), "Nobody/Wanted"));
+
+    // Gone from the file meanwhile: refused with a message, nothing written.
+    const std::string before = slurp(book);
+    {
+        auto yes = apptest::answerMessageBox(QMessageBox::Yes);
+        auto warning = apptest::answerMessageBox(QMessageBox::Ok);
+        emit w.page->wishRemoveRequested(moved);
+        REQUIRE(yes.fired());
+        CHECK(apptest::waitUntil([&] { return warning.fired(); }));
+    }
+    CHECK(slurp(book) == before);
+}
+
+TEST_CASE("Wishes: the first save of an imported wish fulfils it, then Add to Songbooks asks",
+          "[app][wishes]") {
+    apptest::Fixture fixture;
+    const auto book = fixture / "songbooks/wish/wish.tex";
+    apptest::writeFile(book, wishBook);
+    apptest::writeFile(fixture / "wishes.txt", "Someone/ListWish\n");
+    WishWindow w(fixture);
+
+    // A new song standing in for an import of the book's wish "Nobody/Wanted".
+    const auto data = buildHomeData(*A::model(w.window), fixture.root(), {});
+    {
+        auto answer = apptest::answerDialog<NewSongDialog>([](NewSongDialog* d) {
+            d->findChild<QLineEdit*>("newSongTitle")->setText("Wanted");
+            d->findChild<QComboBox*>("newSongArtist")->setCurrentText("Nobody");
+            d->accept();
+        });
+        A::newSong(w.window);
+        REQUIRE(answer.fired());
+    }
+    SongEditor* editor = A::editor(w.window);
+    REQUIRE(editor != nullptr);
+    const auto path = editor->path();
+    A::setPendingWish(w.window, path, wishOf(data.wishes, "Nobody/Wanted"));
+    // A wish above it goes before the save: its line moves up one, it is still found.
+    REQUIRE(removeWish(fixture.root(), wishOf(data.wishes, "Abba/OurLastSummer")));
+
+    // The first save: the wish line becomes the song, then the dialog offers the books; the
+    // wish book has it already (checked, disabled). Not Now.
+    bool offered = false, wishBookHasIt = false;
+    auto dialog = apptest::answerTitledDialog("Add to Songbooks", [&](QDialog* d) {
+        offered = true;
+        for (QTreeWidgetItemIterator it(d->findChild<QTreeWidget*>("addToBooksTree")); *it; ++it)
+            if ((*it)->text(0).startsWith("Wish Book") && (*it)->text(0).contains("has it"))
+                wishBookHasIt = (*it)->checkState(0) == Qt::Checked;
+        d->reject();
+    });
+    A::saveCurrent(w.window);
+    REQUIRE(apptest::waitUntil([&] { return dialog.fired(); }));
+    CHECK(offered);
+    CHECK(wishBookHasIt);
+    CHECK(has(slurp(book), "\\begin{songs}{obsah}\n    \\input{WabiDanek/Montgomery}\n"
+                           "    \\input{Nobody/Wanted}\n\\end{songs}"));
+    CHECK(!A::hasPendingWish(w.window));
+    // A second save asks nothing more.
+    editor->textEdit()->appendPlainText("% more");
+    A::saveCurrent(w.window);
+    QTest::qWait(50);
+}
+
+TEST_CASE("Wishes: Add to Songbooks puts the song into the chosen section", "[app][wishes]") {
+    apptest::Fixture fixture;
+    const auto book = fixture / "songbooks/wish/wish.tex";
+    apptest::writeFile(book, wishBook);
+    apptest::writeFile(fixture / "songbooks/locked/locked.tex",
+                       "% zpevnikar: locked\n" + std::string(wishBook));
+    WishWindow w(fixture);
+    REQUIRE(A::openExistingSong(w.window, fixture / "songs/chords/Ayreon/EMc2.tex"));
+
+    bool lockedDisabled = false;
+    auto dialog = apptest::answerTitledDialog("Add to Songbooks", [&](QDialog* d) {
+        for (QTreeWidgetItemIterator it(d->findChild<QTreeWidget*>("addToBooksTree")); *it; ++it) {
+            const QString text = (*it)->text(0);
+            if (text.contains("locked/locked.tex") && text.contains("locked)"))
+                lockedDisabled = !((*it)->flags() & Qt::ItemIsEnabled);
+            if (text.startsWith("Wish Book") && text.contains("wish/wish.tex"))
+                (*it)->setCheckState(0, Qt::Checked);
+        }
+        for (auto* b : d->findChildren<QPushButton*>())
+            if (b->text() == "Add")
+                b->click();
+    });
+    A::addToBooksAction(w.window)->trigger();
+    REQUIRE(dialog.fired());
+    CHECK(lockedDisabled);
+    // No texlua on PATH in the tests: at the end of the section.
+    REQUIRE(apptest::waitUntil([&] { return !A::bookAdder(w.window)->busy(); }));
+    CHECK(has(slurp(book), "    \\input{WabiDanek/Montgomery}\n    \\input{Ayreon/EMc2}\n"
+                           "    % TODO: Nobody/Wanted\n\\end{songs}"));
+    CHECK(slurp(fixture / "songbooks/locked/locked.tex") ==
+          "% zpevnikar: locked\n" + std::string(wishBook));
+    // The Songbooks page does not take Add to Songbooks' sorting (failed: no texlua) as its own.
+    CHECK(A::sorterWarning(*A::songbooksPage(w.window))->isHidden());
+}
+
+TEST_CASE("Wishes: --library opens a song library for that run only", "[app][wishes]") {
+    apptest::Fixture fixture;
+    QSettings{}.setValue(QStringLiteral("songbook/path"), QStringLiteral("/remembered/library"));
+    MainWindow w;
+    w.show();
+    w.openInitialSongbook(toQString(fixture.root()));
+    CHECK(A::songbookRoot(w) == fixture.root());
+    CHECK(QSettings{}.value(QStringLiteral("songbook/path")).toString() ==
+          QStringLiteral("/remembered/library"));
+    QSettings{}.remove(QStringLiteral("songbook/path"));
+}

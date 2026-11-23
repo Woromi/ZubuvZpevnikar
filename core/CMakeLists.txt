@@ -34,6 +34,7 @@ add_library(zub_core STATIC
     src/songcheck.cpp
     src/textfile.cpp
     src/version.cpp
+    src/wishlist.cpp
 )
 add_library(Zub::core ALIAS zub_core)
 

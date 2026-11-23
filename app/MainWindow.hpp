@@ -1,5 +1,7 @@
 #pragma once
 
+#include "HomeData.hpp"
+
 #include "ActivityBar.hpp"
 #include "ScoreTabs.hpp"
 
@@ -48,7 +50,9 @@ class SongbookCheck;
 class SongDatesRunner;
 class SongbookSorter;
 class SongbooksPage;
+class BookAdder;
 class HomePage;
+class QUrl;
 class SongFilterProxy;
 class SongTableModel;
 class SongActions;
@@ -108,7 +112,23 @@ private:
     // from the song header, else the file name.
     SongEditor* openEditor(const std::filesystem::path& path, const QString& title);
     void showSong(SongEditor* editor, const QString& title, const QString& toolTip);
-    void importSong();
+    void importSong() { importSongFor(std::nullopt); }
+    // Import… of a Home wish: the dialog names the wish; the first save of the song fulfils it.
+    void importSongFor(const std::optional<HomeWish>& wish);
+    // After the first save of a new song (`path`): its pending wish is fulfilled, then Add to
+    // Songbooks asks (not while the app is closing).
+    void onFirstSave(const std::filesystem::path& path, const std::filesystem::path& root);
+    // The first save of `path`: its pending wish fulfilled (no dialog unless it fails).
+    void fulfilPendingWish(const std::filesystem::path& path);
+    // A wish change (`change` writes) unless its book has unsaved LaTeX on the Songbooks page; a
+    // failure is shown; the page reads a changed book again, Home refreshes.
+    std::expected<void, QString>
+    changeWish(const HomeWish& wish, const std::function<std::expected<void, QString>()>& change);
+    // Add to Songbooks… for the saved song at `path`; `afterNew`: asked by the first save (no
+    // dialog when no songbook can take it).
+    void addToSongbooks(const std::filesystem::path& path, bool afterNew);
+    std::string inputNameOfPath(const std::filesystem::path& path) const; // "Artist/Title"
+    QUrl wishSearchUrl(const HomeWish& wish) const;
     void newSong(); // File → New Song…: an empty song by hand, unsaved
     // Shows the song at `path` (already open: kept as it is), closing the open one; false if
     // it could not be loaded or the user kept the open one.
@@ -201,6 +221,15 @@ private:
     SongbooksPage* songbooksPage_ = nullptr; // the songbook assembler
     HomePage* homePage_ = nullptr;           // Home: the start page (the welcome panel without a songbook)
     QTimer* homeTimer_ = nullptr;
+    BookAdder* bookAdder_ = nullptr;         // Add to Songbooks…
+    QAction* addToBooksAction_ = nullptr;    // the song toolbar's Add to Songbooks…
+    bool closing_ = false;                   // the window is closing: no more dialogs
+    // An imported wish waiting for its song's first save.
+    struct PendingWish {
+        std::filesystem::path song;
+        HomeWish wish;
+    };
+    std::optional<PendingWish> pendingWish_;
     std::vector<ActivityBar::View> viewHistory_; // the views left, the latest last (Back)
     // Where the open song was opened from (Close Song returns there); nullopt: unknown.
     std::optional<ActivityBar::View> songOpenedFrom_;

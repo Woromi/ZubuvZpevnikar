@@ -19,6 +19,8 @@
 #include "SongbookCheck.hpp"
 #include "SongbookTree.hpp"
 #include "LibraryDialog.hpp"
+#include "AddToBooksDialog.hpp"
+#include "BookAdder.hpp"
 #include "HomePage.hpp"
 #include "SongbookExporter.hpp"
 #include "SongbooksPage.hpp"
@@ -65,6 +67,13 @@ struct AppTestAccess {
     static HomePage* homePage(MainWindow& w) { return w.homePage_; }
     static const std::filesystem::path& songbookRoot(MainWindow& w) { return w.songbookRoot_; }
     static void refreshHome(MainWindow& w) { w.refreshHome(); }
+    static void setPendingWish(MainWindow& w, const std::filesystem::path& song,
+                               const HomeWish& wish) {
+        w.pendingWish_ = MainWindow::PendingWish{song, wish};
+    }
+    static bool hasPendingWish(MainWindow& w) { return w.pendingWish_.has_value(); }
+    static BookAdder* bookAdder(MainWindow& w) { return w.bookAdder_; }
+    static QAction* addToBooksAction(MainWindow& w) { return w.addToBooksAction_; }
     // ---- HomePage
     static QListWidget* homeOpened(HomePage& p) { return p.opened_; }
     static QListWidget* homeAdded(HomePage& p) { return p.added_; }
