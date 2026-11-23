@@ -1,7 +1,9 @@
 // Hidden [.tools] cases that run the real tools: lualatex (the song preview), texlua (the
 // songbook sorter), python3 (the package's linters), the converter, fluidsynth (playback).
 // Run: build/debug/tests/app/zub_app_tests "[.tools]"   (each case skips what it cannot find)
+#include "ActivityBar.hpp"
 #include "AppTestAccess.hpp"
+#include "SongListPage.hpp"
 #include "ConverterRunner.hpp"
 #include "PreviewRunner.hpp"
 #include "ScorePreviewPane.hpp"
@@ -228,9 +230,13 @@ TEST_CASE("Check Songs: the key check offers the key and a nocheck comment",
                 return;
             }
     });
+    A::activityBar(w)->button(ActivityBar::View::Home)->click(); // started from Home
     A::scanSongbook(w);
     REQUIRE(dialog.fired());
     REQUIRE(apptest::waitUntil([&] { return !A::scanRunning(w); }, 60000));
+    // Found something: the song list shows them.
+    CHECK(A::pages(w)->currentWidget() == A::listPage(w));
+    CHECK(A::show(*A::listPage(w))->currentData().toInt() == SongListPage::Changes);
 
     const auto row = [&](const char* name) {
         return A::model(w)->rowOf(fixture / "songs/chords" / name);

@@ -369,6 +369,16 @@ void MainWindow::createCentralWidget() {
     });
     songbookCheck_ = new SongbookCheck(this, model_, proxy_, listPage_, songActions_,
                                        std::move(checkHooks));
+    // The results are in the song list: shown there (filtered), unless a song is being edited.
+    connect(songbookCheck_, &SongbookCheck::finished, this, [this](int found, bool cancelled) {
+        if (found > 0) {
+            if (pages_->currentWidget() != songPage_)
+                showView(ActivityBar::View::Songs);
+        } else if (!cancelled) {
+            QMessageBox::information(this, tr("Check Songs"),
+                                     tr("No song with possible changes was found."));
+        }
+    });
     connect(songbookCheck_, &SongbookCheck::statusMessage, this,
             [this](const QString& text, int timeoutMs) { statusBar()->showMessage(text, timeoutMs); });
     connect(songActions_, &SongActions::statusMessage, this,

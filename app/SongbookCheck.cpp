@@ -232,6 +232,7 @@ void SongbookCheck::start() {
                 tr("%n song(s) with possible changes: open one to see them and decide.", nullptr,
                    found_),
             15000);
+        emit finished(found_, cancelled);
     });
     scan_->start();
 }

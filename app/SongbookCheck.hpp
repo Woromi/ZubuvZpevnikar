@@ -38,6 +38,8 @@ public:
 
 signals:
     void statusMessage(const QString& text, int timeoutMs);
+    // The scan ended: `found` songs with possible changes (the list's filter shows them).
+    void finished(int found, bool cancelled);
 
 private:
     QWidget* window_;
