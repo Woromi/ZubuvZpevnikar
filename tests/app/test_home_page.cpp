@@ -5,6 +5,7 @@
 #include "HomeData.hpp"
 #include "HomePage.hpp"
 #include "SongListPage.hpp"
+#include "SongFilterProxy.hpp"
 #include "SongTableModel.hpp"
 #include "Support.hpp"
 #include "WelcomePage.hpp"
@@ -317,4 +318,35 @@ TEST_CASE("Home: a refresh keeps the chosen wish; a song that did not open is no
         emit w.page->songRequested(fixture / "songs/chords/Nobody/Missing.tex");
     }
     CHECK(rememberedSongs(fixture.root()).empty());
+}
+
+TEST_CASE("Home: Back and Close Song return to where the song was opened from", "[app][home]") {
+    apptest::Fixture fixture;
+    const auto montgomery = fixture / "songs/chords/WabiDanek/Montgomery.tex";
+    apptest::writeFile(montgomery, slurp(montgomery) + "% TODO: the bridge\n");
+    HomeWindow w(fixture);
+    auto* pages = A::pages(w.window);
+    const auto openFromHome = [&] {
+        click(A::homeTodo(*w.page), itemContaining(A::homeTodo(*w.page), "the bridge"));
+        REQUIRE(pages->currentWidget() == A::songPage(w.window));
+    };
+    // Back (the mouse's back button): Home, the song stays open.
+    openFromHome();
+    QTest::mouseClick(pages, Qt::BackButton);
+    CHECK(pages->currentWidget() == static_cast<QWidget*>(w.page));
+    CHECK(A::editor(w.window) != nullptr);
+    // Close Song after opening it from Home again: Home.
+    openFromHome();
+    REQUIRE(A::closeSong(w.window));
+    CHECK(pages->currentWidget() == static_cast<QWidget*>(w.page));
+
+    // Back from Home with nothing before it (the start): the song list.
+    QTest::mouseClick(pages, Qt::BackButton);
+    CHECK(pages->currentWidget() == A::listPage(w.window));
+
+    // From the list: back to the list.
+    A::openSong(w.window, A::proxy(w.window)->index(0, 0));
+    REQUIRE(pages->currentWidget() == A::songPage(w.window));
+    REQUIRE(A::closeSong(w.window));
+    CHECK(pages->currentWidget() == A::listPage(w.window));
 }

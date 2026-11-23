@@ -95,7 +95,10 @@ private:
     void updateLanguageFilter();
     // The views of the activity bar: the song list, the open song (Song falls back to the list
     // without one) and the songbooks. Switching keeps the open song open.
+    // Shows a view; the one it leaves goes onto the Back history.
     void showView(ActivityBar::View view);
+    void switchView(ActivityBar::View view);            // the switch itself, no history
+    std::optional<ActivityBar::View> currentView() const; // nullopt before any view is shown
     void openSettings(); // File → Settings…, the bar's gear
     void updateStatus();
 
@@ -118,6 +121,8 @@ private:
     bool closeSong();                      // false if the user cancelled
     // Back to the song list from the song page (closing the song) or the Songbooks page; the
     // mouse's back button and Alt+Left.
+    // Back (Alt+Left, the mouse's back button, closing a song): to the view shown before, the
+    // song only while it is still open; the song list when there is none.
     void goBack();
     bool confirmClose(SongEditor* editor); // asks Save/Discard/Cancel if modified
     bool confirmCloseAll();
@@ -195,7 +200,11 @@ private:
     QWidget* songPage_ = nullptr;
     SongbooksPage* songbooksPage_ = nullptr; // the songbook assembler
     HomePage* homePage_ = nullptr;           // Home: the start page (the welcome panel without a songbook)
-    QTimer* homeTimer_ = nullptr;            // refreshes Home a moment after the songs changed
+    QTimer* homeTimer_ = nullptr;
+    std::vector<ActivityBar::View> viewHistory_; // the views left, the latest last (Back)
+    // Where the open song was opened from (Close Song returns there); nullopt: unknown.
+    std::optional<ActivityBar::View> songOpenedFrom_;
+    void noteSongOpenedFrom(); // the current view, unless it is the song page            // refreshes Home a moment after the songs changed
     SongbookSorter* songbookSorter_ = nullptr;
     SongbookExporter* songbookExporter_ = nullptr;
     QToolBar* songToolBar_ = nullptr;

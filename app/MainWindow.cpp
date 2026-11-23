@@ -518,6 +518,7 @@ void MainWindow::openInitialSongbook(const QString& commandLinePath) {
             showWelcome(commandLinePath);
         else
             showView(ActivityBar::View::Home);
+        viewHistory_.clear(); // the start: nothing to go back to
         return;
     }
 
@@ -533,6 +534,7 @@ void MainWindow::openInitialSongbook(const QString& commandLinePath) {
         showWelcome(path);
     else
         showView(ActivityBar::View::Home);
+    viewHistory_.clear(); // the start: nothing to go back to
 }
 
 void MainWindow::showWelcome(const QString& path) {
@@ -660,7 +662,32 @@ void MainWindow::showSongbooks() {
     showView(ActivityBar::View::Songbooks);
 }
 
+std::optional<ActivityBar::View> MainWindow::currentView() const {
+    using View = ActivityBar::View;
+    const QWidget* page = pages_->currentWidget();
+    if (page == homePage_)
+        return View::Home;
+    if (page == listPage_)
+        return View::Songs;
+    if (page == songPage_)
+        return View::Song;
+    if (page == songbooksPage_)
+        return View::Songbooks;
+    return std::nullopt;
+}
+
 void MainWindow::showView(ActivityBar::View view) {
+    const auto from = currentView();
+    switchView(view);
+    const auto to = currentView();
+    if (from && to && *from != *to) {
+        viewHistory_.push_back(*from);
+        if (viewHistory_.size() > 50)
+            viewHistory_.erase(viewHistory_.begin());
+    }
+}
+
+void MainWindow::switchView(ActivityBar::View view) {
     using View = ActivityBar::View;
     if (view == View::Song && !editor_)
         view = View::Songs;
@@ -757,7 +784,13 @@ SongEditor* MainWindow::openEditor(const std::filesystem::path& path, const QStr
     return editor;
 }
 
+void MainWindow::noteSongOpenedFrom() {
+    if (const auto view = currentView(); view && *view != ActivityBar::View::Song)
+        songOpenedFrom_ = *view;
+}
+
 void MainWindow::showSong(SongEditor* editor, const QString& title, const QString& toolTip) {
+    noteSongOpenedFrom();
     if (editor_ && editor_ != editor)
         editor_->hideSuggestion();
     editor_ = editor;
@@ -907,8 +940,19 @@ void MainWindow::replaceSongText(const std::string& edited) {
 }
 
 void MainWindow::goBack() {
-    // To the list; the song stays open (the bar or Ctrl+2 bring it back, Ctrl+W closes it).
-    showView(ActivityBar::View::Songs);
+    // The song stays open when Back leaves it (the bar or Ctrl+2 bring it back, Ctrl+W closes it).
+    using View = ActivityBar::View;
+    const auto current = currentView();
+    while (!viewHistory_.empty()) {
+        const View view = viewHistory_.back();
+        viewHistory_.pop_back();
+        if ((view == View::Song && !editor_) || (current && view == *current))
+            continue;
+        switchView(view);
+        if (currentView() != current)
+            return;
+    }
+    switchView(View::Songs);
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
@@ -946,8 +990,14 @@ bool MainWindow::closeSong() {
     editor->setParent(nullptr); // out of the stack now; the next song takes index 0
     editor->deleteLater();
 
-    if (pages_->currentWidget() == songPage_)
-        showView(ActivityBar::View::Songs);
+    // Where the song was opened from (the list, Home, Songbooks), else Back.
+    if (pages_->currentWidget() == songPage_) {
+        if (songOpenedFrom_)
+            showView(*songOpenedFrom_);
+        else
+            goBack();
+    }
+    songOpenedFrom_.reset();
     updateSongActions();
     updateWindowTitle();
     requestPreview(); // cancels the build and clears the pane
@@ -1870,6 +1920,7 @@ void MainWindow::importSong() {
 bool MainWindow::openExistingSong(const std::filesystem::path& path) {
     // Already open: keep it as it is (edits, undo history, approvals).
     if (editor_ && editor_->path() == path) {
+        noteSongOpenedFrom();
         rememberSong(songbookRoot_, path); // for Home's Continue editing
         editor_->textEdit()->setFocus();
         return true;
