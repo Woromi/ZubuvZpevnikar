@@ -491,6 +491,8 @@ void MainWindow::createCentralWidget() {
     });
     connect(homePage_, &HomePage::wishImportRequested, this,
             [this](HomeWish wish) { importSongFor(wish); });
+    connect(homePage_, &HomePage::wishNewSongRequested, this,
+            [this](HomeWish wish) { newSongFor(wish); });
     connect(homePage_, &HomePage::wishDoneRequested, this, [this](HomeWish wish) {
         changeWish(wish, [&] { return fulfilWish(songbookRoot_, wish, inputNameOfPath(wish.song)); });
         refreshHome();
@@ -2084,7 +2086,7 @@ bool MainWindow::openExistingSong(const std::filesystem::path& path) {
     return true;
 }
 
-void MainWindow::newSong() {
+void MainWindow::newSongFor(const std::optional<HomeWish>& wish) {
     if (songbookRoot_.empty()) {
         QMessageBox::information(this, tr("New Song"), tr("Open a song library first."));
         return;
@@ -2101,6 +2103,16 @@ void MainWindow::newSong() {
             artistFolders.emplace(artist, toQString(song->path.parent_path().filename()));
     }
     NewSongDialog dialog(artistFolders, zub::collections(songbookRoot_), this);
+    if (wish) {
+        // "PavelDobes/NecoOLasce": the artist's folder and the title's words; any other text
+        // is the title.
+        const qsizetype slash = wish->name.lastIndexOf(QLatin1Char('/'));
+        if (wish->name.isEmpty())
+            dialog.setSong(wish->text, {});
+        else
+            dialog.setSong(splitWords(wish->name.mid(slash + 1)),
+                           splitWords(wish->name.left(slash)), wish->name.left(slash));
+    }
     if (dialog.exec() != QDialog::Accepted)
         return;
     const std::string inputName = toStdString(dialog.inputName());
@@ -2126,6 +2138,8 @@ void MainWindow::newSong() {
     auto* editor = new SongEditor(dest.path, *repository_);
     editor->openNew(song.text);
     showSong(editor, dialog.title(), toQString(dest.inputName) + tr(" (new, not saved)"));
+    if (wish)
+        pendingWish_ = PendingWish{dest.path, *wish}; // fulfilled by the first save
     editor->setCursorByteOffset(song.cursor);
     statusBar()->showMessage(
         tr("New song %1: write it, then save with Ctrl+S.").arg(toQString(dest.inputName)), 10000);

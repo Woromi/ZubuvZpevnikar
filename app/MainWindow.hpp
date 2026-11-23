@@ -129,7 +129,9 @@ private:
     void addToSongbooks(const std::filesystem::path& path, bool afterNew);
     std::string inputNameOfPath(const std::filesystem::path& path) const; // "Artist/Title"
     QUrl wishSearchUrl(const HomeWish& wish) const;
-    void newSong(); // File → New Song…: an empty song by hand, unsaved
+    void newSong() { newSongFor(std::nullopt); } // File → New Song…: an empty song by hand
+    // New Song… of a Home wish: title and artist filled from it; the first save fulfils it.
+    void newSongFor(const std::optional<HomeWish>& wish);
     // Shows the song at `path` (already open: kept as it is), closing the open one; false if
     // it could not be loaded or the user kept the open one.
     bool openExistingSong(const std::filesystem::path& path);

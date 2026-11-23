@@ -91,3 +91,14 @@ void NewSongDialog::update() {
     file_->setCursorPosition(0);
     buttons_->button(QDialogButtonBox::Ok)->setEnabled(!name.isEmpty());
 }
+
+void NewSongDialog::setSong(const QString& title, const QString& artist,
+                            const QString& artistFolder) {
+    title_->setText(title);
+    QString shown = artist;
+    for (const auto& [name, folder] : artistFolders_)
+        if (!artistFolder.isEmpty() && folder == artistFolder)
+            shown = name;
+    artist_->setCurrentText(shown);
+    update();
+}

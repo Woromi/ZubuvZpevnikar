@@ -215,3 +215,30 @@ TEST_CASE("Wishes: --library opens a song library for that run only", "[app][wis
           QStringLiteral("/remembered/library"));
     QSettings{}.remove(QStringLiteral("songbook/path"));
 }
+
+TEST_CASE("Wishes: New Song… writes a wish by hand, the first save fulfils it", "[app][wishes]") {
+    apptest::Fixture fixture;
+    apptest::writeFile(fixture / "wishes.txt", "PavelDobes/NecoOLasce\nWabi/Montgomery\n");
+    WishWindow w(fixture);
+    const auto data = buildHomeData(*A::model(w.window), fixture.root(), {});
+    QString title, artist;
+    {
+        auto answer = apptest::answerDialog<NewSongDialog>([&](NewSongDialog* d) {
+            title = d->title();
+            artist = d->artist();
+            d->accept();
+        });
+        emit w.page->wishNewSongRequested(wishOf(data.wishes, "PavelDobes/NecoOLasce"));
+        REQUIRE(answer.fired());
+    }
+    CHECK(title == "Neco O Lasce");
+    CHECK(artist == "Pavel Dobes");
+    SongEditor* editor = A::editor(w.window);
+    REQUIRE(editor != nullptr);
+    CHECK(editor->textEdit()->toPlainText().startsWith("\\beginsong{Neco O Lasce}[\n    by={Pavel Dobes},"));
+
+    auto later = apptest::answerTitledDialog("Add to Songbooks", [](QDialog* d) { d->reject(); });
+    A::saveCurrent(w.window);
+    CHECK(slurp(fixture / "wishes.txt") == "Wabi/Montgomery\n");
+    apptest::waitUntil([&] { return later.fired(); }, 2000);
+}

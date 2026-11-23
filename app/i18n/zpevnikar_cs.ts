@@ -400,6 +400,15 @@ Použijte vestavěný.</translation>
         <source>A song you want: a new line of the wish list (wishes.txt in the song library)</source>
         <translation>Píseň, kterou chcete: nový řádek seznamu přání (wishes.txt v knihovně písní)</translation>
     </message>
+    <message>
+        <source>New Song…</source>
+        <comment>Home: write a wished song by hand</comment>
+        <translation>Nová píseň…</translation>
+    </message>
+    <message>
+        <source>Write the song by hand: a new song with the wish&apos;s title and artist</source>
+        <translation>Napsat píseň ručně: nová píseň s názvem a interpretem z přání</translation>
+    </message>
     <message numerus="yes">
         <source>%n song(s)</source>
         <translation>

@@ -27,6 +27,9 @@ public:
     // zub::songimport::fileNameOf of each; empty while either part is.
     QString inputName() const;
     QString collection() const; // the folder under songs/ the song goes to ("chords")
+    // Fills the title and the artist (a wish's): an artist whose folder is `artistFolder` is
+    // chosen as the library writes them, else `artist` as given.
+    void setSong(const QString& title, const QString& artist, const QString& artistFolder = {});
 
 private:
     void update();

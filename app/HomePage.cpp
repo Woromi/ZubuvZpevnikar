@@ -101,7 +101,10 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     wishAdd_ = new QPushButton(tr("Add Wish…"), wishesCard_);
     wishAdd_->setToolTip(tr("A song you want: a new line of the wish list (wishes.txt in the song "
                             "library)"));
+    wishNew_ = new QPushButton(tr("New Song…", "Home: write a wished song by hand"), wishesCard_);
+    wishNew_->setToolTip(tr("Write the song by hand: a new song with the wish's title and artist"));
     wishButtons->addWidget(wishImport_);
+    wishButtons->addWidget(wishNew_);
     wishButtons->addWidget(wishOpen_);
     wishButtons->addWidget(wishDone_);
     wishButtons->addWidget(wishRemove_);
@@ -144,6 +147,10 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     connect(wishImport_, &QPushButton::clicked, this, [this] {
         if (const HomeWish* wish = selectedWish())
             emit wishImportRequested(*wish);
+    });
+    connect(wishNew_, &QPushButton::clicked, this, [this] {
+        if (const HomeWish* wish = selectedWish())
+            emit wishNewSongRequested(*wish);
     });
     connect(wishDone_, &QPushButton::clicked, this, [this] {
         if (const HomeWish* wish = selectedWish(); wish && !wish->song.empty())
@@ -329,6 +336,7 @@ void HomePage::updateWishButtons() {
     wishImport_->setEnabled(wish != nullptr);
     wishOpen_->setEnabled(wish && !wish->song.empty());
     wishDone_->setEnabled(wish && !wish->song.empty());
+    wishNew_->setEnabled(wish && wish->song.empty());
     wishRemove_->setEnabled(wish != nullptr);
 }
 

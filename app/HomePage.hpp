@@ -42,7 +42,8 @@ signals:
     void showAllRequested(HomePage::ShowAll which);
     void bookRequested(const QString& id);
     void wishSearchRequested(HomeWish wish); // Find Online
-    void wishImportRequested(HomeWish wish); // Import…
+    void wishImportRequested(HomeWish wish);  // Import…
+    void wishNewSongRequested(HomeWish wish); // New Song… (written by hand)
     void wishDoneRequested(HomeWish wish);   // Done (the song is in the library)
     void wishRemoveRequested(HomeWish wish); // Remove
     void wishAddRequested();                 // Add Wish…
@@ -81,6 +82,7 @@ private:
     QPushButton* wishImport_ = nullptr;
     QPushButton* wishOpen_ = nullptr;
     QPushButton* wishDone_ = nullptr;
+    QPushButton* wishNew_ = nullptr;
     QPushButton* wishRemove_ = nullptr;
     QPushButton* wishAdd_ = nullptr;
     std::vector<HomeWish> wishList_;
