@@ -73,7 +73,7 @@ jobs:
           set -e
           echo "exit status: $status"
           test "$status" -eq 124 # still running when the timeout stopped it
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         with:
           name: appimage
           path: dist/*.AppImage

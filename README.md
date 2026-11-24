@@ -41,7 +41,7 @@ start it adds itself to the application menu (with its icon; it follows the AppI
 or update it; Settings can turn that off). The songs are not inside: the app opens your song
 library, or creates or downloads one. Install the
 programs the songs are built with yourself (see the requirements below). Windows is not supported
-yet; CI builds it to show what is missing.
+yet; CI builds and tests it there.
 
 ## Building
 

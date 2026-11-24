@@ -81,7 +81,7 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zpevnikar   # headless smoke
 
 ## Releases and CI
 
-- `.github/workflows/ci.yml`: core (Ubuntu), the app (Fedora 42), and Windows (`windows-2022`, MSVC, Qt 6.8.3 from aqt, KF6 SyntaxHighlighting built by `.github/actions/kf6-syntax-highlighting`): `continue-on-error` until Windows is supported; it shows what breaks there.
+- `.github/workflows/ci.yml`: core (Ubuntu), the app (Fedora 42), and Windows (`windows-2022`, MSVC, Qt 6.8.3 from aqt, KF6 SyntaxHighlighting built by `.github/actions/kf6-syntax-highlighting`): all tests pass there since 2026-11-24 and the job must stay green (Windows paths, `;` in TEXINPUTS, no open files while replacing them); the MSVC environment comes from `vcvars64.bat` in a step of its own (no Node 20 action).
 - `.github/workflows/release.yml`: a tag `v<VERSION of CMakeLists.txt>` builds the Linux AppImage (Ubuntu 24.04, Qt 6.8.3 from aqt, `packaging/appimage.sh` with linuxdeploy) and attaches it to a GitHub release; run by hand it only builds the artifact. The user tags and pushes, never Claude.
 - Run as an AppImage (`$APPIMAGE`), the app writes its launcher entry and icons into `~/.local/share` on every start where they changed (`DesktopIntegration`, `zub::desktopentry::forAppImage`: Exec/TryExec = the AppImage, marker `X-Zpevnikar-AppImage=true`); an entry without the marker (e.g. from `cmake --install`) is never replaced or removed. Settings → "Show Zpěvníkář in the application menu" (`desktop/menuEntry`, only shown for an AppImage).
 - Windows: one codebase; the OS-specific parts get a Windows variant (TEXINPUTS `;`, stopping a build's process tree, bash for the package's `build.sh`, `locale -a`). See PLAN.md.
