@@ -35,7 +35,7 @@ QWidget* row(QWidget* parent, std::initializer_list<QWidget*> widgets) {
 } // namespace
 
 SettingsDialog::SettingsDialog(const State& state, QWidget* parent)
-    : QDialog(parent), state_(state), converter_(state.converter), soundfont_(state.soundfont) {
+    : QDialog(parent), state_(state), soundfont_(state.soundfont) {
     setWindowTitle(tr("Settings"));
     auto* form = new QFormLayout;
 
@@ -49,29 +49,6 @@ SettingsDialog::SettingsDialog(const State& state, QWidget* parent)
     auto* languageNote = new QLabel(
         tr("Applies when %1 is started again.").arg(QApplication::applicationDisplayName()), this);
     form->addRow(tr("&Language:"), row(this, {language_, languageNote}));
-
-    converterLine_ = pathLine(this);
-    converterLine_->setObjectName(QStringLiteral("settingsConverter"));
-    auto* chooseConverter = new QPushButton(tr("Choose…"), this);
-    useBuiltIn_ = new QPushButton(tr("Use Built-in"), this);
-    useBuiltIn_->setToolTip(tr("The converter built with this app, the version it is tested with"));
-    connect(chooseConverter, &QPushButton::clicked, this, [this] {
-        const QString path = QFileDialog::getOpenFileName(
-            this, tr("Choose chords_converter"),
-            converter_.isEmpty() ? QString() : QFileInfo(converter_).absolutePath());
-        if (path.isEmpty())
-            return;
-        converterChanged_ = true;
-        converter_ = path;
-        showConverter(path, true);
-    });
-    connect(useBuiltIn_, &QPushButton::clicked, this, [this] {
-        converterChanged_ = true;
-        converter_.clear();
-        showConverter(state_.builtInConverter, false);
-    });
-    form->addRow(tr("&Converter:"), row(this, {converterLine_, chooseConverter, useBuiltIn_}));
-    showConverter(state.converter, state.converterChosen);
 
     soundfontLine_ = pathLine(this);
     soundfontLine_->setObjectName(QStringLiteral("settingsSoundfont"));
@@ -158,13 +135,6 @@ void SettingsDialog::showBuildFilesSize(qint64 bytes) {
 
 QString SettingsDialog::language() const {
     return language_->currentData().toString();
-}
-
-void SettingsDialog::showConverter(const QString& path, bool chosen) {
-    converterLine_->setText(path);
-    converterLine_->setPlaceholderText(tr("not found: choose one"));
-    converterLine_->setToolTip(chosen ? tr("Chosen by you") : tr("Found automatically"));
-    useBuiltIn_->setEnabled(chosen && !state_.builtInConverter.isEmpty());
 }
 
 void SettingsDialog::showSoundfont(const QString& path, bool chosen) {

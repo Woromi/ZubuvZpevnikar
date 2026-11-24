@@ -49,11 +49,11 @@ std::filesystem::path converterPath() {
     return std::filesystem::path(ZUB_CONVERTER_BUILT);
 }
 
-// The converter of this build as "the remembered one" in the isolated settings.
+// The converter of this build, as a developer would point the app at one (ZUB_CONVERTER).
 void useBuiltConverter() {
     if (!std::filesystem::exists(converterPath()))
         SKIP("chords_converter is not built (cargo missing or the submodule not checked out)");
-    QSettings().setValue("converter/path", toQString(converterPath()));
+    qputenv("ZUB_CONVERTER", QFile::encodeName(toQString(converterPath())));
 }
 
 std::vector<std::set<int>> programs(const std::filesystem::path& file) {

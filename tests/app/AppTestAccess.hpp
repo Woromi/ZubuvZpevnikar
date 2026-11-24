@@ -106,6 +106,7 @@ struct AppTestAccess {
     static void saveCurrent(MainWindow& w) { w.saveCurrent(); }
     static bool closeSong(MainWindow& w) { return w.closeSong(); }
     static void openSettings(MainWindow& w) { w.openSettings(); }
+    static std::filesystem::path findConverter(MainWindow& w) { return w.findConverter(); }
     static void offerPapers(MainWindow& w, SongEditor* editor, const std::string& measuredText,
                             const zub::songsuggest::Suggestions& suggestions) {
         w.songActions_->offerPapers(editor, measuredText, suggestions);

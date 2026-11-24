@@ -59,14 +59,10 @@ ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::pat
     hint->setWordWrap(true);
 
     converterLabel_ = new QLabel;
-    chooseConverter_ = new QPushButton(tr("Choose…"));
-    useBuiltIn_ = new QPushButton(tr("Use Built-in"));
-    useBuiltIn_->setToolTip(tr("Use the chords_converter built with this app"));
+    converterLabel_->setObjectName(QStringLiteral("importConverter"));
     auto* converterRow = new QHBoxLayout;
     converterRow->addWidget(new QLabel(tr("Converter:")));
     converterRow->addWidget(converterLabel_, 1);
-    converterRow->addWidget(useBuiltIn_);
-    converterRow->addWidget(chooseConverter_);
 
     tidy_ = new QCheckBox(tr("Tidy the song (repeated choruses, chord positions)"));
     tidy_->setChecked(QSettings{}.value(tidyKey, true).toBool());
@@ -156,14 +152,6 @@ ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::pat
     connect(source_, &QLineEdit::textChanged, this, [this] { updateImportEnabled(); });
     connect(source_, &QLineEdit::returnPressed, importButton_, &QPushButton::click);
     connect(browse_, &QPushButton::clicked, this, [this] { chooseSource(); });
-    connect(chooseConverter_, &QPushButton::clicked, this, [this] { chooseConverter(); });
-    connect(useBuiltIn_, &QPushButton::clicked, this, [this] {
-        converter_ = builtIn_;
-        converterChosen_ = false;
-        converterReset_ = true;
-        updateConverterLabel();
-        updateImportEnabled();
-    });
     connect(importButton_, &QPushButton::clicked, this, [this] { startImport(); });
     connect(buttons_, &QDialogButtonBox::rejected, this, &ImportDialog::reject);
 
@@ -193,7 +181,11 @@ void ImportDialog::updateConverterLabel() {
         const QString path = toQString(converter_);
         const QFontMetrics metrics(converterLabel_->font());
         converterLabel_->setStyleSheet({});
-        QString shown = converter_ == builtIn_ ? tr("built-in (%1)").arg(path) : path;
+        QString shown = converter_ == builtIn_ ? tr("built-in (%1)").arg(path)
+                        : !qEnvironmentVariable("ZUB_CONVERTER").isEmpty() &&
+                                toPath(qEnvironmentVariable("ZUB_CONVERTER")) == converter_
+                            ? tr("from ZUB_CONVERTER (%1)").arg(path)
+                            : path;
         shown = metrics.elidedText(shown, Qt::ElideMiddle, 380);
         const auto answer = converterVersion(converter_);
         QString tip = path;
@@ -214,10 +206,9 @@ void ImportDialog::updateConverterLabel() {
     } else {
         converterLabel_->setStyleSheet(QString::fromLatin1(errorStyle));
         converterLabel_->setText(tr("chords_converter not found — build the app with "
-                                    "ZUB_BUILD_CONVERTER, or choose it"));
+                                    "ZUB_BUILD_CONVERTER, or set ZUB_CONVERTER to one"));
         converterLabel_->setToolTip(toQString(converter_));
     }
-    useBuiltIn_->setVisible(!builtIn_.empty() && converter_ != builtIn_);
     converterLabel_->setMinimumWidth(0);
     converterLabel_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
 }
@@ -235,24 +226,10 @@ void ImportDialog::chooseSource() {
         source_->setText(file);
 }
 
-void ImportDialog::chooseConverter() {
-    const QString file =
-        QFileDialog::getOpenFileName(this, tr("Choose chords_converter"), toQString(converter_));
-    if (file.isEmpty())
-        return;
-    converter_ = toPath(file);
-    converterChosen_ = true;
-    converterReset_ = false;
-    updateConverterLabel();
-    updateImportEnabled();
-}
-
 void ImportDialog::setRunning(bool running) {
     running_ = running;
     source_->setEnabled(!running);
     browse_->setEnabled(!running);
-    chooseConverter_->setEnabled(!running);
-    useBuiltIn_->setEnabled(!running);
     tidy_->setEnabled(!running);
     botCheck_->setEnabled(!running);
     updateImportEnabled();

@@ -109,7 +109,8 @@ namespace {
 
 const auto songbookPathKey = QStringLiteral("songbook/path");
 const auto previewClassKey = QStringLiteral("preview/class");
-const auto converterKey = QStringLiteral("converter/path");
+// Was: the converter chosen in Settings or the import dialog (removed 2026-11-24; ZUB_CONVERTER).
+const auto oldConverterKey = QStringLiteral("converter/path");
 const auto geometryKey = QStringLiteral("window/geometry");
 const auto languageKey = QStringLiteral("ui/language");
 const auto soundfontKey = QStringLiteral("playback/soundfont"); // read by findSoundTools
@@ -150,6 +151,9 @@ MainWindow::MainWindow(QWidget* parent)
     issuesLabel_ = new QLabel(this);
     statusBar()->addPermanentWidget(issuesLabel_);
     updateStatus();
+
+    // A converter remembered by older versions is no longer used: forget it.
+    QSettings{}.remove(oldConverterKey);
 
     // Window size and pane widths as the user left them.
     const QSettings settings;
@@ -1937,10 +1941,6 @@ void MainWindow::openSettings() {
     SettingsDialog::State state;
     QSettings settings;
     state.language = settings.value(languageKey).toString();
-    state.builtInConverter = toQString(builtInConverter());
-    state.converter = toQString(findConverter());
-    state.converterChosen = !settings.value(converterKey).toString().isEmpty() &&
-                            state.converter == settings.value(converterKey).toString();
     const SoundTools tools = findSoundTools();
     state.soundfont = toQString(tools.soundfont);
     state.soundfontChosen = !settings.value(soundfontKey).toString().isEmpty() &&
@@ -1959,18 +1959,6 @@ void MainWindow::openSettings() {
         QMessageBox::information(this, tr("Language"),
                                  tr("The language changes when %1 is started again.")
                                      .arg(QApplication::applicationDisplayName()));
-    }
-    if (dialog.converterChanged()) {
-        // Never remember the built-in one: after an update it would shadow the new build.
-        if (dialog.converter().isEmpty() || toPath(dialog.converter()) == builtInConverter())
-            settings.remove(converterKey);
-        else if (usableConverter(dialog.converter()))
-            settings.setValue(converterKey, dialog.converter());
-        else
-            QMessageBox::warning(
-                this, tr("Settings"),
-                tr("%1 is not a program that can be run.").arg(dialog.converter()));
-        updateSongActions();
     }
     if (dialog.soundfontChanged()) {
         if (dialog.soundfont().isEmpty())
@@ -2009,12 +1997,12 @@ qint64 MainWindow::deleteBuildFiles() {
 }
 
 std::filesystem::path MainWindow::findConverter() const {
-    // The built-in converter is the version this app is tested with. Another one is used only
-    // when the user chose it in the import dialog; PATH and ~/.cargo/bin are fallbacks for an
-    // app built without it (ZUB_BUILD_CONVERTER=OFF).
+    // The built-in converter is the version this app is tested with. ZUB_CONVERTER (an absolute
+    // path) overrides it, to try a converter build before its pin is bumped; PATH and
+    // ~/.cargo/bin are fallbacks for an app built without it (ZUB_BUILD_CONVERTER=OFF).
     const auto builtIn = builtInConverter();
     QStringList candidates{
-        QSettings{}.value(converterKey).toString(),
+        qEnvironmentVariable("ZUB_CONVERTER"),
         builtIn.empty() ? QString{} : toQString(builtIn),
         QStandardPaths::findExecutable(QStringLiteral("chords_converter")),
         // cargo install puts it here, which is not always on PATH for GUI apps
@@ -2032,17 +2020,10 @@ void MainWindow::importSongFor(const std::optional<HomeWish>& wish) {
         QMessageBox::information(this, tr("Import Song"), tr("Open a song library first."));
         return;
     }
-    const auto builtIn = builtInConverter();
-    ImportDialog dialog(findConverter(), builtIn, this);
+    ImportDialog dialog(findConverter(), builtInConverter(), this);
     if (wish)
         dialog.setWish(wishDisplayText(wish->text, wish->name), wishSearchUrl(*wish));
     const int result = dialog.exec();
-    // Remember only a converter the user picked, and never the built-in one: a remembered
-    // automatic find would shadow the built-in converter after an update.
-    if (dialog.converterReset() || (dialog.converterChosen() && dialog.converter() == builtIn))
-        QSettings{}.remove(converterKey);
-    else if (dialog.converterChosen())
-        QSettings{}.setValue(converterKey, toQString(dialog.converter()));
     if (result != QDialog::Accepted)
         return;
     const zub::songimport::Imported& imported = dialog.imported();

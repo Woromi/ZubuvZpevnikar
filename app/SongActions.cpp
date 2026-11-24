@@ -119,7 +119,8 @@ void SongActions::startTidy(const QString& note) {
     const std::filesystem::path converter = hooks_.findConverter();
     if (converter.empty()) {
         showStatus(
-            tr("Tidy needs chords_converter, which was not found: choose it in Settings (Ctrl+,)."),
+            tr("Tidy needs chords_converter, which was not found: it is built with the app "
+               "(ZUB_BUILD_CONVERTER)."),
             8000);
         return;
     }
@@ -265,7 +266,8 @@ void SongActions::startProposals(SongAction action) {
     const std::filesystem::path converter = hooks_.findConverter();
     if (converter.empty()) {
         showStatus(
-            tr("%1 needs chords_converter, which was not found: choose it in Settings (Ctrl+,).")
+            tr("%1 needs chords_converter, which was not found: it is built with the app "
+               "(ZUB_BUILD_CONVERTER).")
                 .arg(name),
             8000);
         return;

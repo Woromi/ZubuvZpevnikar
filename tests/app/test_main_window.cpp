@@ -2,7 +2,9 @@
 #include <QAbstractButton>
 #include <QComboBox>
 #include <QLabel>
+#include <QFile>
 #include <QLocale>
+#include <QSettings>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRadioButton>
@@ -278,4 +280,32 @@ TEST_CASE("Build files: only the app's cache folders are deleted", "[app][buildf
     apptest::writeFile(other / "x.wav", "x");
     CHECK(!buildfiles::remove(QString::fromStdString(other.string())));
     CHECK(std::filesystem::exists(other / "x.wav"));
+}
+
+TEST_CASE("Converter: ZUB_CONVERTER is the only way to choose one; Settings has no choice",
+          "[app][converter]") {
+    apptest::Fixture fixture;
+    // A remembered converter of older versions is forgotten.
+    QSettings().setValue("converter/path", "/usr/bin/true");
+    MainWindow w;
+    CHECK(!QSettings().contains("converter/path"));
+    CHECK(A::findConverter(w).empty()); // empty PATH, nothing next to the test binary
+
+    const auto fake = fixture / "bin/chords_converter";
+    apptest::writeFile(fake, "#!/bin/sh\n");
+    std::filesystem::permissions(fake, std::filesystem::perms::owner_all);
+    qputenv("ZUB_CONVERTER", QFile::encodeName(QString::fromStdString(fake.string())));
+    CHECK(A::findConverter(w) == fake);
+    qputenv("ZUB_CONVERTER", "relative/chords_converter"); // only an absolute path counts
+    CHECK(A::findConverter(w).empty());
+    qunsetenv("ZUB_CONVERTER");
+
+    bool noConverterRow = false;
+    auto settings = apptest::answerDialog<SettingsDialog>([&](SettingsDialog* d) {
+        noConverterRow = d->findChild<QWidget*>(QStringLiteral("settingsConverter")) == nullptr;
+        d->reject();
+    });
+    A::openSettings(w);
+    REQUIRE(settings.fired());
+    CHECK(noConverterRow);
 }

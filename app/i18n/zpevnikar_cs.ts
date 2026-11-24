@@ -558,18 +558,6 @@ Použijte vestavěný.</translation>
         <translation>Podporované weby: %1</translation>
     </message>
     <message>
-        <source>Choose…</source>
-        <translation>Vybrat…</translation>
-    </message>
-    <message>
-        <source>Use Built-in</source>
-        <translation>Použít vestavěný</translation>
-    </message>
-    <message>
-        <source>Use the chords_converter built with this app</source>
-        <translation>Použít chords_converter sestavený s touto aplikací</translation>
-    </message>
-    <message>
         <source>Converter:</source>
         <translation>Převodník:</translation>
     </message>
@@ -622,6 +610,10 @@ Použijte vestavěný.</translation>
         <translation>vestavěný (%1)</translation>
     </message>
     <message>
+        <source>from ZUB_CONVERTER (%1)</source>
+        <translation>z ZUB_CONVERTER (%1)</translation>
+    </message>
+    <message>
         <source>version %1</source>
         <translation>verze %1</translation>
     </message>
@@ -630,8 +622,8 @@ Použijte vestavěný.</translation>
         <translation>neznámá verze</translation>
     </message>
     <message>
-        <source>chords_converter not found — build the app with ZUB_BUILD_CONVERTER, or choose it</source>
-        <translation>chords_converter nebyl nalezen — sestavte aplikaci se ZUB_BUILD_CONVERTER, nebo ho vyberte</translation>
+        <source>chords_converter not found — build the app with ZUB_BUILD_CONVERTER, or set ZUB_CONVERTER to one</source>
+        <translation>chords_converter nenalezen — sestavte aplikaci se ZUB_BUILD_CONVERTER, nebo na něj nastavte ZUB_CONVERTER</translation>
     </message>
     <message>
         <source>Choose a saved page</source>
@@ -640,10 +632,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>Saved pages and text (*.html *.htm *.txt);;All files (*)</source>
         <translation>Uložené stránky a text (*.html *.htm *.txt);;Všechny soubory (*)</translation>
-    </message>
-    <message>
-        <source>Choose chords_converter</source>
-        <translation>Vybrat chords_converter</translation>
     </message>
     <message>
         <source>Converting… a slow site can take up to a minute and a half.</source>
@@ -1323,14 +1311,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>No package to build the songs with: the song library&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
         <translation>Chybí balíček pro sestavení písní: zubuvzpevnik/ knihovny písní není stažený (git submodule update --init) a aplikace nemá vlastní kopii.</translation>
-    </message>
-    <message>
-        <source>Settings</source>
-        <translation>Nastavení</translation>
-    </message>
-    <message>
-        <source>%1 is not a program that can be run.</source>
-        <translation>%1 není spustitelný program.</translation>
     </message>
     <message>
         <source>Import Song</source>
@@ -2070,22 +2050,6 @@ Použijte vestavěný.</translation>
         <translation>Vybrat…</translation>
     </message>
     <message>
-        <source>Use Built-in</source>
-        <translation>Použít vestavěný</translation>
-    </message>
-    <message>
-        <source>The converter built with this app, the version it is tested with</source>
-        <translation>Převodník sestavený s aplikací, verze, se kterou je vyzkoušená</translation>
-    </message>
-    <message>
-        <source>Choose chords_converter</source>
-        <translation>Vybrat chords_converter</translation>
-    </message>
-    <message>
-        <source>&amp;Converter:</source>
-        <translation>&amp;Převodník:</translation>
-    </message>
-    <message>
         <source>Automatic</source>
         <translation>Automaticky</translation>
     </message>
@@ -2145,10 +2109,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>They take %1 now.</source>
         <translation>Teď zabírají %1.</translation>
-    </message>
-    <message>
-        <source>not found: choose one</source>
-        <translation>nenalezen: vyberte ho</translation>
     </message>
     <message>
         <source>Chosen by you</source>
@@ -2353,10 +2313,6 @@ Použijte vestavěný.</translation>
         <translation>Hledat chyby: překlepy, kde se kopie řádku liší, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
     </message>
     <message>
-        <source>Tidy needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
-        <translation>Učesání potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
-    </message>
-    <message>
         <source>Tidying…</source>
         <translation>Učesávám…</translation>
     </message>
@@ -2393,8 +2349,12 @@ Použijte vestavěný.</translation>
         <translation> (pozice akordů se kontrolují jen pro lang czech, slovak nebo english)</translation>
     </message>
     <message>
-        <source>%1 needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
-        <translation>%1 potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
+        <source>Tidy needs chords_converter, which was not found: it is built with the app (ZUB_BUILD_CONVERTER).</source>
+        <translation>Učesání potřebuje chords_converter, který nebyl nalezen: sestavuje se s aplikací (ZUB_BUILD_CONVERTER).</translation>
+    </message>
+    <message>
+        <source>%1 needs chords_converter, which was not found: it is built with the app (ZUB_BUILD_CONVERTER).</source>
+        <translation>%1 potřebuje chords_converter, který nebyl nalezen: sestavuje se s aplikací (ZUB_BUILD_CONVERTER).</translation>
     </message>
     <message>
         <source>Measure</source>
@@ -2854,8 +2814,8 @@ Použijte vestavěný.</translation>
         <translation>Metadata: klíče a hodnoty hlavičky (chybějící tempo, takt …)</translation>
     </message>
     <message>
-        <source>Needs chords_converter, which was not found: choose it in Settings (Ctrl+,).</source>
-        <translation>Potřebuje chords_converter, který nebyl nalezen: vyberte ho v Nastavení (Ctrl+,).</translation>
+        <source>Needs chords_converter, which was not found: it is built with the app (ZUB_BUILD_CONVERTER).</source>
+        <translation>Potřebuje chords_converter, který nebyl nalezen: sestavuje se s aplikací (ZUB_BUILD_CONVERTER).</translation>
     </message>
     <message numerus="yes">
         <source>All %n song(s)</source>

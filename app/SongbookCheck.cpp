@@ -89,8 +89,8 @@ void SongbookCheck::start() {
         for (QCheckBox* box : {tidy, check, shrink}) {
             box->setChecked(false);
             box->setEnabled(false);
-            box->setToolTip(tr("Needs chords_converter, which was not found: choose it in "
-                               "Settings (Ctrl+,)."));
+            box->setToolTip(tr("Needs chords_converter, which was not found: it is built with the "
+                               "app (ZUB_BUILD_CONVERTER)."));
         }
     }
     for (QCheckBox* box : {tidy, check, shrink, keysMissing, keysStated, metadata})
