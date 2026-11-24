@@ -418,7 +418,11 @@ TEST_CASE("prepare: the playback score lists its notes", "[scoretiming][score]")
     CHECK(ls.str().find("set-port-encoding! port \"UTF-8\"") != std::string::npos);
     CHECK(ls.str().find(work.filename().string()) == std::string::npos);
 
-    // Without MIDI there is neither a logger nor a list.
+    // Without MIDI there is neither a logger nor a list. (The files are closed first: Windows
+    // cannot replace a file that is open.)
+    copy.close();
+    wrapper.close();
+    logger.close();
     request.midi.reset();
     const auto plain = zub::score::prepare(request);
     REQUIRE(plain);

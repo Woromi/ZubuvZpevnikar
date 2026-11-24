@@ -253,6 +253,7 @@ TEST_CASE("prepare appends the midi score and reports the MIDI file", "[score][m
     std::ifstream copy(cmd->scoreCopy);
     std::stringstream copied;
     copied << copy.rdbuf();
+    copy.close(); // Windows cannot replace a file that is open
     const std::string text = copied.str();
     CHECK(text.starts_with(jolene)); // the original is untouched: line numbers stay valid
     CHECK(contains(text.substr(std::string(jolene).size()), "\\unfoldRepeats"));
