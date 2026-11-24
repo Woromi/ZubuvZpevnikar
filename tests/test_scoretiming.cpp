@@ -1,5 +1,7 @@
 // The score cursor as the play position: the note list of the playback score, the tempo map and
 // the timeline. tests/data/timing/ is a real LilyPond run (see tests/data/README.md).
+#include "Unique.hpp"
+
 #include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -387,7 +389,8 @@ TEST_CASE("Timeline: other files, CR LF copies and files that do not belong toge
 
 TEST_CASE("prepare: the playback score lists its notes", "[scoretiming][score]") {
     zub::score::Request request;
-    const auto work = fs::temp_directory_path() / "zub-test-scoretiming";
+    const auto work =
+        fs::temp_directory_path() / ("zub-test-scoretiming-" + zubtest::uniqueSuffix());
     fs::remove_all(work);
     request.workDir = work;
     request.songbookRoot = work;
@@ -431,5 +434,6 @@ TEST_CASE("prepare: the playback score lists its notes", "[scoretiming][score]")
     std::stringstream pw;
     pw << plainWrapper.rdbuf();
     CHECK(pw.str().find("zub-playback") == std::string::npos);
+    plainWrapper.close(); // Windows cannot delete an open file
     fs::remove_all(work);
 }
