@@ -825,6 +825,10 @@ void SongbooksPage::fillList(const QString& selectId) {
     latexKeepFor_.clear();
 }
 
+bool SongbooksPage::buildingPdf() const {
+    return preview_ && preview_->building();
+}
+
 QString SongbooksPage::bookWithUnsavedLatex() const {
     return latexModified() ? id_ : QString();
 }

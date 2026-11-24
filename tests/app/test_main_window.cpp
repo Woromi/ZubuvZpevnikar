@@ -2,8 +2,10 @@
 #include <QAbstractButton>
 #include <QComboBox>
 #include <QLabel>
+#include <QLocale>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QStackedWidget>
 #include <QTableView>
 #include <QToolButton>
@@ -11,6 +13,8 @@
 #include <zub/core/songheader.hpp>
 
 #include "AppTestAccess.hpp"
+#include "BuildFiles.hpp"
+#include "PreviewRunner.hpp"
 #include "SettingsDialog.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongTableModel.hpp"
@@ -182,4 +186,96 @@ TEST_CASE("Papers: the bar offers the measured papers; Mark writes them, typing 
     QTest::mouseClick(update, Qt::LeftButton);
     CHECK(zub::songheader::option(ed->content(), "pap") == "a4");
     ed->textEdit()->document()->setModified(false);
+}
+
+TEST_CASE("Build files: kept by default; Settings can drop them after every build",
+          "[app][buildfiles]") {
+    apptest::Fixture fixture;
+    MainWindow w;
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    CHECK(buildfiles::keep());
+    apptest::KeepBuildFiles restore;
+    const auto scores = A::previewWorkDir(w) / "tmp-ly";
+    const auto book = std::filesystem::path(buildfiles::songbooksDir().toStdString()) / "repo-1";
+    const auto makeFiles = [&] {
+        apptest::writeFile(scores / "abc.pdf", "score");
+        apptest::writeFile(book / "tmp-ly/abc.pdf", "book score");
+    };
+    makeFiles();
+
+    // Kept: a preview build (no lualatex here: it does not start) leaves them.
+    REQUIRE(A::openExistingSong(w, fixture / "songs/chords/Abba/OurLastSummer.tex"));
+    REQUIRE(apptest::waitUntil(
+        [&] { return A::status(*A::preview(w))->text().contains(QStringLiteral("failed")); },
+        5000));
+    CHECK(std::filesystem::exists(scores / "abc.pdf"));
+
+    // The dialog shows their size; choosing "build everything again" deletes them.
+    QString sizeText;
+    const QString size = QLocale().formattedDataSize(A::buildFilesSize(w));
+    auto settings = apptest::answerDialog<SettingsDialog>([&](SettingsDialog* d) {
+        sizeText = d->findChild<QLabel*>(QStringLiteral("settingsBuildFilesSize"))->text();
+        d->findChild<QRadioButton*>(QStringLiteral("settingsRebuildAll"))->setChecked(true);
+        d->accept();
+    });
+    A::openSettings(w);
+    REQUIRE(settings.fired());
+    INFO(sizeText.toStdString());
+    CHECK(sizeText.contains(size));
+    CHECK(!buildfiles::keep());
+    CHECK(!std::filesystem::exists(scores));
+    CHECK(!std::filesystem::exists(book));
+
+    // From now on a preview build drops the scores when it ends.
+    apptest::writeFile(scores / "abc.pdf", "score");
+    A::requestPreview(w);
+    CHECK(apptest::waitUntil([&] { return !std::filesystem::exists(scores); }, 5000));
+
+    // Delete Now, back to keeping them.
+    makeFiles();
+    auto again = apptest::answerDialog<SettingsDialog>([&](SettingsDialog* d) {
+        auto* now = d->findChild<QPushButton*>(QStringLiteral("settingsDeleteBuildFiles"));
+        CHECK(now->isEnabled());
+        now->click();
+        d->findChild<QRadioButton*>(QStringLiteral("settingsKeepBuilds"))->setChecked(true);
+        d->accept();
+    });
+    A::openSettings(w);
+    REQUIRE(again.fired());
+    CHECK(!std::filesystem::exists(scores));
+    CHECK(!std::filesystem::exists(book));
+    CHECK(buildfiles::keep());
+}
+
+TEST_CASE("Build files: only the app's cache folders are deleted", "[app][buildfiles]") {
+    apptest::Fixture fixture;
+    MainWindow w;
+    const auto cache = std::filesystem::path(buildfiles::cacheDir().toStdString());
+    // Accepted: a tmp-ly in the cache, a repo-* in songbooks/.
+    apptest::writeFile(cache / "preview/tmp-ly/a", "a");
+    CHECK(buildfiles::remove(QString::fromStdString((cache / "preview/tmp-ly").string())));
+    CHECK(!std::filesystem::exists(cache / "preview/tmp-ly"));
+    const auto book = cache / "songbooks/repo-abc";
+    apptest::writeFile(book / "book.tex", "x");
+    CHECK(buildfiles::remove(QString::fromStdString(book.string())));
+    CHECK(!std::filesystem::exists(book));
+    // Links into the cache that point elsewhere are refused.
+    const auto target = fixture / "target";
+    apptest::writeFile(target / "keep", "k");
+    std::filesystem::create_directory_symlink(target, cache / "preview/tmp-ly");
+    std::filesystem::create_directory_symlink(target, cache / "songbooks/repo-link");
+    CHECK(!buildfiles::remove(QString::fromStdString((cache / "preview/tmp-ly").string())));
+    CHECK(!buildfiles::remove(QString::fromStdString((cache / "songbooks/repo-link").string())));
+    CHECK(std::filesystem::exists(target / "keep"));
+    // A repo-* deeper than songbooks/ is no work dir.
+    apptest::writeFile(cache / "songbooks/x/repo-y/f", "f");
+    CHECK(!buildfiles::remove(QString::fromStdString((cache / "songbooks/x/repo-y").string())));
+    const auto elsewhere = fixture / "tmp-ly";
+    apptest::writeFile(elsewhere / "x", "x");
+    CHECK(!buildfiles::remove(QString::fromStdString(elsewhere.string())));
+    CHECK(std::filesystem::exists(elsewhere / "x"));
+    const auto other = std::filesystem::path(buildfiles::cacheDir().toStdString()) / "playback";
+    apptest::writeFile(other / "x.wav", "x");
+    CHECK(!buildfiles::remove(QString::fromStdString(other.string())));
+    CHECK(std::filesystem::exists(other / "x.wav"));
 }

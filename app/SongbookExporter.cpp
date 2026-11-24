@@ -47,7 +47,7 @@ namespace {
 const QString exportDirKey = QStringLiteral("songbooks/exportDir");
 
 // Stops the build and what it started (lualatex, lilypond): the build leads its own process
-// group on Unix; SIGTERM to the group, 500 ms, SIGKILL. Waits for the process to exit.
+// group on Unix; SIGTERM to the group, up to 500 ms, then SIGKILL to what is left of it. Waits for the process to exit.
 void killTree(QProcess* process) {
     if (process->state() == QProcess::NotRunning)
         return;
@@ -55,9 +55,12 @@ void killTree(QProcess* process) {
     const qint64 pid = process->processId();
     if (pid > 0) {
         ::kill(-static_cast<pid_t>(pid), SIGTERM);
-        if (process->waitForFinished(500))
-            return;
+        const bool exited = process->waitForFinished(500);
+        // The rest of the group (lilypond, gs) must not outlive bash: the work dir may be deleted
+        // as soon as it has exited (Settings → Build files).
         ::kill(-static_cast<pid_t>(pid), SIGKILL);
+        if (exited)
+            return;
     }
 #endif
     process->kill();
@@ -213,7 +216,8 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
     if (!confirmSafety(resolution, bookRisks, songs))
         return std::nullopt;
 
-    // One work dir per book file: LilyPond's cache and the index files stay between builds.
+    // One work dir per book file: LilyPond's cache stays between builds (unless Settings →
+    // Build files says otherwise: BookPreview deletes the dir after the build).
     const QString hash = QString::fromLatin1(
         QCryptographicHash::hash(toQString(bookFile).toUtf8(), QCryptographicHash::Sha1)
             .toHex()

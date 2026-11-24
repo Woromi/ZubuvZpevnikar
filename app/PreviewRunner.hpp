@@ -4,6 +4,7 @@
 #include <QElapsedTimer>
 #include <QObject>
 #include <QString>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <zub/core/preview.hpp>
@@ -43,6 +44,9 @@ private:
     void start(zub::preview::Request request, bool announce);
     void killTree();
     void onProcessFinished();
+    // Without Settings → Keep build files: LilyPond's scores of the work dir go once no build
+    // runs (the next build engraves them again).
+    void dropBuildFiles();
 
     QProcess* process_ = nullptr;
     QTimer* timeout_ = nullptr;
@@ -50,6 +54,7 @@ private:
     std::optional<zub::preview::Command> command_; // the running build
     std::optional<zub::preview::Request> pending_; // waits for the killed build to exit
     std::string inputName_;                        // of the running build
+    std::filesystem::path workDir_;                // of the last build started
     bool timedOut_ = false;
     bool cancelled_ = false;
 };

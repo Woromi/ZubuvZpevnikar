@@ -1,6 +1,7 @@
 // The Songbooks page (milestone 7): the books of the songbook repo, their form, sections, songs,
 // lock and LaTeX tab, New Songbook, Duplicate and Check.
 #include "AppTestAccess.hpp"
+#include "BuildFiles.hpp"
 #include "HomePage.hpp"
 #include "ActivityBar.hpp"
 #include "HomeData.hpp"
@@ -828,6 +829,26 @@ TEST_CASE("Songbooks page: the build writes the song copies where TEXINPUTS find
     REQUIRE(plain);
     CHECK(!std::filesystem::exists(override / "Ayreon/EMc2.tex"));
     CHECK(!plain->environment[0].second.contains("override"));
+}
+
+TEST_CASE("Songbooks page: without keeping build files the book's work dir goes after a build",
+          "[app][songbooks][buildfiles]") {
+    KeyedFixture f;
+    BooksWindow w(f.fixture, "songbooks/keyed/keyed.tex");
+    auto* preview = A::bookPreview(*w.page);
+    apptest::KeepBuildFiles restore;
+    // Kept (the default): the build (bash does not start here) leaves its work dir.
+    REQUIRE(preview->build());
+    REQUIRE(apptest::waitUntil([&] { return !preview->building(); }, 5000));
+    const auto workDir = A::bookWorkDir(*preview);
+    REQUIRE(workDir.filename().string().starts_with("repo-"));
+    CHECK(std::filesystem::exists(workDir / "book.tex"));
+
+    buildfiles::setKeep(false);
+    REQUIRE(preview->build());
+    REQUIRE(apptest::waitUntil([&] { return !preview->building(); }, 5000));
+    CHECK(A::bookWorkDir(*preview) == workDir);
+    CHECK(!std::filesystem::exists(workDir));
 }
 
 // Not run by default: ZUB_SCREENSHOT=<file.png> saves the page of a book with a key.

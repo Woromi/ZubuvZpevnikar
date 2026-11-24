@@ -1,5 +1,6 @@
 #include "BookPreview.hpp"
 
+#include "BuildFiles.hpp"
 #include "SongbookExporter.hpp"
 #include "convert.hpp"
 
@@ -162,6 +163,11 @@ void BookPreview::onFinished(int exitCode, bool crashed) {
         if (result.log.isEmpty())
             result.log = tr("The build did not start: is bash installed?");
     }
+    pdf.close();
+    // Without Settings → Keep build files the work dir goes (its PDF is in memory now); the next
+    // build engraves every score again.
+    if (!buildfiles::keep())
+        buildfiles::remove(toQString(buildingPdf_.parent_path()));
     const QString id = buildingId_;
     buildingId_.clear();
     updateView();

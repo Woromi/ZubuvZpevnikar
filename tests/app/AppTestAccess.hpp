@@ -170,6 +170,8 @@ struct AppTestAccess {
     }
     static const QList<QAction*>& regionActions(MainWindow& w) { return w.scores_->regionActions_; }
     static PreviewRunner* previewRunner(MainWindow& w) { return w.previewRunner_; }
+    static void requestPreview(MainWindow& w) { w.requestPreview(true); }
+    static qint64 buildFilesSize(MainWindow& w) { return w.buildFilesSize(); }
     static PreviewPane* preview(MainWindow& w) { return w.preview_; }
     static const std::filesystem::path& previewWorkDir(MainWindow& w) { return w.previewWorkDir_; }
     static const std::filesystem::path& scoreMidi(MainWindow& w) { return w.scores_->scoreMidi_; }
@@ -251,6 +253,8 @@ struct AppTestAccess {
     static SongbookExporter* exporter(SongbooksPage& p) { return p.exporter_; }
     static BookPreview* bookPreview(SongbooksPage& p) { return p.preview_; }
     static QLabel* bookPreviewStatus(BookPreview& b) { return b.status_; }
+    // The work dir of the book's last build.
+    static std::filesystem::path bookWorkDir(BookPreview& b) { return b.buildingPdf_.parent_path(); }
     // Pretends the shown book was built (a PDF of its current text, without transposing).
     static void fakeBookBuild(BookPreview& b, const std::string& signature = {}) {
         auto& result = b.results_[b.id_];

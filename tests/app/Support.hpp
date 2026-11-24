@@ -1,6 +1,7 @@
 #pragma once
 
 // Helpers of the app tests: a songbook fixture copy, dialogs answered by themselves, waiting.
+#include "BuildFiles.hpp"
 #include "ScorePlayer.hpp"
 #include "convert.hpp"
 
@@ -24,6 +25,14 @@ template <> struct StringMaker<QString> {
 } // namespace Catch
 
 namespace apptest {
+
+// Settings → Build files goes back to "keep" (the default) when the test ends, also on a failure.
+struct KeepBuildFiles {
+    KeepBuildFiles() = default;
+    KeepBuildFiles(const KeepBuildFiles&) = delete;
+    KeepBuildFiles& operator=(const KeepBuildFiles&) = delete;
+    ~KeepBuildFiles() { buildfiles::setKeep(true); }
+};
 
 // A score player without an audio device: records what it is asked to play (the real one talks
 // to the sound server). Install it with AppTestAccess::replacePlayer.

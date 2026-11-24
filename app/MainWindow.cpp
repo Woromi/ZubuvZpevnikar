@@ -1,5 +1,6 @@
 #include "MainWindow.hpp"
 
+#include "BuildFiles.hpp"
 #include "DiffView.hpp"
 #include "FindBar.hpp"
 #include "ImportDialog.hpp"
@@ -1946,6 +1947,9 @@ void MainWindow::openSettings() {
                             state.soundfont == settings.value(soundfontKey).toString();
     state.package = toQString(packageDir_);
     state.ownPackage = !packageDir_.empty() && zub::package::ofSongbook(songbookRoot_).has_value();
+    state.keepBuildFiles = buildfiles::keep();
+    state.buildFilesBytes = buildFilesSize();
+    state.deleteBuildFiles = [this] { return deleteBuildFiles(); };
 
     SettingsDialog dialog(state, this);
     if (dialog.exec() != QDialog::Accepted)
@@ -1975,6 +1979,33 @@ void MainWindow::openSettings() {
             settings.setValue(soundfontKey, dialog.soundfont());
         scores_->updateSoundAvailability();
     }
+    if (dialog.keepBuildFiles() != state.keepBuildFiles) {
+        buildfiles::setKeep(dialog.keepBuildFiles());
+        // A running build drops its own when it ends (the setting is read then).
+        if (!dialog.keepBuildFiles())
+            deleteBuildFiles();
+    }
+}
+
+qint64 MainWindow::buildFilesSize() const {
+    qint64 bytes = buildfiles::size(buildfiles::songbooksDir());
+    if (!previewWorkDir_.empty())
+        bytes += buildfiles::size(toQString(previewWorkDir_ / "tmp-ly"));
+    return bytes;
+}
+
+qint64 MainWindow::deleteBuildFiles() {
+    if (!previewWorkDir_.empty() && !previewRunner_->isRunning())
+        buildfiles::remove(toQString(previewWorkDir_ / "tmp-ly"));
+    // While this window builds a book, all stay (the work dir of a build is per book file). A
+    // build of another running instance is not known here: it may fail and has to run again.
+    if (!songbooksPage_->buildingPdf()) {
+        const QDir books(buildfiles::songbooksDir());
+        for (const QString& name :
+             books.entryList({QStringLiteral("repo-*")}, QDir::Dirs | QDir::NoDotAndDotDot))
+            buildfiles::remove(books.filePath(name));
+    }
+    return buildFilesSize();
 }
 
 std::filesystem::path MainWindow::findConverter() const {

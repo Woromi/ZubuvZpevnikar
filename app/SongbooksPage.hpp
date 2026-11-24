@@ -75,6 +75,7 @@ public:
     void newSongbook(); // New Songbook… (asks)
     // The book (id) whose LaTeX tab has unsaved edits, "" none: others must not write it.
     QString bookWithUnsavedLatex() const;
+    bool buildingPdf() const; // a book's PDF is being built (its work dir is in use)
     void showOverview(); // the Overview tab of the shown book
     // Ctrl+F / Ctrl+H: opens the find bar of the LaTeX tab when that tab is the current one;
     // false otherwise.

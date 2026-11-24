@@ -104,6 +104,9 @@ private:
     void switchView(ActivityBar::View view);            // the switch itself, no history
     std::optional<ActivityBar::View> currentView() const; // nullopt before any view is shown
     void openSettings(); // File → Settings…, the bar's gear
+    // Build files (buildfiles): the song preview's LilyPond scores and the songbooks' work dirs.
+    qint64 buildFilesSize() const;
+    qint64 deleteBuildFiles(); // what no running build uses; returns buildFilesSize()
     void updateStatus();
 
     // The open song (one at a time)

@@ -1,5 +1,6 @@
 #include "PreviewRunner.hpp"
 
+#include "BuildFiles.hpp"
 #include "convert.hpp"
 
 #include <QFile>
@@ -44,6 +45,7 @@ PreviewRunner::PreviewRunner(QObject* parent)
             cancelled_ = false;
             timedOut_ = false;
             command_.reset();
+            dropBuildFiles();
             return;
         }
         PreviewResult result;
@@ -53,6 +55,7 @@ PreviewRunner::PreviewRunner(QObject* parent)
                              .arg(process_->errorString());
         timedOut_ = false;
         command_.reset();
+        dropBuildFiles();
         emit finished(result);
     });
     connect(timeout_, &QTimer::timeout, this, [this] {
@@ -110,11 +113,13 @@ void PreviewRunner::start(zub::preview::Request request, bool announce) {
         PreviewResult result;
         result.inputName = inputName_;
         result.message = toQString(prepared.error());
+        dropBuildFiles(); // of a killed build before it (pending)
         emit finished(result);
         return;
     }
     command_ = std::move(*prepared);
     const zub::preview::Command& cmd = *command_;
+    workDir_ = cmd.workingDirectory;
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     for (const auto& [name, value] : cmd.environment)
@@ -152,6 +157,7 @@ void PreviewRunner::onProcessFinished() {
         cancelled_ = false;
         timedOut_ = false;
         command_.reset();
+        dropBuildFiles();
         return;
     }
 
@@ -195,5 +201,12 @@ void PreviewRunner::onProcessFinished() {
 
     timedOut_ = false;
     command_.reset();
+    dropBuildFiles();
     emit finished(result);
+}
+
+void PreviewRunner::dropBuildFiles() {
+    // Nothing runs now (a pending request would have started instead).
+    if (!workDir_.empty() && !buildfiles::keep())
+        buildfiles::remove(toQString(workDir_ / "tmp-ly"));
 }

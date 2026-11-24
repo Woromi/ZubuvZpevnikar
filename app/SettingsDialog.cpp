@@ -9,7 +9,9 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLocale>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QVBoxLayout>
 
 namespace {
@@ -96,6 +98,36 @@ SettingsDialog::SettingsDialog(const State& state, QWidget* parent)
     form->addRow(tr("&Soundfont:"), row(this, {soundfontLine_, chooseSoundfont, automatic_}));
     showSoundfont(state.soundfont, state.soundfontChosen);
 
+    // Build files: LilyPond's engraved scores and the songbooks' work dirs in the cache.
+    keepBuilds_ = new QRadioButton(
+        tr("&Keep them: a rebuild engraves only the scores that changed (faster, uses disk space)"),
+        this);
+    keepBuilds_->setObjectName(QStringLiteral("settingsKeepBuilds"));
+    rebuildAll_ = new QRadioButton(
+        tr("&Build everything again each time: nothing is kept (less disk space, a songbook "
+           "takes minutes)"),
+        this);
+    rebuildAll_->setObjectName(QStringLiteral("settingsRebuildAll"));
+    (state.keepBuildFiles ? keepBuilds_ : rebuildAll_)->setChecked(true);
+    buildFilesSize_ = new QLabel(this);
+    buildFilesSize_->setObjectName(QStringLiteral("settingsBuildFilesSize"));
+    deleteBuildFiles_ = new QPushButton(tr("Delete Now", "the build files"), this);
+    deleteBuildFiles_->setObjectName(QStringLiteral("settingsDeleteBuildFiles"));
+    deleteBuildFiles_->setToolTip(
+        tr("Delete the build files now (not those of a build that is running)"));
+    connect(deleteBuildFiles_, &QPushButton::clicked, this, [this] {
+        if (state_.deleteBuildFiles)
+            showBuildFilesSize(state_.deleteBuildFiles());
+    });
+    auto* builds = new QWidget(this);
+    auto* buildsLayout = new QVBoxLayout(builds);
+    buildsLayout->setContentsMargins(0, 0, 0, 0);
+    buildsLayout->addWidget(keepBuilds_);
+    buildsLayout->addWidget(rebuildAll_);
+    buildsLayout->addWidget(row(this, {buildFilesSize_, deleteBuildFiles_}));
+    form->addRow(tr("Build files:"), builds);
+    showBuildFilesSize(state.buildFilesBytes);
+
     // The package is not a choice: the songbook's own, else the app's copy (zub::package).
     auto* package = pathLine(this);
     package->setObjectName(QStringLiteral("settingsPackage"));
@@ -113,6 +145,15 @@ SettingsDialog::SettingsDialog(const State& state, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->addLayout(form);
     layout->addWidget(buttons);
+}
+
+bool SettingsDialog::keepBuildFiles() const {
+    return keepBuilds_->isChecked();
+}
+
+void SettingsDialog::showBuildFilesSize(qint64 bytes) {
+    buildFilesSize_->setText(tr("They take %1 now.").arg(QLocale().formattedDataSize(bytes)));
+    deleteBuildFiles_->setEnabled(bytes > 0 && state_.deleteBuildFiles);
 }
 
 QString SettingsDialog::language() const {

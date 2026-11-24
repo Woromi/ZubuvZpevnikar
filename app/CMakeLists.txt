@@ -10,6 +10,8 @@ qt_add_library(zpevnikar_app STATIC
     FindMatches.hpp
     FindMatches.cpp
     ActivityBar.cpp
+    BuildFiles.hpp
+    BuildFiles.cpp
     SettingsDialog.hpp
     SettingsDialog.cpp
     SongListPage.hpp

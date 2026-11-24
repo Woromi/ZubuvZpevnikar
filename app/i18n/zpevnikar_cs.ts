@@ -2106,6 +2106,27 @@ Použijte vestavěný.</translation>
         <translation>&amp;Soundfont:</translation>
     </message>
     <message>
+        <source>&amp;Keep them: a rebuild engraves only the scores that changed (faster, uses disk space)</source>
+        <translation>&amp;Ponechat: při dalším sestavení se znovu sázejí jen změněné noty (rychlejší, zabírá místo na disku)</translation>
+    </message>
+    <message>
+        <source>&amp;Build everything again each time: nothing is kept (less disk space, a songbook takes minutes)</source>
+        <translation>&amp;Pokaždé sestavit vše znovu: nic se neuchovává (méně místa na disku, zpěvník trvá minuty)</translation>
+    </message>
+    <message>
+        <source>Delete Now</source>
+        <comment>the build files</comment>
+        <translation>Smazat hned</translation>
+    </message>
+    <message>
+        <source>Delete the build files now (not those of a build that is running)</source>
+        <translation>Smazat soubory sestavení hned (kromě těch, které používá běžící sestavení)</translation>
+    </message>
+    <message>
+        <source>Build files:</source>
+        <translation>Soubory sestavení:</translation>
+    </message>
+    <message>
         <source>none: the song library&apos;s zubuvzpevnik/ is not checked out</source>
         <translation>žádný: zubuvzpevnik/ knihovny písní není stažený</translation>
     </message>
@@ -2120,6 +2141,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Package:</source>
         <translation>Balíček:</translation>
+    </message>
+    <message>
+        <source>They take %1 now.</source>
+        <translation>Teď zabírají %1.</translation>
     </message>
     <message>
         <source>not found: choose one</source>
