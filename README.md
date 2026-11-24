@@ -32,6 +32,14 @@ classes and build scripts from the [zubuvzpevnik-package](https://github.com/Wor
 (the songbook's own `zubuvzpevnik/` submodule, else the copy bundled with the app), and
 conversions from chords_converter (0.14.0 or newer).
 
+## Install
+
+Linux: each [release](https://github.com/Woromi/ZubuvZpevnikar/releases) has an AppImage
+(Ubuntu 24.04, Debian 13, Fedora 40 or newer). Make it executable (`chmod +x
+Zpevnikar-*.AppImage`) and run it; the converter and the LaTeX package are inside. Install the
+programs the songs are built with yourself (see the requirements below). Windows is not supported
+yet; CI builds it to show what is missing.
+
 ## Building
 
 Requirements:
@@ -39,7 +47,7 @@ Requirements:
 - CMake ≥ 3.25 and a C++23 compiler (developed with GCC 13)
 - Qt ≥ 6.5 with the Widgets, Svg, PDF, Multimedia and Linguist tools modules
 - KF6 SyntaxHighlighting
-- Catch2 v3 (tests)
+- Catch2 v3 (tests; downloaded at configure time when it is not installed)
 - Rust and cargo, to build the bundled chords_converter (optional)
 
 To build songs and songbooks you also need what the songbook needs (see its `docs/building.md`):
@@ -59,7 +67,9 @@ build/debug/app/zpevnikar
 ```
 
 Without cargo, or without the submodule (`git submodule update --init`), the converter is not
-built; the app then finds one you installed yourself, or you choose one in the import dialog.
+built; the app then finds one you installed yourself (on `PATH` or in `~/.cargo/bin`).
+`ZUB_CONVERTER=/absolute/path/to/chords_converter` makes the app use another build of it, e.g. to
+try a converter change.
 Without the `external/zubuvzpevnik-package` submodule the app has no package of its own and builds
 only songbooks that have theirs.
 `-DZUB_BUILD_APP=OFF` builds only the core library and its tests, without Qt.
@@ -70,8 +80,17 @@ the package (`share/zpevnikar/zubuvzpevnik`), a launcher entry and the icon.
 ## First start
 
 The app asks for your ZubuvZpevnik checkout (a folder with `songs/chords/`; clone it with
-`--recurse-submodules` so its `zubuvzpevnik/` package is there too) and remembers it. Songbooks you create are stored by the app, not in the checkout; exports and previews
-are built in the app's cache folder, never inside the checkout.
+`--recurse-submodules` so its `zubuvzpevnik/` package is there too), or creates a new one, and
+remembers it. Songbooks are the `.tex` books in its `songbooks/`; exports and previews are built
+in the app's cache folder, never inside the checkout.
+
+## Releasing
+
+Set the version in `CMakeLists.txt` (`project(... VERSION x.y.z)`), commit, then tag and push
+`vx.y.z`: the Release workflow builds the AppImage and makes a GitHub release with it (the tag
+must match the version). Actions → Release → Run workflow builds it without releasing, as an
+artifact to try first. `packaging/appimage.sh` packs a local release build the same way (it
+needs linuxdeploy and its Qt plugin).
 
 ## Layout
 

@@ -1,0 +1,41 @@
+name: KF6 SyntaxHighlighting
+description: >
+  Builds extra-cmake-modules and KSyntaxHighlighting (KDE Frameworks 6) against the Qt already
+  installed, into `prefix` (cached). For runners without a KF6 package (Ubuntu 24.04, Windows).
+  On Windows the MSVC environment must be set up before (ilammy/msvc-dev-cmd).
+inputs:
+  prefix:
+    description: Where to install (pass it to CMAKE_PREFIX_PATH)
+    required: true
+  version:
+    description: The KDE Frameworks tag
+    default: v6.8.0
+  qt-version:
+    description: The Qt version it is built against (part of the cache key)
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      id: cache
+      with:
+        path: ${{ inputs.prefix }}
+        key: kf6-syntax-${{ inputs.version }}-qt${{ inputs.qt-version }}-${{ runner.os }}-1
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        src=$(mktemp -d)
+        for repo in extra-cmake-modules syntax-highlighting; do
+          git clone --quiet --depth 1 --branch "${{ inputs.version }}" \
+            "https://invent.kde.org/frameworks/$repo.git" "$src/$repo"
+          cmake -S "$src/$repo" -B "$src/$repo/build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${{ inputs.prefix }}" \
+            -DCMAKE_PREFIX_PATH="${{ inputs.prefix }}" \
+            -DCMAKE_INSTALL_LIBDIR=lib \
+            -DBUILD_TESTING=OFF -DBUILD_QCH=OFF \
+            -DBUILD_HTML_DOCS=OFF -DBUILD_MAN_DOCS=OFF -DBUILD_QTHELP_DOCS=OFF
+          cmake --build "$src/$repo/build"
+          cmake --install "$src/$repo/build"
+        done

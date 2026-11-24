@@ -79,6 +79,12 @@ QT_QPA_PLATFORM=offscreen timeout 3 build/debug/app/zpevnikar   # headless smoke
 - Warnings: every target links `zub_warnings` (`-Wall -Wextra -Wpedantic -Wshadow -Wconversion ...`). Keep the build warning-free.
 - Formatting is `.clang-format` (a hook runs clang-format on C++ files Claude edits). clangd reads `build/debug/compile_commands.json` via `.clangd`.
 
+## Releases and CI
+
+- `.github/workflows/ci.yml`: core (Ubuntu), the app (Fedora 42), and Windows (`windows-2022`, MSVC, Qt 6.8.3 from aqt, KF6 SyntaxHighlighting built by `.github/actions/kf6-syntax-highlighting`): `continue-on-error` until Windows is supported; it shows what breaks there.
+- `.github/workflows/release.yml`: a tag `v<VERSION of CMakeLists.txt>` builds the Linux AppImage (Ubuntu 24.04, Qt 6.8.3 from aqt, `packaging/appimage.sh` with linuxdeploy) and attaches it to a GitHub release; run by hand it only builds the artifact. The user tags and pushes, never Claude.
+- Windows: one codebase; the OS-specific parts get a Windows variant (TEXINPUTS `;`, stopping a build's process tree, bash for the package's `build.sh`, `locale -a`). See PLAN.md.
+
 ## Translations
 
 - UI texts in `app/` go through `tr()` (`QCoreApplication::translate` with a fixed context outside QObject classes). Counts use `tr("%n song(s)", nullptr, n)`, never `.arg(n)` plus "(s)". Give short ambiguous texts a disambiguation comment.

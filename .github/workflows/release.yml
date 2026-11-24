@@ -1,0 +1,93 @@
+name: Release
+
+# A tag v<version> (the project VERSION in CMakeLists.txt) builds the Linux AppImage and attaches
+# it to a GitHub release of that tag. Run by hand (Actions → Release → Run workflow), it only
+# builds the AppImage and keeps it as an artifact of the run, to try it before tagging.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # the release
+
+env:
+  QT_VERSION: 6.8.3
+
+jobs:
+  appimage:
+    name: Linux AppImage
+    # The AppImage needs the glibc of its build system or newer: Ubuntu 24.04, Debian 13,
+    # Fedora 40 and later.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive # the converter and the package
+      - name: The tag is the app's version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version=$(sed -n 's/^project(ZubuvZpevnikar VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "The tag is $GITHUB_REF_NAME, but CMakeLists.txt has VERSION $version"
+            exit 1
+          fi
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build perl libgl1-mesa-dev libegl1 libxkbcommon-dev \
+            libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libwayland-cursor0
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          modules: qtmultimedia qtpdf
+          aqtversion: '==3.3.*'
+          cache: true
+      - uses: ./.github/actions/kf6-syntax-highlighting
+        with:
+          prefix: ${{ runner.temp }}/kf6
+          qt-version: ${{ env.QT_VERSION }}
+      - name: Build
+        run: |
+          cmake --preset release -DZUB_BUILD_TESTS=OFF -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/kf6"
+          cmake --build --preset release
+      - name: AppImage
+        run: |
+          tools=$(mktemp -d)
+          for tool in linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage \
+                      linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage; do
+            curl -sSfL -o "$tools/$(basename "$tool")" "https://github.com/linuxdeploy/$tool"
+          done
+          chmod +x "$tools"/*.AppImage
+          export APPIMAGE_EXTRACT_AND_RUN=1 # no FUSE on the runner
+          export PATH="$tools:$PATH" LINUXDEPLOY="$tools/linuxdeploy-x86_64.AppImage"
+          export QMAKE="$QT_ROOT_DIR/bin/qmake"
+          export LD_LIBRARY_PATH="$RUNNER_TEMP/kf6/lib:${LD_LIBRARY_PATH:-}"
+          packaging/appimage.sh build/release dist
+      - name: The AppImage starts
+        run: |
+          set +e
+          QT_QPA_PLATFORM=offscreen APPIMAGE_EXTRACT_AND_RUN=1 timeout 10 dist/*.AppImage
+          status=$?
+          set -e
+          echo "exit status: $status"
+          test "$status" -eq 124 # still running when the timeout stopped it
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appimage
+          path: dist/*.AppImage
+      - name: GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.AppImage
+          generate_release_notes: true
+          body: |
+            **Linux:** download `Zpevnikar-*-x86_64.AppImage`, make it executable
+            (`chmod +x Zpevnikar-*.AppImage`) and run it. It needs Ubuntu 24.04, Debian 13,
+            Fedora 40 or newer. The converter and the LaTeX package are inside.
+
+            Install separately, as for building songs: TeX Live with LuaLaTeX, LilyPond, git,
+            python3 (measuring whether songs fit the paper), a Czech locale for the index order,
+            and optionally fluidsynth with a General MIDI soundfont for playing scores.

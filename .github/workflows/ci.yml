@@ -62,3 +62,42 @@ jobs:
             echo "Untranslated Czech texts: translate them in app/i18n/zpevnikar_cs.ts"
             exit 1
           fi
+
+  # The app on Windows. It is not supported yet: this job shows how far it gets (configure,
+  # build, tests), so new Linux-only code is noticed. It does not fail the run until Windows works.
+  windows:
+    name: App (Windows, not supported yet)
+    runs-on: windows-2022
+    continue-on-error: true
+    env:
+      QT_VERSION: 6.8.3
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Ninja
+        run: choco install ninja --no-progress -y
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          modules: qtmultimedia qtpdf
+          aqtversion: '==3.3.*'
+          cache: true
+      - uses: ./.github/actions/kf6-syntax-highlighting
+        with:
+          prefix: ${{ runner.temp }}/kf6
+          qt-version: ${{ env.QT_VERSION }}
+      # Release: KF6 is built against Qt's release DLLs, which a debug build cannot share.
+      - name: Configure
+        run: cmake --preset release -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/kf6"
+      - name: Build
+        run: cmake --build --preset release
+      - name: Test
+        run: |
+          export PATH="$RUNNER_TEMP/kf6/bin:$PATH"
+          ctest --preset release
