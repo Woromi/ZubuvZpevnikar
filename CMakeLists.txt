@@ -41,6 +41,8 @@ elseif(MSVC)
     # /Zc:preprocessor: the standard preprocessor (the old one breaks raw strings in macro
     # arguments, e.g. CHECK(parse(R"("\u0041")))).
     target_compile_options(zub_warnings INTERFACE /W4 /permissive- /utf-8 /Zc:preprocessor)
+    # std::getenv and friends are standard C++; MSVC's "unsafe" warning about them is noise.
+    target_compile_definitions(zub_warnings INTERFACE _CRT_SECURE_NO_WARNINGS)
 endif()
 
 add_subdirectory(core)

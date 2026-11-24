@@ -71,9 +71,11 @@ jobs:
     continue-on-error: true
     env:
       QT_VERSION: 6.8.3
+    # PowerShell, not Git Bash: Git's usr/bin has a Unix `link` that cargo would take for
+    # MSVC's link.exe.
     defaults:
       run:
-        shell: bash
+        shell: pwsh
     steps:
       - uses: actions/checkout@v5
         with:
@@ -94,10 +96,10 @@ jobs:
           qt-version: ${{ env.QT_VERSION }}
       # Release: KF6 is built against Qt's release DLLs, which a debug build cannot share.
       - name: Configure
-        run: cmake --preset release -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/kf6"
+        run: cmake --preset release -DCMAKE_PREFIX_PATH="$env:RUNNER_TEMP/kf6"
       - name: Build
         run: cmake --build --preset release
       - name: Test
         run: |
-          export PATH="$RUNNER_TEMP/kf6/bin:$PATH"
+          $env:PATH = "$env:RUNNER_TEMP\kf6\bin;$env:PATH"
           ctest --preset release
