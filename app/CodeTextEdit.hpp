@@ -12,11 +12,15 @@ class QTimer;
 // numbers are the 1-based block numbers, which are the file's lines (the editor does not wrap).
 // Enter keeps the current line's indentation. Selecting text marks its other occurrences.
 // (Only a selection the user makes with the keys or the mouse; one set by the app is not marked.)
-// Ctrl+Shift+Up/Down add cursors on the lines above/below, the other direction takes them back
-// (like a code editor's multi-cursor):
+// Alt+Shift+Up/Down add cursors on the lines above/below, the other direction takes them back
+// (like Visual Studio's multi-line cursor):
 // typing, Backspace/Delete, Enter, the arrows, Home/End (with Shift and Ctrl), copy, cut and paste
 // then act at every cursor, one undo step per key; Escape, a click or any other key leave only the
 // main cursor.
+// Virtual space: Up/Down (and adding cursors) keep the column; on a shorter line the cursor
+// stands past its end, and typed or pasted text there is preceded by the spaces up to it. Nothing
+// is written until then: moving on leaves the line as it was. Left and Backspace step back
+// through the virtual space; any other key leaves it (the cursor is at the line's end again).
 class CodeTextEdit : public QPlainTextEdit {
     Q_OBJECT
 
@@ -70,6 +74,9 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
+    void insertFromMimeData(const QMimeData* source) override;
+    void inputMethodEvent(QInputMethodEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
 private:
     bool handleEvent(QEvent* event); // event() without the user-input bookkeeping
@@ -82,6 +89,27 @@ private:
     // cursors are gone then).
     bool multiCursorKey(QKeyEvent* event);
     void dropDuplicateCursors();
+    // Without extra cursors: plain Up/Down keep the column (virtual space), Left/Backspace step
+    // back in it, typed text is padded. True when the key was handled here.
+    bool virtualSpaceKey(QKeyEvent* event);
+    // `cursor` one line up (-1) or down (+1) at its column (`spaces` past the line's end
+    // included); `spaces` becomes what is past the new line's end.
+    void moveKeepingColumn(QTextCursor& cursor, int& spaces, int direction) const;
+    // Columns as shown: a tab to the next tab stop, a character with its combining marks (or a
+    // surrogate pair) one column.
+    int columnOf(const QTextBlock& block, int positionInBlock) const;
+    // The cursor position in `block` at `column` (never inside a character or before a tab's
+    // stop it does not reach), and the spaces past the line's end still missing to it.
+    int positionAtColumn(const QTextBlock& block, int column, int& spaces) const;
+    int tabColumns() const;
+    // A key that QPlainTextEdit inserts as text (its own rule: printable, not with Ctrl).
+    static bool insertsText(const QKeyEvent* event);
+    // Writes the virtual spaces of `cursor` (when it still stands at its line's end) and clears
+    // them.
+    static void padVirtualSpace(QTextCursor& cursor, int& spaces);
+    // Runs `edit` on every cursor with its virtual spaces, as one undo step (editAtCursors).
+    void editAtCursorsVirtual(const std::function<void(QTextCursor&, int&)>& edit);
+    void setMainVirtualSpaces(int spaces);
     void updateExtraSelections();
     // Hides Qt's cursor while there are extra cursors (paintEvent draws them all), shows it after.
     void updateCursorDrawing();
@@ -93,6 +121,9 @@ private:
 
     QList<QAction*> extraActions_;
     QList<QTextCursor> extraCursors_;
+    QList<int> extraVirtual_; // per extra cursor: its virtual spaces past the line's end
+    int mainVirtual_ = 0;     // the main cursor's
+    bool virtualMove_ = false; // the main cursor is moved here: its virtual spaces stay
     QList<QTextEdit::ExtraSelection> occurrenceMarks_;
     QList<QTextEdit::ExtraSelection> searchMarks_;
     QList<QTextEdit::ExtraSelection> playbackMarks_;

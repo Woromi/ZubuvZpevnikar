@@ -48,8 +48,8 @@ struct OpenSong {
         QTest::keyClicks(edit, "gamma three");
         QTest::keyClick(edit, Qt::Key_Return);
     }
-    void addCursorDown() { QTest::keyClick(edit, Qt::Key_Down, Qt::ControlModifier | Qt::ShiftModifier); }
-    void addCursorUp() { QTest::keyClick(edit, Qt::Key_Up, Qt::ControlModifier | Qt::ShiftModifier); }
+    void addCursorDown() { QTest::keyClick(edit, Qt::Key_Down, Qt::AltModifier | Qt::ShiftModifier); }
+    void addCursorUp() { QTest::keyClick(edit, Qt::Key_Up, Qt::AltModifier | Qt::ShiftModifier); }
 
     apptest::Fixture fixture;
     MainWindow window;

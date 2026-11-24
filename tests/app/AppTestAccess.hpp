@@ -46,6 +46,7 @@
 struct AppTestAccess {
     // ---- CodeTextEdit
     static bool& blinkOn(CodeTextEdit& e) { return e.blinkOn_; }
+    static int mainVirtualSpaces(const CodeTextEdit& e) { return e.mainVirtual_; }
     static QTimer* blinkTimer(CodeTextEdit& e) { return e.blinkTimer_; }
 
     // ---- FindBar

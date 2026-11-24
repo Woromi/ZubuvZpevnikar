@@ -3,8 +3,13 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QContextMenuEvent>
+#include <QDropEvent>
+#include <QFontMetricsF>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
+#include <QTextLayout>
 #include <QMenu>
+#include <QMimeData>
 #include <QPainter>
 #include <QTextBlock>
 #include <QTextDocument>
@@ -56,6 +61,9 @@ CodeTextEdit::CodeTextEdit(QWidget* parent)
             clearExtraCursors();
         else if (!extraCursors_.isEmpty())
             restartBlink();
+        // Moved by anything but Up/Down or an edit at every cursor: out of the virtual space.
+        if (!keepingCursors_ && !virtualMove_ && mainVirtual_ > 0)
+            setMainVirtualSpaces(0);
     });
     blinkTimer_ = new QTimer(this);
     connect(blinkTimer_, &QTimer::timeout, this, [this] {
@@ -131,6 +139,7 @@ void CodeTextEdit::clearExtraCursors() {
     if (extraCursors_.isEmpty())
         return;
     extraCursors_.clear();
+    extraVirtual_.clear();
     updateExtraSelections();
     updateCursorDrawing();
 }
@@ -142,6 +151,7 @@ void CodeTextEdit::addCursorVertically(int direction) {
     // back the last one added.
     if (!extraCursors_.isEmpty() && direction != growth_) {
         extraCursors_.removeLast();
+        extraVirtual_.removeLast();
         if (extraCursors_.isEmpty())
             growth_ = 0;
         updateExtraSelections();
@@ -149,14 +159,17 @@ void CodeTextEdit::addCursorVertically(int direction) {
         return;
     }
     if (multiColumn_ < 0)
-        multiColumn_ = textCursor().positionInBlock();
+        multiColumn_ = columnOf(textCursor().block(), textCursor().positionInBlock()) + mainVirtual_;
     const QTextCursor edge = extraCursors_.isEmpty() ? textCursor() : extraCursors_.last();
     const QTextBlock block = direction < 0 ? edge.block().previous() : edge.block().next();
     if (!block.isValid())
         return;
+    // At the first cursor's column, past the end of a shorter line (virtual space).
+    int spaces = 0;
     QTextCursor added(document());
-    added.setPosition(block.position() + std::min(multiColumn_, block.length() - 1));
+    added.setPosition(block.position() + positionAtColumn(block, multiColumn_, spaces));
     extraCursors_.append(added);
+    extraVirtual_.append(spaces);
     growth_ = direction;
     dropDuplicateCursors();
     updateExtraSelections();
@@ -166,13 +179,101 @@ void CodeTextEdit::addCursorVertically(int direction) {
 void CodeTextEdit::dropDuplicateCursors() {
     QList<int> seen{textCursor().position()};
     QList<QTextCursor> kept;
-    for (const QTextCursor& cursor : std::as_const(extraCursors_)) {
+    QList<int> keptVirtual;
+    for (qsizetype i = 0; i < extraCursors_.size(); ++i) {
+        const QTextCursor& cursor = extraCursors_[i];
         if (seen.contains(cursor.position()))
             continue;
         seen.append(cursor.position());
         kept.append(cursor);
+        keptVirtual.append(extraVirtual_.value(i));
     }
     extraCursors_ = kept;
+    extraVirtual_ = keptVirtual;
+}
+
+int CodeTextEdit::tabColumns() const {
+    const qreal space = QFontMetricsF(document()->defaultFont()).horizontalAdvance(QLatin1Char(' '));
+    return space > 0 ? std::max(1, qRound(tabStopDistance() / space)) : 4;
+}
+
+namespace {
+// The next cursor position after `i` in `block` (a character with its combining marks, a
+// surrogate pair).
+int nextPosition(const QTextBlock& block, int i) {
+    const QTextLayout* layout = block.layout();
+    const int next = layout ? layout->nextCursorPosition(i) : i + 1;
+    return next > i ? next : i + 1;
+}
+} // namespace
+
+int CodeTextEdit::columnOf(const QTextBlock& block, int positionInBlock) const {
+    const QString text = block.text();
+    const int tab = tabColumns();
+    int column = 0;
+    for (int i = 0; i < positionInBlock && i < text.size(); i = nextPosition(block, i))
+        column = text[i] == QLatin1Char('\t') ? (column / tab + 1) * tab : column + 1;
+    return column;
+}
+
+int CodeTextEdit::positionAtColumn(const QTextBlock& block, int column, int& spaces) const {
+    const QString text = block.text();
+    const int tab = tabColumns();
+    int at = 0;
+    int i = 0;
+    while (i < text.size()) {
+        const int next = text[i] == QLatin1Char('\t') ? (at / tab + 1) * tab : at + 1;
+        if (next > column)
+            break;
+        at = next;
+        i = nextPosition(block, i);
+    }
+    spaces = i >= text.size() ? std::max(0, column - at) : 0;
+    return std::min(i, static_cast<int>(text.size()));
+}
+
+void CodeTextEdit::moveKeepingColumn(QTextCursor& cursor, int& spaces, int direction) const {
+    const int column = columnOf(cursor.block(), cursor.positionInBlock()) + spaces;
+    const QTextBlock block =
+        direction < 0 ? cursor.block().previous() : cursor.block().next();
+    if (!block.isValid())
+        return;
+    cursor.setPosition(block.position() + positionAtColumn(block, column, spaces));
+}
+
+bool CodeTextEdit::insertsText(const QKeyEvent* event) {
+    const auto modifiers = event->modifiers() &
+                           ~(Qt::ShiftModifier | Qt::KeypadModifier | Qt::GroupSwitchModifier);
+    const QString text = event->text();
+    return modifiers != Qt::ControlModifier && !text.isEmpty() &&
+           std::ranges::all_of(text, [](QChar c) { return c.isPrint() || c == QLatin1Char('\t'); });
+}
+
+void CodeTextEdit::padVirtualSpace(QTextCursor& cursor, int& spaces) {
+    if (spaces > 0 && !cursor.hasSelection() && cursor.atBlockEnd())
+        cursor.insertText(QString(spaces, QLatin1Char(' ')));
+    spaces = 0;
+}
+
+void CodeTextEdit::setMainVirtualSpaces(int spaces) {
+    if (spaces == mainVirtual_)
+        return;
+    mainVirtual_ = spaces;
+    updateCursorDrawing();
+    viewport()->update();
+}
+
+void CodeTextEdit::editAtCursorsVirtual(const std::function<void(QTextCursor&, int&)>& edit) {
+    int mainSpaces = mainVirtual_;
+    editKeepingCursors([&] {
+        QTextCursor main = textCursor();
+        edit(main, mainSpaces);
+        for (qsizetype i = 0; i < extraCursors_.size(); ++i)
+            edit(extraCursors_[i], extraVirtual_[i]);
+        setTextCursor(main);
+    });
+    setMainVirtualSpaces(mainSpaces);
+    ensureCursorVisible();
 }
 
 void CodeTextEdit::editKeepingCursors(const std::function<void()>& edit) {
@@ -189,6 +290,9 @@ void CodeTextEdit::editKeepingCursors(const std::function<void()>& edit) {
 }
 
 void CodeTextEdit::editAtCursors(const std::function<void(QTextCursor&)>& edit) {
+    // These edits do not use the virtual space: the cursors are where the text is.
+    std::ranges::fill(extraVirtual_, 0);
+    setMainVirtualSpaces(0);
     editKeepingCursors([&] {
         QTextCursor main = textCursor();
         edit(main);
@@ -282,16 +386,20 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
         // As many lines as cursors (e.g. copied from as many cursors): one line each, in text
         // order.
         const bool spread = lines.size() == cursors().size();
+        int mainSpaces = mainVirtual_;
         editKeepingCursors([&] {
             QTextCursor main = textCursor();
-            QList<QTextCursor*> all{&main};
-            for (QTextCursor& extra : extraCursors_)
-                all.append(&extra);
-            std::ranges::sort(all, {}, [](const QTextCursor* c) { return c->selectionStart(); });
-            for (qsizetype i = 0; i < all.size(); ++i)
-                all[i]->insertText(spread ? lines[i] : text);
+            QList<std::pair<QTextCursor*, int*>> all{{&main, &mainSpaces}};
+            for (qsizetype i = 0; i < extraCursors_.size(); ++i)
+                all.append({&extraCursors_[i], &extraVirtual_[i]});
+            std::ranges::sort(all, {}, [](const auto& c) { return c.first->selectionStart(); });
+            for (qsizetype i = 0; i < all.size(); ++i) {
+                padVirtualSpace(*all[i].first, *all[i].second);
+                all[i].first->insertText(spread ? lines[i] : text);
+            }
             setTextCursor(main);
         });
+        setMainVirtualSpaces(mainSpaces);
         ensureCursorVisible();
         return true;
     }
@@ -301,22 +409,32 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
         const auto mode = shift ? QTextCursor::KeepAnchor : QTextCursor::MoveAnchor;
         keepingCursors_ = true;
         QTextCursor main = textCursor();
-        for (QTextCursor* cursor : [&] {
-                 QList<QTextCursor*> all{&main};
-                 for (QTextCursor& extra : extraCursors_)
-                     all.append(&extra);
-                 return all;
-             }()) {
+        int mainSpaces = mainVirtual_;
+        QList<std::pair<QTextCursor*, int*>> all{{&main, &mainSpaces}};
+        for (qsizetype i = 0; i < extraCursors_.size(); ++i)
+            all.append({&extraCursors_[i], &extraVirtual_[i]});
+        for (auto [cursor, spaces] : all) {
             if (!shift && cursor->hasSelection() && (key == Qt::Key_Left || key == Qt::Key_Right)) {
                 // Like a code editor: Left/Right first collapse a selection to its edge.
                 cursor->setPosition(key == Qt::Key_Left ? cursor->selectionStart()
                                                         : cursor->selectionEnd());
+                *spaces = 0;
                 continue;
             }
+            if (!shift && !ctrl && (key == Qt::Key_Up || key == Qt::Key_Down)) {
+                moveKeepingColumn(*cursor, *spaces, key == Qt::Key_Up ? -1 : +1);
+                continue;
+            }
+            if (!shift && !ctrl && key == Qt::Key_Left && *spaces > 0 && cursor->atBlockEnd()) {
+                --*spaces; // back through the virtual space
+                continue;
+            }
+            *spaces = 0;
             cursor->movePosition(ctrl ? word : plain, mode);
         }
         setTextCursor(main);
         keepingCursors_ = false;
+        setMainVirtualSpaces(mainSpaces);
         dropDuplicateCursors();
         updateExtraSelections();
         viewport()->update();
@@ -359,7 +477,14 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
                 }
                 cursor.removeSelectedText();
             };
-            editAtCursors([&](QTextCursor& cursor) {
+            editAtCursorsVirtual([&](QTextCursor& cursor, int& spaces) {
+                // Backspace in the virtual space only steps back.
+                if (back && !ctrl && spaces > 0 && !cursor.hasSelection() &&
+                    cursor.atBlockEnd()) {
+                    --spaces;
+                    return;
+                }
+                spaces = 0;
                 if (!cursorKeyHook_ || !cursorKeyHook_(cursor, event, plain))
                     plain(cursor);
             });
@@ -383,19 +508,19 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
         default:
             break;
         }
+    }
+    // Text as QPlainTextEdit would insert it (also AltGr arriving as Ctrl+Alt).
+    if (insertsText(event)) {
         const QString text = event->text();
-        if (!ctrl && !text.isEmpty() && std::ranges::all_of(text, [](QChar c) {
-                return c.isPrint() || c == QLatin1Char('\t');
-            })) {
-            const std::function<void(QTextCursor&)> plain = [&](QTextCursor& cursor) {
-                cursor.insertText(text);
-            };
-            editAtCursors([&](QTextCursor& cursor) {
-                if (!cursorKeyHook_ || !cursorKeyHook_(cursor, event, plain))
-                    plain(cursor);
-            });
-            return true;
-        }
+        const std::function<void(QTextCursor&)> plain = [&](QTextCursor& cursor) {
+            cursor.insertText(text);
+        };
+        editAtCursorsVirtual([&](QTextCursor& cursor, int& spaces) {
+            padVirtualSpace(cursor, spaces);
+            if (!cursorKeyHook_ || !cursorKeyHook_(cursor, event, plain))
+                plain(cursor);
+        });
+        return true;
     }
     clearExtraCursors();
     return false;
@@ -428,6 +553,11 @@ bool CodeTextEdit::event(QEvent* event) {
 }
 
 bool CodeTextEdit::handleEvent(QEvent* event) {
+    // Read-only: nothing is typed, so no cursor waits past a line's end.
+    if (event->type() == QEvent::ReadOnlyChange && isReadOnly()) {
+        std::ranges::fill(extraVirtual_, 0);
+        setMainVirtualSpaces(0);
+    }
     // With several cursors, copy, cut and paste and Escape act at all of them, before any
     // shortcut of the window gets these keys.
     if (event->type() == QEvent::ShortcutOverride && !extraCursors_.isEmpty()) {
@@ -444,18 +574,27 @@ bool CodeTextEdit::handleEvent(QEvent* event) {
 void CodeTextEdit::paintEvent(QPaintEvent* event) {
     QPlainTextEdit::paintEvent(event);
     // With several cursors Qt's own one is hidden: all of them are drawn here, blinking together.
-    if (extraCursors_.isEmpty() || !hasFocus() || !blinkOn_)
+    // So is a cursor in the virtual space (past its line's end).
+    if (ownCursorWidth_ < 0 || !hasFocus() || !blinkOn_)
         return;
     QPainter painter(viewport());
-    for (const QTextCursor& cursor : cursors()) {
+    const qreal space =
+        QFontMetricsF(document()->defaultFont()).horizontalAdvance(QLatin1Char(' '));
+    const auto draw = [&](const QTextCursor& cursor, int spaces) {
         const QRect rect = cursorRect(cursor);
-        painter.fillRect(rect.x(), rect.y(), std::max(1, ownCursorWidth_), rect.height(),
+        const int x = rect.x() + (cursor.atBlockEnd() && !cursor.hasSelection()
+                                      ? qRound(spaces * space)
+                                      : 0);
+        painter.fillRect(x, rect.y(), std::max(1, ownCursorWidth_), rect.height(),
                          palette().text());
-    }
+    };
+    draw(textCursor(), mainVirtual_);
+    for (qsizetype i = 0; i < extraCursors_.size(); ++i)
+        draw(extraCursors_[i], extraVirtual_.value(i));
 }
 
 void CodeTextEdit::updateCursorDrawing() {
-    if (!extraCursors_.isEmpty()) {
+    if (!extraCursors_.isEmpty() || mainVirtual_ > 0) {
         if (ownCursorWidth_ < 0) {
             ownCursorWidth_ = cursorWidth();
             setCursorWidth(0);
@@ -483,6 +622,7 @@ void CodeTextEdit::restartBlink() {
 
 void CodeTextEdit::mousePressEvent(QMouseEvent* event) {
     clearExtraCursors();
+    setMainVirtualSpaces(0);
     QPlainTextEdit::mousePressEvent(event);
 }
 
@@ -530,19 +670,118 @@ void CodeTextEdit::contextMenuEvent(QContextMenuEvent* event) {
 
 void CodeTextEdit::keyPressEvent(QKeyEvent* event) {
     const auto modifiers = event->modifiers() & ~Qt::KeypadModifier;
+    // Alt+Shift+Up/Down, as in Visual Studio (Alt+Up/Down move the line).
     if ((event->key() == Qt::Key_Up || event->key() == Qt::Key_Down) &&
-        modifiers == (Qt::ControlModifier | Qt::ShiftModifier)) {
+        modifiers == (Qt::AltModifier | Qt::ShiftModifier)) {
         addCursorVertically(event->key() == Qt::Key_Up ? -1 : +1);
         return;
     }
     if (!extraCursors_.isEmpty() && multiCursorKey(event)) {
-        if (!extraCursors_.isEmpty())
+        if (!extraCursors_.isEmpty() || mainVirtual_ > 0)
             restartBlink();
         return;
     }
-    if (keyFilter_ && keyFilter_(event))
+    // Text typed in the virtual space: the spaces and the key's edit are one undo step.
+    QTextCursor editBlock(document());
+    bool padded = false;
+    if (extraCursors_.isEmpty()) {
+        if (virtualSpaceKey(event))
+            return;
+        // (A paste is padded by insertFromMimeData, only when something is pasted.)
+        if (mainVirtual_ > 0 && !isReadOnly() && !event->matches(QKeySequence::Paste)) {
+            editBlock.beginEditBlock();
+            padded = true;
+            QTextCursor cursor = textCursor();
+            int spaces = mainVirtual_;
+            padVirtualSpace(cursor, spaces);
+            setTextCursor(cursor); // out of the virtual space
+        }
+    }
+    if (!keyFilter_ || !keyFilter_(event))
+        processKey(event);
+    if (padded)
+        editBlock.endEditBlock();
+}
+
+bool CodeTextEdit::virtualSpaceKey(QKeyEvent* event) {
+    if (isReadOnly()) {
+        setMainVirtualSpaces(0);
+        return false;
+    }
+    const auto modifiers = event->modifiers() & ~Qt::KeypadModifier;
+    const int key = event->key();
+    if ((key == Qt::Key_Up || key == Qt::Key_Down) && modifiers == Qt::NoModifier &&
+        !textCursor().hasSelection()) {
+        QTextCursor cursor = textCursor();
+        int spaces = mainVirtual_;
+        moveKeepingColumn(cursor, spaces, key == Qt::Key_Up ? -1 : +1);
+        virtualMove_ = true;
+        setTextCursor(cursor);
+        virtualMove_ = false;
+        setMainVirtualSpaces(spaces);
+        if (spaces > 0)
+            restartBlink();
+        ensureCursorVisible();
+        return true;
+    }
+    if (mainVirtual_ == 0)
+        return false;
+    if (key == Qt::Key_Shift || key == Qt::Key_Control || key == Qt::Key_Alt ||
+        key == Qt::Key_Meta || key == Qt::Key_AltGr)
+        return true; // a modifier alone changes nothing
+    if (!textCursor().atBlockEnd() || textCursor().hasSelection()) {
+        setMainVirtualSpaces(0);
+        return false;
+    }
+    if ((key == Qt::Key_Left || key == Qt::Key_Backspace) && modifiers == Qt::NoModifier) {
+        setMainVirtualSpaces(mainVirtual_ - 1);
+        restartBlink();
+        return true;
+    }
+    // Typed text is padded by keyPressEvent, a paste by insertFromMimeData.
+    if (!insertsText(event) && !event->matches(QKeySequence::Paste))
+        setMainVirtualSpaces(0);
+    return false;
+}
+
+void CodeTextEdit::insertFromMimeData(const QMimeData* source) {
+    if (mainVirtual_ == 0 || !extraCursors_.isEmpty() || isReadOnly() || !source ||
+        !source->hasText() || source->text().isEmpty()) {
+        setMainVirtualSpaces(0);
+        QPlainTextEdit::insertFromMimeData(source);
         return;
-    processKey(event);
+    }
+    // Pasted in the virtual space: the spaces first, one undo step with the text.
+    QTextCursor editBlock(document());
+    editBlock.beginEditBlock();
+    QTextCursor cursor = textCursor();
+    int spaces = mainVirtual_;
+    padVirtualSpace(cursor, spaces);
+    setTextCursor(cursor);
+    QPlainTextEdit::insertFromMimeData(source);
+    editBlock.endEditBlock();
+}
+
+void CodeTextEdit::inputMethodEvent(QInputMethodEvent* event) {
+    // Dead keys and input methods (ó, ň, ...) commit text without a key press: padded too.
+    const bool text = !event->commitString().isEmpty() || !event->preeditString().isEmpty();
+    if (!text || mainVirtual_ == 0 || !extraCursors_.isEmpty() || isReadOnly()) {
+        QPlainTextEdit::inputMethodEvent(event);
+        return;
+    }
+    QTextCursor editBlock(document());
+    editBlock.beginEditBlock();
+    QTextCursor cursor = textCursor();
+    int spaces = mainVirtual_;
+    padVirtualSpace(cursor, spaces);
+    setTextCursor(cursor);
+    QPlainTextEdit::inputMethodEvent(event);
+    editBlock.endEditBlock();
+}
+
+void CodeTextEdit::dropEvent(QDropEvent* event) {
+    setMainVirtualSpaces(0); // dropped where the mouse is, not at the cursor
+    QPlainTextEdit::dropEvent(event);
 }
 
 void CodeTextEdit::processKey(QKeyEvent* event) {

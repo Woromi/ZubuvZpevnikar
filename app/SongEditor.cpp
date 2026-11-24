@@ -986,7 +986,7 @@ bool SongEditor::typeSpaceOutsideChord(QKeyEvent* event) {
     return true;
 }
 
-// The three inserts work at every cursor (Ctrl+Shift+Up/Down), each line with its own.
+// The three inserts work at every cursor (Alt+Shift+Up/Down), each line with its own.
 void SongEditor::insertChord() {
     if (edit_->isReadOnly() || kind_ != Kind::Song)
         return;
