@@ -1,6 +1,7 @@
 #include "SettingsDialog.hpp"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFileDialog>
@@ -75,6 +76,17 @@ SettingsDialog::SettingsDialog(const State& state, QWidget* parent)
     form->addRow(tr("&Soundfont:"), row(this, {soundfontLine_, chooseSoundfont, automatic_}));
     showSoundfont(state.soundfont, state.soundfontChosen);
 
+    // Only an AppImage puts itself into the menu (an installed app has its entry already).
+    menuEntry_ = new QCheckBox(tr("Show Zpěvníkář in the application menu"), this);
+    menuEntry_->setObjectName(QStringLiteral("settingsMenuEntry"));
+    menuEntry_->setToolTip(tr("Its launcher entry and icon in ~/.local/share, following the "
+                              "AppImage when it is moved or updated"));
+    menuEntry_->setChecked(state.menuEntry);
+    if (state.appImage)
+        form->addRow(tr("AppImage:"), menuEntry_);
+    else
+        menuEntry_->hide();
+
     // Build files: LilyPond's engraved scores and the songbooks' work dirs in the cache.
     keepBuilds_ = new QRadioButton(
         tr("&Keep them: a rebuild engraves only the scores that changed (faster, uses disk space)"),
@@ -122,6 +134,10 @@ SettingsDialog::SettingsDialog(const State& state, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->addLayout(form);
     layout->addWidget(buttons);
+}
+
+bool SettingsDialog::menuEntry() const {
+    return menuEntry_->isChecked();
 }
 
 bool SettingsDialog::keepBuildFiles() const {

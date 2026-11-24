@@ -4,6 +4,7 @@
 #include <QString>
 #include <functional>
 
+class QCheckBox;
 class QComboBox;
 class QLabel;
 class QRadioButton;
@@ -23,6 +24,8 @@ public:
         bool soundfontChosen = false; // picked by the user
         QString package;              // the package in use ("" = none)
         bool ownPackage = false;      // it is the songbook's own (else the app's copy)
+        bool appImage = false;  // runs as an AppImage (the menu entry is the app's own)
+        bool menuEntry = true;  // it puts itself into the application menu
         bool keepBuildFiles = true;
         qint64 buildFilesBytes = 0;
         std::function<qint64()> deleteBuildFiles; // deletes what no build uses; the bytes left
@@ -35,6 +38,7 @@ public:
     bool soundfontChanged() const { return soundfontChanged_; }
     QString soundfont() const { return soundfont_; } // "" = found automatically
     bool keepBuildFiles() const;
+    bool menuEntry() const;
 
 private:
     void showSoundfont(const QString& path, bool chosen);
@@ -44,6 +48,7 @@ private:
     QComboBox* language_ = nullptr;
     QLineEdit* soundfontLine_ = nullptr;
     QPushButton* automatic_ = nullptr;
+    QCheckBox* menuEntry_ = nullptr;
     QRadioButton* keepBuilds_ = nullptr;
     QRadioButton* rebuildAll_ = nullptr;
     QLabel* buildFilesSize_ = nullptr;

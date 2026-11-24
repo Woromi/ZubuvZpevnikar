@@ -15,6 +15,7 @@ include(Catch)
 add_executable(zub_core_tests
     test_audio.cpp
     test_bookfile.cpp
+    test_desktopentry.cpp
     test_booktranspose.cpp
     test_fretboard.cpp
     test_json.cpp

@@ -1,6 +1,9 @@
 // MainWindow: the views, the package lookup, the language filter and the papers offer.
 #include <QAbstractButton>
+#include <QCheckBox>
 #include <QComboBox>
+#include <QFileInfo>
+#include <QStandardPaths>
 #include <QLabel>
 #include <QFile>
 #include <QLocale>
@@ -16,6 +19,7 @@
 
 #include "AppTestAccess.hpp"
 #include "BuildFiles.hpp"
+#include "DesktopIntegration.hpp"
 #include "PreviewRunner.hpp"
 #include "SettingsDialog.hpp"
 #include "SongFilterProxy.hpp"
@@ -308,4 +312,49 @@ TEST_CASE("Converter: ZUB_CONVERTER is the only way to choose one; Settings has 
     A::openSettings(w);
     REQUIRE(settings.fired());
     CHECK(noConverterRow);
+}
+
+TEST_CASE("Desktop: an AppImage puts itself into the application menu", "[app][desktop]") {
+    apptest::Fixture fixture;
+    namespace di = desktopintegration;
+    const QString app = QStringLiteral(ZUB_TEST_DATA_DIR "/../../app");
+    di::Source source{app + QStringLiteral("/zpevnikar.desktop"),
+                      {{48, app + QStringLiteral("/icons/zpevnikar-48.png")},
+                       {256, app + QStringLiteral("/icons/zpevnikar-256.png")}}};
+    const auto image = fixture / "Apps/Zpevnikar-1.0-x86_64.AppImage";
+    apptest::writeFile(image, "not really an image");
+    const QString imagePath = toQString(image);
+    const auto entry = [] { return slurp(toPath(di::entryPath())); };
+
+    CHECK(di::install(imagePath, source) == di::Result::Added);
+    CHECK(entry().contains("Exec=\"" + image.generic_string() + "\"\n"));
+    CHECK(entry().contains("Name=Zpěvníkář\n"));
+    const QString data = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+    CHECK(QFileInfo(data + "/icons/hicolor/256x256/apps/zpevnikar.png").isFile());
+    CHECK(di::install(imagePath, source) == di::Result::Unchanged);
+    // Moved or updated: the entry follows it.
+    const auto moved = fixture / "Zpevnikar-1.1-x86_64.AppImage";
+    apptest::writeFile(moved, "newer");
+    CHECK(di::install(toQString(moved), source) == di::Result::Updated);
+    CHECK(entry().contains("TryExec=" + moved.generic_string() + "\n"));
+    CHECK(di::remove());
+    CHECK_FALSE(QFileInfo::exists(di::entryPath()));
+
+    // An entry installed otherwise is left alone, also by remove().
+    apptest::writeFile(toPath(di::entryPath()), "[Desktop Entry]\nExec=zpevnikar\n");
+    CHECK(di::install(imagePath, source) == di::Result::NotOurs);
+    CHECK_FALSE(di::remove());
+    CHECK(entry() == "[Desktop Entry]\nExec=zpevnikar\n");
+
+    // The Settings choice is shown only when running as an AppImage.
+    MainWindow w;
+    bool shown = true;
+    auto settings = apptest::answerDialog<SettingsDialog>([&](SettingsDialog* d) {
+        shown = d->findChild<QCheckBox*>(QStringLiteral("settingsMenuEntry"))->isVisibleTo(d);
+        d->reject();
+    });
+    qunsetenv("APPIMAGE");
+    A::openSettings(w);
+    REQUIRE(settings.fired());
+    CHECK_FALSE(shown);
 }

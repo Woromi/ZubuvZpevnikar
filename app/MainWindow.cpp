@@ -1,6 +1,7 @@
 #include "MainWindow.hpp"
 
 #include "BuildFiles.hpp"
+#include "DesktopIntegration.hpp"
 #include "DiffView.hpp"
 #include "FindBar.hpp"
 #include "ImportDialog.hpp"
@@ -1950,6 +1951,8 @@ void MainWindow::openSettings() {
                             state.soundfont == settings.value(soundfontKey).toString();
     state.package = toQString(packageDir_);
     state.ownPackage = !packageDir_.empty() && zub::package::ofSongbook(songbookRoot_).has_value();
+    state.appImage = !desktopintegration::appImage().isEmpty();
+    state.menuEntry = desktopintegration::enabled();
     state.keepBuildFiles = buildfiles::keep();
     state.buildFilesBytes = buildFilesSize();
     state.deleteBuildFiles = [this] { return deleteBuildFiles(); };
@@ -1969,6 +1972,19 @@ void MainWindow::openSettings() {
         else
             settings.setValue(soundfontKey, dialog.soundfont());
         scores_->updateSoundAvailability();
+    }
+    if (state.appImage && dialog.menuEntry() != state.menuEntry) {
+        desktopintegration::setEnabled(dialog.menuEntry());
+        const bool done =
+            dialog.menuEntry()
+                ? desktopintegration::install(desktopintegration::appImage(),
+                                              desktopintegration::bundled()) !=
+                      desktopintegration::Result::Failed
+                : desktopintegration::remove();
+        if (!done)
+            QMessageBox::warning(this, tr("Settings"),
+                                 tr("The application menu entry %1 could not be changed.")
+                                     .arg(desktopintegration::entryPath()));
     }
     if (dialog.keepBuildFiles() != state.keepBuildFiles) {
         buildfiles::setKeep(dialog.keepBuildFiles());

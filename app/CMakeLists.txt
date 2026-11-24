@@ -11,6 +11,8 @@ qt_add_library(zpevnikar_app STATIC
     FindMatches.cpp
     ActivityBar.cpp
     BuildFiles.hpp
+    DesktopIntegration.hpp
+    DesktopIntegration.cpp
     BuildFiles.cpp
     SettingsDialog.hpp
     SettingsDialog.cpp

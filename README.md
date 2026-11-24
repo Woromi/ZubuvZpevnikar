@@ -36,7 +36,10 @@ conversions from chords_converter (0.14.0 or newer).
 
 Linux: each [release](https://github.com/Woromi/ZubuvZpevnikar/releases) has an AppImage
 (Ubuntu 24.04, Debian 13, Fedora 40 or newer). Make it executable (`chmod +x
-Zpevnikar-*.AppImage`) and run it; the converter and the LaTeX package are inside. Install the
+Zpevnikar-*.AppImage`) and run it; the converter and the LaTeX package are inside. On its first
+start it adds itself to the application menu (with its icon; it follows the AppImage when you move
+or update it; Settings can turn that off). The songs are not inside: the app opens your song
+library, or creates or downloads one. Install the
 programs the songs are built with yourself (see the requirements below). Windows is not supported
 yet; CI builds it to show what is missing.
 

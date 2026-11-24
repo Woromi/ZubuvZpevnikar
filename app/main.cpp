@@ -1,3 +1,4 @@
+#include "DesktopIntegration.hpp"
 #include "MainWindow.hpp"
 
 #include <QApplication>
@@ -9,6 +10,7 @@
 #include <QLocale>
 #include <QTranslator>
 #include <QString>
+#include <QStatusBar>
 #include <QTimer>
 #include <zub/core/version.hpp>
 
@@ -67,6 +69,16 @@ int main(int argc, char* argv[]) {
 
     MainWindow window;
     window.show();
+    // Run as an AppImage: into the application menu, as an installed app is.
+    if (const QString image = desktopintegration::appImage();
+        !image.isEmpty() && desktopintegration::enabled() &&
+        desktopintegration::install(image, desktopintegration::bundled()) ==
+            desktopintegration::Result::Added)
+        window.statusBar()->showMessage(
+            QCoreApplication::translate("main",
+                                        "Zpěvníkář is in the application menu now (Settings can "
+                                        "remove it)."),
+            15000);
     // After show(), so a folder dialog opens on top of the main window.
     QTimer::singleShot(0, &window, [&window, path = parser.value(songbookOption)] {
         window.openInitialSongbook(path);

@@ -1212,6 +1212,14 @@ Použijte vestavěný.</translation>
         <translation>Píseň se ještě přidává do zpěvníků: zkuste Přidat do zpěvníků… za chvíli znovu.</translation>
     </message>
     <message>
+        <source>Settings</source>
+        <translation>Nastavení</translation>
+    </message>
+    <message>
+        <source>The application menu entry %1 could not be changed.</source>
+        <translation>Položku v nabídce aplikací %1 nelze změnit.</translation>
+    </message>
+    <message>
         <source>Open a song library first.</source>
         <translation>Nejdřív otevřete knihovnu písní.</translation>
     </message>
@@ -2068,6 +2076,18 @@ Použijte vestavěný.</translation>
     <message>
         <source>&amp;Soundfont:</source>
         <translation>&amp;Soundfont:</translation>
+    </message>
+    <message>
+        <source>Show Zpěvníkář in the application menu</source>
+        <translation>Zobrazovat Zpěvníkáře v nabídce aplikací</translation>
+    </message>
+    <message>
+        <source>Its launcher entry and icon in ~/.local/share, following the AppImage when it is moved or updated</source>
+        <translation>Jeho spouštěč a ikona v ~/.local/share; sleduje AppImage, když ho přesunete nebo aktualizujete</translation>
+    </message>
+    <message>
+        <source>AppImage:</source>
+        <translation>AppImage:</translation>
     </message>
     <message>
         <source>&amp;Keep them: a rebuild engraves only the scores that changed (faster, uses disk space)</source>
@@ -3842,6 +3862,13 @@ Pokud je na disku, který není připojený, připojte ho a zkuste to znovu.</tr
     <message>
         <source>Choose Another…</source>
         <translation>Vybrat jinou…</translation>
+    </message>
+</context>
+<context>
+    <name>main</name>
+    <message>
+        <source>Zpěvníkář is in the application menu now (Settings can remove it).</source>
+        <translation>Zpěvníkář je teď v nabídce aplikací (v Nastavení ho lze odebrat).</translation>
     </message>
 </context>
 </TS>

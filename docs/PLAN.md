@@ -237,6 +237,7 @@ Asked by the user 2026-11-11. Qt Linguist translations in `app/i18n/`.
 
 ## Releases and Windows (asked by the user 2026-11-24)
 - [x] Release workflow: a tag `vX.Y.Z` (= the CMake project version) builds a Linux AppImage (`packaging/appimage.sh`) and makes a GitHub release with it; Actions → Run workflow builds it as an artifact only.
+- [x] The AppImage adds itself to the application menu with its icon on start, following it when it is moved or updated (asked by the user 2026-11-24: "if I download anything, I just run that and it just happens"); Settings can turn it off.
 - [x] Windows CI job (build + tests, not failing the run yet) to see what breaks.
 - [ ] Windows variants: TEXINPUTS separator `;` (core), stopping a build with its children (job objects instead of process groups: PreviewRunner, ScoreRunner, PlaybackRunner, NoteSounds, ConverterRunner, SongbookExporter, LibraryDialog), the songbook build's `bash scripts/build.sh` (Git for Windows' bash, or a change in the package: the user decides), `locale -a` in the package's scripts, `.exe` names (ZUB_CONVERTER_BUILT, the built-in converter).
 - [ ] Windows package (windeployqt; zip or installer) in the release workflow.
