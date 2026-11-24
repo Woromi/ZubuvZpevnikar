@@ -498,13 +498,15 @@ void MainWindow::createCentralWidget() {
     connect(homePage_, &HomePage::wishImportRequested, this,
             [this](HomeWish wish) { importSongFor(wish); });
     connect(homePage_, &HomePage::wishMoveRequested, this, [this](HomeWish wish) {
-        changeWish(wish, [&] { return moveWishToList(songbookRoot_, wish); });
+        // changeWish shows a failure itself (std::expected is [[nodiscard]] with MSVC).
+        (void)changeWish(wish, [&] { return moveWishToList(songbookRoot_, wish); });
         refreshHome();
     });
     connect(homePage_, &HomePage::wishNewSongRequested, this,
             [this](HomeWish wish) { newSongFor(wish); });
     connect(homePage_, &HomePage::wishDoneRequested, this, [this](HomeWish wish) {
-        changeWish(wish, [&] { return fulfilWish(songbookRoot_, wish, inputNameOfPath(wish.song)); });
+        (void)changeWish(wish,
+                         [&] { return fulfilWish(songbookRoot_, wish, inputNameOfPath(wish.song)); });
         refreshHome();
     });
     connect(homePage_, &HomePage::wishRemoveRequested, this, [this](HomeWish wish) {
@@ -513,7 +515,7 @@ void MainWindow::createCentralWidget() {
             tr("Remove the wish \"%1\"?").arg(wishDisplayText(wish.text, wish.name)));
         if (answer != QMessageBox::Yes)
             return;
-        changeWish(wish, [&] { return removeWish(songbookRoot_, wish); });
+        (void)changeWish(wish, [&] { return removeWish(songbookRoot_, wish); });
         refreshHome();
     });
     connect(homePage_, &HomePage::wishAddRequested, this, [this] {
@@ -1823,8 +1825,9 @@ std::vector<MainWindow::RiskSource> MainWindow::songBuildRisks(SongEditor* edito
         const auto resolved = zub::songbook::resolveScoreReference(reference);
         if (!resolved) {
             // Built from wherever TEXINPUTS finds it, so it cannot be checked: needs confirmation.
-            sources.push_back({std::filesystem::path(editor->path().native() + "\\lilypondfile{" +
-                                                     reference + "}"),
+            // (Through QString: a path's native string is std::wstring on Windows.)
+            sources.push_back({toPath(toQString(editor->path()) + QStringLiteral("\\lilypondfile{") +
+                                      toQString(reference) + QLatin1Char('}')),
                                {},
                                {"\\lilypondfile{" + reference + "}"}});
             continue;

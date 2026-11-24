@@ -2,6 +2,18 @@
 
 #include "SongTableModel.hpp"
 
+#include <QtGlobal>
+
+// Qt 6.10 has begin/endFilterChange (the filter's state changes between them); older Qt
+// invalidates the filter after the change.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+#define ZUB_BEGIN_FILTER_CHANGE() beginFilterChange()
+#define ZUB_END_FILTER_CHANGE() endFilterChange(QSortFilterProxyModel::Direction::Rows)
+#else
+#define ZUB_BEGIN_FILTER_CHANGE() static_cast<void>(0)
+#define ZUB_END_FILTER_CHANGE() invalidateRowsFilter()
+#endif
+
 SongFilterProxy::SongFilterProxy(QObject* parent) : QSortFilterProxyModel(parent) {
     setSortLocaleAware(true);
     setSortRole(SongTableModel::SortRole);
@@ -9,63 +21,63 @@ SongFilterProxy::SongFilterProxy(QObject* parent) : QSortFilterProxyModel(parent
 }
 
 void SongFilterProxy::setSearchText(const QString& text) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     searchWords_ = SongTableModel::foldForSearch(text).split(QLatin1Char(' '), Qt::SkipEmptyParts);
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 void SongFilterProxy::setLanguage(const QString& language) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     language_ = language;
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 void SongFilterProxy::setTodoOnly(bool todoOnly) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     todoOnly_ = todoOnly;
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 void SongFilterProxy::setChangesOnly(bool changesOnly) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     changesOnly_ = changesOnly;
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 void SongFilterProxy::setFavouritesOnly(bool favouritesOnly) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     favouritesOnly_ = favouritesOnly;
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 void SongFilterProxy::setTabsOnly(bool tabsOnly) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     tabsOnly_ = tabsOnly;
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 void SongFilterProxy::setRecentOnly(bool recentOnly) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     recentOnly_ = recentOnly;
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 void SongFilterProxy::setLabel(const QString& label) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     label_ = label;
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 void SongFilterProxy::setCollection(const QString& collection) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     collection_ = collection;
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 void SongFilterProxy::setOnlyNames(std::optional<std::set<std::string>> names) {
-    beginFilterChange();
+    ZUB_BEGIN_FILTER_CHANGE();
     onlyNames_ = std::move(names);
-    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+    ZUB_END_FILTER_CHANGE();
 }
 
 bool SongFilterProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const {
