@@ -3,12 +3,12 @@
 
 #include <filesystem>
 #include <fstream>
-#include <unistd.h>
+#include "Unique.hpp"
 
 namespace fs = std::filesystem;
 
 TEST_CASE("a package checkout has the style file and scripts/build.sh", "[package]") {
-    const fs::path root = fs::temp_directory_path() / ("zub-package-" + std::to_string(::getpid()));
+    const fs::path root = fs::temp_directory_path() / ("zub-package-" + zubtest::uniqueSuffix());
     fs::remove_all(root);
     const fs::path own = root / "zubuvzpevnik";
     fs::create_directories(own / "scripts");
@@ -24,7 +24,7 @@ TEST_CASE("a package checkout has the style file and scripts/build.sh", "[packag
 }
 
 TEST_CASE("the package defines \\transposesong in its style or a feature file", "[package]") {
-    const fs::path dir = fs::temp_directory_path() / ("zub-package-tr-" + std::to_string(::getpid()));
+    const fs::path dir = fs::temp_directory_path() / ("zub-package-tr-" + zubtest::uniqueSuffix());
     fs::remove_all(dir);
     fs::create_directories(dir / "feature");
     CHECK_FALSE(zub::package::definesTransposesong(dir));

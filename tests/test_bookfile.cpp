@@ -4,7 +4,7 @@
 #include <regex>
 #include <set>
 #include <sstream>
-#include <unistd.h>
+#include "Unique.hpp"
 #include <zub/core/bookfile.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/textfile.hpp>
@@ -365,7 +365,7 @@ TEST_CASE("findBooks lists the books with a \\documentclass", "[bookfile]") {
     CHECK(findBooks(root / "songs").empty());
 
     // `projects` is the fallback, a commented \documentclass does not count
-    const fs::path dir = fs::temp_directory_path() / ("zub-bookfile-" + std::to_string(::getpid()));
+    const fs::path dir = fs::temp_directory_path() / ("zub-bookfile-" + zubtest::uniqueSuffix());
     fs::create_directories(dir / "projects" / "p");
     std::ofstream(dir / "projects" / "p" / "p.tex") << "\\documentclass{x}\n";
     std::ofstream(dir / "projects" / "p" / "q.tex") << "% \\documentclass{x}\n";

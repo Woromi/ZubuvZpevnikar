@@ -2,7 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <fstream>
 #include <map>
-#include <unistd.h>
+#include "Unique.hpp"
 #include <zub/core/bookfile.hpp>
 #include <zub/core/json.hpp>
 #include <zub/core/library.hpp>

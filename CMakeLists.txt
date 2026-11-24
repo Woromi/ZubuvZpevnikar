@@ -38,7 +38,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(zub_warnings INTERFACE
         -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion -Wnon-virtual-dtor)
 elseif(MSVC)
-    target_compile_options(zub_warnings INTERFACE /W4 /permissive- /utf-8)
+    # /Zc:preprocessor: the standard preprocessor (the old one breaks raw strings in macro
+    # arguments, e.g. CHECK(parse(R"("\u0041")))).
+    target_compile_options(zub_warnings INTERFACE /W4 /permissive- /utf-8 /Zc:preprocessor)
 endif()
 
 add_subdirectory(core)

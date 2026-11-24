@@ -1,8 +1,9 @@
+#include "Unique.hpp"
+
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <fstream>
-#include <stdlib.h>
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/safety.hpp>
@@ -213,9 +214,8 @@ TEST_CASE("scanLibrary records the scores a song includes", "[library]") {
 }
 
 TEST_CASE("createSongbookRepo makes an empty songbook in a new or empty folder", "[library]") {
-    std::string pattern = (fs::temp_directory_path() / "zub-new-songbook-XXXXXX").string();
-    REQUIRE(::mkdtemp(pattern.data()) != nullptr);
-    const fs::path base = pattern;
+    const fs::path base = fs::temp_directory_path() / ("zub-new-songbook-" + zubtest::uniqueSuffix());
+    REQUIRE(fs::create_directory(base)); // a new folder of its own
     const fs::path root = base / "Mine";
     REQUIRE(zub::createSongbookRepo(root));
     CHECK(zub::validateSongbookRepo(root));
