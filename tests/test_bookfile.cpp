@@ -643,7 +643,7 @@ TEST_CASE("bookfile builds a repo book from a copy in the work dir", "[bookfile]
     CHECK(command.workingDirectory == "/work");
     REQUIRE(command.environment.size() == 1);
     CHECK(command.environment[0].second ==
-          ".:/work:/pkg:/sb/songbooks/t/2025:/sb:"); // /sb has no songs/ folders here
+          onTexinputs({".", "/work", "/pkg", "/sb/songbooks/t/2025", "/sb"})); // no songs/ here
     CHECK(command.pdf == "/work/book.pdf");
     CHECK(command.log == "/work/book.log");
 }

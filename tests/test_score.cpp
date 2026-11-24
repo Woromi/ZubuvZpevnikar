@@ -49,7 +49,7 @@ sc::Request requestIn(const TempDir& dir) {
     r.workDir = dir.path / "work";
     r.inputName = "Artist/Title.ly";
     r.content = "{ c4 d e f }\n";
-    r.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    r.includeDir = fs::absolute("/songbook/zubuvzpevnik/lilypond");
     return r;
 }
 
@@ -77,7 +77,7 @@ TEST_CASE("score prepare writes the copy, the wrapper and the command", "[score]
     CHECK(cmd->scoreCopy == work / "score/Artist/Title.ly");
     CHECK(cmd->svg == work / "out/score.cropped.svg");
     CHECK(cmd->arguments == std::vector<std::string>{
-                                "-dbackend=svg", "-dcrop", "-I", "/songbook/zubuvzpevnik/lilypond",
+                                "-dbackend=svg", "-dcrop", "-I", request.includeDir.generic_string(),
                                 "-I", (work / "score").generic_string(), "-o",
                                 (work / "out/score").generic_string(), "score.ly"});
 

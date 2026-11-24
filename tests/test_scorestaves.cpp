@@ -342,7 +342,7 @@ TEST_CASE("prepare plays amp staves in a book of their own", "[score][staves][mi
     request.workDir = dir.path / "work";
     request.inputName = "Artist/Title.ly";
     request.content = rozarka;
-    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    request.includeDir = fs::absolute("/songbook/zubuvzpevnik/lilypond");
     sc::MidiOptions midi;
     midi.instrument = "acoustic guitar (steel)";
 
@@ -412,7 +412,7 @@ TEST_CASE("prepare counts sounding chord names as a staff of the amp's mix", "[s
     request.workDir = dir.path / "work";
     request.inputName = "Artist/Title.ly";
     request.content = rozarka;
-    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    request.includeDir = fs::absolute("/songbook/zubuvzpevnik/lilypond");
     sc::MidiOptions midi;
     midi.instrument = "acoustic guitar (steel)";
     midi.staffInstruments = {"amp", "amp"};

@@ -238,7 +238,7 @@ TEST_CASE("prepare appends the midi score and reports the MIDI file", "[score][m
     request.workDir = dir.path / "work";
     request.inputName = "Artist/Title.ly";
     request.content = jolene;
-    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    request.includeDir = fs::absolute("/songbook/zubuvzpevnik/lilypond");
 
     auto cmd = sc::prepare(request); // without midi: as before
     REQUIRE(cmd);
@@ -271,7 +271,7 @@ TEST_CASE("prepare appends no playback score after text that would change how it
     sc::Request request;
     request.workDir = dir.path / "work";
     request.inputName = "Artist/Title.ly";
-    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    request.includeDir = fs::absolute("/songbook/zubuvzpevnik/lilypond");
     request.midi = options();
     for (const std::string text :
          {"\\score { { c'4^\"#(ly:warning (symbol->string 'PWNED))\" } }\n\"\n",
@@ -356,7 +356,7 @@ TEST_CASE("the playback score marks bends and is still appended", "[score][midi]
     request.workDir = dir.path / "work";
     request.inputName = "Artist/Title.ly";
     request.content = "\\score { \\new TabStaff { a'4\\2\\^ \\grace h'8\\2 a'4\\2 } }\n";
-    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    request.includeDir = fs::absolute("/songbook/zubuvzpevnik/lilypond");
     request.midi = options();
     const auto cmd = sc::prepare(request);
     REQUIRE(cmd);
@@ -610,7 +610,7 @@ TEST_CASE("errors in the appended playback score are dropped", "[score][midi]") 
     request.workDir = dir.path / "work";
     request.inputName = "Artist/Title.ly";
     request.content = "\\score { { c'4 } }\n";
-    request.includeDir = "/songbook/zubuvzpevnik/lilypond";
+    request.includeDir = fs::absolute("/songbook/zubuvzpevnik/lilypond");
 
     auto cmd = sc::prepare(request);
     REQUIRE(cmd);

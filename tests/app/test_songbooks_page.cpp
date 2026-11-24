@@ -821,8 +821,8 @@ TEST_CASE("Songbooks page: the build writes the song copies where TEXINPUTS find
     for (const auto part : std::views::split(texinputs, zub::preview::kPathListSeparator))
         entries.emplace_back(part.begin(), part.end());
     REQUIRE(entries.size() > 4);
-    CHECK(entries[1] == command->workingDirectory.string());
-    CHECK(entries[3] == override.string());
+    CHECK(std::filesystem::path(entries[1]) == command->workingDirectory);
+    CHECK(std::filesystem::path(entries[3]) == override);
     CHECK(entries[4].ends_with("/songs/chords"));
 
     // The next build without copies: the old one is gone, TEXINPUTS has no override folder.

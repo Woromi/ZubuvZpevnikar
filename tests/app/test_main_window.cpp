@@ -295,7 +295,11 @@ TEST_CASE("Converter: ZUB_CONVERTER is the only way to choose one; Settings has 
     CHECK(!QSettings().contains("converter/path"));
     CHECK(A::findConverter(w).empty()); // empty PATH, nothing next to the test binary
 
+#ifdef Q_OS_WIN
+    const auto fake = fixture / "bin/chords_converter.exe"; // runnable by its name there
+#else
     const auto fake = fixture / "bin/chords_converter";
+#endif
     apptest::writeFile(fake, "#!/bin/sh\n");
     std::filesystem::permissions(fake, std::filesystem::perms::owner_all);
     qputenv("ZUB_CONVERTER", QFile::encodeName(QString::fromStdString(fake.string())));

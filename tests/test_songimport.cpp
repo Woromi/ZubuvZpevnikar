@@ -83,7 +83,7 @@ TEST_CASE("prepare accepts URLs and existing files", "[songimport]") {
     SECTION("existing file") {
         const auto command = si::prepare({"conv", workDir, file.string()});
         REQUIRE(command);
-        CHECK(command->arguments.front() == file.string());
+        CHECK(fs::path(command->arguments.front()) == file);
     }
     SECTION("relative file becomes absolute") {
         struct CwdGuard {

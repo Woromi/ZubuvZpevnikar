@@ -46,7 +46,12 @@ TEST_CASE("collections lists the folders under songs/", "[library]") {
     CHECK(zub::collections(root) ==
           std::vector<std::string>{"chords", "alto", "banjo", "tinwhistle"});
     // Names that would add TEXINPUTS entries or run code in a build.sh, and links: skipped.
+    // (':' and '"' cannot be in a Windows file name.)
+#ifdef _WIN32
+    for (const char* d : {"x$(id)", "sp ace"})
+#else
     for (const char* d : {"a:b", "x$(id)", "sp ace", "q\"q"})
+#endif
         fs::create_directories(root / "songs" / d);
     fs::create_directory_symlink(root / "songs" / "alto", root / "songs" / "linked");
     CHECK(zub::collections(root) ==

@@ -12,7 +12,7 @@ namespace zub::songcheck {
 namespace {
 
 std::string utf8(const fs::path& p) {
-    const auto u8 = p.u8string();
+    const auto u8 = p.generic_u8string(); // '/' on every system
     return {u8.begin(), u8.end()};
 }
 
