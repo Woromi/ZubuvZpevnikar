@@ -19,7 +19,12 @@ TEST_CASE("the app tests never use the real user's settings, cache or data", "[a
          {QStandardPaths::AppDataLocation, QStandardPaths::CacheLocation,
           QStandardPaths::AppConfigLocation, QStandardPaths::GenericConfigLocation}) {
         INFO(QStandardPaths::writableLocation(location).toStdString());
+#ifdef Q_OS_WIN
+        // Windows ignores HOME/XDG_*: Qt's test mode keeps them in its own qttest folder.
+        CHECK(QStandardPaths::writableLocation(location).contains(QStringLiteral("/qttest")));
+#else
         CHECK(QStandardPaths::writableLocation(location).startsWith(temp));
+#endif
     }
     INFO(QSettings().fileName().toStdString());
     CHECK(QSettings().fileName().startsWith(temp));

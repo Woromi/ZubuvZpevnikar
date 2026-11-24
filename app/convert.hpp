@@ -19,8 +19,10 @@ inline QString toQString(const std::string& utf8) {
     return toQString(std::string_view{utf8});
 }
 
+// With '/' between folders on every system, as Qt writes paths (QDir::toNativeSeparators for
+// showing them the Windows way).
 inline QString toQString(const std::filesystem::path& path) {
-    return QString::fromStdU16String(path.u16string());
+    return QString::fromStdU16String(path.generic_u16string());
 }
 
 inline std::string toStdString(const QString& text) {

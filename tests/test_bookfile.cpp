@@ -6,6 +6,7 @@
 #include <sstream>
 #include "Unique.hpp"
 #include <zub/core/bookfile.hpp>
+#include <zub/core/preview.hpp>
 #include <zub/core/safety.hpp>
 #include <zub/core/textfile.hpp>
 
@@ -42,6 +43,16 @@ std::string set(const std::string& text, const Strings& names, std::size_t env =
     return *r;
 }
 
+} // namespace
+
+namespace {
+// The folders as TEXINPUTS lists them, each followed by the system's separator.
+std::string onTexinputs(std::initializer_list<std::string> folders) {
+    std::string out;
+    for (const auto& folder : folders)
+        out += folder + zub::preview::kPathListSeparator;
+    return out;
+}
 } // namespace
 
 TEST_CASE("parse reads the header of a book", "[bookfile]") {
@@ -642,7 +653,8 @@ TEST_CASE("bookfile build TEXINPUTS lists every collection", "[bookfile]") {
     const auto command = zub::bookfile::buildCommand(repo, "/pkg", "/work", "/bd", "book", {});
     const auto root = repo.generic_string();
     CHECK(command.environment[0].second ==
-          ".:/work:/pkg:" + root + "/songs/chords:" + root + "/songs/whistle2:/bd:" + root + ":");
+          onTexinputs({".", "/work", "/pkg", root + "/songs/chords", root + "/songs/whistle2", "/bd",
+                       root}));
 
     const auto script = zub::bookfile::buildScriptFor("b", zub::songbook::BookClass::Velky, {},
                                                       {"chords", "tinwhistle", "whistle2"});
@@ -1275,7 +1287,8 @@ TEST_CASE("a build.sh never gets an odd collection name", "[bookfile]") {
 TEST_CASE("bookfile build TEXINPUTS puts song copies after the package", "[bookfile]") {
     const auto command =
         zub::bookfile::buildCommand("/sb", "/pkg", "/work", "/bd", "book", {}, "/work/override");
-    CHECK(command.environment[0].second == ".:/work:/pkg:/work/override:/bd:/sb:");
+    CHECK(command.environment[0].second ==
+          onTexinputs({".", "/work", "/pkg", "/work/override", "/bd", "/sb"}));
 }
 
 TEST_CASE("addClassOption adds a class option once, byte-exact", "[bookfile]") {

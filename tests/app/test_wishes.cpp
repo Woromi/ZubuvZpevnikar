@@ -220,7 +220,7 @@ TEST_CASE("Wishes: --library opens a song library for that run only", "[app][wis
     QSettings{}.remove(QStringLiteral("songbook/path"));
 }
 
-TEST_CASE("Wishes: New Song… writes a wish by hand, the first save fulfils it", "[app][wishes]") {
+TEST_CASE("Wishes: New Song writes a wish by hand, the first save fulfils it", "[app][wishes]") {
     apptest::Fixture fixture;
     apptest::writeFile(fixture / "wishes.txt", "PavelDobes/NecoOLasce\nWabi/Montgomery\n");
     WishWindow w(fixture);

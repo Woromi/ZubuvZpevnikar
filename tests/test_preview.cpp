@@ -101,11 +101,7 @@ TEST_CASE("prepare writes the wrapper, the song copy and the command", "[preview
     CHECK(cmd->pdf == work / "preview.pdf");
     CHECK(cmd->log == work / "preview.log");
 
-#ifdef _WIN32
-    const char sep = ';';
-#else
-    const char sep = ':';
-#endif
+    const char sep = zub::preview::kPathListSeparator;
     const auto g = [](const fs::path& p) { return p.generic_string(); };
     const std::string root = g(fixtureRepo);
     // The package, the song collections, then the repo root (nothing there can stand in for a

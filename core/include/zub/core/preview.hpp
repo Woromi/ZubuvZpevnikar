@@ -13,6 +13,13 @@
 // command (QProcess), so it can run in the background and be cancelled.
 namespace zub::preview {
 
+// Between the folders of TEXINPUTS (kpathsea: ';' on Windows, ':' elsewhere).
+#ifdef _WIN32
+inline constexpr char kPathListSeparator = ';';
+#else
+inline constexpr char kPathListSeparator = ':';
+#endif
+
 struct Request {
     std::filesystem::path songbookRoot; // the ZubuvZpevnik checkout (its songs)
     std::filesystem::path packageDir;   // the package that builds them (zub::package)

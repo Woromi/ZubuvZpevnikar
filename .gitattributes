@@ -1,0 +1,4 @@
+# The test data is compared byte for byte: Git for Windows must not check it out with CR LF
+# line endings (its default core.autocrlf). Files that test CR LF have it in the repository.
+tests/data/** -text
+tests/app/data/** -text

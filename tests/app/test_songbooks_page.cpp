@@ -26,6 +26,7 @@
 #include <ranges>
 #include <catch2/catch_test_macros.hpp>
 #include <map>
+#include <zub/core/preview.hpp>
 
 using apptest::has;
 using apptest::slurp;
@@ -817,7 +818,7 @@ TEST_CASE("Songbooks page: the build writes the song copies where TEXINPUTS find
     INFO(texinputs);
     // ".", the work dir, the package, the copies, then the song folders.
     std::vector<std::string> entries;
-    for (const auto part : std::views::split(texinputs, ':'))
+    for (const auto part : std::views::split(texinputs, zub::preview::kPathListSeparator))
         entries.emplace_back(part.begin(), part.end());
     REQUIRE(entries.size() > 4);
     CHECK(entries[1] == command->workingDirectory.string());

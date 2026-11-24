@@ -3,6 +3,8 @@
 // real app's settings or songbook.
 #include <QApplication>
 #include <QByteArray>
+#include <QDir>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QtLogging>
 #include <cstdio>
@@ -51,6 +53,13 @@ int main(int argc, char** argv) {
     qputenv("XDG_CACHE_HOME", dir + "/cache");
     qputenv("XDG_DATA_HOME", dir + "/data");
     QStandardPaths::setTestModeEnabled(true);
+#ifdef Q_OS_WIN
+    // Windows: QSettings would use the registry and QStandardPaths ignores the variables above
+    // (test mode puts the folders under %LOCALAPPDATA%/qttest, shared by the test processes).
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope,
+                       QString::fromUtf8(dir + "/config"));
+#endif
 
     // Qt must not see (and complain about) Catch's command line.
     int qtArgc = 1;
@@ -59,6 +68,17 @@ int main(int argc, char** argv) {
     QApplication::setOrganizationName(QStringLiteral("ZubuvZpevnikarTests"));
     QApplication::setApplicationName(QStringLiteral("ZubuvZpevnikarTests"));
     QApplication::setStyle(QStringLiteral("Fusion"));
+#ifdef Q_OS_WIN
+    // Every test starts with an empty cache and data folder there too (only Qt's test-mode
+    // folders of this test program).
+    for (const auto location : {QStandardPaths::AppDataLocation, QStandardPaths::CacheLocation,
+                                QStandardPaths::AppConfigLocation}) {
+        const QString path = QStandardPaths::writableLocation(location);
+        if (path.contains(QStringLiteral("/qttest/")) &&
+            path.contains(QStringLiteral("ZubuvZpevnikarTests")))
+            QDir(path).removeRecursively();
+    }
+#endif
 
     return Catch::Session().run(argc, argv);
 }

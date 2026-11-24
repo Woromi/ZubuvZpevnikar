@@ -14,11 +14,7 @@ namespace zub::preview {
 
 namespace {
 
-#ifdef _WIN32
-constexpr char kSep = ';';
-#else
-constexpr char kSep = ':';
-#endif
+constexpr char kSep = kPathListSeparator;
 
 // UTF-8 text of a path (see utf8() in library.cpp).
 std::string utf8(const fs::path& p) {

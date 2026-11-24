@@ -8,6 +8,7 @@
 #include <utility>
 #include <zub/core/bookfile.hpp>
 #include <zub/core/latex.hpp>
+#include <zub/core/preview.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
@@ -842,8 +843,9 @@ songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& bookDir, std::string_view bookName,
                                     const std::vector<std::string>& indexes,
                                     const std::filesystem::path& overrideDir) {
+    // '/' between folders on every system (TeX and bash read it on Windows too).
     const auto utf8 = [](const std::filesystem::path& p) {
-        const auto u8 = p.u8string();
+        const auto u8 = p.generic_u8string();
         return std::string(u8.begin(), u8.end());
     };
     songbook::BuildCommand command;
@@ -859,12 +861,13 @@ songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
     // The package, then the songs, before anything else: no folder under songs/ can stand in for
     // a package file (class, .sty, .cfg, Lua; song names are Artist/Title), and nothing in the
     // book's folder or the repo root for a checked song.
-    std::string texinputs = ".:" + utf8(workDir) + ":" + utf8(packageDir) + ":";
+    constexpr char sep = preview::kPathListSeparator;
+    std::string texinputs = std::string(".") + sep + utf8(workDir) + sep + utf8(packageDir) + sep;
     if (!overrideDir.empty())
-        texinputs += utf8(overrideDir) + ":";
+        texinputs += utf8(overrideDir) + sep;
     for (const auto& collection : collections(repoRoot))
-        texinputs += root + "/songs/" + collection + ":";
-    texinputs += utf8(bookDir) + ":" + root + ":";
+        texinputs += root + "/songs/" + collection + sep;
+    texinputs += utf8(bookDir) + sep + root + sep;
     command.environment.emplace_back("TEXINPUTS", std::move(texinputs));
     command.pdf = workDir / (std::string(bookName) + ".pdf");
     command.log = workDir / (std::string(bookName) + ".log");
