@@ -2090,8 +2090,8 @@ Použijte vestavěný.</translation>
         <translation>AppImage:</translation>
     </message>
     <message>
-        <source>&amp;Keep them: a rebuild engraves only the scores that changed (faster, uses disk space)</source>
-        <translation>&amp;Ponechat: při dalším sestavení se znovu sázejí jen změněné noty (rychlejší, zabírá místo na disku)</translation>
+        <source>&amp;Keep them: a rebuild engraves only the scores that changed (faster, uses disk space; scores no build used for 30 days are deleted)</source>
+        <translation>&amp;Ponechat: při dalším sestavení se znovu sázejí jen změněné noty (rychlejší, zabírá místo na disku; noty, které 30 dní žádné sestavení nepoužilo, se smažou)</translation>
     </message>
     <message>
         <source>&amp;Build everything again each time: nothing is kept (less disk space, a songbook takes minutes)</source>

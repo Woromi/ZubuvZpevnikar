@@ -276,6 +276,9 @@ TEST_CASE("Build files: only the app's cache folders are deleted", "[app][buildf
     // A repo-* deeper than songbooks/ is no work dir.
     apptest::writeFile(cache / "songbooks/x/repo-y/f", "f");
     CHECK(!buildfiles::remove(QString::fromStdString((cache / "songbooks/x/repo-y").string())));
+    // The links go with the test (they would point nowhere once the fixture is gone).
+    std::filesystem::remove(cache / "preview/tmp-ly");
+    std::filesystem::remove(cache / "songbooks/repo-link");
     const auto elsewhere = fixture / "tmp-ly";
     apptest::writeFile(elsewhere / "x", "x");
     CHECK(!buildfiles::remove(QString::fromStdString(elsewhere.string())));
@@ -361,4 +364,45 @@ TEST_CASE("Desktop: an AppImage puts itself into the application menu", "[app][d
     A::openSettings(w);
     REQUIRE(settings.fired());
     CHECK_FALSE(shown);
+}
+
+TEST_CASE("Build files: kept scores stay while builds use them; unused ones go after 30 days",
+          "[app][buildfiles]") {
+    namespace fs = std::filesystem;
+    apptest::Fixture fixture;
+    const fs::path cache = buildfiles::cacheDir().toStdString();
+    const auto old = fs::file_time_type::clock::now() - std::chrono::days{40};
+    const auto age = [&](const fs::path& path) { fs::last_write_time(path, old); };
+    const std::string used = "6a98dcfd07cdb2219f2e34fffa662cb6";
+    const std::string unused = "1a3d62675ec021fe5f95964696f9e4bd";
+    const std::string recent = "0228b01b6ac40837d68a17e56ed79309";
+    const fs::path scores = cache / "preview/tmp-ly";
+    for (const std::string& name : {used + ".pdf", used + "-1.eps", unused + ".pdf", std::string("notes.txt")}) {
+        apptest::writeFile(scores / name, "x");
+        age(scores / name);
+    }
+    apptest::writeFile(scores / (recent + ".pdf"), "x");
+
+    buildfiles::keepUsed(QString::fromStdString(scores.string()),
+                         "Compiling score tmp-ly/" + used + " with LilyPond executable");
+    CHECK(fs::exists(scores / (used + ".pdf")));
+    CHECK(fs::last_write_time(scores / (used + "-1.eps")) > old + std::chrono::days{1}); // used now
+    CHECK_FALSE(fs::exists(scores / (unused + ".pdf")));
+    CHECK(fs::exists(scores / (recent + ".pdf")));
+    CHECK(fs::exists(scores / "notes.txt")); // not a score: left alone
+
+    // Work dirs no build changed for long: a book's, another instance's preview; not the one in use.
+    const fs::path books = cache / "songbooks";
+    for (const char* name : {"repo-old", "repo-new", "repo-busy"})
+        apptest::writeFile(books / name / "book.tex", "x");
+    apptest::writeFile(cache / "preview-1234/preview.tex", "x");
+    for (const fs::path& dir :
+         {books / "repo-old", books / "repo-busy", cache / "preview-1234", cache / "preview"})
+        age(dir);
+    buildfiles::pruneWorkDirs(QString::fromStdString((books / "repo-busy").string()));
+    CHECK_FALSE(fs::exists(books / "repo-old"));
+    CHECK(fs::exists(books / "repo-new"));
+    CHECK(fs::exists(books / "repo-busy"));
+    CHECK_FALSE(fs::exists(cache / "preview-1234"));
+    CHECK(fs::exists(cache / "preview")); // this instance's own
 }

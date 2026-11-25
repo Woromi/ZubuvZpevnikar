@@ -20,6 +20,7 @@ add_library(zub_core STATIC
     src/scoreregion.cpp
     src/scoretiming.cpp
     src/score.cpp
+    src/scorecache.cpp
     src/linediff.cpp
     src/songbook.cpp
     src/songedit.cpp

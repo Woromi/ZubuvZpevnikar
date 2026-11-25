@@ -193,6 +193,11 @@ void PreviewRunner::onProcessFinished() {
     timedOut_ = false;
     command_.reset();
     dropBuildFiles();
+    // Kept build files: the scores this build used stay, others unused for long go.
+    if (result.success && buildfiles::keep() && !workDir_.empty()) {
+        buildfiles::keepUsed(toQString(workDir_ / "tmp-ly"), logText);
+        buildfiles::pruneWorkDirs(toQString(workDir_));
+    }
     emit finished(result);
 }
 

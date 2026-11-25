@@ -5,6 +5,10 @@
 #include <QFileInfo>
 #include <QSettings>
 #include <QStandardPaths>
+#include <filesystem>
+#include <set>
+#include <system_error>
+#include <zub/core/scorecache.hpp>
 
 namespace buildfiles {
 
@@ -63,9 +67,60 @@ bool remove(const QString& dir) {
                          parent.startsWith(canonicalCache + QLatin1Char('/')));
     const bool book = !books.isEmpty() && info.fileName().startsWith(QStringLiteral("repo-")) &&
                       QFileInfo(info.absolutePath()).canonicalFilePath() == books;
-    if (!scores && !book)
+    const bool otherPreview = info.fileName().startsWith(QStringLiteral("preview-")) &&
+                              parent == canonicalCache;
+    if (!scores && !book && !otherPreview)
         return false;
     return QDir(path).removeRecursively();
+}
+
+namespace {
+
+namespace fs = std::filesystem;
+
+fs::path nativePath(const QString& path) {
+    return fs::path(path.toStdU16String());
+}
+
+} // namespace
+
+void keepUsed(const QString& scoresDir, const std::string& log) {
+    const std::set<std::string> used = zub::scorecache::usedScores(log);
+    const auto now = fs::file_time_type::clock::now();
+    const auto oldest = now - unusedFor;
+    std::error_code ec;
+    for (const auto& entry : fs::directory_iterator(nativePath(scoresDir), ec)) {
+        if (!entry.is_regular_file(ec))
+            continue;
+        const auto u8 = entry.path().filename().u8string();
+        const auto score = zub::scorecache::scoreOf(std::string(u8.begin(), u8.end()));
+        if (!score)
+            continue;
+        if (used.contains(*score))
+            fs::last_write_time(entry.path(), now, ec);
+        else if (const auto changed = entry.last_write_time(ec); !ec && changed < oldest)
+            fs::remove(entry.path(), ec);
+    }
+}
+
+void pruneWorkDirs(const QString& inUse) {
+    const auto oldest = fs::file_time_type::clock::now() - unusedFor;
+    const QString keep = inUse.isEmpty() ? QString() : QFileInfo(inUse).canonicalFilePath();
+    const auto prune = [&](const QString& folder, const QString& pattern) {
+        const QDir dir(folder);
+        for (const QString& name : dir.entryList({pattern}, QDir::Dirs | QDir::NoDotAndDotDot)) {
+            const QString path = dir.filePath(name);
+            if (!keep.isEmpty() && QFileInfo(path).canonicalFilePath() == keep)
+                continue;
+            // A build rewrites files in it, which changes the folder's own time.
+            std::error_code ec;
+            const auto changed = fs::last_write_time(nativePath(path), ec);
+            if (!ec && changed < oldest)
+                remove(path);
+        }
+    };
+    prune(songbooksDir(), QStringLiteral("repo-*"));
+    prune(cacheDir(), QStringLiteral("preview-*"));
 }
 
 } // namespace buildfiles

@@ -166,8 +166,16 @@ void BookPreview::onFinished(int exitCode, bool crashed) {
     pdf.close();
     // Without Settings → Keep build files the work dir goes (its PDF is in memory now); the next
     // build engraves every score again.
-    if (!buildfiles::keep())
-        buildfiles::remove(toQString(buildingPdf_.parent_path()));
+    const QString workDir = toQString(buildingPdf_.parent_path());
+    if (!buildfiles::keep()) {
+        buildfiles::remove(workDir);
+    } else if (ok) {
+        // The scores this build used stay; others, and books not built for long, go.
+        QFile log(toQString(buildingLog_));
+        if (log.open(QIODevice::ReadOnly))
+            buildfiles::keepUsed(workDir + QStringLiteral("/tmp-ly"), log.readAll().toStdString());
+        buildfiles::pruneWorkDirs(workDir);
+    }
     const QString id = buildingId_;
     buildingId_.clear();
     updateView();

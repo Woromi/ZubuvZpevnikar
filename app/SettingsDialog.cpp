@@ -89,7 +89,8 @@ SettingsDialog::SettingsDialog(const State& state, QWidget* parent)
 
     // Build files: LilyPond's engraved scores and the songbooks' work dirs in the cache.
     keepBuilds_ = new QRadioButton(
-        tr("&Keep them: a rebuild engraves only the scores that changed (faster, uses disk space)"),
+        tr("&Keep them: a rebuild engraves only the scores that changed (faster, uses disk "
+           "space; scores no build used for 30 days are deleted)"),
         this);
     keepBuilds_->setObjectName(QStringLiteral("settingsKeepBuilds"));
     rebuildAll_ = new QRadioButton(
