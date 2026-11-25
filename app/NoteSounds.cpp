@@ -1,5 +1,7 @@
 #include "NoteSounds.hpp"
 
+#include "ProcessTree.hpp"
+
 #include "WavFile.hpp"
 #include "convert.hpp"
 
@@ -15,10 +17,6 @@
 #include <zub/core/audio.hpp>
 #include <zub/core/midi.hpp>
 
-#ifdef Q_OS_UNIX
-#include <signal.h>
-#include <unistd.h>
-#endif
 
 namespace fs = std::filesystem;
 
@@ -89,12 +87,8 @@ NoteSounds::~NoteSounds() {
 }
 
 void NoteSounds::killTree() {
-#ifdef Q_OS_UNIX
-    // The render runs in its own process group, like PlaybackRunner's.
-    if (const qint64 pid = process_->processId(); pid > 0)
-        ::kill(-static_cast<pid_t>(pid), SIGKILL);
-#endif
-    process_->kill();
+    // lualatex, lilypond, gs, fluidsynth: what it started dies with it (processtree).
+    processtree::kill(process_);
 }
 
 fs::path NoteSounds::fileOf(int program, int pitch, bool amp) const {
@@ -150,9 +144,7 @@ void NoteSounds::renderNext() {
     for (const std::string& argument : command.arguments)
         arguments << toQString(argument);
     timeout_->start();
-#ifdef Q_OS_UNIX
-    process_->setChildProcessModifier([] { ::setpgid(0, 0); });
-#endif
+    processtree::prepare(process_);
     process_->start(tools_.fluidsynth, arguments);
 }
 

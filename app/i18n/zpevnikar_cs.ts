@@ -2985,6 +2985,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Exportovat PDF</translation>
     </message>
     <message>
+        <source>Building a songbook needs bash, which comes with Git for Windows (https://git-scm.com). Install it, then try again.</source>
+        <translation>Sestavení zpěvníku potřebuje bash, který je součástí Git for Windows (https://git-scm.com). Nainstalujte ho a zkuste to znovu.</translation>
+    </message>
+    <message>
         <source>\input{%1}: not a song of the song library</source>
         <translation>\input{%1}: není to píseň z knihovny písní</translation>
     </message>

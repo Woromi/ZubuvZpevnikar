@@ -1,5 +1,6 @@
 #include "SongActions.hpp"
 
+#include "ExternalTools.hpp"
 #include "ConverterRunner.hpp"
 #include "ConverterVersion.hpp"
 #include "ShrinkDialog.hpp"
@@ -555,8 +556,15 @@ void SongActions::checkKey(SongEditor* editor, const std::string& content,
         done(std::nullopt);
         return;
     }
-    const auto command = zub::songcheck::scriptCommand(packageDir_, "checkkeys.py", songbookRoot_,
-                                                       {"--all", toStdString(toQString(file))});
+    auto command = zub::songcheck::scriptCommand(packageDir_, "checkkeys.py", songbookRoot_,
+                                                 {"--all", toStdString(toQString(file))});
+    // python3, or on Windows the Python found there.
+    const QString python = externaltools::python();
+    if (python.isEmpty()) {
+        done(std::nullopt);
+        return;
+    }
+    command.program = toStdString(python);
     auto* process = new QProcess(this);
     const QPointer<SongEditor> guard = editor;
     const std::filesystem::path songPath = editor->path();

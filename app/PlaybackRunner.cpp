@@ -1,5 +1,7 @@
 #include "PlaybackRunner.hpp"
 
+#include "ProcessTree.hpp"
+
 #include "SoundTools.hpp"
 #include "WavFile.hpp"
 #include "convert.hpp"
@@ -22,10 +24,6 @@
 #include <zub/core/audio.hpp>
 #include <zub/core/midi.hpp>
 
-#ifdef Q_OS_UNIX
-#include <signal.h>
-#include <unistd.h>
-#endif
 
 namespace fs = std::filesystem;
 
@@ -101,12 +99,8 @@ void PlaybackRunner::cancel() {
 }
 
 void PlaybackRunner::killTree() {
-#ifdef Q_OS_UNIX
-    // Each process runs in its own process group, so whatever lilypond started dies with it.
-    if (const qint64 pid = process_->processId(); pid > 0)
-        ::kill(-static_cast<pid_t>(pid), SIGKILL);
-#endif
-    process_->kill();
+    // lualatex, lilypond, gs, fluidsynth: what it started dies with it (processtree).
+    processtree::kill(process_);
 }
 
 void PlaybackRunner::start(PlaybackRequest request) {
@@ -203,9 +197,7 @@ void PlaybackRunner::startRender(const fs::path& midi, const fs::path& wav) {
     for (const std::string& argument : render.arguments)
         list << toQString(argument);
     timeout_->start();
-#ifdef Q_OS_UNIX
-    process_->setChildProcessModifier([] { ::setpgid(0, 0); });
-#endif
+    processtree::prepare(process_);
     process_->start(current_.fluidsynth, list);
 }
 

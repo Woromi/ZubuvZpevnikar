@@ -1,5 +1,7 @@
 #include "LibraryDialog.hpp"
 
+#include "ProcessTree.hpp"
+
 #include "convert.hpp"
 
 #include <QCheckBox>
@@ -24,10 +26,6 @@
 #include <algorithm>
 #include <zub/core/library.hpp>
 
-#ifdef Q_OS_UNIX
-#include <signal.h>
-#include <unistd.h>
-#endif
 
 namespace {
 const QString urlKey = QStringLiteral("home/cloneUrl");
@@ -37,11 +35,7 @@ const QString urlKey = QStringLiteral("home/cloneUrl");
 void killGroup(QProcess* process) {
     if (process->state() == QProcess::NotRunning)
         return;
-#ifdef Q_OS_UNIX
-    if (const qint64 pid = process->processId(); pid > 0)
-        ::kill(-static_cast<pid_t>(pid), SIGKILL);
-#endif
-    process->kill();
+    processtree::kill(process);
     process->waitForFinished(2000);
 }
 } // namespace
@@ -218,9 +212,7 @@ void LibraryDialog::startGit(const QStringList& arguments, const QString& workin
     pending_.clear();
     process_ = new QProcess(this);
     process_->setProcessChannelMode(QProcess::MergedChannels);
-#ifdef Q_OS_UNIX
-    process_->setChildProcessModifier([] { ::setpgid(0, 0); });
-#endif
+    processtree::prepare(process_);
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     environment.insert(QStringLiteral("GIT_TERMINAL_PROMPT"),
                        QStringLiteral("0")); // no password prompt

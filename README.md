@@ -39,9 +39,15 @@ Linux: each [release](https://github.com/Woromi/ZubuvZpevnikar/releases) has an 
 Zpevnikar-*.AppImage`) and run it; the converter and the LaTeX package are inside. On its first
 start it adds itself to the application menu (with its icon; it follows the AppImage when you move
 or update it; Settings can turn that off). The songs are not inside: the app opens your song
-library, or creates or downloads one. Install the
-programs the songs are built with yourself (see the requirements below). Windows is not supported
-yet; CI builds and tests it there.
+library, or creates or downloads one.
+
+Windows (10 or 11, 64-bit; new, please report what does not work): `Zpevnikar-*-setup.exe`
+installs it with a Start menu entry, `Zpevnikar-*-windows-x64.zip` runs from any folder. Besides
+TeX Live or MiKTeX and LilyPond it needs [Git for Windows](https://git-scm.com): its bash runs the
+songbook build script.
+
+On both systems, install the programs the songs are built with yourself (see the requirements
+below).
 
 ## Building
 
@@ -93,7 +99,8 @@ Set the version in `CMakeLists.txt` (`project(... VERSION x.y.z)`), commit, then
 `vx.y.z`: the Release workflow builds the AppImage and makes a GitHub release with it (the tag
 must match the version). Actions → Release → Run workflow builds it without releasing, as an
 artifact to try first. `packaging/appimage.sh` packs a local release build the same way (it
-needs linuxdeploy and its Qt plugin).
+needs linuxdeploy and its Qt plugin); on Windows `packaging/windows/package.ps1` makes the zip and
+the installer (windeployqt, Inno Setup 6).
 
 ## Layout
 

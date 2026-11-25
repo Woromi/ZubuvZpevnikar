@@ -1902,6 +1902,15 @@ bool MainWindow::approveRisks(const std::vector<RiskSource>& sources, bool askUs
 
 namespace {
 
+// The converter's file name (chords_converter.exe on Windows).
+QString converterFileName() {
+#ifdef Q_OS_WIN
+    return QStringLiteral("chords_converter.exe");
+#else
+    return QStringLiteral("chords_converter");
+#endif
+}
+
 bool usableConverter(const QString& path) {
     const QFileInfo info(path);
     // Absolute only: PATH may contain "." or empty entries.
@@ -1914,7 +1923,7 @@ std::filesystem::path MainWindow::builtInConverter() const {
     // Built from the external/chords_converter submodule and put next to the app by CMake
     // (in the build dir, and by cmake --install).
     const QString path =
-        QDir(QApplication::applicationDirPath()).filePath(QStringLiteral("chords_converter"));
+        QDir(QApplication::applicationDirPath()).filePath(converterFileName());
     return usableConverter(path) ? toPath(path) : std::filesystem::path{};
 }
 
@@ -2025,7 +2034,7 @@ std::filesystem::path MainWindow::findConverter() const {
         builtIn.empty() ? QString{} : toQString(builtIn),
         QStandardPaths::findExecutable(QStringLiteral("chords_converter")),
         // cargo install puts it here, which is not always on PATH for GUI apps
-        QDir::home().filePath(QStringLiteral(".cargo/bin/chords_converter")),
+        QDir::home().filePath(QStringLiteral(".cargo/bin/") + converterFileName()),
     };
     for (const QString& candidate : candidates) {
         if (usableConverter(candidate))

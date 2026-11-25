@@ -1,0 +1,2 @@
+// Windows: the app icon of zpevnikar.exe (Explorer, the taskbar, the Start menu entry).
+IDI_ICON1 ICON "icons/zpevnikar.ico"

@@ -21,6 +21,7 @@ add_executable(zub_app_tests
     test_tools_score.cpp
     test_tools.cpp
     test_welcome.cpp
+    test_process_tree.cpp
     test_pdf_links.cpp
     test_home_page.cpp
     test_wishes.cpp
@@ -31,7 +32,7 @@ target_link_libraries(zub_app_tests PRIVATE zpevnikar_app zub_warnings Qt6::Widg
 target_compile_definitions(zub_app_tests PRIVATE
     ZUB_TEST_DATA_DIR="${PROJECT_SOURCE_DIR}/tests/data"
     ZUB_APP_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
-    ZUB_CONVERTER_BUILT="$<TARGET_FILE_DIR:zpevnikar>/chords_converter"
+    ZUB_CONVERTER_BUILT="$<TARGET_FILE_DIR:zpevnikar>/chords_converter${CMAKE_EXECUTABLE_SUFFIX}"
 )
 
 catch_discover_tests(zub_app_tests

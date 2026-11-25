@@ -1,5 +1,7 @@
 #include "ConverterRunner.hpp"
 
+#include "ProcessTree.hpp"
+
 #include "convert.hpp"
 
 #include <QFile>
@@ -9,10 +11,6 @@
 #include <QTimer>
 #include <QPointer>
 #include <memory>
-#ifdef Q_OS_UNIX
-#include <signal.h>
-#include <unistd.h>
-#endif
 
 namespace {
 // Measuring (shrink --measure, join) builds the song with lualatex: slow on a cold cache.
@@ -25,17 +23,11 @@ constexpr int killGraceMs = 500; // between SIGTERM and SIGKILL of a cancelled r
 void killTree(QProcess* process) {
     if (process->state() == QProcess::NotRunning)
         return;
-#ifdef Q_OS_UNIX
-    const qint64 pid = process->processId();
-    if (pid > 0) {
-        ::kill(-static_cast<pid_t>(pid), SIGTERM);
-        if (process->waitForFinished(500))
-            return;
-        ::kill(-static_cast<pid_t>(pid), SIGKILL);
-    }
-#endif
-    process->kill();
-    process->waitForFinished(2000);
+    processtree::terminate(process);
+    const bool exited = process->waitForFinished(500);
+    processtree::kill(process); // what is left of the tree
+    if (!exited)
+        process->waitForFinished(2000);
 }
 } // namespace
 
@@ -89,15 +81,7 @@ void ConverterRunner::cancel() {
         delete process;
         return;
     }
-#ifdef Q_OS_UNIX
-    const qint64 pid = process->processId();
-    if (pid > 0)
-        ::kill(-static_cast<pid_t>(pid), SIGTERM);
-    else
-        process->terminate();
-#else
-    process->terminate();
-#endif
+    processtree::terminate(process);
     dying_.append(process);
     connect(process, &QProcess::finished, this, [this, process, dir] {
         dying_.removeOne(process);
@@ -113,11 +97,7 @@ void ConverterRunner::cancel() {
     QTimer::singleShot(killGraceMs, process, [process] {
         if (process->state() == QProcess::NotRunning)
             return;
-#ifdef Q_OS_UNIX
-        if (const qint64 leader = process->processId(); leader > 0)
-            ::kill(-static_cast<pid_t>(leader), SIGKILL);
-#endif
-        process->kill();
+        processtree::kill(process);
     });
 }
 
@@ -162,9 +142,7 @@ bool ConverterRunner::start(const CommandFactory& makeCommand, const std::string
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     environment.insert(QStringLiteral("TMPDIR"), dir_->path());
     process_->setProcessEnvironment(environment);
-#ifdef Q_OS_UNIX
-    process_->setChildProcessModifier([] { ::setpgid(0, 0); });
-#endif
+    processtree::prepare(process_);
     connect(process_, &QProcess::readyReadStandardOutput, this,
             [this] { out_ += process_->readAllStandardOutput(); });
     connect(process_, &QProcess::readyReadStandardError, this,

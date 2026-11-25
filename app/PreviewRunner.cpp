@@ -1,5 +1,7 @@
 #include "PreviewRunner.hpp"
 
+#include "ProcessTree.hpp"
+
 #include "BuildFiles.hpp"
 #include "convert.hpp"
 
@@ -9,10 +11,6 @@
 #include <QTimer>
 #include <zub/core/textfile.hpp>
 
-#ifdef Q_OS_UNIX
-#include <signal.h>
-#include <unistd.h>
-#endif
 
 namespace {
 constexpr int timeoutSeconds = 120;
@@ -97,13 +95,8 @@ void PreviewRunner::cancel() {
 }
 
 void PreviewRunner::killTree() {
-#ifdef Q_OS_UNIX
-    // lualatex -shell-escape starts sh/lilypond/gs children; the build runs in its own
-    // process group so they die with it.
-    if (const qint64 pid = process_->processId(); pid > 0)
-        ::kill(-static_cast<pid_t>(pid), SIGKILL);
-#endif
-    process_->kill();
+    // lualatex, lilypond, gs, fluidsynth: what it started dies with it (processtree).
+    processtree::kill(process_);
 }
 
 void PreviewRunner::start(zub::preview::Request request, bool announce) {
@@ -136,9 +129,7 @@ void PreviewRunner::start(zub::preview::Request request, bool announce) {
     timeout_->start();
     if (announce)
         emit started();
-#ifdef Q_OS_UNIX
-    process_->setChildProcessModifier([] { ::setpgid(0, 0); });
-#endif
+    processtree::prepare(process_);
     process_->start(toQString(cmd.program), arguments);
 }
 

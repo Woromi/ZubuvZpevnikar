@@ -239,6 +239,6 @@ Asked by the user 2026-11-11. Qt Linguist translations in `app/i18n/`.
 - [x] Release workflow: a tag `vX.Y.Z` (= the CMake project version) builds a Linux AppImage (`packaging/appimage.sh`) and makes a GitHub release with it; Actions → Run workflow builds it as an artifact only.
 - [x] The AppImage adds itself to the application menu with its icon on start, following it when it is moved or updated (asked by the user 2026-11-24: "if I download anything, I just run that and it just happens"); Settings can turn it off.
 - [x] Windows CI job (build + tests): green since 2026-11-24 (paths with '/', TEXINPUTS with ';', test data without CR LF, isolated test settings, no open files while replacing them); it fails the run now.
-- [ ] Windows variants: TEXINPUTS separator `;` (core), stopping a build with its children (job objects instead of process groups: PreviewRunner, ScoreRunner, PlaybackRunner, NoteSounds, ConverterRunner, SongbookExporter, LibraryDialog), the songbook build's `bash scripts/build.sh` (Git for Windows' bash, or a change in the package: the user decides), `locale -a` in the package's scripts, `.exe` names (ZUB_CONVERTER_BUILT, the built-in converter).
-- [ ] Windows package (windeployqt; zip or installer) in the release workflow.
-
+- [x] Windows variants (2026-11-25): TEXINPUTS `;`, paths with `/`, `processtree` (job objects: Cancel stops lualatex, lilypond, gs with their parent), Git for Windows' bash for build.sh and Python without the Store stubs (`externaltools`; the user chose Git for Windows over a build.ps1 in the package), the exe's icon and no console.
+- [x] Windows package (2026-11-25): the Release workflow makes a portable zip and an Inno Setup installer (the user chose both).
+- [ ] Try on a real Windows machine: a songbook build through Git's bash (TEXINPUTS from bash to lualatex, `locale -a`), the index order (songidx.lua's locale on Windows), LilyPond and fluidsynth found on PATH.

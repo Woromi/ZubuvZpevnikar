@@ -1,5 +1,7 @@
 #include "ScoreRunner.hpp"
 
+#include "ProcessTree.hpp"
+
 #include "convert.hpp"
 
 #include <QFile>
@@ -8,10 +10,6 @@
 #include <QTimer>
 #include <system_error>
 
-#ifdef Q_OS_UNIX
-#include <signal.h>
-#include <unistd.h>
-#endif
 
 namespace {
 constexpr int timeoutSeconds = 60;
@@ -88,12 +86,8 @@ void ScoreRunner::cancel() {
 }
 
 void ScoreRunner::killTree() {
-#ifdef Q_OS_UNIX
-    // The build runs in its own process group, so anything lilypond started dies with it.
-    if (const qint64 pid = process_->processId(); pid > 0)
-        ::kill(-static_cast<pid_t>(pid), SIGKILL);
-#endif
-    process_->kill();
+    // lualatex, lilypond, gs, fluidsynth: what it started dies with it (processtree).
+    processtree::kill(process_);
 }
 
 void ScoreRunner::startPending() {
@@ -132,9 +126,7 @@ void ScoreRunner::start(zub::score::Request request, bool announce) {
     timeout_->start();
     if (announce)
         emit started();
-#ifdef Q_OS_UNIX
-    process_->setChildProcessModifier([] { ::setpgid(0, 0); });
-#endif
+    processtree::prepare(process_);
     process_->start(toQString(cmd.program), arguments);
 }
 

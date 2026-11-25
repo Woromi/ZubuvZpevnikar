@@ -1,6 +1,7 @@
 #include "SongbookScan.hpp"
 
 #include "ConverterRunner.hpp"
+#include "ExternalTools.hpp"
 #include "convert.hpp"
 
 #include <QProcess>
@@ -69,7 +70,9 @@ void SongbookScan::nextScript() {
     QStringList arguments;
     for (const auto& argument : command.arguments)
         arguments << toQString(argument);
-    process_->start(toQString(command.program), arguments);
+    // python3, or on Windows the Python found there (none: it fails to start, as without one).
+    const QString python = externaltools::python();
+    process_->start(python.isEmpty() ? toQString(command.program) : python, arguments);
 }
 
 void SongbookScan::onScriptFinished() {

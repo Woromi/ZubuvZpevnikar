@@ -14,6 +14,10 @@ qt_add_library(zpevnikar_app STATIC
     DesktopIntegration.hpp
     DesktopIntegration.cpp
     BuildFiles.cpp
+    ExternalTools.hpp
+    ExternalTools.cpp
+    ProcessTree.hpp
+    ProcessTree.cpp
     SettingsDialog.hpp
     SettingsDialog.cpp
     SongListPage.hpp
@@ -112,6 +116,11 @@ target_link_libraries(zpevnikar_app
 
 qt_add_executable(zpevnikar main.cpp)
 target_link_libraries(zpevnikar PRIVATE zpevnikar_app Zub::core zub_warnings Qt6::Widgets)
+if(WIN32)
+    # Its icon, and no console window next to it.
+    target_sources(zpevnikar PRIVATE zpevnikar.rc)
+    set_target_properties(zpevnikar PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
 
 # The LaTeX package that builds the songs (external/zubuvzpevnik-package, a git submodule), for
 # songbooks without one of their own: found in the source tree by builds that run from here, and

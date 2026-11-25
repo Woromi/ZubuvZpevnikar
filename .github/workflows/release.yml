@@ -1,8 +1,9 @@
 name: Release
 
-# A tag v<version> (the project VERSION in CMakeLists.txt) builds the Linux AppImage and attaches
-# it to a GitHub release of that tag. Run by hand (Actions → Release → Run workflow), it only
-# builds the AppImage and keeps it as an artifact of the run, to try it before tagging.
+# A tag v<version> (the project VERSION in CMakeLists.txt) builds the Linux AppImage and the
+# Windows zip and installer, and attaches them to a GitHub release of that tag. Run by hand
+# (Actions → Release → Run workflow), it only builds them and keeps them as artifacts of the run,
+# to try them before tagging.
 on:
   push:
     tags: ['v*']
@@ -77,17 +78,71 @@ jobs:
         with:
           name: appimage
           path: dist/*.AppImage
+
+  windows:
+    name: Windows zip and installer
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh # not Git Bash: cargo would take Git's Unix link for MSVC's
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/msvc-env
+      - name: Ninja and Inno Setup
+        run: |
+          choco install ninja --no-progress -y
+          # zpevnikar.iss needs Inno Setup 6.3 or newer (x64compatible): installs or updates it.
+          choco upgrade innosetup --no-progress -y
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          modules: qtmultimedia qtpdf
+          aqtversion: '==3.3.*'
+          cache: true
+      - uses: ./.github/actions/kf6-syntax-highlighting
+        with:
+          prefix: ${{ runner.temp }}/kf6
+          qt-version: ${{ env.QT_VERSION }}
+      - name: Build
+        run: |
+          cmake --preset release -DZUB_BUILD_TESTS=OFF -DCMAKE_PREFIX_PATH="$env:RUNNER_TEMP/kf6"
+          cmake --build --preset release
+      - name: Zip and installer
+        run: packaging/windows/package.ps1 -Build build/release -Kf6 "$env:RUNNER_TEMP/kf6" -Out dist
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows
+          path: dist/*
+
+  release:
+    name: GitHub release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [appimage, windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
       - name: GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/*.AppImage
+          files: dist/*
           generate_release_notes: true
           body: |
             **Linux:** download `Zpevnikar-*-x86_64.AppImage`, make it executable
-            (`chmod +x Zpevnikar-*.AppImage`) and run it. It needs Ubuntu 24.04, Debian 13,
-            Fedora 40 or newer. The converter and the LaTeX package are inside.
+            (`chmod +x Zpevnikar-*.AppImage`) and run it; it adds itself to the application
+            menu. It needs Ubuntu 24.04, Debian 13, Fedora 40 or newer.
 
-            Install separately, as for building songs: TeX Live with LuaLaTeX, LilyPond, git,
-            python3 (measuring whether songs fit the paper), a Czech locale for the index order,
-            and optionally fluidsynth with a General MIDI soundfont for playing scores.
+            **Windows (10 or 11, 64-bit):** `Zpevnikar-*-setup.exe` installs it with a Start menu
+            entry; `Zpevnikar-*-windows-x64.zip` runs from any folder (`Zpevnikar\bin\zpevnikar.exe`).
+            Windows support is new: please report what does not work.
+
+            The converter and the LaTeX package are inside. Install separately, as for building
+            songs: TeX Live (or MiKTeX) with LuaLaTeX, LilyPond, git (on Windows: Git for Windows,
+            whose bash builds the songbooks), Python 3 (measuring whether songs fit the paper), a
+            Czech locale for the index order, and optionally fluidsynth with a General MIDI
+            soundfont for playing scores.

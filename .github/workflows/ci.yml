@@ -79,20 +79,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
-      # The MSVC environment for the later steps (what vcvars64.bat sets), without
-      # ilammy/msvc-dev-cmd, which runs on the deprecated Node 20.
-      - name: MSVC environment
-        run: |
-          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-            -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-            -property installationPath
-          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
-            # Only what vcvars changed (GitHub refuses some names, e.g. NODE_OPTIONS).
-            if ($_ -match '^([^=]+)=(.*)$' -and
-                [Environment]::GetEnvironmentVariable($Matches[1]) -ne $Matches[2]) {
-              "$($Matches[1])=$($Matches[2])" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-            }
-          }
+      - uses: ./.github/actions/msvc-env
       - name: Ninja
         run: choco install ninja --no-progress -y
       - uses: jurplel/install-qt-action@v4

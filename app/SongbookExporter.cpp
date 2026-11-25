@@ -1,5 +1,8 @@
 #include "SongbookExporter.hpp"
 
+#include "ExternalTools.hpp"
+#include "ProcessTree.hpp"
+
 #include "convert.hpp"
 
 #include <QCryptographicHash>
@@ -38,10 +41,6 @@
 #include <zub/core/safety.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
-#ifdef Q_OS_UNIX
-#include <signal.h>
-#include <unistd.h>
-#endif
 
 namespace {
 const QString exportDirKey = QStringLiteral("songbooks/exportDir");
@@ -51,20 +50,13 @@ const QString exportDirKey = QStringLiteral("songbooks/exportDir");
 void killTree(QProcess* process) {
     if (process->state() == QProcess::NotRunning)
         return;
-#ifdef Q_OS_UNIX
-    const qint64 pid = process->processId();
-    if (pid > 0) {
-        ::kill(-static_cast<pid_t>(pid), SIGTERM);
-        const bool exited = process->waitForFinished(500);
-        // The rest of the group (lilypond, gs) must not outlive bash: the work dir may be deleted
-        // as soon as it has exited (Settings → Build files).
-        ::kill(-static_cast<pid_t>(pid), SIGKILL);
-        if (exited)
-            return;
-    }
-#endif
-    process->kill();
-    process->waitForFinished(2000);
+    processtree::terminate(process);
+    const bool exited = process->waitForFinished(500);
+    // The rest of the tree (lilypond, gs) must not outlive bash: the work dir may be deleted as
+    // soon as it has exited (Settings → Build files).
+    processtree::kill(process);
+    if (!exited)
+        process->waitForFinished(2000);
 }
 
 bool writeFile(const QString& path, const std::string& content, QString* error) {
@@ -151,6 +143,14 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
                                    const std::map<std::string, std::string>& songs) {
     if (package_.empty()) {
         QMessageBox::warning(window_, tr("Export PDF"), noPackageText());
+        return std::nullopt;
+    }
+    // The package's build.sh is a bash script (Windows: Git for Windows' bash).
+    const QString bash = externaltools::bash();
+    if (bash.isEmpty()) {
+        QMessageBox::warning(window_, tr("Export PDF"),
+                             tr("Building a songbook needs bash, which comes with Git for Windows "
+                                "(https://git-scm.com). Install it, then try again."));
         return std::nullopt;
     }
     const auto parsed = zub::bookfile::parse(text);
@@ -259,10 +259,12 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
             return std::nullopt;
         }
     }
-    return zub::bookfile::buildCommand(root_, package_, toPath(workDir), bookDir, "book",
-                                       zub::bookfile::indexFiles(*parsed),
-                                       songs.empty() ? std::filesystem::path()
-                                                     : toPath(overrideDir));
+    auto command = zub::bookfile::buildCommand(root_, package_, toPath(workDir), bookDir, "book",
+                                               zub::bookfile::indexFiles(*parsed),
+                                               songs.empty() ? std::filesystem::path()
+                                                             : toPath(overrideDir));
+    command.program = toStdString(bash);
+    return command;
 }
 
 QProcess* SongbookExporter::createBuildProcess(const zub::songbook::BuildCommand& command,
@@ -274,10 +276,8 @@ QProcess* SongbookExporter::createBuildProcess(const zub::songbook::BuildCommand
     for (const auto& [name, value] : command.environment)
         environment.insert(toQString(name), toQString(value));
     process->setProcessEnvironment(environment);
-#ifdef Q_OS_UNIX
     // Its own process group: Cancel stops lualatex and lilypond with it.
-    process->setChildProcessModifier([] { ::setpgid(0, 0); });
-#endif
+    processtree::prepare(process);
     // The build must not outlive the app.
     QObject::connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, process,
                      [process] { killTree(process); });
