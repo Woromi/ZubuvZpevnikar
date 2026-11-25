@@ -52,20 +52,36 @@ int main(int argc, char* argv[]) {
     QApplication::setApplicationVersion(QString::fromUtf8(QByteArrayView{version}));
     QApplication::setWindowIcon(appIcon());
 
+    // Before the command line: --help is in the UI's language too.
+    QTranslator appTranslator;
+    QTranslator qtTranslator;
+    installTranslators(app, appTranslator, qtTranslator);
+
     QCommandLineParser parser;
-    parser.setApplicationDescription(
-        QStringLiteral("Song editor and songbook assembler for a ZubuvZpevnik song library"));
-    parser.addHelpOption();
+    parser.setApplicationDescription(QCoreApplication::translate(
+        "main", "Song editor and songbook assembler for a ZubuvZpevnik song library"));
+    // Our own help option: Qt's Czech translation lacks the text of addHelpOption's.
+    const QCommandLineOption helpOption(
+        QStringList{QStringLiteral("h"), QStringLiteral("help")
+#ifdef Q_OS_WIN
+                    ,
+                    QStringLiteral("?")
+#endif
+        },
+        QCoreApplication::translate("main", "Shows this help."));
+    parser.addOption(helpOption);
     parser.addVersionOption();
     // --songbook: the option's older name, still read.
     const QCommandLineOption songbookOption(
         QStringList{QStringLiteral("library"), QStringLiteral("songbook")},
-        QStringLiteral("Path to the song library (a ZubuvZpevnik checkout)."), QStringLiteral("dir"));
+        QCoreApplication::translate("main",
+                                    "Opens this song library (a ZubuvZpevnik checkout) for this "
+                                    "run only; the one chosen in the app stays."),
+        QCoreApplication::translate("main", "folder", "the value of --library"));
     parser.addOption(songbookOption);
     parser.process(app);
-    QTranslator appTranslator;
-    QTranslator qtTranslator;
-    installTranslators(app, appTranslator, qtTranslator);
+    if (parser.isSet(helpOption))
+        parser.showHelp(0); // exits
 
     MainWindow window;
     window.show();

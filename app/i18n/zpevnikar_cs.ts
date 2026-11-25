@@ -3871,6 +3871,23 @@ Pokud je na disku, který není připojený, připojte ho a zkuste to znovu.</tr
 <context>
     <name>main</name>
     <message>
+        <source>Song editor and songbook assembler for a ZubuvZpevnik song library</source>
+        <translation>Editor písní a sestavování zpěvníků pro knihovnu písní ZubuvZpevnik</translation>
+    </message>
+    <message>
+        <source>Shows this help.</source>
+        <translation>Zobrazí tuto nápovědu.</translation>
+    </message>
+    <message>
+        <source>Opens this song library (a ZubuvZpevnik checkout) for this run only; the one chosen in the app stays.</source>
+        <translation>Otevře tuto knihovnu písní (checkout ZubuvZpevniku) jen pro toto spuštění; knihovna zvolená v aplikaci zůstává.</translation>
+    </message>
+    <message>
+        <source>folder</source>
+        <comment>the value of --library</comment>
+        <translation>složka</translation>
+    </message>
+    <message>
         <source>Zpěvníkář is in the application menu now (Settings can remove it).</source>
         <translation>Zpěvníkář je teď v nabídce aplikací (v Nastavení ho lze odebrat).</translation>
     </message>
