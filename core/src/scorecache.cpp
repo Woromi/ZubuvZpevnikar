@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iterator>
 #include <zub/core/scorecache.hpp>
 
 namespace zub::scorecache {

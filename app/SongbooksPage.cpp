@@ -65,6 +65,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 #include <algorithm>
+#include <iterator>
 #include <map>
 #include <set>
 #include <utility>
