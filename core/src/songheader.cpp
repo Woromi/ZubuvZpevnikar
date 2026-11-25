@@ -147,13 +147,18 @@ bool restOfLineIsEmpty(std::string_view orig, std::size_t pos, std::size_t& comm
 
 namespace {
 
-// The order of the header's options, as the converter writes them and the songs have them (tags
-// right after by); an option is added at its place in it.
-constexpr std::string_view optionOrder[] = {"by",  "tags", "lang", "tem", "met",
-                                            "tun", "key",  "cap",  "src", "pap"};
+// The order of the header's options, as the converter writes them and its tidy sorts them
+// (`prelude_rank` in chords_converter/src/tex/mod.rs): the keys velkyzpevnik prints in the order
+// it prints them, then the ones that print nothing. A key it does not name ranks at the empty
+// entry (just before pap), chr after pap. An option is added at its place in it.
+constexpr std::string_view optionOrder[] = {"by",  "ori",  "tun", "tem", "met", "cap", "lang",
+                                            "key", "tags", "src", "",    "pap", "chr"};
 
 std::size_t orderOf(std::string_view name) {
     const auto it = std::ranges::find(optionOrder, name);
+    if (name.empty() || it == std::end(optionOrder))
+        return static_cast<std::size_t>(std::ranges::find(optionOrder, "") -
+                                        std::begin(optionOrder));
     return static_cast<std::size_t>(it - std::begin(optionOrder));
 }
 

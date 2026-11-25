@@ -39,11 +39,11 @@ TEST_CASE("setTags replaces an existing option in place", "[tags]") {
     CHECK(setTags(out, {"fav", "táborák"}) == out);
 }
 
-TEST_CASE("setTags inserts after the by line", "[tags]") {
+TEST_CASE("setTags inserts in the converter's order, after lang", "[tags]") {
     const auto in = song("\\beginsong{Africa}[\n  by={Toto},\n  lang={english},\n]\n");
     const auto out = setTags(in, {"a", "b"});
     CHECK(out ==
-          song("\\beginsong{Africa}[\n  by={Toto},\n  tags={a, b},\n  lang={english},\n]\n"));
+          song("\\beginsong{Africa}[\n  by={Toto},\n  lang={english},\n  tags={a, b},\n]\n"));
     CHECK(setTags(out, {"a", "b"}) == out);
 }
 
@@ -52,11 +52,11 @@ TEST_CASE("setTags adds a comma to a by line without one", "[tags]") {
     CHECK(setTags(in, {"a"}) == song("\\beginsong{T}[\n    by={X},\n    tags={a},\n]\n"));
 }
 
-TEST_CASE("setTags goes before lang without a by line", "[tags]") {
-    const auto in = song("\\beginsong{T}[\n    lang={czech},\n]\n");
-    CHECK(setTags(in, {"a"}) == song("\\beginsong{T}[\n    tags={a},\n    lang={czech},\n]\n"));
-    const auto noComma = song("\\beginsong{T}[\n    lang={czech}\n]\n");
-    CHECK(setTags(noComma, {"a"}) == song("\\beginsong{T}[\n    tags={a},\n    lang={czech}\n]\n"));
+TEST_CASE("setTags goes before src without an option before it", "[tags]") {
+    const auto in = song("\\beginsong{T}[\n    src={u},\n]\n");
+    CHECK(setTags(in, {"a"}) == song("\\beginsong{T}[\n    tags={a},\n    src={u},\n]\n"));
+    const auto noComma = song("\\beginsong{T}[\n    src={u}\n]\n");
+    CHECK(setTags(noComma, {"a"}) == song("\\beginsong{T}[\n    tags={a},\n    src={u}\n]\n"));
     CHECK(setTags(song("\\beginsong{T}[\n]\n"), {"a"}) ==
           song("\\beginsong{T}[\n    tags={a},\n]\n"));
 }
@@ -73,7 +73,7 @@ TEST_CASE("setTags keeps CRLF", "[tags]") {
     const auto in = song("\\beginsong{T}[\r\n    by={X},\r\n    lang={czech},\r\n]\r\n");
     const auto out = setTags(in, {"fav"});
     CHECK(out ==
-          song("\\beginsong{T}[\r\n    by={X},\r\n    tags={fav},\r\n    lang={czech},\r\n]\r\n"));
+          song("\\beginsong{T}[\r\n    by={X},\r\n    lang={czech},\r\n    tags={fav},\r\n]\r\n"));
     CHECK(setTags(out, {}) == in);
 }
 
@@ -92,7 +92,7 @@ TEST_CASE("setTags ignores comments and keeps them", "[tags]") {
                          "    lang={czech},\n]\n");
     const auto out = setTags(in, {"a"});
     CHECK(out == song("\\beginsong{T}[\n    by={X}, % the artist, really\n"
-                      "    tags={a},\n    lang={czech},\n]\n"));
+                      "    lang={czech},\n    tags={a},\n]\n"));
     // A commented-out tags line is a placeholder: written tags take its place.
     CHECK(setTags(song("\\beginsong{T}[\n    % tags={old},\n    by={X},\n]\n"), {"a"}) ==
           song("\\beginsong{T}[\n    tags={a},\n    by={X},\n]\n"));

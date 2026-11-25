@@ -92,13 +92,19 @@ TEST_CASE("a written option takes the place of its commented-out placeholder", "
     // A value already there: a leftover placeholder goes.
     const auto both = song("\\beginsong{T}[\n    by={X},\n    key={C},\n    % key={},\n]\n");
     CHECK(setOption(both, "key", "{D}") == song("\\beginsong{T}[\n    by={X},\n    key={D},\n]\n"));
-    // Without a placeholder, in the converter's order: key after tun, before cap.
-    const auto plain = song("\\beginsong{T}[\n    by={X},\n    tun={Standard},\n    cap={2},\n]\n");
+    // Without a placeholder, in the converter's order: key after cap, before src.
+    const auto plain = song("\\beginsong{T}[\n    by={X},\n    cap={2},\n    src={u},\n]\n");
     CHECK(setOption(plain, "key", "{G}") ==
-          song("\\beginsong{T}[\n    by={X},\n    tun={Standard},\n    key={G},\n    cap={2},\n]\n"));
-    const auto first = song("\\beginsong{T}[\n    cap={2},\n]\n");
+          song("\\beginsong{T}[\n    by={X},\n    cap={2},\n    key={G},\n    src={u},\n]\n"));
+    const auto first = song("\\beginsong{T}[\n    src={u},\n]\n");
     CHECK(setOption(first, "key", "{G}") ==
-          song("\\beginsong{T}[\n    key={G},\n    cap={2},\n]\n"));
+          song("\\beginsong{T}[\n    key={G},\n    src={u},\n]\n"));
+    // A key the order does not name ranks just before pap; chr comes after pap.
+    const auto other = song("\\beginsong{T}[\n    by={X},\n    foo={1},\n    chr={x},\n]\n");
+    CHECK(setPap(other, "a5") ==
+          song("\\beginsong{T}[\n    by={X},\n    foo={1},\n    pap={a5},\n    chr={x},\n]\n"));
+    CHECK(setOption(other, "src", "{u}") ==
+          song("\\beginsong{T}[\n    by={X},\n    src={u},\n    foo={1},\n    chr={x},\n]\n"));
     // A last option without its comma gets one.
     const auto noComma = song("\\beginsong{T}[\n    by={X}\n    % key={}\n]\n");
     CHECK(setOption(noComma, "key", "{G}") ==
