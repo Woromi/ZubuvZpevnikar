@@ -343,7 +343,8 @@ void MainWindow::createCentralWidget() {
     tidyLayout->setContentsMargins(4, 2, 4, 2);
     tidyLayout->setSpacing(2);
     auto* tidyHeader = new QHBoxLayout;
-    tidyHeader->addWidget(new QLabel(tr("Tidy changed:"), tidyPanel_), 1);
+    tidyTitle_ = new QLabel(tr("Tidy changed:"), tidyPanel_);
+    tidyHeader->addWidget(tidyTitle_, 1);
     auto* tidyClose = new QToolButton(tidyPanel_);
     tidyClose->setText(QStringLiteral("×"));
     tidyClose->setAutoRaise(true);
@@ -357,7 +358,10 @@ void MainWindow::createCentralWidget() {
     songTabLayout->addWidget(tidyPanel_);
     connect(tidyClose, &QToolButton::clicked, this, &MainWindow::clearTidyChanges);
     connect(tidyList_, &QListWidget::itemDoubleClicked, this,
-            [this](QListWidgetItem* item) { jumpToLine(item->data(Qt::UserRole).toInt()); });
+            [this](QListWidgetItem* item) {
+                if (const int line = item->data(Qt::UserRole).toInt(); line > 0)
+                    jumpToLine(line);
+            });
 
     previewStack_ = new QStackedWidget(songSplitter_);
     previewStack_->addWidget(preview_);
@@ -410,8 +414,9 @@ void MainWindow::createCentralWidget() {
     connect(songActions_, &SongActions::previewRequested, this, [this] { requestPreview(); });
     connect(songActions_, &SongActions::lineRequested, this, &MainWindow::jumpToLine);
     connect(songActions_, &SongActions::stateChanged, this, &MainWindow::updateSongActions);
-    connect(songActions_, &SongActions::tidyChangesListed, this,
-            [this](const std::vector<std::pair<int, QString>>& changes) {
+    connect(songActions_, &SongActions::changesListed, this,
+            [this](const QString& title, const std::vector<std::pair<int, QString>>& changes) {
+                tidyTitle_->setText(title);
                 tidyList_->clear();
                 for (const auto& [line, text] : changes) {
                     auto* item = new QListWidgetItem(text, tidyList_);

@@ -33,7 +33,7 @@ The app does not reimplement the songbook: the songs come from a ZubuvZpevnik ch
 classes and build scripts from the [zubuvzpevnik-package](https://github.com/Woromi/zubuvzpevnik-package)
 (always the copy bundled with the app, never the song library's own `zubuvzpevnik/` submodule:
 the builds run with `-shell-escape`, so a library could otherwise bring code of its own), and
-conversions from chords_converter (0.14.0 or newer).
+conversions from chords_converter (0.16.0 or newer).
 
 ## Install
 

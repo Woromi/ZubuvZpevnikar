@@ -172,6 +172,20 @@
             <numerusform>%n changes</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>It fits %1 after %n change(s). Check them, then save.</source>
+        <translation>
+            <numerusform>It fits %1 after %n change. Check it, then save.</numerusform>
+            <numerusform>It fits %1 after %n changes. Check them, then save.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>The song does not fit %1 even after %n change(s), and nothing else is left to try. The song is unchanged.</source>
+        <translation>
+            <numerusform>The song does not fit %1 even after %n change, and nothing else is left to try. The song is unchanged.</numerusform>
+            <numerusform>The song does not fit %1 even after %n changes, and nothing else is left to try. The song is unchanged.</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>SongbookCheck</name>

@@ -1,0 +1,14 @@
+/work/join-input.tex:14: join every two lines of each chorus into one (24 lines into 12); 12 line starts made lowercase, Refrén though the song nowhere else writes it so: check it is not a name; lines 15, 17, 33, 35, 51, 53, 69, 71, 87, 89, 105 and 107 may want a comma at their end
+/work/join-input.tex:14: join every two lines of each chorus into one (2 lines into 1); 1 line start made lowercase; line 15 may want a comma at its end
+/work/join-input.tex:3: join every two lines of each verse into one (48 lines into 24); 24 line starts made lowercase; lines 4, 6, 8, 10, 19, 21, 23, 25, 32, 34, 36, 38, 45, 47, 49, 51, 58, 60, 62, 64, 71, 73, 75 and 77 may want a comma at their end
+/work/join-input.tex:57: the 6th chorus is reprinted in full: shorten it to \insertchorus*
+/work/join-input.tex:48: the 5th chorus is reprinted in full: shorten it to \insertchorus*
+/work/join-input.tex:39: the 4th chorus is reprinted in full: shorten it to \insertchorus*
+/work/join-input.tex:30: the 3rd chorus is reprinted in full: shorten it to \insertchorus*
+/work/join-input.tex:21: the 2nd chorus is reprinted in full: shorten it to \insertchorus*
+/work/join-input.tex:52: lines 52–54 of verse 6 play the chords of line 51 again: \chordsoffonsmallpage before line 52
+/work/join-input.tex:43: lines 43–45 of verse 5 play the chords of line 42 again: \chordsoffonsmallpage before line 43
+/work/join-input.tex:34: lines 34–36 of verse 4 play the chords of line 33 again: \chordsoffonsmallpage before line 34
+/work/join-input.tex:25: lines 25–27 of verse 3 play the chords of line 24 again: \chordsoffonsmallpage before line 25
+/work/join-input.tex:16: lines 16–18 of verse 2 play the chords of line 15 again: \chordsoffonsmallpage before line 16
+/work/join-input.tex:5: lines 5–7 of verse 1 play the chords of line 4 again: \chordsoffonsmallpage before line 5

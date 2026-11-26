@@ -113,6 +113,44 @@ converter::Command applyCommand(const std::filesystem::path& converter,
                                 const std::filesystem::path& songFile,
                                 std::span<const std::string> ids);
 
+// Make Smaller's Apply Until It Fits (converter 0.16.0): "shrink SONG.tex --apply --fit a4|a5 [--last-resort] --songbook
+// ROOT --package DIR --json -o OUTPUT" takes the best proposal, tidies and measures the song, and
+// goes on until it fits the paper; all or nothing: a song it cannot fit is written to OUTPUT
+// unchanged. It always typesets the song (lualatex -shell-escape, a few seconds a step): the
+// preview's safety approval applies. Each step is also listed on stderr as
+// "<file>:<line>: <description>" ("tried, not made: " first when it did not fit).
+struct FitStep {
+    std::string id;
+    std::string kind;
+    int line = 0; // where the change was made, in the text of that step
+    std::string description;
+    int score = 0;
+    std::string grade; // "good", "fair", "poor" or "last resort"
+    bool operator==(const FitStep&) const = default;
+};
+
+struct Fitted {
+    bool fits = false;
+    // Why it stopped: "fits", "nothing_left" (no change left that helps) or "last_resort" (only
+    // a last resort is left, which --last-resort would allow: `lastResort`).
+    std::string stopped;
+    std::optional<FitStep> lastResort;
+    std::vector<FitStep> steps; // made, in order; when it does not fit: tried and not made
+    std::optional<Measured> a4; // the song as it ends, on the papers measured (no wrap lines)
+    std::optional<Measured> a5;
+    bool operator==(const Fitted&) const = default;
+};
+
+converter::Command fitCommand(const std::filesystem::path& converter,
+                              const std::filesystem::path& songFile, Paper paper,
+                              bool lastResort, const std::filesystem::path& songbookRoot,
+                              const std::filesystem::path& packageDir,
+                              const std::filesystem::path& output);
+// Exit code 0 and stdout = the fit JSON; else the error (stderr trimmed). The song itself is in
+// the command's output file.
+std::expected<Fitted, std::string> interpretFit(int exitCode, std::string_view stdOut,
+                                                std::string_view stdErr);
+
 // Exit code 0 and stdout = the JSON (of shrink, join or check). Non-zero exit, malformed JSON or a missing field gives an
 // error message (stderr trimmed, or a description). stderr is ignored on success.
 std::expected<Suggestions, std::string> interpretProposals(int exitCode, std::string_view stdOut,

@@ -2221,6 +2221,14 @@ Použijte vestavěný.</translation>
         <source>The selected findings are right as they are: add a &quot;% nocheck&quot; line so Check Song leaves them out</source>
         <translation>Vybrané nálezy jsou správně tak, jak jsou: přidá se řádek &quot;% nocheck&quot; a Zkontrolovat píseň je příště vynechá</translation>
     </message>
+    <message>
+        <source>Apply Until It Fits</source>
+        <translation>Použít, dokud se nevejde</translation>
+    </message>
+    <message>
+        <source>Let chords_converter take these changes itself, the most readable first, typesetting the song after each, until it fits (one undo step; a song it cannot fit stays as it is; it asks before a last resort). A few seconds a change.</source>
+        <translation>Nechat chords_converter použít tyto změny sám, nejčitelnější první, a po každé píseň znovu vysázet, dokud se nevejde (jeden krok zpět; píseň, kterou nedokáže vtěsnat, zůstane, jak je; před krajním řešením se zeptá). Pár sekund na změnu.</translation>
+    </message>
     <message numerus="yes">
         <source>Apply %n Changes</source>
         <translation>
@@ -2359,6 +2367,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Tidy needs chords_converter, which was not found: it is built with the app (ZUB_BUILD_CONVERTER).</source>
         <translation>Učesání potřebuje chords_converter, který nebyl nalezen: sestavuje se s aplikací (ZUB_BUILD_CONVERTER).</translation>
+    </message>
+    <message>
+        <source>Tidy changed:</source>
+        <translation>Učesání změnilo:</translation>
     </message>
     <message>
         <source>%1 needs chords_converter, which was not found: it is built with the app (ZUB_BUILD_CONVERTER).</source>
@@ -2563,6 +2575,76 @@ Použijte vestavěný.</translation>
     <message>
         <source>Measuring…</source>
         <translation>Měřím…</translation>
+    </message>
+    <message>
+        <source>Apply Until It Fits stopped: the song changed (or another action started).</source>
+        <translation>Použít, dokud se nevejde: zastaveno, píseň se změnila (nebo začala jiná akce).</translation>
+    </message>
+    <message>
+        <source>Apply Until It Fits</source>
+        <translation>Použít, dokud se nevejde</translation>
+    </message>
+    <message>
+        <source>Applying changes until the song fits %1 (typesetting it after each change, this can take minutes; typing stops it)…</source>
+        <translation>Používají se změny, dokud se píseň nevejde na %1 (po každé změně se znovu sází, může to trvat minuty; psaní to zastaví)…</translation>
+    </message>
+    <message>
+        <source>Apply Until It Fits failed</source>
+        <translation>Použít, dokud se nevejde: nepodařilo se</translation>
+    </message>
+    <message>
+        <source>Make Smaller changed:</source>
+        <translation>Zmenšení změnilo:</translation>
+    </message>
+    <message>
+        <source>chords_converter wrote no song.</source>
+        <translation>chords_converter nezapsal žádnou píseň.</translation>
+    </message>
+    <message numerus="yes">
+        <source>It fits %1 after %n change(s). Check them, then save.</source>
+        <translation>
+            <numerusform>Vejde se na %1 po %n změně. Zkontrolujte ji a pak uložte.</numerusform>
+            <numerusform>Vejde se na %1 po %n změnách. Zkontrolujte je a pak uložte.</numerusform>
+            <numerusform>Vejde se na %1 po %n změnách. Zkontrolujte je a pak uložte.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>It fits %1 as it is.</source>
+        <translation>Vejde se na %1 tak, jak je.</translation>
+    </message>
+    <message>
+        <source>The song does not fit %1 without a last resort: next would be %2.</source>
+        <translation>Píseň se na %1 nevejde bez krajního řešení: další by bylo %2.</translation>
+    </message>
+    <message>
+        <source>Nothing else helps. The song is unchanged.</source>
+        <translation>Nic jiného nepomůže. Píseň zůstala beze změny.</translation>
+    </message>
+    <message>
+        <source>Tried, not made (the song is unchanged):
+%1</source>
+        <translation>Vyzkoušeno, neprovedeno (píseň zůstala beze změny):
+%1</translation>
+    </message>
+    <message>
+        <source>Allow a Last Resort</source>
+        <translation>Povolit krajní řešení</translation>
+    </message>
+    <message>
+        <source>Nothing chords_converter knows makes the song fit %1. The song is unchanged.</source>
+        <translation>Nic, co chords_converter zná, píseň na %1 nevtěsná. Píseň zůstala beze změny.</translation>
+    </message>
+    <message numerus="yes">
+        <source>The song does not fit %1 even after %n change(s), and nothing else is left to try. The song is unchanged.</source>
+        <translation>
+            <numerusform>Píseň se na %1 nevejde ani po %n změně a nic dalšího už nezbývá. Píseň zůstala beze změny.</numerusform>
+            <numerusform>Píseň se na %1 nevejde ani po %n změnách a nic dalšího už nezbývá. Píseň zůstala beze změny.</numerusform>
+            <numerusform>Píseň se na %1 nevejde ani po %n změnách a nic dalšího už nezbývá. Píseň zůstala beze změny.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Tried:</source>
+        <translation>Vyzkoušeno:</translation>
     </message>
 </context>
 <context>

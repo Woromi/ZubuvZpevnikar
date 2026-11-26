@@ -332,14 +332,14 @@ TEST_CASE("apply interprets real runs", "[songsuggest]") {
 TEST_CASE("version output is parsed", "[converter]") {
     const auto version = cv::parseVersion(slurp(converterData / "version.out"));
     REQUIRE(version);
-    CHECK(*version == cv::Version{0, 15, 0});
-    CHECK(cv::toString(*version) == "0.15.0");
+    CHECK(*version == cv::Version{0, 16, 0});
+    CHECK(cv::toString(*version) == "0.16.0");
     CHECK(*version >= cv::kRequired);
 
     CHECK(cv::parseVersion("chords_converter 0.10.3\r\nmore")->minor == 10);
     CHECK(cv::parseVersion("chords_converter 1.0.0-beta")->major == 1);
-    CHECK(*cv::parseVersion("chords_converter 0.13.0") < cv::kRequired);
-    CHECK(*cv::parseVersion("chords_converter 0.14.1") > cv::kRequired);
+    CHECK(*cv::parseVersion("chords_converter 0.15.0") < cv::kRequired); // no shrink --apply
+    CHECK(*cv::parseVersion("chords_converter 0.16.1") > cv::kRequired);
 }
 
 TEST_CASE("unparseable version output gives nothing", "[converter]") {
@@ -386,4 +386,61 @@ TEST_CASE("paperOf reads the base class options", "[songsuggest][preview]") {
     CHECK_FALSE(zub::preview::paperOf(root.path / "zubuvzpevnik", "missing"));
     CHECK_FALSE(zub::preview::paperOf(root.path / "zubuvzpevnik", "../small"));
     CHECK_FALSE(zub::preview::paperOf(root.path / "zubuvzpevnik", ""));
+}
+
+TEST_CASE("Apply Until It Fits: shrink --apply's command line", "[songsuggest]") {
+    CHECK(ss::fitCommand("/opt/cc", "/tmp/x/S.tex", ss::Paper::A5, false, "/sb", "/pkg",
+                         "/tmp/x/out.tex")
+              .arguments == std::vector<std::string>{"shrink", "/tmp/x/S.tex", "--apply", "--fit",
+                                                     "a5", "--songbook", "/sb", "--package",
+                                                     "/pkg", "--json", "-o", "/tmp/x/out.tex"});
+    CHECK(ss::fitCommand("/opt/cc", "S.tex", ss::Paper::A4, true, "/sb", "", "o.tex").arguments ==
+          std::vector<std::string>{"shrink", "S.tex", "--apply", "--fit", "a4", "--last-resort",
+                                   "--songbook", "/sb", "--json", "-o", "o.tex"});
+}
+
+TEST_CASE("Apply Until It Fits reads real runs: fits, a last resort held back, nothing left",
+          "[songsuggest]") {
+    // join-input.tex fits A5 after 14 steps (joined lines, reminders, chords hidden inside parts).
+    const auto fits = ss::interpretFit(exitCode("fit"), slurp(converterData / "fit.json"),
+                                       slurp(converterData / "fit.err"));
+    REQUIRE(fits);
+    CHECK(fits->fits);
+    CHECK(fits->stopped == "fits");
+    CHECK_FALSE(fits->lastResort);
+    REQUIRE(fits->steps.size() == 14);
+    CHECK(fits->steps[0].id == "joinlines@14");
+    CHECK(fits->steps[0].line == 14);
+    CHECK(fits->steps[0].description.starts_with("join every two lines of each chorus"));
+    CHECK(fits->steps[3].kind == "insertchorus*");
+    REQUIRE(fits->a5);
+    CHECK(fits->a5->pages == 1);
+    CHECK(fits->a5->fits);
+    REQUIRE(fits->a4);
+    CHECK(fits->a4->fits);
+
+    // shrink-input.tex: three steps tried, then only the smaller type is left.
+    const auto held = ss::interpretFit(exitCode("fit-lastresort"),
+                                       slurp(converterData / "fit-lastresort.json"), "");
+    REQUIRE(held);
+    CHECK_FALSE(held->fits);
+    CHECK(held->stopped == "last_resort");
+    REQUIRE(held->lastResort);
+    CHECK(held->lastResort->id == "smalleronsmallpage@16");
+    CHECK(held->lastResort->grade == "last resort");
+    CHECK(held->steps.size() == 3);
+    CHECK(held->a5->pages == 2);
+
+    // With --last-resort: the smaller type tried too, still two pages: nothing left.
+    const auto none = ss::interpretFit(exitCode("fit-nothing"),
+                                       slurp(converterData / "fit-nothing.json"), "");
+    REQUIRE(none);
+    CHECK(none->stopped == "nothing_left");
+    CHECK(none->steps.size() == 4);
+    CHECK_FALSE(none->lastResort);
+
+    // Failures and broken output.
+    CHECK(ss::interpretFit(1, "", "Failed to read file 'x'\n").error() == "Failed to read file 'x'");
+    CHECK_FALSE(ss::interpretFit(0, "{}", ""));
+    CHECK_FALSE(ss::interpretFit(0, R"({"fits":true,"stopped":"maybe","steps":[]})", ""));
 }

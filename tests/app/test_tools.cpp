@@ -20,6 +20,7 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QSettings>
 #include <QStandardPaths>
@@ -191,6 +192,93 @@ TEST_CASE("Converter: Measure offers pap, is cancelled by typing and by Tidy",
     CHECK(A::converterRunner(w)->isRunning());
     CHECK(apptest::waitUntil([&] { return !A::converterRunner(w)->isRunning(); }, 30000));
     ed->textEdit()->document()->setModified(false);
+}
+
+TEST_CASE("Make Smaller, Apply Until It Fits: one undo step, a last resort asked for",
+          "[.tools][app][converter]") {
+    REQUIRE_TOOL("lualatex");
+    REQUIRE_TOOL("python3");
+    useBuiltConverter();
+    apptest::Fixture fixture;
+    // Made-up songs of the converter captures: a long one that fits A5 after joining lines and
+    // reminders, and one only a smaller type would fit.
+    const auto data = std::filesystem::path(ZUB_TEST_DATA_DIR) / "converter";
+    const auto longSong = fixture / "songs/chords/Test/Long.tex";
+    const auto tight = fixture / "songs/chords/Test/Tight.tex";
+    apptest::writeFile(longSong, slurp(data / "join-input.tex"));
+    apptest::writeFile(tight, slurp(data / "shrink-input.tex"));
+    // The paper of the preview's class, as Make Smaller lists for: the small book's A5.
+    QSettings{}.setValue(QStringLiteral("preview/class"), QStringLiteral("malyzpevnik"));
+    MainWindow w;
+    w.resize(1200, 800);
+    w.show();
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    if (A::packageDir(w).empty())
+        SKIP("the bundled package is not checked out");
+
+    REQUIRE(A::openExistingSong(w, longSong));
+    A::tabs(w)->setCurrentIndex(0);
+    SongEditor* ed = A::editor(w);
+    REQUIRE(ed != nullptr);
+    const std::string before = ed->content();
+    // Make Smaller lists the changes; Apply Until It Fits lets the converter take them.
+    const auto untilItFits = [&w] {
+        return apptest::answerDialog<ShrinkDialog>([](ShrinkDialog* d) {
+            for (auto* b : d->findChildren<QPushButton*>())
+                if (b->text() == QStringLiteral("Apply Until It Fits"))
+                    b->click();
+        });
+    };
+    QAction* smaller = A::songActions(w)->makeSmallerAction();
+    REQUIRE(smaller->isEnabled());
+    {
+        auto dialog = untilItFits();
+        smaller->trigger();
+        REQUIRE(apptest::waitUntil(
+            [&] { return dialog.fired() && !A::converterRunner(w)->isRunning(); }, 300000));
+    }
+    INFO(w.statusBar()->currentMessage().toStdString());
+    CHECK(ed->content() != before);
+    CHECK(has(ed->content(), "\\insertchorus*"));
+    CHECK(slurp(longSong) == before); // nothing saved
+    CHECK(A::changesPanel(w)->isVisible());
+    CHECK(A::changesTitle(w) == QStringLiteral("Make Smaller changed:"));
+    CHECK(A::changesCount(w) > 0);
+    CHECK(w.statusBar()->currentMessage().startsWith(QStringLiteral("It fits A5 after")));
+    // The papers it fits now are offered.
+    CHECK(apptest::waitUntil([&] { return ed->suggestionShown(); }, 5000));
+    ed->textEdit()->undo(); // one undo step
+    CHECK(ed->content() == before);
+    ed->textEdit()->document()->setModified(false);
+    REQUIRE(A::closeSong(w));
+
+    // Only a smaller type would help: asked first; Cancel leaves the song as it was.
+    REQUIRE(A::openExistingSong(w, tight));
+    A::tabs(w)->setCurrentIndex(0);
+    ed = A::editor(w);
+    const std::string tightBefore = ed->content();
+    QString question;
+    apptest::Responder box([](QWidget* top) {
+                               auto* m = qobject_cast<QMessageBox*>(top);
+                               return m && m->text().contains(QStringLiteral("last resort"));
+                           },
+                           [&](QWidget* top) {
+                               auto* m = static_cast<QMessageBox*>(top);
+                               question = m->text();
+                               m->button(QMessageBox::Cancel)->click();
+                           });
+    auto dialog = untilItFits();
+    smaller->trigger();
+    REQUIRE(apptest::waitUntil(
+        [&] { return box.fired() || (dialog.fired() && !A::converterRunner(w)->isRunning()); },
+        300000));
+    INFO(w.statusBar()->currentMessage().toStdString());
+    REQUIRE(box.fired());
+    CHECK(question.contains(QStringLiteral("without a last resort")));
+    CHECK(question.contains(QStringLiteral("smalleronsmallpage")));
+    CHECK(ed->content() == tightBefore);
+    CHECK_FALSE(A::converterRunner(w)->isRunning());
+    QSettings{}.remove(QStringLiteral("preview/class"));
 }
 
 TEST_CASE("Check Songs: the key check offers the key and a nocheck comment",

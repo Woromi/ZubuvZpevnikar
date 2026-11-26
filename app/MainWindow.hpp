@@ -255,6 +255,7 @@ private:
     QStackedWidget* previewStack_ = nullptr; // {song PDF preview, score preview}
     DiffView* diffView_ = nullptr;
     QWidget* tidyPanel_ = nullptr; // "Tidy changed:" list under the editor area
+    QLabel* tidyTitle_ = nullptr; // "Tidy changed:" / "Make Smaller changed:"
     QListWidget* tidyList_ = nullptr;
     SongActions* songActions_ = nullptr;     // Tidy, Make Smaller, Join Lines, Check Song
     QAction* labelsAction_ = nullptr;      // Labels… of the open song

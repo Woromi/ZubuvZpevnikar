@@ -14,7 +14,6 @@
 
 namespace {
 // Measuring (shrink --measure, join) builds the song with lualatex: slow on a cold cache.
-constexpr int watchdogSeconds = 60;
 constexpr int killGraceMs = 500; // between SIGTERM and SIGKILL of a cancelled run
 
 // Stops the converter and what it started (a measuring shrink or join runs python3 checkpaper.py,
@@ -33,7 +32,6 @@ void killTree(QProcess* process) {
 
 ConverterRunner::ConverterRunner(QObject* parent) : QObject(parent), watchdog_(new QTimer(this)) {
     watchdog_->setSingleShot(true);
-    watchdog_->setInterval(watchdogSeconds * 1000);
     connect(watchdog_, &QTimer::timeout, this, [this] {
         if (process_) {
             timedOut_ = true;
@@ -103,8 +101,15 @@ void ConverterRunner::cancel() {
 
 bool ConverterRunner::start(const CommandFactory& makeCommand, const std::string& content,
                             const QString& stem) {
+    return start(makeCommand, content, stem, Options{});
+}
+
+bool ConverterRunner::start(const CommandFactory& makeCommand, const std::string& content,
+                            const QString& stem, const Options& options) {
     if (busy_)
         return false;
+    options_ = options;
+    watchdog_->setInterval(options.watchdogSeconds * 1000);
     busy_ = true;
     out_.clear();
     err_.clear();
@@ -166,14 +171,21 @@ void ConverterRunner::onFinished() {
     err_ += process_->readAllStandardError();
     if (timedOut_) {
         finish(std::unexpected(
-            tr("chords_converter did not finish within %1 s and was stopped.").arg(watchdogSeconds)));
+            tr("chords_converter did not finish within %1 s and was stopped.")
+                .arg(options_.watchdogSeconds)));
         return;
     }
     if (process_->exitStatus() == QProcess::CrashExit) {
         finish(std::unexpected(tr("chords_converter crashed.")));
         return;
     }
-    finish(ConverterOutput{process_->exitCode(), out_.toStdString(), err_.toStdString()});
+    ConverterOutput output{process_->exitCode(), out_.toStdString(), err_.toStdString(), {}};
+    if (!options_.readBack.isEmpty() && dir_) {
+        QFile file(dir_->filePath(options_.readBack));
+        if (file.open(QIODevice::ReadOnly))
+            output.file = file.readAll().toStdString();
+    }
+    finish(std::move(output));
 }
 
 void ConverterRunner::failLater(const QString& message) {

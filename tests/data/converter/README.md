@@ -24,7 +24,10 @@ No real websites were contacted: URLs point at 127.0.0.1 or an `.invalid` host.
 | join | `chords_converter join /work/join-input.tex --songbook <ZubuvZpevnik> --json` | made-up long song (6 verses of 8 short lines, 6 choruses of 4); both papers measured; 2 `joinlines` proposals |
 | apply | `chords_converter apply /work/shrink-input.tex --id chordsoffonsmallpage@48 -o -` | stdout is the changed song (the first proposal of `shrink`) |
 | apply-stale | `chords_converter apply /work/shrink-input.tex --id nosuch@999 -o -` | exit 1, "No proposal '...' for '...' (ask again with shrink, join or check)." |
-| version | `chords_converter --version` | `chords_converter 0.10.0` |
+| fit | `chords_converter shrink /work/join-input.tex --apply --fit a5 --songbook <ZubuvZpevnik> --package <package> --json -o fitted.tex` | Apply Until It Fits (0.16.0): the made-up `join-input.tex` fits A5 after 14 steps (lines joined, reminders, chords hidden inside parts); `.json` is stdout, `.err` one `<file>:<line>: <description>` per step |
+| fit-lastresort | the same on `shrink-input.tex` | does not fit without a last resort: `stopped` `last_resort` (`smalleronsmallpage@16`), 3 steps tried and not made (`tried, not made:` on stderr), the song written unchanged |
+| fit-nothing | the same with `--last-resort` | the smaller type tried too, still 2 A5 pages: `stopped` `nothing_left`, 4 steps tried |
+| version | `chords_converter --version` | `chords_converter 0.16.0` |
 
 All converter captures (everything but `success`, `readonly` and the failures, whose output did not change) were re-captured with `344cac5` (0.10.0) on 2026-11-12; the tidy output did not change. Older note: the tidy captures were from converter `41755c1`, the check/join/version ones from `e1db028`/`ef4faa9` (0.8.0), both 2026-11-08 (0.7.0: `suggest` renamed `shrink`; `check` lists corrections; proposals carry `score`, `grade`, `sources` and `category`; apply names the change on stderr). The song paths in the JSON are normalised to `/work`, the songbook to `/home/user/ZubuvZpevnik`.
 
@@ -49,3 +52,5 @@ Ami             G
 Note: the unsupported case prints no dumped HTML on stdout (older versions did).
 
 With converter `41651cd` (still 0.10.0, 2026-11-13) `check.json` was re-captured: the song says `lang=english` without braces, which the converter now reads, so the `~` finding (`tie@15`) appears; and the import draft (`success-workdir`) ends its prelude with `pap={},`. The other captures did not change.
+
+The `fit*` captures and `version` were taken with converter `d962c20` (0.16.0) on 2026-11-27.

@@ -62,7 +62,9 @@ public:
 
     // Tidy the open song (chords_converter tidy, one undo step); `note` ends the status message.
     void startTidy(const QString& note = {});
-    void cancelMeasure(); // the background measurement, if one runs (the text changed ...)
+    // The background measurement or Apply Until It Fits, if one runs (the text changed, another
+    // action starts ...).
+    void cancelMeasure();
     // False and a message box when the converter is older than zub::converter::kRequired.
     bool converterUsable(const std::filesystem::path& converter, const QString& action);
 
@@ -99,7 +101,8 @@ signals:
     void lineRequested(int line); // show this line of the song
     void stateChanged();          // the window's actions depend on the run state
     // The list under the editor after a Tidy: line and text of each change (replaces the old one).
-    void tidyChangesListed(const std::vector<std::pair<int, QString>>& changes);
+    // What Tidy or Apply Until It Fits changed ("line N: ..."), under `title`.
+    void changesListed(const QString& title, const std::vector<std::pair<int, QString>>& changes);
 
 private:
     void showStatus(const QString& text, int timeoutMs = 0);
@@ -133,6 +136,12 @@ private:
     // --fit --measure; no dialog) and offers the `pap` header from its result alone.
     void startMeasure(SongEditor* editor);
     void onMeasureFinished(const std::expected<ConverterOutput, QString>& output);
+    // Make Smaller's Apply Until It Fits: shrink --apply (converter 0.16.0) takes the best
+    // proposal, tidies and measures, until the song fits fitPaper_; all or nothing. One undo
+    // step, the steps listed. Stopped before a last resort, it asks whether to allow it
+    // (`lastResort`: a run that may).
+    void startFit(bool lastResort);
+    void onFitFinished(const std::expected<ConverterOutput, QString>& output);
     // Takes over the state of the run that just finished; the editor it belongs to, or nullptr
     // (after a status message) when the song changed meanwhile. `input` gets the bytes sent.
     SongEditor* takeRun(std::string& input, const QString& what);
@@ -144,7 +153,7 @@ private:
     std::filesystem::path packageDir_;
 
     ConverterRunner* converterRunner_ = nullptr;
-    enum class RunKind { Tidy, Suggest, Apply, Measure };
+    enum class RunKind { Tidy, Suggest, Apply, Measure, Fit };
     RunKind runKind_ = RunKind::Tidy;
     QPointer<SongEditor> runEditor_; // the editor the running converter belongs to
     std::string runInput_;           // the bytes that were sent
@@ -158,6 +167,9 @@ private:
     QAction* makeSmallerAction_ = nullptr;
     QAction* joinLinesAction_ = nullptr;
     QAction* checkAction_ = nullptr;
+    // Of Apply Until It Fits: the paper Make Smaller listed its proposals for.
+    zub::songsuggest::Paper fitPaper_ = zub::songsuggest::Paper::A5;
+    bool fitLastResort_ = false;                                   // the running fit may use one
     // Keys the last Check Songs found, by song path (this session; dropped when acted on).
     std::map<std::filesystem::path, zub::songcheck::KeyFinding> keyFindings_;
     std::map<std::filesystem::path, std::vector<zub::songcheck::SongIssue>> metadataFindings_;

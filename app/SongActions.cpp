@@ -12,6 +12,7 @@
 #include <QIcon>
 #include <QMessageBox>
 #include <QPointer>
+#include <QPushButton>
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QStringList>
@@ -64,6 +65,7 @@ SongActions::SongActions(QWidget* window, Hooks hooks)
         tr("Look for mistakes: typos where a line's copies differ, apostrophes typed two ways, "
            "a chorus typed as a verse"));
     connect(checkAction_, &QAction::triggered, this, [this] { startProposals(SongAction::Check); });
+
 }
 
 void SongActions::setSong(SongEditor* song) {
@@ -106,7 +108,9 @@ void SongActions::updateEnabled(bool songTab) {
     }
     // The song actions work on the song's text.
     // The background re-measure does not block them: starting one cancels it.
-    const bool busy = converterRunner_->isRunning() && runKind_ != RunKind::Measure;
+    // Nor Apply Until It Fits (minutes): typing or another action stops it.
+    const bool busy = converterRunner_->isRunning() && runKind_ != RunKind::Measure &&
+                      runKind_ != RunKind::Fit;
     const bool converterFree =
         songTab && !song_->textEdit()->isReadOnly() && !busy && !hooks_.findConverter().empty();
     tidyAction_->setEnabled(converterFree);
@@ -159,6 +163,9 @@ void SongActions::onConverterFinished(const std::expected<ConverterOutput, QStri
         break;
     case RunKind::Measure:
         onMeasureFinished(output);
+        break;
+    case RunKind::Fit:
+        onFitFinished(output);
         break;
     }
 }
@@ -223,7 +230,7 @@ void SongActions::onTidyFinished(const std::expected<ConverterOutput, QString>& 
         const int line = zub::diff::mapOldLine(lines, change.line);
         listed.emplace_back(line, tr("line %1: %2").arg(line).arg(toQString(change.description)));
     }
-    emit tidyChangesListed(listed);
+    emit changesListed(tr("Tidy changed:"), listed);
 
     QString message;
     if (tidied.changes.empty())
@@ -297,6 +304,8 @@ void SongActions::startProposals(SongAction action) {
             previewRequested(); // approved now: the pane's "Not built automatically" message goes
         // No paper known (a class without a paper option): no --fit, the converter measures both.
         const auto paper = zub::preview::paperOf(packageDir_, hooks_.documentClass());
+        // Apply Until It Fits fits the same paper (without one A5, which means A4 too).
+        fitPaper_ = paper.value_or(zub::songsuggest::Paper::A5);
         command = [converter, paper, measure, root,
                    package = packageDir_](const std::filesystem::path& file) {
             return zub::songsuggest::shrinkCommand(converter, file, paper, measure, root, package);
@@ -432,7 +441,12 @@ void SongActions::onSuggestFinished(const std::expected<ConverterOutput, QString
                      "the column on A4 and A5):");
         break;
     }
-    ShrinkDialog dialog(suggestions, input, name, heading, window_, action == SongAction::Check);
+    // Make Smaller of a song that does not fit (or was not measured): the converter may also take
+    // the changes itself until it fits.
+    const bool canFitAll = action == SongAction::Shrink && !packageDir_.empty() &&
+                           suggestions.fits != std::optional<bool>(true);
+    ShrinkDialog dialog(suggestions, input, name, heading, window_, action == SongAction::Check,
+                        canFitAll);
     // Show where each proposal is (moving the cursor does not change the text).
     connect(&dialog, &ShrinkDialog::proposalSelected, this, &SongActions::lineRequested);
     if (const int line = suggestions.proposals.front().line; line > 0)
@@ -443,6 +457,10 @@ void SongActions::onSuggestFinished(const std::expected<ConverterOutput, QString
     // have been closed or changed by other means).
     if (!editor || editor != song_ || editor->content() != input) {
         showStatus(tr("%1 discarded: the song changed.").arg(name), 8000);
+        return;
+    }
+    if (dialog.untilItFits()) {
+        startFit(false); // fitPaper_: the paper these proposals were listed for
         return;
     }
     const auto chosen = dialog.selected();
@@ -866,11 +884,180 @@ void SongActions::onMeasureFinished(const std::expected<ConverterOutput, QString
 }
 
 void SongActions::cancelMeasure() {
-    if (runKind_ != RunKind::Measure || !converterRunner_->isRunning())
+    if ((runKind_ != RunKind::Measure && runKind_ != RunKind::Fit) ||
+        !converterRunner_->isRunning())
         return;
+    const bool fit = runKind_ == RunKind::Fit;
     converterRunner_->cancel(); // reports nothing
     runEditor_.clear();
     runInput_.clear();
     emit statusCleared();
+    if (fit)
+        showStatus(tr("Apply Until It Fits stopped: the song changed (or another action started)."),
+                   8000);
     emit stateChanged();
 }
+
+namespace {
+// The name shrink --apply writes the fitted song to, next to the song copy.
+const auto fittedName = QStringLiteral("fitted.tex");
+} // namespace
+
+void SongActions::startFit(bool lastResort) {
+    SongEditor* editor = song_;
+    cancelMeasure();
+    if (!editor || editor->textEdit()->isReadOnly() || converterRunner_->isRunning() ||
+        songbookRoot_.empty())
+        return;
+    const QString name = tr("Apply Until It Fits");
+    const std::filesystem::path converter = hooks_.findConverter();
+    if (converter.empty()) {
+        showStatus(tr("%1 needs chords_converter, which was not found: it is built with the app "
+                      "(ZUB_BUILD_CONVERTER).")
+                       .arg(name),
+                   8000);
+        return;
+    }
+    if (!converterUsable(converter, name))
+        return;
+    // It typesets the song every step: without a package or the approval it can't run.
+    if (packageDir_.empty()) {
+        QMessageBox::information(window_, name, hooks_.noPackageText());
+        return;
+    }
+    const std::string content = editor->content();
+    if (!approveBuild(editor, content, true, tr("Build"), tr("Cancel")))
+        return;
+    emit previewRequested(); // approved now: the pane's "Not built automatically" message goes
+    fitLastResort_ = lastResort;
+    const auto paper = fitPaper_;
+    runKind_ = RunKind::Fit;
+    runEditor_ = editor;
+    runInput_ = content;
+    showStatus(tr("Applying changes until the song fits %1 (typesetting it after each change, "
+                  "this can take minutes; typing stops it)…")
+                   .arg(paper == zub::songsuggest::Paper::A4 ? QStringLiteral("A4")
+                                                              : QStringLiteral("A5")));
+    ConverterRunner::Options options;
+    // Up to 40 steps and as many builds again to leave out what a later step made unnecessary,
+    // a few seconds each; typing or another action stops it sooner.
+    options.watchdogSeconds = 1200;
+    options.readBack = fittedName;
+    if (!converterRunner_->start(
+            [converter, paper, lastResort, root = songbookRoot_,
+             package = packageDir_](const std::filesystem::path& file) {
+                return zub::songsuggest::fitCommand(converter, file, paper, lastResort, root,
+                                                    package,
+                                                    file.parent_path() / toPath(fittedName));
+            },
+            content, toQString(editor->path().stem()), options))
+        return;
+    emit stateChanged();
+}
+
+void SongActions::onFitFinished(const std::expected<ConverterOutput, QString>& output) {
+    const QString name = tr("Apply Until It Fits");
+    std::string input;
+    QPointer<SongEditor> editor = takeRun(input, name);
+    const auto finishUp = [this] { emit stateChanged(); };
+    if (!editor) {
+        finishUp();
+        return;
+    }
+    std::expected<zub::songsuggest::Fitted, QString> result = std::unexpected(output.error_or({}));
+    if (output) {
+        auto interpreted = zub::songsuggest::interpretFit(output->exitCode, output->out,
+                                                          output->err);
+        if (interpreted)
+            result = std::move(*interpreted);
+        else
+            result = std::unexpected(toQString(interpreted.error()));
+    }
+    if (result && result->fits && !result->steps.empty() &&
+        (!output->file || !output->file->contains("\\endsong")))
+        result = std::unexpected(tr("chords_converter wrote no song."));
+    if (!result) {
+        emit statusCleared();
+        QMessageBox::warning(window_, tr("Apply Until It Fits failed"), result.error());
+        finishUp();
+        return;
+    }
+    const zub::songsuggest::Fitted& fitted = *result;
+    const QString paper = fitPaper_ == zub::songsuggest::Paper::A4 ? QStringLiteral("A4")
+                                                                    : QStringLiteral("A5");
+    const auto stepList = [&fitted](const QString& prefix) {
+        QStringList lines;
+        for (const auto& step : fitted.steps)
+            lines << prefix + toQString(step.description);
+        return lines;
+    };
+    zub::songsuggest::Suggestions measured;
+    measured.a4 = fitted.a4;
+    measured.a5 = fitted.a5;
+
+    if (fitted.fits) {
+        std::string after = input;
+        if (!fitted.steps.empty()) {
+            editor->replaceContent(*output->file);
+            after = editor->content();
+            // Without line numbers: a step's line (and the lines its description names) are in
+            // the text of that step, not in the result. Double-clicking one goes nowhere (0).
+            std::vector<std::pair<int, QString>> listed;
+            for (const auto& step : fitted.steps)
+                listed.emplace_back(0, toQString(step.description));
+            emit changesListed(tr("Make Smaller changed:"), listed);
+            showStatus(tr("It fits %1 after %n change(s). Check them, then save.", nullptr,
+                          static_cast<int>(fitted.steps.size()))
+                           .arg(paper),
+                       15000);
+            emit previewRequested();
+        } else {
+            showStatus(tr("It fits %1 as it is.").arg(paper), 10000);
+        }
+        finishUp();
+        offerPapers(editor, after, measured);
+        return;
+    }
+
+    // All or nothing: the song is as it was. Allow a last resort?
+    if (fitted.stopped == "last_resort" && fitted.lastResort) {
+        emit statusCleared();
+        QMessageBox box(QMessageBox::Question, name, {}, QMessageBox::NoButton, window_);
+        box.setTextFormat(Qt::PlainText); // the converter's descriptions quote lyrics and LaTeX
+        const QStringList tried = stepList(QStringLiteral("• "));
+        box.setText(
+            tr("The song does not fit %1 without a last resort: next would be %2.")
+                .arg(paper, toQString(fitted.lastResort->description)) +
+            QStringLiteral("\n\n") +
+            (tried.isEmpty() ? tr("Nothing else helps. The song is unchanged.")
+                             : tr("Tried, not made (the song is unchanged):\n%1")
+                                   .arg(tried.join(QLatin1Char('\n')))));
+        QPushButton* allow = box.addButton(tr("Allow a Last Resort"), QMessageBox::AcceptRole);
+        box.addButton(QMessageBox::Cancel);
+        box.setDefaultButton(allow);
+        finishUp();
+        box.exec();
+        if (box.clickedButton() == allow && editor && editor == song_ &&
+            editor->content() == input)
+            startFit(true);
+        return;
+    }
+    emit statusCleared();
+    QMessageBox box(QMessageBox::Information, name, {}, QMessageBox::Ok, window_);
+    box.setTextFormat(Qt::PlainText);
+    if (fitted.steps.empty()) {
+        box.setText(tr("Nothing chords_converter knows makes the song fit %1. The song is "
+                       "unchanged.")
+                        .arg(paper));
+    } else {
+        box.setText(tr("The song does not fit %1 even after %n change(s), and nothing else is "
+                       "left to try. The song is unchanged.",
+                       nullptr, static_cast<int>(fitted.steps.size()))
+                        .arg(paper) +
+                    QStringLiteral("\n\n") + tr("Tried:") + QLatin1Char('\n') +
+                    stepList(QStringLiteral("• ")).join(QLatin1Char('\n')));
+    }
+    finishUp();
+    box.exec();
+}
+

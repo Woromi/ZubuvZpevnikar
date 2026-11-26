@@ -198,6 +198,9 @@ struct AppTestAccess {
     }
     static QAction* tidyAction(MainWindow& w) { return w.songActions_->tidyAction_; }
     static QAction* checkAction(MainWindow& w) { return w.songActions_->checkAction_; }
+    static QWidget* changesPanel(MainWindow& w) { return w.tidyPanel_; }
+    static QString changesTitle(MainWindow& w) { return w.tidyTitle_->text(); }
+    static int changesCount(MainWindow& w) { return w.tidyList_->count(); }
     static void scanSongbook(MainWindow& w) { w.songbookCheck_->start(); }
     static bool scanRunning(MainWindow& w) { return w.songbookCheck_->scan_ != nullptr; }
     static const std::map<std::filesystem::path, zub::songcheck::KeyFinding>&

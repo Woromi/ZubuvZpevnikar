@@ -246,6 +246,91 @@ std::expected<Suggestions, std::string> interpretProposals(int exitCode, std::st
     return result;
 }
 
+converter::Command fitCommand(const std::filesystem::path& converter,
+                              const std::filesystem::path& songFile, Paper paper,
+                              bool lastResort, const std::filesystem::path& songbookRoot,
+                              const std::filesystem::path& packageDir,
+                              const std::filesystem::path& output) {
+    converter::Command command{utf8(converter),
+                               {"shrink", utf8(songFile), "--apply", "--fit",
+                                paper == Paper::A4 ? "a4" : "a5"}};
+    if (lastResort)
+        command.arguments.push_back("--last-resort");
+    command.arguments.push_back("--songbook");
+    command.arguments.push_back(utf8(songbookRoot));
+    if (!packageDir.empty()) {
+        command.arguments.push_back("--package");
+        command.arguments.push_back(utf8(packageDir));
+    }
+    command.arguments.push_back("--json");
+    command.arguments.push_back("-o");
+    command.arguments.push_back(utf8(output));
+    return command;
+}
+
+namespace {
+
+std::optional<FitStep> readFitStep(const json::Value& object) {
+    FitStep step;
+    const auto id = stringMember(object, "id");
+    const auto kind = stringMember(object, "kind");
+    const auto line = intMember(object, "line");
+    const auto description = stringMember(object, "description");
+    const auto score = intMember(object, "score");
+    const auto grade = stringMember(object, "grade");
+    if (!id || !kind || !line || !description || !score || !grade)
+        return std::nullopt;
+    return FitStep{*id, *kind, *line, *description, *score, *grade};
+}
+
+} // namespace
+
+std::expected<Fitted, std::string> interpretFit(int exitCode, std::string_view stdOut,
+                                                std::string_view stdErr) {
+    if (exitCode != 0)
+        return std::unexpected(failure("shrink --apply", exitCode, stdErr));
+    const auto parsed = json::parse(stdOut);
+    if (!parsed)
+        return badOutput(parsed.error());
+    const json::Value& root = *parsed;
+    Fitted fitted;
+    const json::Value* fits = root.find("fits");
+    const auto stopped = stringMember(root, "stopped");
+    if (!fits || !fits->asBool() || !stopped)
+        return badOutput("no fits or stopped");
+    fitted.fits = *fits->asBool();
+    fitted.stopped = *stopped;
+    if (fitted.stopped != "fits" && fitted.stopped != "nothing_left" &&
+        fitted.stopped != "last_resort")
+        return badOutput("stopped: " + fitted.stopped);
+    if (const json::Value* last = root.find("last_resort"); last && !last->isNull()) {
+        auto step = readFitStep(*last);
+        if (!step)
+            return badOutput("a malformed last_resort");
+        fitted.lastResort = std::move(*step);
+    }
+    const json::Value* steps = root.find("steps");
+    if (!steps || !steps->asArray())
+        return badOutput("no steps");
+    for (const json::Value& value : *steps->asArray()) {
+        auto step = readFitStep(value);
+        if (!step)
+            return badOutput("a malformed step");
+        fitted.steps.push_back(std::move(*step));
+    }
+    if (const json::Value* measured = root.find("measured"); measured && !measured->isNull()) {
+        for (const auto& [paper, target] : {std::pair{"a4", &fitted.a4}, {"a5", &fitted.a5}}) {
+            if (const json::Value* value = measured->find(paper)) {
+                auto m = readMeasured(*value);
+                if (!m)
+                    return badOutput(std::string("a malformed measurement of ") + paper);
+                *target = std::move(*m);
+            }
+        }
+    }
+    return fitted;
+}
+
 std::expected<std::string, std::string> interpretApply(int exitCode, std::string_view stdOut,
                                                        std::string_view stdErr) {
     if (exitCode != 0)

@@ -76,7 +76,8 @@ QString ShrinkDialog::summary(const zub::songsuggest::Suggestions& suggestions) 
 
 ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
                            const std::string& songText, const QString& title,
-                           const QString& heading, QWidget* parent, bool canDismiss)
+                           const QString& heading, QWidget* parent, bool canDismiss,
+                           bool canFitAll)
     : QDialog(parent), suggestions_(suggestions), songText_(songText) {
     setWindowTitle(title);
     resize(1180, 600);
@@ -133,6 +134,17 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
                                 "line so Check Song leaves them out"));
         connect(dismiss_, &QPushButton::clicked, this, [this] {
             dismissed_ = true;
+            accept();
+        });
+    }
+    if (canFitAll) {
+        auto* fitAll = buttons->addButton(tr("Apply Until It Fits"), QDialogButtonBox::ActionRole);
+        fitAll->setToolTip(
+            tr("Let chords_converter take these changes itself, the most readable first, "
+               "typesetting the song after each, until it fits (one undo step; a song it cannot "
+               "fit stays as it is; it asks before a last resort). A few seconds a change."));
+        connect(fitAll, &QPushButton::clicked, this, [this] {
+            untilItFits_ = true;
             accept();
         });
     }

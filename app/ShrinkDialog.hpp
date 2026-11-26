@@ -25,11 +25,15 @@ public:
     // Mark as Correct button.
     ShrinkDialog(const zub::songsuggest::Suggestions& suggestions, const std::string& songText,
                  const QString& title, const QString& heading, QWidget* parent = nullptr,
-                 bool canDismiss = false);
+                 bool canDismiss = false, bool canFitAll = false);
 
     // True when the dialog was closed with Mark as Correct (only offered with `canDismiss`, for
     // Check Song): the caller adds the selected proposals' dismiss edits instead of applying them.
     bool dismissed() const { return dismissed_; }
+    // True when the dialog was closed with Apply Until It Fits (only offered with `canFitAll`, for
+    // Make Smaller): the caller lets the converter take the proposals one by one until the song
+    // fits, instead of applying the selected ones.
+    bool untilItFits() const { return untilItFits_; }
 
     // The selected proposals in list order (Ctrl/Shift+click picks several); valid after the
     // dialog was accepted, never empty then.
@@ -51,6 +55,7 @@ private:
     QPushButton* apply_ = nullptr;
     QPushButton* dismiss_ = nullptr;
     bool dismissed_ = false;
+    bool untilItFits_ = false;
 
     std::vector<int> selectedRows() const; // sorted
     // The sketch of the song with all selected proposals made; Apply only when they fit together.
