@@ -32,6 +32,14 @@ fi
 work=$(mktemp -d)
 appdir=$work/AppDir
 DESTDIR=$appdir cmake --install "$build" --prefix /usr
+# The build skips the converter without cargo and the package without its submodule: a release
+# must have both.
+for file in usr/bin/chords_converter usr/share/zpevnikar/zubuvzpevnik/zubuvzpevnik.sty; do
+    if [ ! -f "$appdir/$file" ]; then
+        echo "$file is missing: the build had no cargo or no submodules" >&2
+        exit 1
+    fi
+done
 
 # Wayland as well as X11 (the plugin names differ between Qt versions), and offscreen for
 # running it headless (the release workflow's start check).

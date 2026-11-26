@@ -1922,15 +1922,18 @@ QString MainWindow::noPackageText() const {
 }
 
 std::filesystem::path MainWindow::bundledPackage() const {
-    // Installed next to the app by cmake --install (share/zpevnikar/zubuvzpevnik), else the
-    // external/zubuvzpevnik-package submodule of the source tree the app was built from.
-    const QStringList candidates{
-        QDir(QApplication::applicationDirPath())
-            .filePath(QStringLiteral("../share/zpevnikar/zubuvzpevnik")),
+    // Installed next to the app by cmake --install (share/zpevnikar/zubuvzpevnik), else, for a
+    // program run from its build dir (the app, the tests), the external/zubuvzpevnik-package
+    // submodule of the source tree it was built from. Never for an installed copy: on another
+    // machine anyone could create the build machine's path (D:/a/... on Windows) and put code
+    // there that builds run under -shell-escape.
+    const QString appDir = QApplication::applicationDirPath();
+    QStringList candidates{QDir(appDir).filePath(QStringLiteral("../share/zpevnikar/zubuvzpevnik"))};
 #ifdef ZUB_BUNDLED_PACKAGE_DIR
-        QStringLiteral(ZUB_BUNDLED_PACKAGE_DIR),
+    const QString fromBuild = QDir(QStringLiteral(ZUB_BUILD_DIR)).relativeFilePath(appDir);
+    if (QDir::isRelativePath(fromBuild) && !fromBuild.startsWith(QLatin1String("..")))
+        candidates << QStringLiteral(ZUB_BUNDLED_PACKAGE_DIR);
 #endif
-    };
     for (const QString& candidate : candidates) {
         const auto path = toPath(QDir::cleanPath(candidate));
         if (zub::package::isPackage(path))

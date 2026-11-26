@@ -26,6 +26,13 @@ $app = Join-Path $stage 'Zpevnikar'
 cmake --install $Build --prefix $app
 if ($LASTEXITCODE) { throw 'cmake --install failed' }
 $bin = Join-Path $app 'bin'
+# The build skips the converter without cargo and the package without its submodule: a release
+# must have both.
+foreach ($file in 'bin/chords_converter.exe', 'share/zpevnikar/zubuvzpevnik/zubuvzpevnik.sty') {
+    if (-not (Test-Path (Join-Path $app $file))) {
+        throw "$file is missing: the build had no cargo or no submodules"
+    }
+}
 Copy-Item (Join-Path $Kf6 'bin/KF6SyntaxHighlighting.dll') $bin
 windeployqt --release --compiler-runtime --no-system-d3d-compiler `
     (Join-Path $bin 'zpevnikar.exe') (Join-Path $bin 'KF6SyntaxHighlighting.dll')

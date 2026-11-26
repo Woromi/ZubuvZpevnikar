@@ -31,8 +31,10 @@ int main(int argc, char** argv) {
     bool wantsTools = false;
     for (int i = 1; i < argc; ++i)
         wantsTools = wantsTools || QByteArray(argv[i]).contains("tools");
-    if (!wantsTools)
+    if (!wantsTools) {
         qputenv("PATH", "/nonexistent");
+        qunsetenv("ZUB_CONVERTER"); // a developer's converter build, found without PATH
+    }
 
     // Silent: playback and fret sounds go to a sound server that does not exist (Qt Multimedia
     // talks to PulseAudio/PipeWire), never to the speakers. ZUB_TEST_SOUND=1 lets them be heard.

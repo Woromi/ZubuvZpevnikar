@@ -128,7 +128,10 @@ endif()
 # without the submodule checked out.
 set(zub_package_dir ${PROJECT_SOURCE_DIR}/external/zubuvzpevnik-package)
 if(EXISTS ${zub_package_dir}/zubuvzpevnik.sty)
-    target_compile_definitions(zpevnikar_app PRIVATE ZUB_BUNDLED_PACKAGE_DIR="${zub_package_dir}")
+    # Only for programs run from this build dir (MainWindow::bundledPackage): an installed copy
+    # never looks for the build machine's source tree.
+    target_compile_definitions(zpevnikar_app PRIVATE
+        ZUB_BUNDLED_PACKAGE_DIR="${zub_package_dir}" ZUB_BUILD_DIR="${CMAKE_BINARY_DIR}")
 else()
     message(STATUS "zubuvzpevnik-package: submodule not checked out "
                    "(git submodule update --init), the app gets no copy of the package")
@@ -201,7 +204,7 @@ if(ZUB_BUILD_CONVERTER)
         set(converter_target_dir ${CMAKE_BINARY_DIR}/chords_converter)
         # Always runs: cargo decides what is out of date (a no-op build takes well under a second).
         add_custom_target(chords_converter ALL
-            COMMAND ${ZUB_CARGO} build --release --quiet
+            COMMAND ${ZUB_CARGO} build --release --quiet --locked
                     --manifest-path ${converter_dir}/Cargo.toml
                     --target-dir ${converter_target_dir}
             COMMAND ${CMAKE_COMMAND} -E copy_if_different

@@ -9,8 +9,10 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# Read only; the release job alone may write (the release). The actions are pinned to commits
+# and linuxdeploy to checksums: a build that publishes runs nothing that changed unseen.
 permissions:
-  contents: write # the release
+  contents: read
 
 env:
   QT_VERSION: 6.8.3
@@ -22,9 +24,10 @@ jobs:
     # Fedora 40 and later.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           submodules: recursive # the converter and the package
+          persist-credentials: false
       - name: The tag is the app's version
         if: startsWith(github.ref, 'refs/tags/')
         run: |
@@ -39,7 +42,7 @@ jobs:
           sudo apt-get install -y ninja-build perl libgl1-mesa-dev libegl1 libxkbcommon-dev \
             libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libwayland-cursor0
-      - uses: jurplel/install-qt-action@v4
+      - uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         with:
           version: ${{ env.QT_VERSION }}
           modules: qtmultimedia qtpdf
@@ -51,15 +54,27 @@ jobs:
           qt-version: ${{ env.QT_VERSION }}
       - name: Build
         run: |
-          cmake --preset release -DZUB_BUILD_TESTS=OFF -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/kf6"
+          cmake --preset release -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/kf6"
           cmake --build --preset release
+      - name: Test
+        run: |
+          export LD_LIBRARY_PATH="$RUNNER_TEMP/kf6/lib:${LD_LIBRARY_PATH:-}"
+          ctest --preset release
       - name: AppImage
         run: |
           tools=$(mktemp -d)
+          # linuxdeploy has no stable releases, only "continuous" builds: these checksums are of
+          # the builds this workflow was last tried with (2026-11-26). When upstream rebuilds
+          # them, the check fails: try the new builds (Run workflow) and update the checksums.
           for tool in linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage \
                       linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage; do
             curl -sSfL -o "$tools/$(basename "$tool")" "https://github.com/linuxdeploy/$tool"
           done
+          (cd "$tools" && sha256sum -c - <<'EOF'
+          df908b19f1ed1cdafa79508d415aa12d6c56ce4d56d4149aa8c09286718706e5  linuxdeploy-x86_64.AppImage
+          cfc1055b2b9dbc08412b579f20990b7b41a17b61beaa5847dc9477c96c9e9617  linuxdeploy-plugin-qt-x86_64.AppImage
+          EOF
+          )
           chmod +x "$tools"/*.AppImage
           export APPIMAGE_EXTRACT_AND_RUN=1 # no FUSE on the runner
           export PATH="$tools:$PATH" LINUXDEPLOY="$tools/linuxdeploy-x86_64.AppImage"
@@ -74,7 +89,7 @@ jobs:
           set -e
           echo "exit status: $status"
           test "$status" -eq 124 # still running when the timeout stopped it
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: appimage
           path: dist/*.AppImage
@@ -86,16 +101,17 @@ jobs:
       run:
         shell: pwsh # not Git Bash: cargo would take Git's Unix link for MSVC's
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           submodules: recursive
+          persist-credentials: false
       - uses: ./.github/actions/msvc-env
       - name: Ninja and Inno Setup
         run: |
           choco install ninja --no-progress -y
           # zpevnikar.iss needs Inno Setup 6.3 or newer (x64compatible): installs or updates it.
           choco upgrade innosetup --no-progress -y
-      - uses: jurplel/install-qt-action@v4
+      - uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
         with:
           version: ${{ env.QT_VERSION }}
           arch: win64_msvc2022_64
@@ -108,11 +124,15 @@ jobs:
           qt-version: ${{ env.QT_VERSION }}
       - name: Build
         run: |
-          cmake --preset release -DZUB_BUILD_TESTS=OFF -DCMAKE_PREFIX_PATH="$env:RUNNER_TEMP/kf6"
+          cmake --preset release -DCMAKE_PREFIX_PATH="$env:RUNNER_TEMP/kf6"
           cmake --build --preset release
+      - name: Test
+        run: |
+          $env:PATH = "$env:RUNNER_TEMP\kf6\bin;$env:PATH"
+          ctest --preset release
       - name: Zip and installer
         run: packaging/windows/package.ps1 -Build build/release -Kf6 "$env:RUNNER_TEMP/kf6" -Out dist
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: windows
           path: dist/*
@@ -122,13 +142,15 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: [appimage, windows]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # creates the release
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           path: dist
           merge-multiple: true
       - name: GitHub release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: dist/*
           generate_release_notes: true
