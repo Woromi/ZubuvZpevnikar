@@ -1,5 +1,7 @@
 #include "ExternalTools.hpp"
 
+#include "ProcessTree.hpp"
+
 #include <QDir>
 #include <QFileInfo>
 #include <QProcess>
@@ -28,10 +30,11 @@ QString gitBash(const QString& gitRoot) {
 // Runs as Python 3 (the Microsoft Store stubs in WindowsApps do not: they offer the Store).
 bool isPython3(const QString& program, const QStringList& leading) {
     QProcess probe;
+    processtree::prepare(&probe);
     probe.start(program, leading + QStringList{QStringLiteral("-c"),
                                                QStringLiteral("import sys; sys.exit(sys.version_info[0] != 3)")});
     if (!probe.waitForFinished(5000)) {
-        probe.kill();
+        processtree::kill(&probe);
         probe.waitForFinished(1000);
         return false;
     }

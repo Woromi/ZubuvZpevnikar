@@ -61,6 +61,11 @@ TEST_CASE("processtree: kill ends the program and what it started", "[app][proce
                   {QStringLiteral("-c"), QStringLiteral("/bin/sleep 60 & echo $!; wait")}); // PATH is empty here
 #endif
     REQUIRE(process.waitForStarted(10000));
+#ifdef Q_OS_WIN
+    // Created inside its job (not put in after it started: a child it starts at once would
+    // escape).
+    CHECK(processtree::createdInJob(&process));
+#endif
     REQUIRE(apptest::waitUntil([&] { return process.canReadLine(); }, 20000));
     const qint64 child = QString::fromLatin1(process.readLine()).trimmed().toLongLong();
     REQUIRE(child > 0);

@@ -217,6 +217,11 @@ void LibraryDialog::startGit(const QStringList& arguments, const QString& workin
     environment.insert(QStringLiteral("GIT_TERMINAL_PROMPT"),
                        QStringLiteral("0")); // no password prompt
     environment.insert(QStringLiteral("LC_ALL"), QStringLiteral("C"));
+    // Started from a git hook or a shell with these set, git init and clone would work on another
+    // repository than the chosen folder.
+    for (const char* name : {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
+                             "GIT_OBJECT_DIRECTORY"})
+        environment.remove(QString::fromLatin1(name));
     // ssh must not wait for a passphrase or a host key answer nobody sees.
     if (!environment.contains(QStringLiteral("GIT_SSH_COMMAND")))
         environment.insert(QStringLiteral("GIT_SSH_COMMAND"), QStringLiteral("ssh -o BatchMode=yes"));

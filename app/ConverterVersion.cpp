@@ -1,5 +1,6 @@
 #include "ConverterVersion.hpp"
 
+#include "ProcessTree.hpp"
 #include "convert.hpp"
 
 #include <QCoreApplication>
@@ -8,6 +9,7 @@
 #include <QFileInfo>
 #include <QProcess>
 #include <map>
+#include <mutex>
 #include <utility>
 
 namespace {
@@ -25,11 +27,12 @@ ConverterVersionResult askVersion(const QString& path) {
     process.setArguments({QStringLiteral("--version")});
     process.setWorkingDirectory(QDir::tempPath());
     process.setProcessChannelMode(QProcess::SeparateChannels);
+    processtree::prepare(&process);
     process.start();
     if (!process.waitForStarted(2000))
         return {State::NoAnswer, std::nullopt, process.error() == QProcess::FailedToStart};
     if (!process.waitForFinished(2000)) {
-        process.kill();
+        processtree::kill(&process);
         process.waitForFinished(1000);
         return {State::NoAnswer, std::nullopt, false};
     }
@@ -44,6 +47,10 @@ ConverterVersionResult askVersion(const QString& path) {
 } // namespace
 
 ConverterVersionResult converterVersion(const std::filesystem::path& converter) {
+    // Also called on a worker thread (MainWindow asks once at start, so the window does not wait
+    // later); a second caller waits for the first one's answer.
+    static std::mutex mutex;
+    const std::scoped_lock lock(mutex);
     static std::map<std::filesystem::path, CacheEntry> cache;
     const QString path = toQString(converter);
     const QFileInfo info(path);

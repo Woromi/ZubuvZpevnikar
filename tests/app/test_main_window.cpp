@@ -397,14 +397,23 @@ TEST_CASE("Build files: kept scores stay while builds use them; unused ones go a
     for (const char* name : {"repo-old", "repo-new", "repo-busy"})
         apptest::writeFile(books / name / "book.tex", "x");
     apptest::writeFile(cache / "preview-1234/preview.tex", "x");
+    apptest::writeFile(cache / "score-1234/score.ly", "x");
+    // This instance's own (a second instance's names), however old: never.
+    const std::string pid = std::to_string(QCoreApplication::applicationPid());
+    apptest::writeFile(cache / ("preview-" + pid) / "preview.tex", "x");
+    apptest::writeFile(cache / ("score-" + pid) / "score.ly", "x");
     for (const fs::path& dir :
-         {books / "repo-old", books / "repo-busy", cache / "preview-1234", cache / "preview"})
+         {books / "repo-old", books / "repo-busy", cache / "preview-1234", cache / "preview",
+          cache / "score-1234", cache / ("preview-" + pid), cache / ("score-" + pid)})
         age(dir);
     buildfiles::pruneWorkDirs(QString::fromStdString((books / "repo-busy").string()));
     CHECK_FALSE(fs::exists(books / "repo-old"));
     CHECK(fs::exists(books / "repo-new"));
     CHECK(fs::exists(books / "repo-busy"));
     CHECK_FALSE(fs::exists(cache / "preview-1234"));
+    CHECK_FALSE(fs::exists(cache / "score-1234"));
+    CHECK(fs::exists(cache / ("preview-" + pid)));
+    CHECK(fs::exists(cache / ("score-" + pid)));
     CHECK(fs::exists(cache / "preview")); // this instance's own
 }
 

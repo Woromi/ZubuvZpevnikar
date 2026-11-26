@@ -1,5 +1,6 @@
 #include "BuildFiles.hpp"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
@@ -67,7 +68,8 @@ bool remove(const QString& dir) {
                          parent.startsWith(canonicalCache + QLatin1Char('/')));
     const bool book = !books.isEmpty() && info.fileName().startsWith(QStringLiteral("repo-")) &&
                       QFileInfo(info.absolutePath()).canonicalFilePath() == books;
-    const bool otherPreview = info.fileName().startsWith(QStringLiteral("preview-")) &&
+    const bool otherPreview = (info.fileName().startsWith(QStringLiteral("preview-")) ||
+                               info.fileName().startsWith(QStringLiteral("score-"))) &&
                               parent == canonicalCache;
     if (!scores && !book && !otherPreview)
         return false;
@@ -106,11 +108,15 @@ void keepUsed(const QString& scoresDir, const std::string& log) {
 void pruneWorkDirs(const QString& inUse) {
     const auto oldest = fs::file_time_type::clock::now() - unusedFor;
     const QString keep = inUse.isEmpty() ? QString() : QFileInfo(inUse).canonicalFilePath();
+    // This instance's own work dirs stay whatever their age (a pid of an old run reused).
+    const QString ownPid = QString::number(QCoreApplication::applicationPid());
     const auto prune = [&](const QString& folder, const QString& pattern) {
         const QDir dir(folder);
         for (const QString& name : dir.entryList({pattern}, QDir::Dirs | QDir::NoDotAndDotDot)) {
             const QString path = dir.filePath(name);
             if (!keep.isEmpty() && QFileInfo(path).canonicalFilePath() == keep)
+                continue;
+            if (name.section(QLatin1Char('-'), 1) == ownPid)
                 continue;
             // A build rewrites files in it, which changes the folder's own time.
             std::error_code ec;
@@ -121,6 +127,7 @@ void pruneWorkDirs(const QString& inUse) {
     };
     prune(songbooksDir(), QStringLiteral("repo-*"));
     prune(cacheDir(), QStringLiteral("preview-*"));
+    prune(cacheDir(), QStringLiteral("score-*")); // a second instance's score previews
 }
 
 } // namespace buildfiles

@@ -1,5 +1,7 @@
 #include "SongDatesRunner.hpp"
 
+#include "ProcessTree.hpp"
+
 #include "convert.hpp"
 
 #include <QFileInfo>
@@ -14,7 +16,7 @@ SongDatesRunner::~SongDatesRunner() {
     // Killed processes still exiting: a QProcess must not be destroyed while it runs.
     for (QProcess* process : findChildren<QProcess*>(Qt::FindDirectChildrenOnly)) {
         if (process->state() != QProcess::NotRunning) {
-            process->kill();
+            processtree::kill(process);
             process->waitForFinished(1000);
         }
     }
@@ -27,7 +29,7 @@ void SongDatesRunner::release() {
     process_ = nullptr;
     process->disconnect(this);
     if (process->state() != QProcess::NotRunning)
-        process->kill();
+        processtree::kill(process);
     // Deleted once it is gone (a process still starting or exiting must not be destroyed).
     if (process->state() == QProcess::NotRunning) {
         process->deleteLater();
@@ -71,6 +73,7 @@ void SongDatesRunner::run(Stage stage) {
     QStringList arguments;
     for (const auto& argument : command.arguments)
         arguments << toQString(argument);
+    processtree::prepare(process);
     process->start(toQString(command.program), arguments);
 }
 

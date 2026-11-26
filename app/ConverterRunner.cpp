@@ -152,8 +152,9 @@ bool ConverterRunner::start(const CommandFactory& makeCommand, const std::string
         // Other errors (crash, kill) are followed by finished(); FailedToStart is not.
         if (error != QProcess::FailedToStart)
             return;
-        const QString message = tr("Cannot run chords_converter: %1").arg(process_->errorString());
-        finish(std::unexpected(message));
+        // Through the event loop: on Windows QProcess reports it inside start(), and a slot of
+        // finished() may start the next run (Check Songs would recurse once per song).
+        failLater(tr("Cannot run chords_converter: %1").arg(process_->errorString()));
     });
     watchdog_->start();
     process_->start(toQString(command.program), arguments);

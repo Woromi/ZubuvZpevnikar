@@ -48,8 +48,10 @@ const QString exportDirKey = QStringLiteral("songbooks/exportDir");
 // Stops the build and what it started (lualatex, lilypond): the build leads its own process
 // group on Unix; SIGTERM to the group, up to 500 ms, then SIGKILL to what is left of it. Waits for the process to exit.
 void killTree(QProcess* process) {
-    if (process->state() == QProcess::NotRunning)
+    if (process->state() == QProcess::NotRunning) {
+        processtree::kill(process); // bash has exited; what it started may not have
         return;
+    }
     processtree::terminate(process);
     const bool exited = process->waitForFinished(500);
     // The rest of the tree (lilypond, gs) must not outlive bash: the work dir may be deleted as

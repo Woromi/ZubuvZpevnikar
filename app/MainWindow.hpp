@@ -7,6 +7,8 @@
 
 #include <QByteArray>
 #include <QMainWindow>
+#include <atomic>
+#include <memory>
 #include <QPoint>
 #include <QPointer>
 #include <QString>
@@ -14,7 +16,6 @@
 #include <filesystem>
 #include <functional>
 #include <map>
-#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -227,6 +228,8 @@ private:
     HomePage* homePage_ = nullptr;           // Home: the start page (the welcome panel without a songbook)
     QTimer* homeTimer_ = nullptr;
     BookAdder* bookAdder_ = nullptr;         // Add to Songbooks…
+    // Set when the window goes: the startup task skips its later probes.
+    std::shared_ptr<std::atomic<bool>> windowGone_ = std::make_shared<std::atomic<bool>>(false);
     QString takenOutMessage_; // the removals of an Apply, shown with its additions
     QAction* addToBooksAction_ = nullptr;    // the song toolbar's Add to Songbooks…
     bool closing_ = false;                   // the window is closing: no more dialogs

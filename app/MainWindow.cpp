@@ -29,6 +29,8 @@
 #include "HomePage.hpp"
 #include "WelcomePage.hpp"
 #include "SoundTools.hpp"
+#include "ConverterVersion.hpp"
+#include "ExternalTools.hpp"
 #include "convert.hpp"
 
 #include <KSyntaxHighlighting/Repository>
@@ -74,6 +76,7 @@
 #include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QThreadPool>
 #include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
@@ -160,6 +163,15 @@ MainWindow::MainWindow(QWidget* parent)
     const QSettings settings;
     restoreGeometry(settings.value(geometryKey).toByteArray());
     songSplitter_->restoreState(settings.value(songSplitterKey).toByteArray());
+
+    // The first answers of `chords_converter --version` and (on Windows) of the Python probes
+    // take seconds; asked now on a worker thread, Import and Check Songs find them ready.
+    // Quitting meanwhile skips what has not begun (the app waits for the task at exit).
+    QThreadPool::globalInstance()->start([converter = findConverter(), windowGone = windowGone_] {
+        (void)externaltools::python();
+        if (!converter.empty() && !windowGone->load())
+            (void)converterVersion(converter);
+    });
 }
 
 KSyntaxHighlighting::Repository& MainWindow::sharedRepository() {
@@ -172,6 +184,7 @@ KSyntaxHighlighting::Repository& MainWindow::sharedRepository() {
 }
 
 MainWindow::~MainWindow() {
+    windowGone_->store(true);
     songActions_->shutdown();
     // Members are destroyed before QWidget deletes the children, so without this the editors
     // (and its highlighter) would outlive repository_. Disconnect first: no signal may reach

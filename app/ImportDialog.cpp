@@ -1,6 +1,7 @@
 #include "ImportDialog.hpp"
 
 #include "ConverterVersion.hpp"
+#include "ProcessTree.hpp"
 #include "convert.hpp"
 
 #include <QCheckBox>
@@ -130,7 +131,7 @@ ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::pat
     watchdog_->setInterval(watchdogSeconds * 1000);
     connect(watchdog_, &QTimer::timeout, this, [this] {
         timedOut_ = true;
-        process_->kill();
+        processtree::kill(process_);
     });
 
     connect(process_, &QProcess::readyReadStandardOutput, this,
@@ -162,7 +163,7 @@ ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::pat
 ImportDialog::~ImportDialog() {
     if (process_ && process_->state() != QProcess::NotRunning) {
         process_->blockSignals(true);
-        process_->kill();
+        processtree::kill(process_);
         process_->waitForFinished(2000);
     }
 }
@@ -288,6 +289,7 @@ void ImportDialog::startImport() {
 
     setRunning(true);
     watchdog_->start();
+    processtree::prepare(process_);
     process_->start();
 }
 
@@ -360,7 +362,7 @@ void ImportDialog::reject() {
     if (running_ || process_->state() != QProcess::NotRunning) {
         cancelled_ = true;
         watchdog_->stop();
-        process_->kill();
+        processtree::kill(process_);
         process_->waitForFinished(2000);
         setRunning(false);
         status_->setStyleSheet({});
