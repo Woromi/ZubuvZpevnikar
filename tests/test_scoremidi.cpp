@@ -326,7 +326,7 @@ TEST_CASE("markBends finds a slide's target past \\unHideNotes and a grace's bra
     CHECK(marked.find("\"bird tweet\" e'4") != std::string::npos); // slides in
     // A grace note that slides on is no bend target (no bend marker before it).
     for (const std::string text : {"f4\\4 \\hideNotes\\grace g4\\3\\glissando\\unHideNotes e'4\\3",
-                                    "g'4\\2 \\grace g'\\2 \\glissando a'8\\2"}) {
+                                   "g'4\\2 \\grace g'\\2 \\glissando a'8\\2"}) {
         const std::string out = sc::markBends(text);
         INFO(out);
         CHECK(out.find("gunshot") == std::string::npos);
@@ -340,6 +340,19 @@ TEST_CASE("markBends finds a slide's target past \\unHideNotes and a grace's bra
     CHECK(sc::markBends("c4\\3 \\glissando e4\\3").find("seashore") != std::string::npos);
     // Still nothing before a rest after the brace.
     CHECK(sc::markBends("\\grace { g\\3 \\glissando } r4").find("seashore") == std::string::npos);
+}
+
+TEST_CASE("markBends puts a chord's slide before the next event, never inside the chord",
+          "[score][midi]") {
+    // Inside `< >` a \set is no music: LilyPond failed with "not a rhythmic event".
+    const auto marker = std::string("\\once \\set Staff.midiInstrument = \"seashore\" ");
+    CHECK(sc::markBends("<c'\\glissando e'>4 <d' f'>4") ==
+          "<c'\\glissando e'>4 " + marker + "<d' f'>4");
+    // Two notes sliding: one marker.
+    CHECK(sc::markBends("<c'\\glissando e'\\glissando>4( | g'4)") ==
+          "<c'\\glissando e'\\glissando>4( | " + marker + "g'4)");
+    // A rest after the chord: no target.
+    CHECK(sc::markBends("<c'\\glissando e'>4 r4") == "<c'\\glissando e'>4 r4");
 }
 
 TEST_CASE("markBends leaves comments, strings, Scheme, rests and a plain \\grace shape alone",
@@ -455,8 +468,7 @@ TEST_CASE("every real score builds an SVG and a MIDI file", "[.integration][scor
                 int markers = 0;
                 for (const auto& e : raw[t]) {
                     before += e.noteOn() ? 1 : 0;
-                    markers +=
-                        e.status == 0xc0 && e.d1 >= 122 && e.d1 <= 127 ? 1 : 0;
+                    markers += e.status == 0xc0 && e.d1 >= 122 && e.d1 <= 127 ? 1 : 0;
                 }
                 for (const auto& e : after[t]) {
                     now += e.noteOn() ? 1 : 0;

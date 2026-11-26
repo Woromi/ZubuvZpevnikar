@@ -355,8 +355,8 @@ TEST_CASE("every note of every real score has a valid position", "[.integration]
         }
     }
     CAPTURE(cursors, unplayable, unplayableWholeScore, staffCount);
-    WARN("unplayable cursors: whole-score tuning "
-                  << unplayableWholeScore << ", per staff " << unplayable << " of " << cursors);
+    WARN("unplayable cursors: whole-score tuning " << unplayableWholeScore << ", per staff "
+                                                   << unplayable << " of " << cursors);
     CHECK(unplayable <= unplayableWholeScore);
     CHECK(unplayable * 100 < cursors * 4);
     CHECK(scores > 0);
@@ -421,6 +421,15 @@ TEST_CASE("fretboard addToChord keeps prefix functions and ! ? on their pitch", 
           "a <\\deadNote c\\3 f\\4>4^\\strokeUp r");
     CHECK(fb::addToChord("c!4\\3", 5, "f\\4").text == "<c!\\3 f\\4>4");
     CHECK(fb::addToChord("c?\\3(", 5, "f\\4").text == "<c?\\3 f\\4>(");
+    // Functions of the whole chord stay before the `<` (inside it LilyPond fails).
+    CHECK(fb::addToChord("\\grace g8\\3", 11, "b\\1").text == "\\grace <g\\3 b\\1>8");
+    const std::string colored = "\\once \\override NoteHead.color = #red g8\\3";
+    CHECK(fb::addToChord(colored, colored.size(), "b\\1").text ==
+          "\\once \\override NoteHead.color = #red <g\\3 b\\1>8");
+    // Mixed: the note's own functions after the chord's.
+    const std::string mixed = "\\grace \\tweak color #red \\deadNote g8\\3";
+    CHECK(fb::addToChord(mixed, mixed.size(), "b\\1").text ==
+          "\\grace <\\tweak color #red \\deadNote g\\3 b\\1>8");
 }
 
 TEST_CASE("fretboard inCommentOrString", "[fretboard]") {

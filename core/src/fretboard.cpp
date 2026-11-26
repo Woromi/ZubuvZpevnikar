@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -459,6 +460,42 @@ Change insertNote(std::string_view line, std::size_t cursor, std::string_view to
                                  effective);
 }
 
+namespace {
+
+// Where the prefix functions in [prefixBegin, pitch) that may stay on a chord's note begin: the
+// trailing run of `\deadNote`, `\xNote`, `\tweak ...`, `\parenthesize` (`pitch` when none).
+std::size_t innerPrefixBegin(std::string_view line, std::size_t prefixBegin, std::size_t pitch) {
+    const Scanner scanner{line, Names::Any, {}};
+    std::vector<std::pair<std::size_t, std::string_view>> words;
+    for (std::size_t i = prefixBegin; i < pitch;) {
+        const char c = line[i];
+        if (c == '%') {
+            i = scanner.skipComment(i);
+        } else if (c == '"') {
+            i = scanner.skipString(i);
+        } else if (c == '#' || c == '$') {
+            i = scanner.skipScheme(i);
+        } else if (c == '\\') {
+            std::size_t end = i + 1;
+            while (end < pitch && isLetter(line[end]))
+                ++end;
+            words.emplace_back(i, line.substr(i + 1, end - i - 1));
+            i = std::max(end, i + 2);
+        } else {
+            ++i;
+        }
+    }
+    std::size_t begin = pitch;
+    for (const auto& [at, word] : std::views::reverse(words)) {
+        if (word != "deadNote" && word != "xNote" && word != "tweak" && word != "parenthesize")
+            break;
+        begin = at;
+    }
+    return begin;
+}
+
+} // namespace
+
 Change addToChord(std::string_view line, std::size_t cursor, std::string_view token) {
     cursor = std::min(cursor, line.size());
     const auto events = scan(line, Names::Any);
@@ -488,11 +525,14 @@ Change addToChord(std::string_view line, std::size_t cursor, std::string_view to
         text += line.substr(target->closeAt);
         return {std::move(text), after};
     }
-    // A single note: <pitch\N token>duration post-events. Its prefix function (`\deadNote`) and
-    // `!` / `?` stay with its pitch.
-    text.assign(line.substr(0, target->prefixBegin));
+    // A single note: <pitch\N token>duration post-events. The prefix functions that work on a
+    // chord's note (`\deadNote`, `\tweak`, ...) and `!` / `?` stay with its pitch; the others
+    // (`\grace`, `\once \override ...`) are music functions of the whole chord and go before
+    // the `<` (inside it they are a syntax error).
+    const std::size_t inner = innerPrefixBegin(line, target->prefixBegin, target->begin);
+    text.assign(line.substr(0, inner));
     text += '<';
-    text += line.substr(target->prefixBegin, target->pitchEnd - target->prefixBegin);
+    text += line.substr(inner, target->pitchEnd - inner);
     text += line.substr(target->pitchEnd, target->durBegin - target->pitchEnd);
     text += line.substr(target->stringBegin, target->stringEnd - target->stringBegin);
     text += ' ';

@@ -188,7 +188,12 @@ std::expected<Command, std::string> prepare(const Request& request) {
 
     // LilyPond fails with "cannot change directory" if the output directory is missing.
     const auto outDir = work / "out";
+    // Best effort (a player may still have the last MIDI open on Windows), except for the notes
+    // file: the playback logger appends to it, so a leftover would give the timeline old notes.
     fs::remove_all(outDir, ec);
+    ec.clear();
+    if (fs::remove(outDir / playbackNotesName, ec); ec)
+        return std::unexpected(utf8(outDir / playbackNotesName) + ": " + ec.message());
     fs::create_directories(outDir, ec);
     if (ec)
         return std::unexpected(utf8(outDir) + ": " + ec.message());

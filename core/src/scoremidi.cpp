@@ -568,6 +568,12 @@ std::string markBends(std::string_view music) {
     std::vector<std::pair<std::size_t, std::string>> inserts;
     std::size_t preBendEnd = npos;
     std::size_t graceEnd = 0; // the end of the last \grace's music: a slide begun in it slides in
+    // A \glissando inside a chord (`<c'\glissando e'>4 <d' f'>4`) slides the chord: its target is
+    // the event after the chord, never the next note inside it (a \set there is no music).
+    std::vector<std::pair<std::size_t, std::size_t>> chords; // `<` and the chord's postEnd
+    for (const auto& event : zub::fretboard::scan_detail::scan(music, Names::Any))
+        if (event.chord)
+            chords.emplace_back(event.begin, event.postEnd);
     walk(
         music, 0,
         [&](std::size_t begin, std::size_t wordEnd, std::string_view word) {
@@ -614,6 +620,11 @@ std::string markBends(std::string_view music) {
                 // take nothing (a slide from nowhere: \grace { \hideNotes g\3 \glissando
                 // \unHideNotes } e'4\3).
                 std::size_t next = skipSpace(music, wordEnd);
+                for (const auto& [open, end] : chords)
+                    if (open < begin && begin < end) {
+                        next = skipSpace(music, end);
+                        break;
+                    }
                 for (bool moved = true; moved && next < music.size();) {
                     moved = false;
                     if (music[next] == '|' || music[next] == '}') {
@@ -640,7 +651,10 @@ std::string markBends(std::string_view music) {
                     // there to draw the slide); else, also between two notes of one grace, from
                     // one sounding note to the next.
                     const bool slideIn = begin < graceEnd && next >= graceEnd;
-                    inserts.emplace_back(next, marker(slideIn ? "bird tweet" : "seashore"));
+                    // Once per target (several notes of a chord may slide).
+                    if (!std::ranges::contains(inserts, next,
+                                               &std::pair<std::size_t, std::string>::first))
+                        inserts.emplace_back(next, marker(slideIn ? "bird tweet" : "seashore"));
                 }
             }
             return proceed;

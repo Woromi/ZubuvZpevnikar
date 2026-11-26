@@ -319,6 +319,18 @@ TEST_CASE("Timeline: everything that sounds at a time, in all parts", "[scoretim
     CHECK(f.original.substr(timing::cueAt(t, 0.2)->event.begin, 7) == "<e, e>2");
 }
 
+TEST_CASE("Timeline: a lyric or chord name right before the closing brace", "[scoretiming]") {
+    // `la lo}` and `g2:m7}`: the word ends at the brace (removing the space moves nothing that
+    // LilyPond's note list points at).
+    Sing f;
+    f.original = replaceAll(replaceAll(f.original, "la lo }", "la lo}"), "g2:m7 }", "g2:m7}");
+    f.copy = replaceAll(replaceAll(f.copy, "la lo }", "la lo}"), "g2:m7 }", "g2:m7}");
+    const auto result = timing::buildTimeline(f.source());
+    REQUIRE(result);
+    using V = std::vector<std::string>;
+    CHECK(f.soundingTexts(*result, 1.0) == V{"e'2", "f''2", "g'2", "g2:m7", "lo"});
+}
+
 TEST_CASE("Timeline: sounds of the old note list, grace notes and words that do not map",
           "[scoretiming]") {
     // An old list (no kind, no length): a note sounds for the minimum.

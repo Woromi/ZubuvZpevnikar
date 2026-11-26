@@ -67,6 +67,16 @@ TEST_CASE("scoreregion musicEvents reads past quoted values with spaces", "[scor
           std::vector<std::string>{"a4\\3", "\\tweak color \"dark red\" e4\\1", "r2", "q4"});
 }
 
+TEST_CASE("scoreregion musicEvents survives a long run of Scheme quotes", "[scoreregion]") {
+    // `#'''...`: each quote was a recursive call, and a few hundred thousand overflowed the stack
+    // (a score from a downloaded library could crash the app when opened).
+    const std::string text = "{ a4 #" + std::string(1'000'000, '\'') + "x b4 }";
+    std::vector<std::string> events;
+    for (const auto& e : sr::musicEvents(text))
+        events.push_back(text.substr(e.begin, e.end - e.begin));
+    CHECK(events == std::vector<std::string>{"a4", "b4"});
+}
+
 TEST_CASE("scoreregion expandToEvents takes whole tokens", "[scoreregion]") {
     const std::string text = "e4\\1 <d\\4 g\\3>8^\\strokeDown a,16\\5( b,\\5) r8 c'";
     const auto chord = text.find('<');

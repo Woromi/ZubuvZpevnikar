@@ -307,11 +307,12 @@ struct Scanner {
     }
 
     std::size_t skipDatum(std::size_t i) const {
+        // Quote prefixes in a loop, not by recursion: a long run of them would overflow the stack.
+        while (i < s.size() && (s[i] == '\'' || s[i] == '`' || s[i] == ','))
+            ++i;
         if (i >= s.size())
             return i;
         const char c = s[i];
-        if (c == '\'' || c == '`' || c == ',')
-            return skipDatum(i + 1);
         if (c == '"')
             return skipString(i);
         if (c == '(') {

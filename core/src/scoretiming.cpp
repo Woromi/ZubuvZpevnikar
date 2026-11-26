@@ -8,6 +8,8 @@
 #include <zub/core/midi.hpp>
 #include <zub/core/score.hpp>
 
+#include "scorescan.hpp"
+
 namespace fs = std::filesystem;
 
 namespace zub::scoretiming {
@@ -93,7 +95,8 @@ std::vector<std::size_t> occurrences(std::string_view text, std::string_view wor
     for (std::size_t at = text.find(word); at != std::string_view::npos;
          at = text.find(word, at + 1)) {
         const bool startsWord = at == 0 || !isWordChar(text[at - 1]);
-        const bool endsWord = at + word.size() >= text.size() || isSpace(text[at + word.size()]);
+        const bool endsWord = at + word.size() >= text.size() || isSpace(text[at + word.size()]) ||
+                              text[at + word.size()] == '}'; // `la lo}`, as tokenEnd ends it
         if (startsWord && endsWord)
             found.push_back(at);
     }
@@ -190,30 +193,12 @@ std::expected<Timeline, std::string> buildTimeline(const Source& source) {
             return std::unexpected("the playback score is missing");
         // The generated music only: up to the closing brace of \unfoldRepeats { ... } (not the
         // \layout and \midi after it, whose words would count as lyrics or chord names).
-        std::size_t to = std::min(copy.find(ampBook, from), copy.size());
-        {
-            int depth = 1;
-            bool quoted = false;
-            for (std::size_t i = from + music.size(); i < to; ++i) {
-                const char c = copy[i];
-                if (quoted) {
-                    if (c == '\\')
-                        ++i;
-                    else if (c == '"')
-                        quoted = false;
-                } else if (c == '"') {
-                    quoted = true;
-                } else if (c == '%') {
-                    const auto nl = copy.find('\n', i);
-                    i = nl == std::string::npos ? to : nl;
-                } else if (c == '{') {
-                    ++depth;
-                } else if (c == '}' && --depth == 0) {
-                    to = i;
-                    break;
-                }
-            }
-        }
+        // The scanner of the scores skips strings, comments (also %{ ... %} blocks) and Scheme.
+        const std::size_t open = from + music.size() - 2; // the `{`
+        const std::size_t close =
+            fretboard::scan_detail::Scanner{copy, fretboard::scan_detail::Names::Any, {}}
+                .skipBraced(open);
+        const std::size_t to = std::min({close - 1, copy.find(ampBook, from), copy.size()});
         generated = within(scoreregion::musicEvents(copy), from + music.size(), to);
         if (generated.size() != blockEvents.size())
             return std::unexpected("the playback score's notes do not match the score's");
