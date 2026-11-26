@@ -415,6 +415,80 @@ std::string setOption(std::string_view songText, std::string_view key,
     return splice(entries.back().valEnd, entries.back().valEnd, ", " + newOption);
 }
 
+namespace {
+
+// The header's options: the positions of its '[' and ']' (nullopt without a header).
+std::optional<std::pair<std::size_t, std::size_t>> headerBrackets(std::string_view m) {
+    const auto begin = m.find("\\beginsong");
+    if (begin == npos)
+        return std::nullopt;
+    const auto titleOpen = m.find('{', begin);
+    if (titleOpen == npos)
+        return std::nullopt;
+    const auto titleClose = latex::findMatching(m, titleOpen);
+    if (!titleClose)
+        return std::nullopt;
+    const auto open = skipSpaces(m, *titleClose + 1);
+    if (open >= m.size() || m[open] != '[')
+        return std::nullopt;
+    const auto close = latex::findMatching(m, open);
+    if (!close)
+        return std::nullopt;
+    return std::pair{open, *close};
+}
+
+} // namespace
+
+Placeholders addPlaceholders(std::string_view songText, const std::vector<std::string>& keys) {
+    // First as options with a value no header holds, so each finds its place among the others
+    // (setOption does not see comments), then each on a line of its own becomes "% key={},";
+    // one that is not (a one-line header) goes again.
+    constexpr std::string_view marker = "{\x01zub-placeholder\x01}";
+    std::string text(songText);
+    std::vector<std::string> wanted;
+    for (const std::string& key : keys) {
+        if (key.empty() || option(text, key) || std::ranges::find(wanted, key) != wanted.end())
+            continue;
+        const std::string masked = maskComments(text);
+        const auto brackets = headerBrackets(masked);
+        if (!brackets || !placeholderLines(text, brackets->first, brackets->second, key).empty())
+            continue;
+        text = setOption(text, key, marker);
+        wanted.push_back(key);
+    }
+    const auto ownLineAt = [&](const std::string& key) -> std::optional<std::size_t> {
+        const std::string written = key + "=" + std::string(marker);
+        const auto at = text.find(written);
+        if (at == npos)
+            return std::nullopt;
+        const auto ls = text.rfind('\n', at);
+        const auto lineBegin = ls == npos ? 0 : ls + 1;
+        const auto end = at + written.size();
+        const bool own =
+            std::ranges::all_of(text.substr(lineBegin, at - lineBegin),
+                                [](char c) { return c == ' ' || c == '\t'; }) &&
+            text.compare(end, 1, ",") == 0 &&
+            (text.compare(end + 1, 1, "\n") == 0 || text.compare(end + 1, 2, "\r\n") == 0);
+        return own ? std::optional(at) : std::nullopt;
+    };
+    Placeholders result;
+    for (const std::string& key : wanted)
+        if (!ownLineAt(key))
+            text = setOption(text, key, std::nullopt);
+    for (const std::string& key : wanted) {
+        if (const auto at = ownLineAt(key)) {
+            text.replace(*at, key.size() + 1 + marker.size(), "% " + key + "={}");
+            result.added.push_back(key);
+        }
+    }
+    // In the header's order (the first is the topmost).
+    std::ranges::sort(result.added, {}, [&text](const std::string& key) {
+        return text.find("% " + key + "={}");
+    });
+    result.text = std::move(text);
+    return result;
+}
+
 std::optional<std::string> option(std::string_view songText, std::string_view key) {
     const std::string masked = maskComments(songText);
     const std::string_view m = masked;

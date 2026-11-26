@@ -192,6 +192,7 @@ struct AppTestAccess {
         w.songActions_->startMeasure(editor);
     }
     static void startTidy(MainWindow& w) { w.songActions_->startTidy(); }
+    static SongActions* songActions(MainWindow& w) { return w.songActions_; }
     static bool tidyRunning(MainWindow& w) {
         return w.songActions_->runKind_ == SongActions::RunKind::Tidy;
     }

@@ -21,6 +21,18 @@ namespace zub::songheader {
 std::string setOption(std::string_view songText, std::string_view key,
                       std::optional<std::string_view> value, bool dropEmptyHeader = false);
 
+// What addPlaceholders did: the new text and the keys it added, in the header's order.
+struct Placeholders {
+    std::string text;
+    std::vector<std::string> added;
+};
+// `songText` with a commented-out placeholder line "% key={}," (as the converter writes what it
+// does not know) for each of `keys` that the header has neither as an option (even empty) nor as
+// a placeholder, where setOption would add the key. Only in a header with its options on lines of
+// their own (a comment would end a one-line header); the rest stays byte-identical. Writing the
+// key later (setOption) takes the placeholder's place.
+Placeholders addPlaceholders(std::string_view songText, const std::vector<std::string>& keys);
+
 // The value of the last `key` option of the header with its outer braces taken off, raw
 // (not decoded); nullopt if there is none.
 std::optional<std::string> option(std::string_view songText, std::string_view key);

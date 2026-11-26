@@ -907,7 +907,7 @@ void MainWindow::showSong(SongEditor* editor, const QString& title, const QStrin
     connect(edit, &QPlainTextEdit::copyAvailable, this, [this] { updateEditState(); });
 
     showView(ActivityBar::View::Song);
-    songActions_->offerKey(editor); // a key the last Check Songs found for it
+    songActions_->offerFindings(editor); // what the last Check Songs found for it
     scores_->syncScoreTabs();
     updateSongActions(); // after load: the editor may have made itself read-only
     updateWindowTitle();

@@ -73,6 +73,8 @@ signals:
     // A key the open song may be offered (a missing one, or a written one the chords disagree
     // with and that is not confirmed with % nocheck key).
     void keyFound(const QString& path, const zub::songcheck::KeyFinding& finding);
+    // checksongs.py's issues of a song (missing fields to add as placeholders when it is opened).
+    void metadataFound(const QString& path, const std::vector<zub::songcheck::SongIssue>& issues);
     void problem(const QString& message); // a script that failed: for the status bar
     void finished(bool cancelled);
 

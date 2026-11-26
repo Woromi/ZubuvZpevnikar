@@ -153,6 +153,32 @@ TEST_CASE("setOption pap round-trips every real song", "[.integration][songheade
     CHECK(n > 150);
 }
 
+TEST_CASE("addPlaceholders changes no value of any real song", "[.integration][songheader]") {
+    const std::filesystem::path root = std::filesystem::path{ZUB_REAL_SONGBOOK_DIR} / "songs";
+    if (!std::filesystem::is_directory(root))
+        SKIP("no songbook checkout at " << ZUB_REAL_SONGBOOK_DIR);
+    const std::vector<std::string> keys{"by", "lang", "key", "tem", "tun", "met", "src", "cap"};
+    int added = 0;
+    for (const auto& e : std::filesystem::recursive_directory_iterator(root)) {
+        if (e.path().extension() != ".tex")
+            continue;
+        std::ifstream f(e.path(), std::ios::binary);
+        std::stringstream ss;
+        ss << f.rdbuf();
+        const std::string text = ss.str();
+        INFO(e.path().string());
+        const auto r = zub::songheader::addPlaceholders(text, keys);
+        added += static_cast<int>(r.added.size());
+        // Only comment lines were added: every value reads the same.
+        for (const auto& key : keys)
+            CHECK(option(r.text, key) == option(text, key));
+        CHECK(r.text.size() >= text.size());
+        // Adding them again adds nothing.
+        CHECK(zub::songheader::addPlaceholders(r.text, keys).text == r.text);
+    }
+    CHECK(added > 0);
+}
+
 TEST_CASE("a comment ends at a bare CR, as in TeX", "[songheader]") {
     // Before, the comment ran to the LF and swallowed the key.
     CHECK(option(song("\\beginsong{T}[by={A}, % x\rkey={C}]\n"), "key") == "C");
@@ -184,4 +210,31 @@ TEST_CASE("bodyCapos and shiftBodyCapos change every \\capo{n} in code", "[songh
     const std::string none = "\\beginverse\nLa\n\\endverse\n";
     CHECK(bodyCapos(none).empty());
     CHECK(shiftBodyCapos(none, 3) == none);
+}
+
+TEST_CASE("addPlaceholders writes the missing keys as the converter's placeholders",
+          "[songheader]") {
+    using zub::songheader::addPlaceholders;
+    const std::string head = "\\beginsong{T}[\n    by={X},\n    lang={czech},\n    key={G},\n"
+                             "    % src={},\n    pap={a5},\n]\nbody\n\\endsong\n";
+    const auto r = addPlaceholders(head, {"lang", "key", "tem", "tun", "met", "src"});
+    // In the converter's order; present options and an existing placeholder are left alone.
+    CHECK(r.added == std::vector<std::string>{"tun", "tem", "met"});
+    CHECK(r.text == "\\beginsong{T}[\n    by={X},\n    % tun={},\n    % tem={},\n    % met={},\n"
+                    "    lang={czech},\n    key={G},\n    % src={},\n    pap={a5},\n]\nbody\n"
+                    "\\endsong\n");
+    // Again: nothing more to add.
+    CHECK(addPlaceholders(r.text, {"tem", "tun", "met"}).added.empty());
+    // An empty value counts as present (it is there to be filled in).
+    CHECK(addPlaceholders("\\beginsong{T}[\n    by={X},\n    tem={},\n]\n", {"tem"}).added.empty());
+    // CR LF stays.
+    CHECK(addPlaceholders("\\beginsong{T}[\r\n    by={X},\r\n]\r\n", {"tem"}).text ==
+          "\\beginsong{T}[\r\n    by={X},\r\n    % tem={},\r\n]\r\n");
+    // Writing the key later takes the placeholder's place.
+    CHECK(zub::songheader::setOption(r.text, "tem", "{120}").find("    tem={120},\n    % met={}") !=
+          std::string::npos);
+    // A one-line header, or none: a comment would end it, nothing is added.
+    const std::string oneLine = "\\beginsong{T}[by={X}]\n";
+    CHECK(addPlaceholders(oneLine, {"tem"}).text == oneLine);
+    CHECK(addPlaceholders("\\beginsong{T}\n", {"tem"}).added.empty());
 }

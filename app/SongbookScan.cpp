@@ -138,6 +138,7 @@ void SongbookScan::onScriptFinished() {
                 if (!song)
                     continue;
                 ScanFinding& found = scriptFindings_[song->path.lexically_normal().string()];
+                emit metadataFound(toQString(song->path), list);
                 for (const auto& issue : list)
                     found.metadata << (issue.line ? tr("line %1: %2")
                                                         .arg(*issue.line)

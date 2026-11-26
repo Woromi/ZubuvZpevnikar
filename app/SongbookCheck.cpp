@@ -160,7 +160,7 @@ void SongbookCheck::start() {
     options.packageDir = packageDir_;
 
     model_->clearScanResults();
-    actions_->clearKeyFindings();
+    actions_->clearScanFindings();
     found_ = 0;
     scan_ = new SongbookScan(options, std::move(songs), this);
     auto* progress =
@@ -195,8 +195,9 @@ void SongbookCheck::start() {
                                                         : tr("Too big (%1)").arg(finding.pages));
                 if (!finding.keys.isEmpty())
                     summary << tr("Key");
+                // What it is, not just how many (the tooltip lists them all too).
                 if (!finding.metadata.isEmpty())
-                    summary << tr("Metadata %1").arg(finding.metadata.size());
+                    summary << tr("Metadata: %1").arg(finding.metadata.join(QStringLiteral("; ")));
                 if (!finding.errors.isEmpty())
                     summary << tr("Errors %1").arg(finding.errors.size());
                 section(tr("Tidy:"), finding.tidy);
@@ -215,6 +216,10 @@ void SongbookCheck::start() {
             [this](const QString& path, const zub::songcheck::KeyFinding& finding) {
                 actions_->setKeyFinding(toPath(path), finding);
             });
+    connect(scan_, &SongbookScan::metadataFound, this,
+            [this](const QString& path, const std::vector<zub::songcheck::SongIssue>& issues) {
+                actions_->setMetadataFinding(toPath(path), issues);
+            });
     connect(scan_, &SongbookScan::problem, this,
             [this](const QString& message) { emit statusMessage(message, 15000); });
     connect(scan_, &SongbookScan::finished, this, [this, progress](bool cancelled) {
@@ -226,7 +231,7 @@ void SongbookCheck::start() {
         // would hide every song and the list would look empty.
         listPage_->showScanResults(found_ > 0);
         if (SongEditor* editor = hooks_.openSong())
-            actions_->offerKey(editor); // the open song may have a key to offer now
+            actions_->offerFindings(editor); // the open song may have findings now
         emit statusMessage(
             (cancelled ? tr("Check cancelled. ") : QString()) +
                 tr("%n song(s) with possible changes: open one to see them and decide.", nullptr,

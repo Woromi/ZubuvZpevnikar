@@ -19,6 +19,9 @@
 #include <QTimer>
 #include <algorithm>
 #include <memory>
+#include <algorithm>
+#include <ranges>
+#include <string_view>
 #include <zub/core/latex.hpp>
 #include <zub/core/linediff.hpp>
 #include <zub/core/preview.hpp>
@@ -621,6 +624,88 @@ QString SongActions::keyFindingText(const zub::songcheck::KeyFinding& finding,
         .arg(toQString(zub::latex::toDisplayText(stated.value_or(""))), detected);
 }
 
+void SongActions::offerFindings(SongEditor* editor) {
+    addPlaceholders(editor);
+    offerKey(editor);
+    if (!editor->suggestionShown())
+        showMetadataNote(editor);
+}
+
+void SongActions::addPlaceholders(SongEditor* editor) {
+    const auto found = metadataFindings_.find(editor->path());
+    if (found == metadataFindings_.end() || editor->textEdit()->isReadOnly())
+        return;
+    const std::vector<zub::songcheck::SongIssue> issues = std::move(found->second);
+    metadataFindings_.erase(found);
+    // The header's fields checksongs.py misses: "missing recommended: tem, tun", "missing
+    // required key 'by'", "measure bars but no met".
+    std::vector<std::string> fields;
+    const auto addFields = [&fields](std::string_view list) {
+        for (const auto part : std::views::split(list, ',')) {
+            std::string field(part.begin(), part.end());
+            std::erase_if(field, [](char c) { return c == ' ' || c == '\'' || c == '\t'; });
+            if (!field.empty())
+                fields.push_back(field);
+        }
+    };
+    QStringList others;
+    for (const auto& issue : issues) {
+        if (issue.code == "missing-recommended" || issue.code == "missing-required") {
+            const auto colon = issue.message.find(issue.code == "missing-required" ? "key" : ":");
+            if (colon != std::string::npos) {
+                addFields(std::string_view(issue.message).substr(colon + (issue.code == "missing-required" ? 3 : 1)));
+                continue;
+            }
+        } else if (issue.code == "bars-without-meter") {
+            fields.emplace_back("met");
+            continue;
+        }
+        others << (issue.line ? tr("line %1: %2").arg(*issue.line).arg(toQString(issue.message))
+                              : toQString(issue.message));
+    }
+    const std::string content = editor->content();
+    const auto placeholders = zub::songheader::addPlaceholders(content, fields);
+    QStringList notes;
+    if (!placeholders.added.empty()) {
+        QStringList added;
+        for (const auto& field : placeholders.added)
+            added << toQString(field);
+        notes << tr("added the missing %1 to the header as placeholders: fill them in (and remove "
+                    "the %), or Ctrl+Z takes them back.")
+                     .arg(added.join(QStringLiteral(", ")));
+    }
+    QStringList empty;
+    for (const auto& field : fields)
+        if (std::ranges::find(placeholders.added, field) == placeholders.added.end())
+            empty << toQString(field);
+    empty.removeDuplicates();
+    if (!empty.isEmpty())
+        notes << tr("still without a value: %1.").arg(empty.join(QStringLiteral(", ")));
+    notes << others;
+    if (!notes.isEmpty())
+        metadataNotes_[editor->path()] = notes.join(QStringLiteral(" · "));
+    if (placeholders.added.empty())
+        return;
+    emit songTextReplaceRequested(placeholders.text);
+    // The cursor on the first placeholder, ready to fill in.
+    const auto at = placeholders.text.find("% " + placeholders.added.front() + "={}");
+    if (at != std::string::npos)
+        emit lineRequested(
+            static_cast<int>(std::ranges::count(std::string_view(placeholders.text).substr(0, at), '\n')) +
+            1);
+}
+
+void SongActions::showMetadataNote(SongEditor* editor) {
+    const auto note = metadataNotes_.find(editor->path());
+    if (note == metadataNotes_.end())
+        return;
+    const QPointer<SongEditor> guard = editor;
+    editor->showSuggestion(tr("Check Songs, metadata:"), note->second, tr("OK"), [this, guard] {
+        if (guard)
+            metadataNotes_.erase(guard->path());
+    });
+}
+
 void SongActions::offerKey(SongEditor* editor) {
     const auto found = keyFindings_.find(editor->path());
     if (found == keyFindings_.end() || editor->textEdit()->isReadOnly())
@@ -645,6 +730,7 @@ void SongActions::offerKey(SongEditor* editor) {
             zub::songheader::setOption(guard->content(), "key", "{" + wanted + "}"));
         keyFindings_.erase(guard->path());
         showStatus(tr("Key written. Save to keep it."), 8000);
+        showMetadataNote(guard);
     };
     if (finding.kind == "propose") {
         if (zub::songheader::option(content, "key"))
@@ -668,6 +754,7 @@ void SongActions::offerKey(SongEditor* editor) {
                 emit songTextReplaceRequested(*confirmed);
             keyFindings_.erase(guard->path());
             showStatus(tr("The written key is confirmed (% nocheck key). Save to keep it."), 8000);
+            showMetadataNote(guard);
         });
 }
 

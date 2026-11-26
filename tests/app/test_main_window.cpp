@@ -406,3 +406,40 @@ TEST_CASE("Build files: kept scores stay while builds use them; unused ones go a
     CHECK_FALSE(fs::exists(cache / "preview-1234"));
     CHECK(fs::exists(cache / "preview")); // this instance's own
 }
+
+TEST_CASE("Check Songs: opening a song adds its missing fields as placeholders",
+          "[app][scan]") {
+    apptest::Fixture fixture(apptest::Fixture::Extras::Yes);
+    MainWindow w;
+    w.show();
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    const auto path = fixture / "songs/chords/Test/En.tex";
+    const std::string before = slurp(path);
+    // As checksongs.py reports it.
+    A::songActions(w)->setMetadataFinding(
+        path, {{"warn", "missing-recommended", std::nullopt, "missing recommended: tem, tun"},
+               {"warn", "bars-without-meter", std::nullopt,
+                "measure bars but no met: the first bar shows no meter"},
+               {"warn", "gtab-no-fingers", 12, "chord diagram without finger numbers: Am"}});
+    REQUIRE(A::openExistingSong(w, path));
+    SongEditor* ed = A::editor(w);
+    REQUIRE(ed != nullptr);
+    CHECK(ed->content() == "\\beginsong{Test En}[\n    by={Test},\n    % tun={},\n    % tem={},\n"
+                           "    % met={},\n    lang={english},\n    key={Am},\n]\n" +
+                               before.substr(before.find("]\n") + 2));
+    CHECK(ed->textEdit()->textCursor().blockNumber() + 1 == 3); // on the first placeholder
+    REQUIRE(ed->suggestionShown());
+    const QString note = A::suggestionLabel(*ed)->text();
+    INFO(note.toStdString());
+    CHECK(note.contains(QStringLiteral("tun, tem, met")));
+    CHECK(note.contains(QStringLiteral("line 12: chord diagram without finger numbers: Am")));
+    CHECK(slurp(path) == before); // nothing saved
+    ed->textEdit()->undo();       // one undo step
+    CHECK(ed->content() == before);
+    ed->textEdit()->document()->setModified(false);
+
+    // Shown once: opened again, the song stays as it is.
+    REQUIRE(A::closeSong(w));
+    REQUIRE(A::openExistingSong(w, path));
+    CHECK(A::editor(w)->content() == before);
+}

@@ -2517,6 +2517,22 @@ Použijte vestavěný.</translation>
         <translation>Tónina: zapsaná %1, akordy říkají %2.</translation>
     </message>
     <message>
+        <source>added the missing %1 to the header as placeholders: fill them in (and remove the %), or Ctrl+Z takes them back.</source>
+        <translation>chybějící %1 jsou v hlavičce jako zástupné řádky: vyplňte je (a odstraňte %), nebo je Ctrl+Z vrátí.</translation>
+    </message>
+    <message>
+        <source>still without a value: %1.</source>
+        <translation>stále bez hodnoty: %1.</translation>
+    </message>
+    <message>
+        <source>Check Songs, metadata:</source>
+        <translation>Zkontrolovat písně, metadata:</translation>
+    </message>
+    <message>
+        <source>OK</source>
+        <translation>OK</translation>
+    </message>
+    <message>
         <source>Key written. Save to keep it.</source>
         <translation>Tónina zapsána. Uložte, aby zůstala.</translation>
     </message>
@@ -2890,8 +2906,8 @@ Použijte vestavěný.</translation>
         <translation>Tónina</translation>
     </message>
     <message>
-        <source>Metadata %1</source>
-        <translation>Metadata %1</translation>
+        <source>Metadata: %1</source>
+        <translation>Metadata: %1</translation>
     </message>
     <message>
         <source>Errors %1</source>

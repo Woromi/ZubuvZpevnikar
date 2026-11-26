@@ -70,7 +70,21 @@ public:
     void setKeyFinding(const std::filesystem::path& song, const zub::songcheck::KeyFinding& found) {
         keyFindings_[song] = found;
     }
-    void clearKeyFindings() { keyFindings_.clear(); }
+    // checksongs.py's issues Check Songs found, by song path (this session; dropped when shown).
+    void setMetadataFinding(const std::filesystem::path& song,
+                            std::vector<zub::songcheck::SongIssue> issues) {
+        metadataFindings_[song] = std::move(issues);
+    }
+    void clearScanFindings() {
+        keyFindings_.clear();
+        metadataFindings_.clear();
+        metadataNotes_.clear();
+    }
+    // What the last Check Songs found for the song just opened (or open when it ended): the
+    // header's missing fields are added as the converter's placeholders ("% tem={},", one undo
+    // step, the cursor on the first), then the bar above the song offers a key (offerKey), else
+    // says what was added and what else checksongs.py found.
+    void offerFindings(SongEditor* editor);
     // The bar above the song with a key the last Check Songs found for it (to write, or to
     // confirm the written one with % nocheck key).
     void offerKey(SongEditor* editor);
@@ -145,4 +159,8 @@ private:
     QAction* checkAction_ = nullptr;
     // Keys the last Check Songs found, by song path (this session; dropped when acted on).
     std::map<std::filesystem::path, zub::songcheck::KeyFinding> keyFindings_;
+    std::map<std::filesystem::path, std::vector<zub::songcheck::SongIssue>> metadataFindings_;
+    std::map<std::filesystem::path, QString> metadataNotes_; // the bar's text, until dismissed
+    void addPlaceholders(SongEditor* editor); // metadataFindings_ into the text and notes
+    void showMetadataNote(SongEditor* editor);
 };
