@@ -1748,6 +1748,21 @@ void MainWindow::addToSongbooks(const std::filesystem::path& path, bool afterNew
         return;
     if (dialog.exec() != QDialog::Accepted)
         return;
+    if (const auto removals = dialog.removals(); !removals.empty()) {
+        QStringList removed;
+        QStringList notes;
+        BookAdder::remove(name, removals, removed, notes);
+        QStringList parts;
+        if (!removed.isEmpty())
+            parts << tr("Taken out of %1.").arg(removed.join(QStringLiteral(", ")));
+        parts << notes;
+        statusBar()->showMessage(parts.join(QLatin1Char(' ')), 15000);
+        if (!notes.isEmpty() && removed.isEmpty())
+            QMessageBox::warning(this, tr("Add to Songbooks"), notes.join(QLatin1Char('\n')));
+        if (songbooksPage_->bookWithUnsavedLatex().isEmpty())
+            songbooksPage_->reloadList();
+        homeTimer_->start();
+    }
     const auto targets = dialog.targets();
     if (!targets.empty())
         bookAdder_->add(name, targets);

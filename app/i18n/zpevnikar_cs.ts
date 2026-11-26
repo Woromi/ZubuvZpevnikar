@@ -31,16 +31,12 @@
         <translation>Přidat do zpěvníků</translation>
     </message>
     <message>
-        <source>Which songbooks should %1 be in? It goes where the index puts it (by title).</source>
-        <translation>Do kterých zpěvníků má %1 patřit? Zařadí se tam, kam ji dá rejstřík (podle názvu).</translation>
-    </message>
-    <message>
         <source>Songs before the first section</source>
         <translation>Písně před první sekcí</translation>
     </message>
     <message>
-        <source>has it</source>
-        <translation>už ji má</translation>
+        <source>Which songbooks should %1 be in? It goes where the index puts it (by title); unchecking a list takes it out of that one.</source>
+        <translation>Ve kterých zpěvnících má být %1? Píseň se zařadí podle rejstříku (podle názvu); odškrtnutím ji ze seznamu vyjmete.</translation>
     </message>
     <message>
         <source>locked</source>
@@ -59,9 +55,9 @@
         <translation>Zatím žádné zpěvníky: vytvořte si ho na stránce Zpěvníky.</translation>
     </message>
     <message>
-        <source>Add</source>
-        <comment>add the song to the checked songbooks</comment>
-        <translation>Přidat</translation>
+        <source>Apply</source>
+        <comment>add the song to the checked lists, take it out of the unchecked ones</comment>
+        <translation>Použít</translation>
     </message>
     <message>
         <source>Not Now</source>
@@ -1210,6 +1206,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Still adding a song to songbooks: try Add to Songbooks… again in a moment.</source>
         <translation>Píseň se ještě přidává do zpěvníků: zkuste Přidat do zpěvníků… za chvíli znovu.</translation>
+    </message>
+    <message>
+        <source>Taken out of %1.</source>
+        <translation>Vyjmuto z %1.</translation>
     </message>
     <message>
         <source>Settings</source>

@@ -151,13 +151,14 @@ TEST_CASE("Wishes: the first save of an imported wish fulfils it, then Add to So
     REQUIRE(removeWish(fixture.root(), wishOf(data.wishes, "Abba/OurLastSummer")));
 
     // The first save: the wish line becomes the song, then the dialog offers the books; the
-    // wish book has it already (checked, disabled). Not Now.
+    // wish book has it already (checked, and can be unchecked). Not Now.
     bool offered = false, wishBookHasIt = false;
     auto dialog = apptest::answerTitledDialog("Add to Songbooks", [&](QDialog* d) {
         offered = true;
         for (QTreeWidgetItemIterator it(d->findChild<QTreeWidget*>("addToBooksTree")); *it; ++it)
-            if ((*it)->text(0).startsWith("Wish Book") && (*it)->text(0).contains("has it"))
-                wishBookHasIt = (*it)->checkState(0) == Qt::Checked;
+            if ((*it)->text(0).startsWith("Wish Book"))
+                wishBookHasIt = (*it)->checkState(0) == Qt::Checked &&
+                                (*it)->flags() & Qt::ItemIsEnabled;
         d->reject();
     });
     A::saveCurrent(w.window);
@@ -192,7 +193,7 @@ TEST_CASE("Wishes: Add to Songbooks puts the song into the chosen section", "[ap
                 (*it)->setCheckState(0, Qt::Checked);
         }
         for (auto* b : d->findChildren<QPushButton*>())
-            if (b->text() == "Add")
+            if (b->text() == "Apply")
                 b->click();
     });
     A::addToBooksAction(w.window)->trigger();
@@ -206,6 +207,41 @@ TEST_CASE("Wishes: Add to Songbooks puts the song into the chosen section", "[ap
           "% zpevnikar: locked\n" + std::string(wishBook));
     // The Songbooks page does not take Add to Songbooks' sorting (failed: no texlua) as its own.
     CHECK(A::sorterWarning(*A::songbooksPage(w.window))->isHidden());
+}
+
+TEST_CASE("Wishes: unchecking a list in Add to Songbooks takes the song out", "[app][wishes]") {
+    apptest::Fixture fixture;
+    const auto book = fixture / "songbooks/wish/wish.tex";
+    apptest::writeFile(book, wishBook);
+    apptest::writeFile(fixture / "songbooks/locked/locked.tex",
+                       "% zpevnikar: locked\n" + std::string(wishBook));
+    WishWindow w(fixture);
+    REQUIRE(has(slurp(book), "\\input{WabiDanek/Montgomery}"));
+    REQUIRE(A::openExistingSong(w.window, fixture / "songs/chords/WabiDanek/Montgomery.tex"));
+
+    bool lockedStays = false;
+    auto dialog = apptest::answerTitledDialog("Add to Songbooks", [&](QDialog* d) {
+        for (QTreeWidgetItemIterator it(d->findChild<QTreeWidget*>("addToBooksTree")); *it; ++it) {
+            const QString text = (*it)->text(0);
+            // The locked book has it too: checked, and it cannot be unchecked.
+            if (text.contains("locked/locked.tex") && text.contains("locked)"))
+                lockedStays = (*it)->checkState(0) == Qt::Checked &&
+                              !((*it)->flags() & Qt::ItemIsEnabled);
+            if (text.startsWith("Wish Book") && text.contains("wish/wish.tex")) {
+                REQUIRE((*it)->checkState(0) == Qt::Checked);
+                (*it)->setCheckState(0, Qt::Unchecked);
+            }
+        }
+        for (auto* b : d->findChildren<QPushButton*>())
+            if (b->text() == "Apply")
+                b->click();
+    });
+    A::addToBooksAction(w.window)->trigger();
+    REQUIRE(dialog.fired());
+    CHECK(lockedStays);
+    CHECK_FALSE(has(slurp(book), "\\input{WabiDanek/Montgomery}"));
+    CHECK(slurp(fixture / "songbooks/locked/locked.tex") ==
+          "% zpevnikar: locked\n" + std::string(wishBook));
 }
 
 TEST_CASE("Wishes: --library opens a song library for that run only", "[app][wishes]") {

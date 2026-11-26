@@ -25,7 +25,7 @@ AddToBooksDialog::AddToBooksDialog(const std::filesystem::path& root, const std:
     resize(520, 480);
     auto* layout = new QVBoxLayout(this);
     auto* intro = new QLabel(tr("Which songbooks should %1 be in? It goes where the index puts it "
-                                "(by title).")
+                                "(by title); unchecking a list takes it out of that one.")
                                  .arg(songTitle),
                              this);
     intro->setWordWrap(true);
@@ -75,9 +75,7 @@ AddToBooksDialog::AddToBooksDialog(const std::filesystem::path& root, const std:
             const bool has = std::ranges::count(environment.songs(), inputName) > 0;
             item->setCheckState(0, has ? Qt::Checked : Qt::Unchecked);
             item->setData(0, targetRole, -1);
-            if (has) {
-                disable(item, tr("has it"));
-            } else if (locked) {
+            if (locked) {
                 disable(item, tr("locked"));
             } else if (busy) {
                 disable(item, tr("unsaved LaTeX edits on the Songbooks page"));
@@ -86,6 +84,7 @@ AddToBooksDialog::AddToBooksDialog(const std::filesystem::path& root, const std:
             } else {
                 item->setData(0, targetRole, static_cast<int>(all_.size()));
                 all_.push_back({root / relative, label, e});
+                had_.push_back(has);
                 ++available_;
             }
         }
@@ -98,7 +97,9 @@ AddToBooksDialog::AddToBooksDialog(const std::filesystem::path& root, const std:
     }
 
     auto* buttons = new QDialogButtonBox(this);
-    QPushButton* add = buttons->addButton(tr("Add", "add the song to the checked songbooks"), QDialogButtonBox::AcceptRole);
+    QPushButton* add = buttons->addButton(
+        tr("Apply", "add the song to the checked lists, take it out of the unchecked ones"),
+        QDialogButtonBox::AcceptRole);
     buttons->addButton(tr("Not Now"), QDialogButtonBox::RejectRole);
     add->setDefault(true);
     layout->addWidget(buttons);
@@ -110,7 +111,19 @@ std::vector<BookAdder::Target> AddToBooksDialog::targets() const {
     std::vector<BookAdder::Target> out;
     for (QTreeWidgetItemIterator it(tree_); *it; ++it) {
         const int index = (*it)->data(0, targetRole).toInt();
-        if (index >= 0 && (*it)->checkState(0) == Qt::Checked && (*it)->flags() & Qt::ItemIsEnabled)
+        if (index >= 0 && (*it)->checkState(0) == Qt::Checked && (*it)->flags() & Qt::ItemIsEnabled &&
+            !had_[static_cast<std::size_t>(index)])
+            out.push_back(all_[static_cast<std::size_t>(index)]);
+    }
+    return out;
+}
+
+std::vector<BookAdder::Target> AddToBooksDialog::removals() const {
+    std::vector<BookAdder::Target> out;
+    for (QTreeWidgetItemIterator it(tree_); *it; ++it) {
+        const int index = (*it)->data(0, targetRole).toInt();
+        if (index >= 0 && (*it)->checkState(0) != Qt::Checked &&
+            (*it)->flags() & Qt::ItemIsEnabled && had_[static_cast<std::size_t>(index)])
             out.push_back(all_[static_cast<std::size_t>(index)]);
     }
     return out;

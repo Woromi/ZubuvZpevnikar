@@ -108,6 +108,36 @@ void BookAdder::place(const std::vector<std::string>& sortedUnits, const QString
     QTimer::singleShot(0, this, &BookAdder::next);
 }
 
+void BookAdder::remove(const std::string& inputName, const std::vector<Target>& targets,
+                       QStringList& removed, QStringList& notes) {
+    for (const Target& target : targets) {
+        const QString label = target.label;
+        // Read for each list: an earlier one may have been in the same book.
+        const auto text = zub::readTextFile(target.file);
+        if (!text) {
+            notes << label + QStringLiteral(": ") + toQString(text.error());
+            continue;
+        }
+        const auto book = zub::bookfile::parse(*text);
+        if (!book || target.environment >= book->environments.size()) {
+            notes << label + QStringLiteral(": ") +
+                         (book ? tr("the section is gone") : toQString(book.error()));
+            continue;
+        }
+        std::vector<std::string> songs = book->environments[target.environment].songs();
+        if (std::erase(songs, inputName) == 0)
+            continue; // not there any more
+        const auto edited = zub::bookfile::setSongs(*text, target.environment, songs);
+        if (!edited) {
+            notes << label + QStringLiteral(": ") + toQString(edited.error());
+        } else if (auto written = zub::writeTextFileAtomic(target.file, *edited); !written) {
+            notes << label + QStringLiteral(": ") + toQString(written.error());
+        } else {
+            removed << label;
+        }
+    }
+}
+
 std::vector<zub::songbook::SortEntry> sortEntriesFor(const SongTableModel& model,
                                                      const std::vector<std::string>& names) {
     std::map<std::string, const zub::SongEntry*> byName;

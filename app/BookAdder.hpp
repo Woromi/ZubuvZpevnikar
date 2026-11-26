@@ -39,6 +39,11 @@ public:
 
     // Queues the song for each target; finished() follows when all are done.
     void add(const std::string& inputName, const std::vector<Target>& targets);
+    // Takes the song out of each target now (setSongs without it: a line with a note above it is
+    // commented out), written only over what was read. The labels of the lists it left go to
+    // `removed`, what went otherwise to `notes`.
+    static void remove(const std::string& inputName, const std::vector<Target>& targets,
+                       QStringList& removed, QStringList& notes);
     bool busy() const { return current_.has_value() || !queue_.empty(); }
 
 signals:
