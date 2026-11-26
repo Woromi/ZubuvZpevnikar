@@ -1168,6 +1168,10 @@ Použijte vestavěný.</translation>
         <translation>Mezihra</translation>
     </message>
     <message>
+        <source>Score (LilyPond)…</source>
+        <translation>Notová ukázka (LilyPond)…</translation>
+    </message>
+    <message>
         <source>Chorus Again (\insertchorus)</source>
         <translation>Refrén znovu (\insertchorus)</translation>
     </message>

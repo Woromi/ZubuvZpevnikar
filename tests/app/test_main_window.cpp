@@ -86,7 +86,7 @@ TEST_CASE("Views: the open song stays open while the other pages are shown", "[a
     CHECK(settings.fired());
 }
 
-TEST_CASE("Views: the Edit menu's song keys work on the song page only",
+TEST_CASE("Views: the Edit menu's song keys work on the song page only; Insert Part has the score",
           "[app][views]") {
     apptest::Fixture fixture;
     MainWindow w;
@@ -119,6 +119,23 @@ TEST_CASE("Views: the Edit menu's song keys work on the song page only",
     CHECK(editor->content() == before);
     A::showView(w, V::Song);
     CHECK(insertChord->isEnabled());
+
+    // Insert Part (Ctrl+P) offers a score among the parts.
+    editor->textEdit()->setFocus();
+    QTest::keyClick(&w, Qt::Key_P, Qt::ControlModifier);
+    QMenu* menu = nullptr;
+    REQUIRE(apptest::waitUntil([&] {
+        menu = editor->textEdit()->findChild<QMenu*>();
+        return menu && menu->isVisible();
+    }));
+    QStringList items;
+    for (QAction* action : menu->actions())
+        items << action->text();
+    INFO(items.join(QStringLiteral(" | ")).toStdString());
+    CHECK(items.contains(QStringLiteral("Score (LilyPond)…")));
+    CHECK(items.indexOf(QStringLiteral("Score (LilyPond)…")) ==
+          items.indexOf(QStringLiteral("Instrumental")) + 1);
+    menu->close();
 }
 
 TEST_CASE("Package: the app builds with its own copy, never with the song library's",

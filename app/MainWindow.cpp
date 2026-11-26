@@ -1334,6 +1334,9 @@ void MainWindow::showPartMenu() {
     add(tr("Intro"), Part::Intro);
     add(tr("Outro"), Part::Outro);
     add(tr("Instrumental"), Part::Instrumental);
+    // A score is a part too: its \lilypondfile line goes where a part would (New Score).
+    connect(menu->addAction(tr("Score (LilyPond)…")), &QAction::triggered, menu,
+            [this] { scores_->newScore(); });
     menu->addSeparator();
     add(tr("Chorus Again (\\insertchorus)"), Part::ChorusAgain);
     add(tr("Chorus Reminder (\\insertchorus*)"), Part::ChorusReminder);
