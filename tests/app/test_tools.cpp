@@ -257,7 +257,10 @@ TEST_CASE("Check Songs: the key check offers the key and a nocheck comment",
     A::suggestionButton(*ed)->click();
     CHECK(has(ed->content(), "key={Am}"));
     ed->textEdit()->undo();
-    CHECK(!has(ed->content(), "key={"));
+    // Back to what opening the song made: Metadata found the key missing too, so the header has
+    // its placeholder (one undo step of its own), which Write had filled in.
+    CHECK(!has(ed->content(), "key={Am}"));
+    CHECK(has(ed->content(), "% key={},"));
     ed->textEdit()->document()->setModified(false);
 
     // Montgomery: keep the written key: a "% nocheck key" line above it.
