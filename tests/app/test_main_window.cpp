@@ -5,6 +5,8 @@
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <QLabel>
+#include <QMenu>
+#include <QTest>
 #include <QFile>
 #include <QLocale>
 #include <QSettings>
@@ -82,6 +84,41 @@ TEST_CASE("Views: the open song stays open while the other pages are shown", "[a
     auto settings = apptest::answerDialog<SettingsDialog>([](SettingsDialog* d) { d->reject(); });
     A::openSettings(w);
     CHECK(settings.fired());
+}
+
+TEST_CASE("Views: the Edit menu's song keys work on the song page only",
+          "[app][views]") {
+    apptest::Fixture fixture;
+    MainWindow w;
+    w.resize(1300, 560);
+    w.show();
+    w.activateWindow();
+    REQUIRE(QTest::qWaitForWindowActive(&w));
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    A::openSong(w, A::proxy(w)->index(0, 0));
+    SongEditor* editor = A::editor(w);
+    REQUIRE(editor != nullptr);
+    const std::string before = editor->content();
+    const auto editAction = [&w](const QString& text) -> QAction* {
+        for (QAction* action : w.findChildren<QAction*>())
+            if (action->text() == text)
+                return action;
+        return nullptr;
+    };
+    QAction* insertChord = editAction(QStringLiteral("Insert Chord"));
+    QAction* moveLeft = editAction(QStringLiteral("Move Chord Left"));
+    REQUIRE(insertChord != nullptr);
+    REQUIRE(moveLeft != nullptr);
+    CHECK(insertChord->isEnabled());
+
+    // On the list: the keys no longer reach the hidden song, and Alt+Left is Back's alone.
+    A::showView(w, V::Songs);
+    CHECK_FALSE(insertChord->isEnabled());
+    CHECK_FALSE(moveLeft->isEnabled());
+    QTest::keyClick(&w, Qt::Key_A, Qt::AltModifier);
+    CHECK(editor->content() == before);
+    A::showView(w, V::Song);
+    CHECK(insertChord->isEnabled());
 }
 
 TEST_CASE("Package: the app builds with its own copy, never with the song library's",
