@@ -79,6 +79,7 @@ public:
         keyFindings_.clear();
         metadataFindings_.clear();
         metadataNotes_.clear();
+        addedNotes_.clear();
     }
     // What the last Check Songs found for the song just opened (or open when it ended): the
     // header's missing fields are added as the converter's placeholders ("% tem={},", one undo
@@ -161,6 +162,7 @@ private:
     std::map<std::filesystem::path, zub::songcheck::KeyFinding> keyFindings_;
     std::map<std::filesystem::path, std::vector<zub::songcheck::SongIssue>> metadataFindings_;
     std::map<std::filesystem::path, QString> metadataNotes_; // the bar's text, until dismissed
+    std::map<std::filesystem::path, QString> addedNotes_; // "added ...": shown once
     void addPlaceholders(SongEditor* editor); // metadataFindings_ into the text and notes
     void showMetadataNote(SongEditor* editor);
 };

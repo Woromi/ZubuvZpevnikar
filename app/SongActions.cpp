@@ -625,6 +625,9 @@ QString SongActions::keyFindingText(const zub::songcheck::KeyFinding& finding,
 }
 
 void SongActions::offerFindings(SongEditor* editor) {
+    // A note of placeholders added at an earlier opening is no longer true (closed unsaved).
+    if (!metadataFindings_.contains(editor->path()))
+        addedNotes_.erase(editor->path());
     addPlaceholders(editor);
     offerKey(editor);
     if (!editor->suggestionShown())
@@ -637,53 +640,51 @@ void SongActions::addPlaceholders(SongEditor* editor) {
         return;
     const std::vector<zub::songcheck::SongIssue> issues = std::move(found->second);
     metadataFindings_.erase(found);
-    // The header's fields checksongs.py misses: "missing recommended: tem, tun", "missing
-    // required key 'by'", "measure bars but no met".
+    // The header's fields checksongs.py misses become placeholders; the other issues are listed.
     std::vector<std::string> fields;
-    const auto addFields = [&fields](std::string_view list) {
-        for (const auto part : std::views::split(list, ',')) {
-            std::string field(part.begin(), part.end());
-            std::erase_if(field, [](char c) { return c == ' ' || c == '\'' || c == '\t'; });
-            if (!field.empty())
-                fields.push_back(field);
-        }
-    };
-    QStringList others;
+    std::vector<const zub::songcheck::SongIssue*> others;
     for (const auto& issue : issues) {
-        if (issue.code == "missing-recommended" || issue.code == "missing-required") {
-            const auto colon = issue.message.find(issue.code == "missing-required" ? "key" : ":");
-            if (colon != std::string::npos) {
-                addFields(std::string_view(issue.message).substr(colon + (issue.code == "missing-required" ? 3 : 1)));
-                continue;
-            }
-        } else if (issue.code == "bars-without-meter") {
-            fields.emplace_back("met");
-            continue;
-        }
-        others << (issue.line ? tr("line %1: %2").arg(*issue.line).arg(toQString(issue.message))
-                              : toQString(issue.message));
+        const auto missing = zub::songcheck::missingFields(issue);
+        if (missing.empty())
+            others.push_back(&issue);
+        fields.insert(fields.end(), missing.begin(), missing.end());
     }
     const std::string content = editor->content();
     const auto placeholders = zub::songheader::addPlaceholders(content, fields);
-    QStringList notes;
-    if (!placeholders.added.empty()) {
-        QStringList added;
-        for (const auto& field : placeholders.added)
-            added << toQString(field);
-        notes << tr("added the missing %1 to the header as placeholders: fill them in (and remove "
-                    "the %), or Ctrl+Z takes them back.")
-                     .arg(added.join(QStringLiteral(", ")));
-    }
-    QStringList empty;
-    for (const auto& field : fields)
-        if (std::ranges::find(placeholders.added, field) == placeholders.added.end())
-            empty << toQString(field);
-    empty.removeDuplicates();
-    if (!empty.isEmpty())
-        notes << tr("still without a value: %1.").arg(empty.join(QStringLiteral(", ")));
-    notes << others;
-    if (!notes.isEmpty())
-        metadataNotes_[editor->path()] = notes.join(QStringLiteral(" · "));
+    // The issues' lines are the file's; with the placeholders added, they are lower in the
+    // editor. The note with the placeholders is shown once, with this text (after a Discard or
+    // Ctrl+Z it would no longer be true); the lasting one has the file's lines.
+    const auto diff = zub::diff::lines(content, placeholders.text);
+    const auto noteOf = [&](bool withPlaceholders) {
+        QStringList notes;
+        if (withPlaceholders) {
+            QStringList added;
+            for (const auto& field : placeholders.added)
+                added << toQString(field);
+            notes << tr("added the missing %1 to the header as placeholders: fill them in (and "
+                        "remove the %), or Ctrl+Z takes them back.")
+                         .arg(added.join(QStringLiteral(", ")));
+        }
+        QStringList empty;
+        for (const auto& field : fields)
+            if (std::ranges::find(placeholders.added, field) == placeholders.added.end())
+                empty << toQString(field);
+        empty.removeDuplicates();
+        if (!empty.isEmpty())
+            notes << tr("still without a value: %1.").arg(empty.join(QStringLiteral(", ")));
+        for (const auto* issue : others)
+            notes << (issue->line
+                          ? tr("line %1: %2")
+                                .arg(withPlaceholders ? zub::diff::mapOldLine(diff, *issue->line)
+                                                      : *issue->line)
+                                .arg(toQString(issue->message))
+                          : toQString(issue->message));
+        return notes.join(QStringLiteral(" · "));
+    };
+    if (const QString lasting = noteOf(false); !lasting.isEmpty())
+        metadataNotes_[editor->path()] = lasting;
+    if (!placeholders.added.empty())
+        addedNotes_[editor->path()] = noteOf(true);
     if (placeholders.added.empty())
         return;
     emit songTextReplaceRequested(placeholders.text);
@@ -696,11 +697,18 @@ void SongActions::addPlaceholders(SongEditor* editor) {
 }
 
 void SongActions::showMetadataNote(SongEditor* editor) {
-    const auto note = metadataNotes_.find(editor->path());
-    if (note == metadataNotes_.end())
+    // The note with the placeholders just added once, then the lasting one.
+    QString text;
+    if (const auto added = addedNotes_.find(editor->path()); added != addedNotes_.end()) {
+        text = added->second;
+        addedNotes_.erase(added);
+    } else if (const auto note = metadataNotes_.find(editor->path()); note != metadataNotes_.end()) {
+        text = note->second;
+    }
+    if (text.isEmpty())
         return;
     const QPointer<SongEditor> guard = editor;
-    editor->showSuggestion(tr("Check Songs, metadata:"), note->second, tr("OK"), [this, guard] {
+    editor->showSuggestion(tr("Check Songs, metadata:"), text, tr("OK"), [this, guard] {
         if (guard)
             metadataNotes_.erase(guard->path());
     });

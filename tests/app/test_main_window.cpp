@@ -433,14 +433,21 @@ TEST_CASE("Check Songs: opening a song adds its missing fields as placeholders",
     const QString note = A::suggestionLabel(*ed)->text();
     INFO(note.toStdString());
     CHECK(note.contains(QStringLiteral("tun, tem, met")));
-    CHECK(note.contains(QStringLiteral("line 12: chord diagram without finger numbers: Am")));
+    // The file's line 12, below the three added placeholder lines in the editor.
+    CHECK(note.contains(QStringLiteral("line 15: chord diagram without finger numbers: Am")));
     CHECK(slurp(path) == before); // nothing saved
     ed->textEdit()->undo();       // one undo step
     CHECK(ed->content() == before);
     ed->textEdit()->document()->setModified(false);
 
-    // Shown once: opened again, the song stays as it is.
+    // Shown once: opened again, the song stays as it is, and the note no longer says that
+    // placeholders were added (the other issues stay until OK).
     REQUIRE(A::closeSong(w));
     REQUIRE(A::openExistingSong(w, path));
     CHECK(A::editor(w)->content() == before);
+    REQUIRE(A::editor(w)->suggestionShown());
+    const QString again = A::suggestionLabel(*A::editor(w))->text();
+    INFO(again.toStdString());
+    CHECK_FALSE(again.contains(QStringLiteral("added")));
+    CHECK(again.contains(QStringLiteral("line 12: chord diagram without finger numbers: Am")));
 }

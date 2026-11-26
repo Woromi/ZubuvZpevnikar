@@ -7,6 +7,7 @@
 #include <QCoreApplication>
 #include <QTimer>
 #include <algorithm>
+#include <expected>
 #include <map>
 #include <zub/core/bookfile.hpp>
 #include <zub/core/library.hpp>
@@ -14,6 +15,24 @@
 #include <zub/core/songbook.hpp>
 #include <zub/core/textfile.hpp>
 
+
+namespace {
+
+// Why the target can no longer be written (empty: it can), from the book's text as read now: it
+// was locked, or its sections changed, while the dialog was open or the songs were sorted.
+QString unusable(const BookAdder::Target& target, const std::string& text,
+                 const std::expected<zub::bookfile::Book, std::string>& book) {
+    if (!book)
+        return toQString(book.error());
+    if (zub::bookfile::readSettings(text).locked)
+        return BookAdder::tr("locked meanwhile");
+    if (target.environment >= book->environments.size() ||
+        book->environments[target.environment].section != target.section)
+        return BookAdder::tr("the section is gone");
+    return {};
+}
+
+} // namespace
 
 BookAdder::BookAdder(SongbookSorter* sorter, const SongTableModel* model, QObject* parent)
     : QObject(parent), sorter_(sorter), model_(model) {
@@ -47,9 +66,8 @@ void BookAdder::next() {
             continue;
         }
         const auto book = zub::bookfile::parse(*text);
-        if (!book || job.target.environment >= book->environments.size()) {
-            notes_ << label + QStringLiteral(": ") +
-                          (book ? tr("the section is gone") : toQString(book.error()));
+        if (const QString why = unusable(job.target, *text, book); !why.isEmpty()) {
+            notes_ << label + QStringLiteral(": ") + why;
             continue;
         }
         const auto& environment = book->environments[job.target.environment];
@@ -119,9 +137,8 @@ void BookAdder::remove(const std::string& inputName, const std::vector<Target>& 
             continue;
         }
         const auto book = zub::bookfile::parse(*text);
-        if (!book || target.environment >= book->environments.size()) {
-            notes << label + QStringLiteral(": ") +
-                         (book ? tr("the section is gone") : toQString(book.error()));
+        if (const QString why = unusable(target, *text, book); !why.isEmpty()) {
+            notes << label + QStringLiteral(": ") + why;
             continue;
         }
         std::vector<std::string> songs = book->environments[target.environment].songs();

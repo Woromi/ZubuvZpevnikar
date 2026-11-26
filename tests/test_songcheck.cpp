@@ -113,3 +113,23 @@ TEST_CASE("songcheck confirms a stated key with % nocheck key above it", "[songc
     CHECK_FALSE(sc::confirmKey("\\beginsong{T}[\n    by={A},\n]\n\\endsong\n"));
     CHECK_FALSE(sc::keyConfirmed("no song"));
 }
+
+TEST_CASE("songcheck reads the missing header fields from checksongs' issues", "[songcheck]") {
+    using Fields = std::vector<std::string>;
+    // checksongs.py's own messages (scripts/checksongs.py).
+    CHECK(sc::missingFields({"warn", "missing-recommended", std::nullopt,
+                             "missing recommended: tem, tun"}) == Fields{"tem", "tun"});
+    CHECK(sc::missingFields({"error", "missing-required", std::nullopt,
+                             "missing required key 'by'"}) == Fields{"by"});
+    CHECK(sc::missingFields({"warn", "bars-without-meter", std::nullopt,
+                             "measure bars but no met: the first bar shows no meter"}) ==
+          Fields{"met"});
+    CHECK(sc::missingFields({"error", "note-naming", 4, "m"}).empty());
+    // A reworded message gives nothing rather than wrong fields.
+    CHECK(sc::missingFields({"warn", "missing-recommended", std::nullopt, "no tem"}).empty());
+    // The real listing: Connect The Dots misses met.
+    const auto issues = sc::parseCheckSongs(slurp(checks / "checksongs.json"));
+    REQUIRE(issues);
+    CHECK(sc::missingFields(issues->at("songs/chords/Ayreon/ConnectTheDots.tex")[0]) ==
+          Fields{"met"});
+}

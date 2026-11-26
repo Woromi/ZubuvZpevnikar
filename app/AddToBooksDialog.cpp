@@ -83,7 +83,7 @@ AddToBooksDialog::AddToBooksDialog(const std::filesystem::path& root, const std:
                 disable(item, tr("read-only: %1").arg(toQString(environment.readOnly)));
             } else {
                 item->setData(0, targetRole, static_cast<int>(all_.size()));
-                all_.push_back({root / relative, label, e});
+                all_.push_back({root / relative, label, e, environment.section});
                 had_.push_back(has);
                 ++available_;
             }

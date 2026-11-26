@@ -43,6 +43,12 @@ struct SongIssue {
 std::expected<std::map<std::string, std::vector<SongIssue>>, std::string>
 parseCheckSongs(std::string_view json);
 
+// The header fields an issue says are missing, in its order: "missing recommended: tem, tun"
+// (missing-recommended), "missing required key 'by'" (missing-required), and met for
+// bars-without-meter. Empty for every other issue. (Reads checksongs.py's message texts: keep in
+// step with the script.)
+std::vector<std::string> missingFields(const SongIssue& issue);
+
 // `detected` ("F#m", "A#", English sharps) as the song header writes keys: `\shrp` and `\flt`
 // macros ("F\shrp m"), the majors on A#, D# and G# as flats (B\flt, E\flt, A\flt), the rest as
 // sharps; with German names (Czech, Slovak) B natural is H and B flat is B. Empty for anything

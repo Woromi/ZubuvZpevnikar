@@ -5,6 +5,8 @@
 #include <zub/core/latex.hpp>
 #include <zub/core/songcheck.hpp>
 
+#include <ranges>
+
 namespace fs = std::filesystem;
 
 namespace zub::songcheck {
@@ -154,6 +156,35 @@ std::expected<std::vector<KeyFinding>, std::string> parseCheckKeys(std::string_v
             findings.push_back(std::move(f));
     }
     return findings;
+}
+
+std::vector<std::string> missingFields(const SongIssue& issue) {
+    std::string_view list;
+    if (issue.code == "bars-without-meter")
+        return {"met"};
+    if (issue.code == "missing-recommended") {
+        constexpr std::string_view prefix = "missing recommended:";
+        if (!issue.message.starts_with(prefix))
+            return {};
+        list = std::string_view(issue.message).substr(prefix.size());
+    } else if (issue.code == "missing-required") {
+        constexpr std::string_view prefix = "missing required key";
+        if (!issue.message.starts_with(prefix))
+            return {};
+        list = std::string_view(issue.message).substr(prefix.size());
+    } else {
+        return {};
+    }
+    std::vector<std::string> fields;
+    for (const auto part : std::views::split(list, ',')) {
+        std::string field;
+        for (const char c : part)
+            if (c != ' ' && c != '\t' && c != '\'')
+                field += c;
+        if (!field.empty())
+            fields.push_back(std::move(field));
+    }
+    return fields;
 }
 
 std::expected<std::map<std::string, std::vector<SongIssue>>, std::string>

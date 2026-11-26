@@ -67,6 +67,10 @@
 <context>
     <name>BookAdder</name>
     <message>
+        <source>locked meanwhile</source>
+        <translation>mezitím zamčen</translation>
+    </message>
+    <message>
         <source>the section is gone</source>
         <translation>sekce už neexistuje</translation>
     </message>

@@ -443,6 +443,9 @@ void MainWindow::createCentralWidget() {
     connect(bookAdder_, &BookAdder::finished, this,
             [this](const QStringList& added, const QStringList& notes) {
                 QStringList parts;
+                // What the same Apply took out (the song moved between lists) stays in view.
+                if (!takenOutMessage_.isEmpty())
+                    parts << std::exchange(takenOutMessage_, QString());
                 if (!added.isEmpty())
                     parts << tr("Added to %1.").arg(added.join(QStringLiteral(", ")));
                 parts << notes;
@@ -1748,6 +1751,8 @@ void MainWindow::addToSongbooks(const std::filesystem::path& path, bool afterNew
         if (songbooksPage_->bookWithUnsavedLatex().isEmpty())
             songbooksPage_->reloadList();
         homeTimer_->start();
+        if (!dialog.targets().empty())
+            takenOutMessage_ = parts.join(QLatin1Char(' ')); // the adder's report replaces it
     }
     const auto targets = dialog.targets();
     if (!targets.empty())

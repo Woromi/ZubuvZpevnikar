@@ -227,6 +227,7 @@ private:
     HomePage* homePage_ = nullptr;           // Home: the start page (the welcome panel without a songbook)
     QTimer* homeTimer_ = nullptr;
     BookAdder* bookAdder_ = nullptr;         // Add to Songbooks…
+    QString takenOutMessage_; // the removals of an Apply, shown with its additions
     QAction* addToBooksAction_ = nullptr;    // the song toolbar's Add to Songbooks…
     bool closing_ = false;                   // the window is closing: no more dialogs
     // An imported wish waiting for its song's first save.

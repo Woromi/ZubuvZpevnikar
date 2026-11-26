@@ -209,6 +209,39 @@ TEST_CASE("Wishes: Add to Songbooks puts the song into the chosen section", "[ap
     CHECK(A::sorterWarning(*A::songbooksPage(w.window))->isHidden());
 }
 
+TEST_CASE("Wishes: Add to Songbooks writes no book locked while its dialog was open",
+          "[app][wishes]") {
+    apptest::Fixture fixture;
+    const auto book = fixture / "songbooks/wish/wish.tex";
+    apptest::writeFile(book, wishBook);
+    WishWindow w(fixture);
+    REQUIRE(A::openExistingSong(w.window, fixture / "songs/chords/Ayreon/EMc2.tex"));
+
+    const std::string locked = "% zpevnikar: locked\n" + std::string(wishBook);
+    QString warning;
+    apptest::Responder box([](QWidget* top) { return qobject_cast<QMessageBox*>(top) != nullptr; },
+                           [&](QWidget* top) {
+                               auto* m = static_cast<QMessageBox*>(top);
+                               warning = m->text();
+                               m->button(QMessageBox::Ok)->click();
+                           });
+    auto dialog = apptest::answerTitledDialog("Add to Songbooks", [&](QDialog* d) {
+        for (QTreeWidgetItemIterator it(d->findChild<QTreeWidget*>("addToBooksTree")); *it; ++it)
+            if ((*it)->text(0).startsWith("Wish Book") &&
+                (*it)->text(0).contains("wish/wish.tex"))
+                (*it)->setCheckState(0, Qt::Checked);
+        apptest::writeFile(book, locked); // released meanwhile (a git pull)
+        for (auto* b : d->findChildren<QPushButton*>())
+            if (b->text() == "Apply")
+                b->click();
+    });
+    A::addToBooksAction(w.window)->trigger();
+    REQUIRE(dialog.fired());
+    REQUIRE(apptest::waitUntil([&] { return box.fired(); }));
+    CHECK(warning.contains("locked meanwhile"));
+    CHECK(slurp(book) == locked);
+}
+
 TEST_CASE("Wishes: unchecking a list in Add to Songbooks takes the song out", "[app][wishes]") {
     apptest::Fixture fixture;
     const auto book = fixture / "songbooks/wish/wish.tex";

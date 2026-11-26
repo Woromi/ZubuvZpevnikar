@@ -33,6 +33,8 @@ public:
         std::filesystem::path file; // the book
         QString label;              // for people: the book (and the section)
         std::size_t environment = 0;
+        std::string section; // its \songsection when chosen: a book changed since must still have
+                             // it at that index
     };
 
     BookAdder(SongbookSorter* sorter, const SongTableModel* model, QObject* parent = nullptr);
