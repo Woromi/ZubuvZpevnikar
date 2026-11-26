@@ -1,4 +1,4 @@
-// Playback of scores: the MIDI document LilyPond builds (see zub::score::midiDocument).
+// Playback of scores: the MIDI score LilyPond builds (see zub::score::midiScore).
 #include "scorescan.hpp"
 #include "zub/core/fretboard.hpp"
 #include "zub/core/midi.hpp"

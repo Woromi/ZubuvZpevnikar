@@ -2,7 +2,7 @@ name: KF6 SyntaxHighlighting
 description: >
   Builds extra-cmake-modules and KSyntaxHighlighting (KDE Frameworks 6) against the Qt already
   installed, into `prefix` (cached). For runners without a KF6 package (Ubuntu 24.04, Windows).
-  On Windows the MSVC environment must be set up before (ilammy/msvc-dev-cmd).
+  On Windows the MSVC environment must be set up before (./.github/actions/msvc-env).
 inputs:
   prefix:
     description: Where to install (pass it to CMAKE_PREFIX_PATH)

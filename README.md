@@ -9,8 +9,9 @@ tidy them, and put songbooks together for print.
 ## What it does
 
 - **Songs**: browse the songbook's songs (search, language, TODO notes), edit a song with syntax
-  highlighting and see its PDF next to it, rebuilt as you type. Songs with commands outside the
-  song format are only built after you confirm (LaTeX runs with `-shell-escape`).
+  highlighting and see its PDF next to it, rebuilt when you save (or press Ctrl+R). Songs with
+  commands outside the song format are only built after you confirm (LaTeX runs with
+  `-shell-escape`).
 - **Import**: paste a URL from a supported chords website (or a saved page) and get the song in the
   songbook's format, through [chords_converter](https://github.com/Woromi/chords_converter).
   Imported songs are marked "not checked yet" until you mark them checked.
@@ -22,14 +23,16 @@ tidy them, and put songbooks together for print.
     a verse.
   - *Make Smaller* and *Join Lines*: changes that make a song fit its page, rated by how readable
     they leave it.
-- **Scan Songbook**: run those checks over all songs and list the ones with possible changes.
+- **Check Songs** (on the Songs page): run those checks over all songs and list the ones with
+  possible changes.
 - **Songbooks**: pick songs into sections (sorted the way the printed index sorts them, or arranged
-  by hand), choose the book's class (A4 book, A5 book, A5 camp booklet), cover and indexes, and
-  export a PDF, the LaTeX source, or a self-contained folder that builds anywhere.
+  by hand), choose the book's class (A4 book, A5 book, A5 camp booklet), cover and indexes, see
+  whether it is ready to print, preview it (also transposed) and export its PDF.
 
 The app does not reimplement the songbook: the songs come from a ZubuvZpevnik checkout, the
 classes and build scripts from the [zubuvzpevnik-package](https://github.com/Woromi/zubuvzpevnik-package)
-(the songbook's own `zubuvzpevnik/` submodule, else the copy bundled with the app), and
+(always the copy bundled with the app, never the song library's own `zubuvzpevnik/` submodule:
+the builds run with `-shell-escape`, so a library could otherwise bring code of its own), and
 conversions from chords_converter (0.14.0 or newer).
 
 ## Install

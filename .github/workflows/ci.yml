@@ -75,8 +75,8 @@ jobs:
             exit 1
           fi
 
-  # The app on Windows: build and tests, so new Linux-only code is noticed. (Windows users still
-  # need the Windows parts of PLAN.md: stopping builds, bash for build.sh, a package.)
+  # The app on Windows: build and tests, so new Linux-only code is noticed. (Not yet tried on a
+  # real Windows machine: see the Windows item in PLAN.md.)
   windows:
     name: App (Windows)
     runs-on: windows-2022
