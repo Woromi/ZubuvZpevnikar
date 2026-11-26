@@ -204,6 +204,7 @@ Decided with the user 2026-11-15: the LaTeX package and its scripts are their ow
 - [x] The songbook has it as the submodule `zubuvzpevnik/` (where the package was, so TEXINPUTS did not change); the projects call `zubuvzpevnik/scripts/build.sh`. Checked: velkyzpevnik, malyzpevnik and its bound book identical before and after (pages, pdftotext, warnings).
 - [x] Converter 0.14.0: `--package DIR`, and `checkpaper.py` from the submodule.
 - [x] App: `zub::package` (`isPackage`, `ofSongbook`), `MainWindow::packageDir_` (the songbook's own package, else the bundled `external/zubuvzpevnik-package`, installed into `share/zpevnikar/zubuvzpevnik`), used for TEXINPUTS, the classes, the LilyPond includes, the converter, the sorter and both exports; a songbook folder needs only `songs/chords/`; a status message says when the bundled copy is used or none is there.
+- [x] 2026-11-26 (whole-project review, with the user): the app builds only with its bundled copy, never with a library's `zubuvzpevnik/` (it ran unchecked under `-shell-escape`; a cloned library could bring its own `.sty`). `ofSongbook` and the status messages about it are gone; keep the app's pin in step with ZubuvZpevnik's.
 
 ## Name
 

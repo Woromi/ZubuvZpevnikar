@@ -655,9 +655,9 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
         return false;
 
     songbookRoot_ = root;
-    // The songbook's own package (what its releases are built with), else the app's copy.
-    const auto ownPackage = zub::package::ofSongbook(root);
-    packageDir_ = ownPackage ? *ownPackage : bundledPackage();
+    // Always the app's own copy: a library's zubuvzpevnik/ would run with the user's rights
+    // (lualatex -shell-escape) unchecked, so a library from someone else could bring its own.
+    packageDir_ = bundledPackage();
     scores_->setSongbook(songbookRoot_, packageDir_);
     songActions_->setSongbook(songbookRoot_, packageDir_);
     songbookCheck_->setSongbook(songbookRoot_, packageDir_);
@@ -688,22 +688,8 @@ bool MainWindow::openSongbook(const std::filesystem::path& path, OpenOptions opt
         // The main songbook's class unless another was chosen.
         QSettings{}.value(previewClassKey, QStringLiteral("velkyzpevnik")).toString());
     updateStatus();
-    // zubuvzpevnik/ with the TeX files but no scripts/: a songbook from before the package
-    // became a repository of its own.
-    const bool olderLayout = !ownPackage && std::filesystem::is_regular_file(
-                                                root / "zubuvzpevnik" / "zubuvzpevnik.sty", ec);
     if (packageDir_.empty())
         statusBar()->showMessage(noPackageText(), 20000);
-    else if (olderLayout)
-        statusBar()->showMessage(
-            tr("The song library's zubuvzpevnik/ has the older layout (no scripts/ inside): building "
-               "with the app's copy of the package."),
-            15000);
-    else if (!ownPackage)
-        statusBar()->showMessage(
-            tr("The song library has no package of its own in zubuvzpevnik/: building with the app's "
-               "copy."),
-            15000);
     listTitle_ = QApplication::applicationDisplayName() + QStringLiteral(" — ") + toQString(root);
     if (pages_->currentWidget() == homePage_)
         showView(ActivityBar::View::Home); // the cards of this songbook
@@ -1943,8 +1929,8 @@ std::filesystem::path MainWindow::builtInConverter() const {
 }
 
 QString MainWindow::noPackageText() const {
-    return tr("No package to build the songs with: the song library's zubuvzpevnik/ is not checked "
-              "out (git submodule update --init), and this app has no copy of its own.");
+    return tr("No package to build the songs with: this app has no copy of the zubuvzpevnik "
+              "package (external/zubuvzpevnik-package: git submodule update --init).");
 }
 
 std::filesystem::path MainWindow::bundledPackage() const {
@@ -1974,7 +1960,6 @@ void MainWindow::openSettings() {
     state.soundfontChosen = !settings.value(soundfontKey).toString().isEmpty() &&
                             state.soundfont == settings.value(soundfontKey).toString();
     state.package = toQString(packageDir_);
-    state.ownPackage = !packageDir_.empty() && zub::package::ofSongbook(songbookRoot_).has_value();
     state.appImage = !desktopintegration::appImage().isEmpty();
     state.menuEntry = desktopintegration::enabled();
     state.keepBuildFiles = buildfiles::keep();

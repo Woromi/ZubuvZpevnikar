@@ -12,14 +12,12 @@ TEST_CASE("a package checkout has the style file and scripts/build.sh", "[packag
     fs::remove_all(root);
     const fs::path own = root / "zubuvzpevnik";
     fs::create_directories(own / "scripts");
-    CHECK_FALSE(zub::package::ofSongbook(root)); // empty: an unchecked-out submodule
+    CHECK_FALSE(zub::package::isPackage(own)); // empty: an unchecked-out submodule
     std::ofstream(own / "zubuvzpevnik.sty") << "x";
     CHECK_FALSE(zub::package::isPackage(own)); // the layout before the package had its own repo
-    CHECK_FALSE(zub::package::ofSongbook(root));
     std::ofstream(own / "scripts" / "build.sh") << "x";
     CHECK(zub::package::isPackage(own));
-    CHECK(zub::package::ofSongbook(root) == own);
-    CHECK_FALSE(zub::package::ofSongbook(root / "nope"));
+    CHECK_FALSE(zub::package::isPackage(root / "nope"));
     fs::remove_all(root);
 }
 

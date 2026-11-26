@@ -86,8 +86,8 @@ QString lastExportDir() {
 SongbookExporter::SongbookExporter(QWidget* parentWindow) : QObject(parentWindow), window_(parentWindow) {}
 
 QString SongbookExporter::noPackageText() const {
-    return tr("There is no package to build the songbook with: the song library's zubuvzpevnik/ is not "
-              "checked out (git submodule update --init), and this app has no copy of its own.");
+    return tr("There is no package to build the songbook with: this app has no copy of the "
+              "zubuvzpevnik package (external/zubuvzpevnik-package: git submodule update --init).");
 }
 
 bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution,

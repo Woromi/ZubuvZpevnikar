@@ -16,13 +16,6 @@ bool isPackage(const fs::path& dir) {
            fs::is_regular_file(dir / "scripts" / "build.sh", ec);
 }
 
-std::optional<fs::path> ofSongbook(const fs::path& songbookRoot) {
-    const fs::path own = songbookRoot / "zubuvzpevnik";
-    if (isPackage(own))
-        return own;
-    return std::nullopt;
-}
-
 namespace {
 
 bool definesIn(const std::string& text) {

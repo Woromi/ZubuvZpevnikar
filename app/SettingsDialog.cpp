@@ -118,16 +118,12 @@ SettingsDialog::SettingsDialog(const State& state, QWidget* parent)
     form->addRow(tr("Build files:"), builds);
     showBuildFilesSize(state.buildFilesBytes);
 
-    // The package is not a choice: the songbook's own, else the app's copy (zub::package).
+    // The package is not a choice: always the app's copy (a library's own is never used).
     auto* package = pathLine(this);
     package->setObjectName(QStringLiteral("settingsPackage"));
     package->setText(state.package);
-    package->setPlaceholderText(tr("none: the song library's zubuvzpevnik/ is not checked out"));
-    auto* packageNote = new QLabel(state.package.isEmpty() ? QString()
-                                   : state.ownPackage      ? tr("the song library's own")
-                                                           : tr("the app's copy"),
-                                   this);
-    form->addRow(tr("Package:"), row(this, {package, packageNote}));
+    package->setPlaceholderText(tr("none: the app has no copy of the package"));
+    form->addRow(tr("Package:"), package);
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);

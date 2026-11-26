@@ -988,14 +988,6 @@ Použijte vestavěný.</translation>
 %1</translation>
     </message>
     <message>
-        <source>The song library&apos;s zubuvzpevnik/ has the older layout (no scripts/ inside): building with the app&apos;s copy of the package.</source>
-        <translation>Složka zubuvzpevnik/ knihovny písní má starší uspořádání (bez scripts/): sestavuje se kopií balíčku z aplikace.</translation>
-    </message>
-    <message>
-        <source>The song library has no package of its own in zubuvzpevnik/: building with the app&apos;s copy.</source>
-        <translation>Knihovna písní nemá vlastní balíček v zubuvzpevnik/: sestavuje se kopií z aplikace.</translation>
-    </message>
-    <message>
         <source>No song library open. Use File → Open Song Library…</source>
         <translation>Není otevřená žádná knihovna písní. Použijte Soubor → Otevřít knihovnu písní…</translation>
     </message>
@@ -1212,6 +1204,10 @@ Použijte vestavěný.</translation>
         <translation>Vyjmuto z %1.</translation>
     </message>
     <message>
+        <source>No package to build the songs with: this app has no copy of the zubuvzpevnik package (external/zubuvzpevnik-package: git submodule update --init).</source>
+        <translation>Chybí balíček pro sestavení písní: aplikace nemá svou kopii balíčku zubuvzpevnik (external/zubuvzpevnik-package: git submodule update --init).</translation>
+    </message>
+    <message>
         <source>Settings</source>
         <translation>Nastavení</translation>
     </message>
@@ -1315,10 +1311,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>This song uses commands that songs normally don&apos;t: %1</source>
         <translation>Tato píseň používá příkazy, které písně běžně nepoužívají: %1</translation>
-    </message>
-    <message>
-        <source>No package to build the songs with: the song library&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
-        <translation>Chybí balíček pro sestavení písní: zubuvzpevnik/ knihovny písní není stažený (git submodule update --init) a aplikace nemá vlastní kopii.</translation>
     </message>
     <message>
         <source>Import Song</source>
@@ -2111,16 +2103,8 @@ Použijte vestavěný.</translation>
         <translation>Soubory sestavení:</translation>
     </message>
     <message>
-        <source>none: the song library&apos;s zubuvzpevnik/ is not checked out</source>
-        <translation>žádný: zubuvzpevnik/ knihovny písní není stažený</translation>
-    </message>
-    <message>
-        <source>the song library&apos;s own</source>
-        <translation>vlastní balíček knihovny písní</translation>
-    </message>
-    <message>
-        <source>the app&apos;s copy</source>
-        <translation>kopie z aplikace</translation>
+        <source>none: the app has no copy of the package</source>
+        <translation>žádný: aplikace nemá kopii balíčku</translation>
     </message>
     <message>
         <source>Package:</source>
@@ -2964,10 +2948,6 @@ Použijte vestavěný.</translation>
         <source>cannot read the file</source>
         <translation>soubor nelze přečíst</translation>
     </message>
-    <message>
-        <source>There is no package to build the songbook with: the song library&apos;s zubuvzpevnik/ is not checked out (git submodule update --init), and this app has no copy of its own.</source>
-        <translation>Chybí balíček pro sestavení zpěvníku: zubuvzpevnik/ knihovny písní není stažený (git submodule update --init) a aplikace nemá vlastní kopii.</translation>
-    </message>
     <message numerus="yes">
         <source>… and %n more</source>
         <translation>
@@ -3039,6 +3019,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>%1: an index file the build would read</source>
         <translation>%1: soubor rejstříku, který by sestavení načetlo</translation>
+    </message>
+    <message>
+        <source>There is no package to build the songbook with: this app has no copy of the zubuvzpevnik package (external/zubuvzpevnik-package: git submodule update --init).</source>
+        <translation>Chybí balíček pro sestavení zpěvníku: aplikace nemá svou kopii balíčku zubuvzpevnik (external/zubuvzpevnik-package: git submodule update --init).</translation>
     </message>
     <message>
         <source>Cannot write %1: %2</source>

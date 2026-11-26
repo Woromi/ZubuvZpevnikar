@@ -23,7 +23,6 @@ public:
         QString soundfont;            // the one in use ("" = none found)
         bool soundfontChosen = false; // picked by the user
         QString package;              // the package in use ("" = none)
-        bool ownPackage = false;      // it is the songbook's own (else the app's copy)
         bool appImage = false;  // runs as an AppImage (the menu entry is the app's own)
         bool menuEntry = true;  // it puts itself into the application menu
         bool keepBuildFiles = true;

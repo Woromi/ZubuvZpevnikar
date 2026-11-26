@@ -84,7 +84,7 @@ TEST_CASE("Views: the open song stays open while the other pages are shown", "[a
     CHECK(settings.fired());
 }
 
-TEST_CASE("Package: a songbook without its own package builds with the bundled copy",
+TEST_CASE("Package: the app builds with its own copy, never with the song library's",
           "[app][package]") {
     apptest::Fixture fixture;
     MainWindow w;
@@ -96,11 +96,12 @@ TEST_CASE("Package: a songbook without its own package builds with the bundled c
         SKIP("the bundled package (external/zubuvzpevnik-package) is not checked out");
     CHECK(A::packageDir(w).filename() == "zubuvzpevnik-package");
 
-    // A songbook with its own package uses that one.
+    // A library with a package checkout of its own still builds with the app's copy: that
+    // package would run with the user's rights unchecked.
     apptest::writeFile(fixture / "zubuvzpevnik/zubuvzpevnik.sty", "x");
     apptest::writeFile(fixture / "zubuvzpevnik/scripts/build.sh", "x");
     REQUIRE(A::openSongbook(w, fixture.root()));
-    CHECK(A::packageDir(w) == fixture / "zubuvzpevnik");
+    CHECK(A::packageDir(w).filename() == "zubuvzpevnik-package");
 }
 
 TEST_CASE("Language filter: a song listing several languages is shown under each", "[app][language]") {
