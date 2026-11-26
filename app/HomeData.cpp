@@ -62,7 +62,7 @@ HomeData buildHomeData(const SongTableModel& model, const std::filesystem::path&
         ++perCollection[toQString(song->collection)];
         if (!byName.contains(song->inputName) || song->collection == "chords")
             byName[song->inputName] = song->path;
-        byStem[song->path.stem().string()].push_back(song->path);
+        byStem[toUtf8(song->path.stem())].push_back(song->path);
         const QModelIndex index = model.index(row, 0);
         if (data.datesKnown && index.data(SongTableModel::RecentRole).toBool()) {
             const QDateTime when = index.data(SongTableModel::AddedRole).toDateTime();
@@ -157,11 +157,11 @@ HomeData buildHomeData(const SongTableModel& model, const std::filesystem::path&
         if (!text)
             continue;
         HomeBook book;
-        book.id = toQString(relative.generic_string());
+        book.id = toQString(relative);
         const auto parsed = zub::bookfile::parse(*text);
         const auto settings = zub::bookfile::readSettings(*text);
-        book.title = !settings.title.empty() ? toQString(settings.title)
-                                             : toQString(relative.stem().string());
+        book.title =
+            !settings.title.empty() ? toQString(settings.title) : toQString(relative.stem());
         book.locked = settings.locked;
         if (parsed) {
             book.songs = static_cast<int>(parsed->songs().size());
@@ -188,9 +188,8 @@ HomeData buildHomeData(const SongTableModel& model, const std::filesystem::path&
         ++titles[book.title];
     for (HomeBook& book : data.books)
         if (titles[book.title] > 1)
-            book.title += QStringLiteral(" (") +
-                          toQString(std::filesystem::path(toStdString(book.id)).stem().string()) +
-                          QLatin1Char(')');
+            book.title +=
+                QStringLiteral(" (") + toQString(toPath(book.id).stem()) + QLatin1Char(')');
     for (HomeWish& wish : data.wishes)
         for (const HomeBook& book : data.books)
             if (book.id == wish.bookId)
@@ -213,7 +212,7 @@ void rememberSong(const std::filesystem::path& root, const std::filesystem::path
     if (relative.empty() || *relative.begin() == ".." || relative.is_absolute())
         return;
     QStringList list = QSettings{}.value(settingsKey(root)).toStringList();
-    const QString entry = toQString(relative.generic_string());
+    const QString entry = toQString(relative);
     list.removeAll(entry);
     list.prepend(entry);
     while (list.size() > HomeData::kListed)

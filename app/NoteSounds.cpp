@@ -59,7 +59,8 @@ NoteSounds::NoteSounds(fs::path cacheDir, QObject* parent)
         } else {
             fs::rename(job.temp, job.wav, ec);
             if (ec)
-                problem = toQString(job.wav.string() + ": " + ec.message());
+                problem = toQString(job.wav) + QStringLiteral(": ") +
+                          QString::fromStdString(ec.message());
         }
         timedOut_ = false;
         if (problem.isEmpty()) {

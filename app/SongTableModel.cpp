@@ -111,7 +111,7 @@ void SongTableModel::addSong(zub::SongEntry song) {
 void SongTableModel::setDates(const std::filesystem::path& root,
                               const std::map<std::string, zub::songdates::Dates>& dates) {
     for (Row& row : rows_) {
-        const auto it = dates.find(row.entry.path.lexically_relative(root).generic_string());
+        const auto it = dates.find(toUtf8(row.entry.path.lexically_relative(root)));
         setDatesOf(row, it == dates.end() ? zub::songdates::Dates{} : it->second);
     }
     hasDates_ = true;

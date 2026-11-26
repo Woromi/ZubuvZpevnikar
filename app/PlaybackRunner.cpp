@@ -319,7 +319,8 @@ void PlaybackRunner::onPostProcessed(bool ok) {
     }
     fs::rename(wavTemp_, wav_, ec);
     if (ec) {
-        failure.message = toQString(wav_.string() + ": " + ec.message());
+        failure.message =
+            toQString(wav_) + QStringLiteral(": ") + QString::fromStdString(ec.message());
         finishWith(failure);
         return;
     }

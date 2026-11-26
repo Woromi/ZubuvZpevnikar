@@ -89,12 +89,12 @@ void SongbookScan::onScriptFinished() {
         return;
     }
     // The songs of this check, by path.
-    std::map<std::string, std::size_t> wanted;
+    std::map<std::filesystem::path, std::size_t> wanted;
     for (std::size_t i = 0; i < songs_.size(); ++i)
-        wanted.emplace(songs_[i].path.lexically_normal().string(), i);
+        wanted.emplace(songs_[i].path.lexically_normal(), i);
     const auto songOf = [&](const std::string& file) -> const Song* {
         const auto it =
-            wanted.find((options_.songbookRoot / toPath(toQString(file))).lexically_normal().string());
+            wanted.find((options_.songbookRoot / toPath(toQString(file))).lexically_normal());
         return it == wanted.end() ? nullptr : &songs_[it->second];
     };
     if (script == Script::Keys) {
@@ -117,7 +117,7 @@ void SongbookScan::onScriptFinished() {
                 const QString detected =
                     toQString(zub::songcheck::keyValue(finding.detected, german));
                 const QString margin = QString::number(finding.margin, 'f', 1);
-                ScanFinding& found = scriptFindings_[song->path.lexically_normal().string()];
+                ScanFinding& found = scriptFindings_[song->path.lexically_normal()];
                 found.keys << (missing ? tr("none written, the chords say %1 (margin %2)")
                                              .arg(detected, margin)
                                        : tr("written %1, the chords say %2 (margin %3)")
@@ -137,7 +137,7 @@ void SongbookScan::onScriptFinished() {
                 const Song* song = songOf(file);
                 if (!song)
                     continue;
-                ScanFinding& found = scriptFindings_[song->path.lexically_normal().string()];
+                ScanFinding& found = scriptFindings_[song->path.lexically_normal()];
                 emit metadataFound(toQString(song->path), list);
                 for (const auto& issue : list)
                     found.metadata << (issue.line ? tr("line %1: %2")
@@ -151,7 +151,7 @@ void SongbookScan::onScriptFinished() {
 }
 
 void SongbookScan::takeScriptFindings(std::size_t song) {
-    const auto it = scriptFindings_.find(songs_[song].path.lexically_normal().string());
+    const auto it = scriptFindings_.find(songs_[song].path.lexically_normal());
     if (it == scriptFindings_.end())
         return;
     finding_.keys = it->second.keys;

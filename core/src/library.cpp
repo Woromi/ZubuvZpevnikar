@@ -130,8 +130,8 @@ std::vector<std::string> collections(const fs::path& root) {
 }
 
 std::optional<std::string> collectionOf(const fs::path& root, const fs::path& path) {
-    const std::string prefix = (root / songsSubdir / "").generic_string();
-    const std::string full = path.generic_string();
+    const std::string prefix = utf8(root / songsSubdir / "");
+    const std::string full = utf8(path);
     if (!full.starts_with(prefix))
         return std::nullopt;
     const auto rest = std::string_view(full).substr(prefix.size());

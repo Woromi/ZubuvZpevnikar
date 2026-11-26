@@ -235,7 +235,7 @@ void HomePage::fillSongs(QListWidget* list, const std::vector<HomeSong>& songs,
 }
 
 void HomePage::setData(const HomeData& home) {
-    heading_->setText(toQString(home.root.filename().string()));
+    heading_->setText(toQString(home.root.filename()));
     QStringList parts;
     parts << tr("%n song(s)", nullptr, home.songs);
     if (home.collections.size() > 1)

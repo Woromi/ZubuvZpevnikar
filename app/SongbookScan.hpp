@@ -105,6 +105,6 @@ private:
     std::size_t scriptAt_ = 0;
     QProcess* process_ = nullptr;
     // What the scripts found, by the song's path (utf-8), until the song is reported.
-    std::map<std::string, ScanFinding> scriptFindings_;
+    std::map<std::filesystem::path, ScanFinding> scriptFindings_;
     bool cancelled_ = false;
 };

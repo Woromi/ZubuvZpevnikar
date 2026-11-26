@@ -7,8 +7,13 @@
 namespace zub::songdates {
 
 namespace {
+std::string utf8(const std::filesystem::path& p) {
+    const auto u8 = p.generic_u8string(); // never string(): Windows' ANSI code page throws
+    return {u8.begin(), u8.end()};
+}
+
 converter::Command gitCommand(const std::filesystem::path& root, std::vector<std::string> rest) {
-    converter::Command command{"git", {"-C", root.string(), "-c", "core.quotePath=false"}};
+    converter::Command command{"git", {"-C", utf8(root), "-c", "core.quotePath=false"}};
     command.arguments.insert(command.arguments.end(), std::make_move_iterator(rest.begin()),
                              std::make_move_iterator(rest.end()));
     return command;

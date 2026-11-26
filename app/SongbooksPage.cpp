@@ -804,7 +804,7 @@ void SongbooksPage::fillList(const QString& selectId) {
                 }
                 parent = item;
             }
-            const QString id = toQString(relative.generic_string());
+            const QString id = toQString(relative);
             auto* item = parent ? new QTreeWidgetItem(parent, {toQString(relative.stem())})
                                 : new QTreeWidgetItem(list_, {toQString(relative.stem())});
             item->setData(0, Qt::UserRole, id);
@@ -1049,8 +1049,7 @@ void SongbooksPage::newSongbook() {
         for (const auto& relative : zub::bookfile::findBooks(root_)) {
             auto dir = relative.parent_path();
             for (; std::distance(dir.begin(), dir.end()) > 1; dir = dir.parent_path())
-                folders.insert(
-                    toQString(dir.lexically_relative(*relative.begin()).generic_string()));
+                folders.insert(toQString(dir.lexically_relative(*relative.begin())));
         }
         for (const QString& name : folders)
             folder->addItem(name);
@@ -1197,8 +1196,7 @@ void SongbooksPage::newSongbook() {
                                     "lines in a center environment, as in the other camps.\n");
     }
     fillList(toQString((zub::bookfile::booksFolder(root_) / toPath(folderName) /
-                        toPath(stemName + QStringLiteral(".tex")))
-                           .generic_string()));
+                        toPath(stemName + QStringLiteral(".tex")))));
 }
 
 std::optional<std::string> SongbooksPage::coverReference(const std::filesystem::path& file,
@@ -1211,19 +1209,19 @@ std::optional<std::string> SongbooksPage::coverReference(const std::filesystem::
         const auto relative = absolute.lexically_relative(std::filesystem::weakly_canonical(dir));
         if (relative.empty() || *relative.begin() == "..")
             return std::nullopt;
-        return relative.generic_string();
+        return toUtf8(relative);
     };
     if (const auto own = inside(bookDir))
         return own;
     if (const auto repo = inside(root_))
         return repo;
     // <stem>-cover.<ext>, never replacing a file there (another book's cover, cover.pdf).
-    std::string name = stem + "-cover" + absolute.extension().string();
-    for (int n = 2; std::filesystem::exists(bookDir / name); ++n)
-        name = stem + "-cover-" + std::to_string(n) + absolute.extension().string();
+    std::string name = stem + "-cover" + toUtf8(absolute.extension());
+    for (int n = 2; std::filesystem::exists(bookDir / pathFromUtf8(name)); ++n)
+        name = stem + "-cover-" + std::to_string(n) + toUtf8(absolute.extension());
     std::error_code error;
-    std::filesystem::copy_file(absolute, bookDir / name, std::filesystem::copy_options::none,
-                               error);
+    std::filesystem::copy_file(absolute, bookDir / pathFromUtf8(name),
+                               std::filesystem::copy_options::none, error);
     if (error)
         return std::nullopt;
     return name;
@@ -1323,12 +1321,12 @@ void SongbooksPage::duplicateSongbook() {
         const auto relative = real.lexically_relative(base);
         return !relative.empty() && *relative.begin() != "..";
     };
+    const auto cover = pathFromUtf8(settings_.cover);
     if (!settings_.cover.empty() && zub::safety::isPlainFilePath(settings_.cover) &&
-        std::filesystem::is_regular_file(sourceDir / settings_.cover) &&
-        insideSource(sourceDir / settings_.cover) &&
-        !std::filesystem::exists(dir / settings_.cover)) {
-        std::filesystem::create_directories((dir / settings_.cover).parent_path(), error);
-        std::filesystem::copy_file(sourceDir / settings_.cover, dir / settings_.cover, error);
+        std::filesystem::is_regular_file(sourceDir / cover) && insideSource(sourceDir / cover) &&
+        !std::filesystem::exists(dir / cover)) {
+        std::filesystem::create_directories((dir / cover).parent_path(), error);
+        std::filesystem::copy_file(sourceDir / cover, dir / cover, error);
         if (error)
             showWarning(
                 tr("The cover %1 was not copied: %2")
@@ -1340,8 +1338,7 @@ void SongbooksPage::duplicateSongbook() {
     if (!writeNewBook(dir, stemName, copy, *script))
         return;
     fillList(toQString((zub::bookfile::booksFolder(root_) / toPath(folderName) /
-                        toPath(stemName + QStringLiteral(".tex")))
-                           .generic_string()));
+                        toPath(stemName + QStringLiteral(".tex")))));
 }
 
 // ---- The selected songbook ----

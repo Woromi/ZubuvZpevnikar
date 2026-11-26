@@ -42,14 +42,14 @@ AddToBooksDialog::AddToBooksDialog(const std::filesystem::path& root, const std:
         item->setForeground(0, grey);
     };
     for (const auto& relative : zub::bookfile::findBooks(root)) {
-        const QString id = toQString(relative.generic_string());
+        const QString id = toQString(relative);
         const auto text = zub::readTextFile(root / relative);
         if (!text)
             continue;
         const auto book = zub::bookfile::parse(*text);
         const auto settings = zub::bookfile::readSettings(*text);
-        const QString title = settings.title.empty() ? toQString(relative.stem().string())
-                                                     : toQString(settings.title);
+        const QString title =
+            settings.title.empty() ? toQString(relative.stem()) : toQString(settings.title);
         auto* bookItem = new QTreeWidgetItem(tree_, {title + QStringLiteral("  ·  ") + id});
         bookItem->setData(0, targetRole, -1);
         bookItem->setToolTip(0, id);
