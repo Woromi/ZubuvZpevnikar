@@ -23,6 +23,12 @@ std::string utf8(const std::filesystem::path& p) {
     return {u8.begin(), u8.end()};
 }
 
+// For labels people read: '/' between folders on every system.
+std::string utf8Generic(const std::filesystem::path& p) {
+    const auto u8 = p.generic_u8string();
+    return {u8.begin(), u8.end()};
+}
+
 std::filesystem::path fromUtf8(std::string_view s) {
     return std::filesystem::path(std::u8string(s.begin(), s.end()));
 }
@@ -344,7 +350,7 @@ bool loadableByName(const std::string& lowerName, bool texToo) {
 
 std::string relativeLabel(const std::filesystem::path& file, const std::filesystem::path& root) {
     const auto relative = file.lexically_relative(root);
-    return utf8(relative.empty() ? file : relative);
+    return utf8Generic(relative.empty() ? file : relative);
 }
 
 } // namespace
@@ -444,7 +450,7 @@ std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,
             if (!std::filesystem::exists(std::filesystem::symlink_status(file, ec)))
                 continue;
             if (!std::filesystem::is_regular_file(file, ec)) {
-                add(utf8(file.lexically_relative(repoRoot)) + ": not a plain file");
+                add(utf8Generic(file.lexically_relative(repoRoot)) + ": not a plain file");
                 continue;
             }
             const auto text = readTextFile(file);
