@@ -238,10 +238,12 @@ void SongbookScan::next() {
                     endSong(step.song);
                 continue;
             }
-            // ... and neither one whose scores run code in LilyPond.
-            if (const auto risks =
-                    zub::songbook::scoreRisks(options_.songbookRoot, song.path, content_);
-                !risks.empty()) {
+            // ... and neither one whose scores run code in LilyPond, nor while the library's
+            // folders have files the build could load by name.
+            auto risks = zub::songbook::scoreRisks(options_.songbookRoot, song.path, content_);
+            for (std::string& shadow : zub::songbook::texinputsShadows(options_.songbookRoot))
+                risks.push_back(std::move(shadow));
+            if (!risks.empty()) {
                 finding_.errors << tr("not measured: %1").arg(toQString(risks.front()));
                 ++current_;
                 if (current_ >= steps_.size() || steps_[current_].song != step.song)

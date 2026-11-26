@@ -816,14 +816,15 @@ TEST_CASE("Songbooks page: the build writes the song copies where TEXINPUTS find
     REQUIRE(command->environment.size() == 1);
     const std::string texinputs = command->environment[0].second;
     INFO(texinputs);
-    // ".", the work dir, the package, the copies, then the song folders.
+    // ".", the work dir, the package, the copies, TeX's own tree, then the song folders.
     std::vector<std::string> entries;
     for (const auto part : std::views::split(texinputs, zub::preview::kPathListSeparator))
         entries.emplace_back(part.begin(), part.end());
-    REQUIRE(entries.size() > 4);
+    REQUIRE(entries.size() > 5);
     CHECK(std::filesystem::path(entries[1]) == command->workingDirectory);
     CHECK(std::filesystem::path(entries[3]) == override);
-    CHECK(entries[4].ends_with("/songs/chords"));
+    CHECK(entries[4].empty());
+    CHECK(entries[5].ends_with("/songs/chords"));
 
     // The next build without copies: the old one is gone, TEXINPUTS has no override folder.
     const auto plain = exporter->prepareRepoBuild(f.book(), keyedBook);

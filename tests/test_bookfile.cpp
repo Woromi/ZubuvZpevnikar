@@ -46,11 +46,16 @@ std::string set(const std::string& text, const Strings& names, std::size_t env =
 } // namespace
 
 namespace {
-// The folders as TEXINPUTS lists them, each followed by the system's separator.
+// The folders as TEXINPUTS lists them, between the system's separators ("" = TeX's own tree).
 std::string onTexinputs(std::initializer_list<std::string> folders) {
     std::string out;
-    for (const auto& folder : folders)
-        out += folder + zub::preview::kPathListSeparator;
+    bool first = true;
+    for (const auto& folder : folders) {
+        if (!first)
+            out += zub::preview::kPathListSeparator;
+        out += folder;
+        first = false;
+    }
     return out;
 }
 } // namespace
@@ -643,7 +648,7 @@ TEST_CASE("bookfile builds a repo book from a copy in the work dir", "[bookfile]
     CHECK(command.workingDirectory == "/work");
     REQUIRE(command.environment.size() == 1);
     CHECK(command.environment[0].second ==
-          onTexinputs({".", "/work", "/pkg", "/sb/songbooks/t/2025", "/sb"})); // no songs/ here
+          onTexinputs({".", "/work", "/pkg", "", "/sb/songbooks/t/2025", "/sb"})); // no songs/ here
     CHECK(command.pdf == "/work/book.pdf");
     CHECK(command.log == "/work/book.log");
 }
@@ -653,15 +658,16 @@ TEST_CASE("bookfile build TEXINPUTS lists every collection", "[bookfile]") {
     const auto command = zub::bookfile::buildCommand(repo, "/pkg", "/work", "/bd", "book", {});
     const auto root = repo.generic_string();
     CHECK(command.environment[0].second ==
-          onTexinputs({".", "/work", "/pkg", root + "/songs/chords", root + "/songs/whistle2", "/bd",
+          onTexinputs({".", "/work", "/pkg", "", root + "/songs/chords", root + "/songs/whistle2", "/bd",
                        root}));
 
     const auto script = zub::bookfile::buildScriptFor("b", zub::songbook::BookClass::Velky, {},
                                                       {"chords", "tinwhistle", "whistle2"});
-    CHECK(script.contains("$REPO_ROOT/songs/chords:$REPO_ROOT/songs/tinwhistle:"
-                          "$REPO_ROOT/songs/whistle2:${TEXINPUTS:-}"));
+    REQUIRE(script);
+    CHECK(script->contains("$REPO_ROOT/songs/chords:$REPO_ROOT/songs/tinwhistle:"
+                           "$REPO_ROOT/songs/whistle2:${TEXINPUTS:-}"));
     CHECK(zub::bookfile::buildScriptFor("b", zub::songbook::BookClass::Velky, {})
-              .contains("$REPO_ROOT/songs/chords:$REPO_ROOT/songs/tinwhistle:${TEXINPUTS:-}"));
+              ->contains("$REPO_ROOT/songs/chords:$REPO_ROOT/songs/tinwhistle:${TEXINPUTS:-}"));
 }
 
 TEST_CASE("bookfile: review findings", "[bookfile]") {
@@ -1279,16 +1285,51 @@ TEST_CASE("booksFolder is songbooks, or projects in an older checkout", "[bookfi
 TEST_CASE("a build.sh never gets an odd collection name", "[bookfile]") {
     const auto script = zub::bookfile::buildScriptFor("b", zub::songbook::BookClass::Velky,
                                                       {"obsah"}, {"chords", "x$(id)", "a:b"});
-    CHECK(script.find("songs/chords:") != std::string::npos);
-    CHECK(script.find("x$(id)") == std::string::npos);
-    CHECK(script.find("a:b") == std::string::npos);
+    REQUIRE(script);
+    CHECK(script->find("songs/chords:") != std::string::npos);
+    CHECK(script->find("x$(id)") == std::string::npos);
+    CHECK(script->find("a:b") == std::string::npos);
+}
+
+TEST_CASE("a build.sh is refused for a book or index name that is not plain", "[bookfile]") {
+    using zub::songbook::BookClass;
+    // An index name from a book's \newindex goes into the script unquoted.
+    CHECK_FALSE(zub::bookfile::buildScriptFor("b", BookClass::Velky, {"x;id>/tmp/pw"}));
+    CHECK_FALSE(zub::bookfile::buildScriptFor("b", BookClass::Velky, {"two words"}));
+    CHECK_FALSE(zub::bookfile::buildScriptFor("b", BookClass::Velky, {"-o"}));
+    CHECK_FALSE(zub::bookfile::buildScriptFor("b", BookClass::Velky, {""}));
+    CHECK_FALSE(zub::bookfile::buildScriptFor("b$(id)", BookClass::Velky, {"obsah"}));
+    CHECK_FALSE(zub::bookfile::buildScriptFor("", BookClass::Tabor, {"obsah"}));
+    CHECK(zub::bookfile::buildScriptFor("tabor-2027_b", BookClass::Tabor, {"obsah", "obsahAutor"}));
+}
+
+TEST_CASE("chordChartFiles lists every akordy.tex a build could find, in TEXINPUTS order",
+          "[bookfile]") {
+    const fs::path root = fs::temp_directory_path() / ("zub-akordy-" + zubtest::uniqueSuffix());
+    fs::create_directories(root / "songs/chords/A");
+    fs::create_directories(root / "songs/tinwhistle");
+    fs::create_directories(root / "songbooks/t");
+    const fs::path bookDir = root / "songbooks/t";
+    CHECK(zub::bookfile::chordChartFiles(root, bookDir).empty());
+    std::ofstream(bookDir / "akordy.tex") << "x";
+    CHECK(zub::bookfile::chordChartFiles(root, bookDir) ==
+          std::vector<fs::path>{bookDir / "akordy.tex"});
+    std::ofstream(root / "akordy.tex") << "x";
+    std::ofstream(root / "songs/tinwhistle/akordy.tex") << "x";
+    std::ofstream(root / "songs/chords/A/akordy.tex") << "x"; // in an artist folder: not found
+    CHECK(zub::bookfile::chordChartFiles(root, bookDir) ==
+          std::vector<fs::path>{root / "songs/tinwhistle/akordy.tex", bookDir / "akordy.tex",
+                                root / "akordy.tex"});
+    std::ofstream(root / "songs/chords/akordy") << "x"; // TeX tries "akordy" next
+    CHECK(zub::bookfile::chordChartFiles(root, bookDir).front() == root / "songs/chords/akordy");
+    fs::remove_all(root);
 }
 
 TEST_CASE("bookfile build TEXINPUTS puts song copies after the package", "[bookfile]") {
     const auto command =
         zub::bookfile::buildCommand("/sb", "/pkg", "/work", "/bd", "book", {}, "/work/override");
     CHECK(command.environment[0].second ==
-          onTexinputs({".", "/work", "/pkg", "/work/override", "/bd", "/sb"}));
+          onTexinputs({".", "/work", "/pkg", "/work/override", "", "/bd", "/sb"}));
 }
 
 TEST_CASE("addClassOption adds a class option once, byte-exact", "[bookfile]") {

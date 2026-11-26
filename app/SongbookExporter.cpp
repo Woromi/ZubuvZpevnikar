@@ -91,6 +91,7 @@ QString SongbookExporter::noPackageText() const {
 }
 
 bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution,
+                                     const std::filesystem::path& bookDir,
                                      const QStringList& extra,
                                      const std::map<std::string, std::string>& copies) {
     QStringList lines = extra;
@@ -108,7 +109,7 @@ bool SongbookExporter::confirmSafety(const zub::songbook::Resolution& resolution
         } else {
             // The song's own commands, and what its scores would run through LilyPond.
             auto unknown = zub::safety::unknownConstructs(*text);
-            for (std::string& risk : zub::songbook::scoreRisks(root_, song.path, *text))
+            for (std::string& risk : zub::songbook::scoreRisks(root_, song.path, *text, bookDir))
                 unknown.push_back(std::move(risk));
             if (unknown.empty())
                 continue;
@@ -171,9 +172,21 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
         bookRisks << name + QStringLiteral(": ") + commands.join(QStringLiteral(", "));
     };
     addRisks(toQString(bookFile.filename()), text);
+    // Files in the library's folders the build could load by name instead of TeX's or the book's.
+    for (const std::string& shadow : zub::songbook::texinputsShadows(root_, bookDir))
+        bookRisks << toQString(shadow);
     std::vector<std::string> inputs = zub::bookfile::inputs(text);
-    if (const auto akordy = zub::readTextFile(bookDir / "akordy.tex")) {
-        addRisks(QStringLiteral("akordy.tex"), *akordy);
+    // Every akordy.tex the build could find, not only the book's: one in a song folder comes
+    // first on TEXINPUTS, one in the repo root stands in when the book has none.
+    for (const auto& chart : zub::bookfile::chordChartFiles(root_, bookDir)) {
+        const auto relative = chart.lexically_relative(root_);
+        const QString label = toQString(relative.empty() ? chart : relative);
+        const auto akordy = zub::readTextFile(chart);
+        if (!akordy) {
+            bookRisks << label + QStringLiteral(": ") + toQString(akordy.error());
+            continue;
+        }
+        addRisks(label, *akordy);
         for (std::string& name : zub::bookfile::inputs(*akordy))
             if (std::ranges::find(inputs, name) == inputs.end())
                 inputs.push_back(std::move(name));
@@ -195,8 +208,14 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
         else
             bookRisks << tr("\\input{%1}: not a song of the song library").arg(toQString(name));
     }
-    // An index file lying in the book's folder or the repo root would be read by the first run.
-    for (const auto& dir : {bookDir, root_}) {
+    // An index file lying in a song folder, the book's folder or the repo root (all on the
+    // build's TEXINPUTS) would be read by the first run.
+    std::vector<std::filesystem::path> indexDirs;
+    for (const std::string& collection : zub::collections(root_))
+        indexDirs.push_back(root_ / "songs" / toPath(toQString(collection)));
+    indexDirs.push_back(bookDir);
+    indexDirs.push_back(root_);
+    for (const auto& dir : indexDirs) {
         const QDir folder(toQString(dir));
         for (const QString& name :
              folder.entryList({QStringLiteral("*.sbx"), QStringLiteral("*.sxd")}, QDir::Files))
@@ -213,7 +232,7 @@ SongbookExporter::prepareRepoBuild(const std::filesystem::path& bookFile, const 
             return std::nullopt;
         }
     const auto resolution = zub::songbook::resolveSongs(all, root_);
-    if (!confirmSafety(resolution, bookRisks, songs))
+    if (!confirmSafety(resolution, bookDir, bookRisks, songs))
         return std::nullopt;
 
     // One work dir per book file: LilyPond's cache stays between builds (unless Settings →

@@ -74,6 +74,7 @@
 #include <zub/core/library.hpp>
 #include <zub/core/package.hpp>
 #include <zub/core/score.hpp>
+#include <zub/core/safety.hpp>
 #include <zub/core/songbook.hpp>
 #include <zub/core/songheader.hpp>
 #include <zub/core/songtodo.hpp>
@@ -1285,14 +1286,6 @@ void SongbooksPage::duplicateSongbook() {
                                  tr("There is a songbook of this name in that folder already."));
         return;
     }
-    std::error_code error;
-    std::filesystem::create_directories(dir, error);
-    if (error) {
-        QMessageBox::warning(this, tr("Duplicate"),
-                             tr("Cannot create %1: %2")
-                                 .arg(toQString(dir), QString::fromStdString(error.message())));
-        return;
-    }
     // The copy is a new edition: not locked. A cover and a camp's akordy.tex beside the original
     // are copied along.
     const std::string copy = zub::bookfile::setLocked(text_, false);
@@ -1303,8 +1296,36 @@ void SongbooksPage::duplicateSongbook() {
             .value_or(BookClass::Velky),
         parsed ? zub::bookfile::indexFiles(*parsed) : std::vector<std::string>{"obsah"},
         zub::collections(root_));
+    if (!script) { // before the folder is made: a refusal leaves nothing behind
+        QMessageBox::warning(this, tr("Duplicate"), toQString(script.error()));
+        return;
+    }
+    std::error_code error;
+    std::filesystem::create_directories(dir, error);
+    if (error) {
+        QMessageBox::warning(this, tr("Duplicate"),
+                             tr("Cannot create %1: %2")
+                                 .arg(toQString(dir), QString::fromStdString(error.message())));
+        return;
+    }
     const auto sourceDir = pathOf(id_).parent_path();
-    if (!settings_.cover.empty() && std::filesystem::is_regular_file(sourceDir / settings_.cover) &&
+    // Only files inside the book's folder are copied into the library (which may be pushed):
+    // the cover's name comes from the book, so a plain relative path (no "..", nothing absolute)
+    // with no link on the way out of the folder.
+    const auto insideSource = [&sourceDir](const std::filesystem::path& file) {
+        std::error_code ec;
+        const auto base = std::filesystem::canonical(sourceDir, ec);
+        if (ec)
+            return false;
+        const auto real = std::filesystem::canonical(file, ec);
+        if (ec || std::filesystem::is_symlink(file, ec))
+            return false;
+        const auto relative = real.lexically_relative(base);
+        return !relative.empty() && *relative.begin() != "..";
+    };
+    if (!settings_.cover.empty() && zub::safety::isPlainFilePath(settings_.cover) &&
+        std::filesystem::is_regular_file(sourceDir / settings_.cover) &&
+        insideSource(sourceDir / settings_.cover) &&
         !std::filesystem::exists(dir / settings_.cover)) {
         std::filesystem::create_directories((dir / settings_.cover).parent_path(), error);
         std::filesystem::copy_file(sourceDir / settings_.cover, dir / settings_.cover, error);
@@ -1314,9 +1335,9 @@ void SongbooksPage::duplicateSongbook() {
                     .arg(toQString(settings_.cover), QString::fromStdString(error.message())));
     }
     if (std::filesystem::is_regular_file(sourceDir / "akordy.tex") &&
-        !std::filesystem::exists(dir / "akordy.tex"))
+        insideSource(sourceDir / "akordy.tex") && !std::filesystem::exists(dir / "akordy.tex"))
         std::filesystem::copy_file(sourceDir / "akordy.tex", dir / "akordy.tex", error);
-    if (!writeNewBook(dir, stemName, copy, script))
+    if (!writeNewBook(dir, stemName, copy, *script))
         return;
     fillList(toQString((zub::bookfile::booksFolder(root_) / toPath(folderName) /
                         toPath(stemName + QStringLiteral(".tex")))
@@ -2066,7 +2087,7 @@ void SongbooksPage::refreshOverview() {
         return;
     }
     const auto facts = songFacts(*model_, root_);
-    const auto checked = checkSongbook(pathOf(id_), text_, facts);
+    const auto checked = checkSongbook(root_, pathOf(id_), text_, facts);
     if (!checked) {
         overview_->setChecks(id_, tr("The songbook cannot be read: see the LaTeX tab."), false, {});
         return;

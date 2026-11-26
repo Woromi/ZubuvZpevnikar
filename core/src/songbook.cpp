@@ -240,40 +240,20 @@ std::filesystem::path findScoreFile(const std::filesystem::path& repoRoot,
     return {};
 }
 
-std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,
-                                    const std::filesystem::path& /*songPath*/,
-                                    std::string_view songText) {
-    std::vector<std::string> risks;
-    for (const std::string& reference : referencedFiles(songText)) {
-        const auto name = resolveScoreReference(reference);
-        if (!name) {
-            risks.push_back("\\lilypondfile{" + reference + "}");
-            continue;
-        }
-        // Every collection's copy: the preview and a book build search the collections in
-        // different orders, so whichever one a build finds has been checked.
-        for (const std::string& collection : collections(repoRoot)) {
-            const auto file = repoRoot / "songs" / fromUtf8(collection) / fromUtf8(*name);
-            std::error_code ec;
-            if (!std::filesystem::is_regular_file(file, ec))
-                continue;
-            const auto text = readTextFile(file);
-            if (!text) {
-                risks.push_back(*name + ": cannot read the file");
-                continue;
-            }
-            for (const std::string& risk : safety::lilypondRisks(*text))
-                if (std::ranges::find(risks, *name + ": " + risk) == risks.end())
-                    risks.push_back(*name + ": " + risk);
-        }
-    }
-    return risks;
-}
+namespace {
 
-std::vector<std::string> referencedFiles(std::string_view songText) {
-    const std::string text = latex::stripComments(songText);
+// One \lilypondfile or \narrowlilypondfile of a song (comments stripped).
+struct ScoreCall {
+    std::optional<std::string> target; // the braced argument, trimmed; nullopt when unreadable
+    bool bracketed = false;            // "[...]" before it: the package takes no options
+    bool oddBlanks = false;            // blanks around the name, a run of them, tabs or breaks
+    bool unreadable() const { return !target || bracketed || oddBlanks; }
+    std::string text;                  // the call as written, for a risk message
+};
+
+std::vector<ScoreCall> scoreCalls(const std::string& text) {
     constexpr std::string_view name = "lilypondfile";
-    std::vector<std::string> files;
+    std::vector<ScoreCall> calls;
     std::size_t pos = 0;
     while ((pos = text.find(name, pos)) != std::string::npos) {
         const std::size_t start = pos;
@@ -285,24 +265,212 @@ std::vector<std::string> referencedFiles(std::string_view songText) {
         std::size_t i = pos;
         if (i < text.size() && std::isalpha(static_cast<unsigned char>(text[i])))
             continue;
-        while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i])))
-            ++i;
-        if (i < text.size() && text[i] == '[') {
-            const auto closeBracket = text.find(']', i);
-            if (closeBracket == std::string::npos)
-                continue;
-            i = closeBracket + 1;
+        const std::size_t callStart = narrow ? start - 7 : start - 1;
+        ScoreCall call;
+        const auto skipSpaces = [&] {
             while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i])))
                 ++i;
+        };
+        skipSpaces();
+        if (i < text.size() && text[i] == '[') {
+            call.bracketed = true;
+            const auto closeBracket = text.find(']', i);
+            if (closeBracket != std::string::npos) {
+                i = closeBracket + 1;
+                skipSpaces();
+            }
         }
-        if (i >= text.size() || text[i] != '{')
+        std::size_t end = std::min(text.size(), i + 1);
+        if (i < text.size() && text[i] == '{') {
+            if (const auto closeBrace = text.find('}', i); closeBrace != std::string::npos) {
+                const std::string raw = text.substr(i + 1, closeBrace - i - 1);
+                call.target = trimScoreTarget(raw);
+                // TeX keeps a leading blank and squeezes a run of them, and lyluatex trims
+                // nothing: such a name is not the file the scan would read.
+                call.oddBlanks = raw != *call.target || raw.find("  ") != std::string::npos ||
+                                 raw.find_first_of("\t\r\n") != std::string::npos;
+                end = closeBrace + 1;
+            }
+        }
+        std::size_t length = std::min<std::size_t>(end - callStart, 60);
+        while (length > 0 && callStart + length < text.size() &&
+               (static_cast<unsigned char>(text[callStart + length]) & 0xC0) == 0x80)
+            --length; // not in the middle of a UTF-8 character
+        call.text = text.substr(callStart, length);
+        std::ranges::replace_if(call.text, [](char c) { return c == '\n' || c == '\r'; }, ' ');
+        calls.push_back(std::move(call));
+    }
+    return calls;
+}
+
+std::string lowerAscii(std::string s) {
+    for (char& c : s)
+        if (c >= 'A' && c <= 'Z')
+            c = static_cast<char>(c - 'A' + 'a');
+    return s;
+}
+
+} // namespace
+
+std::vector<std::string> includeShadows(const std::filesystem::path& scoreDir) {
+    std::vector<std::string> found;
+    std::error_code ec;
+    for (std::filesystem::directory_iterator it(scoreDir, ec), end; !ec && it != end;
+         it.increment(ec)) {
+        // Case-insensitive: so are the file systems of Windows and macOS.
+        const std::string fileName = utf8(it->path().filename());
+        if (safety::isTrustedInclude(lowerAscii(fileName)))
+            found.push_back(fileName + " beside the score: it stands in for the package's");
+    }
+    std::ranges::sort(found);
+    return found;
+}
+
+namespace {
+
+// Extensions of files TeX, LuaTeX or LilyPond load by a bare name a package probes for
+// (hyperref.cfg, a missing .fd, a Lua module, a score's include), lower case.
+bool loadableByName(const std::string& lowerName, bool texToo) {
+    constexpr std::array extensions = std::to_array<std::string_view>(
+        {".cfg", ".sty", ".cls", ".def", ".fd", ".clo", ".ldf", ".lua", ".luc", ".ltx", ".dtx",
+         ".ins", ".bbx", ".cbx", ".lbx", ".sbx", ".sxd", ".ly", ".ily"});
+    if (lowerName == "akordy")
+        return true; // \input{akordy} tries "akordy" after "akordy.tex"
+    if (texToo && lowerName.ends_with(".tex"))
+        return true;
+    return std::ranges::any_of(extensions,
+                               [&](std::string_view e) { return lowerName.ends_with(e); });
+}
+
+std::string relativeLabel(const std::filesystem::path& file, const std::filesystem::path& root) {
+    const auto relative = file.lexically_relative(root);
+    return utf8(relative.empty() ? file : relative);
+}
+
+} // namespace
+
+std::vector<std::string> texinputsShadows(const std::filesystem::path& repoRoot,
+                                          const std::filesystem::path& bookDir) {
+    namespace fs = std::filesystem;
+    std::vector<std::string> found;
+    const auto report = [&](const fs::path& file, std::string_view why) {
+        found.push_back(relativeLabel(file, repoRoot) + ": " + std::string(why));
+    };
+    std::error_code ec;
+    // A collection's top folder holds only artist folders: any file there is found by a bare
+    // name before the book's folder and the repo root (\input{akordy}, hyperref.cfg, ...).
+    for (const std::string& collection : collections(repoRoot)) {
+        const fs::path dir = repoRoot / "songs" / fromUtf8(collection);
+        for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+            std::error_code statusError;
+            if (!it->is_directory(statusError) || it->is_symlink(statusError))
+                report(it->path(), "a file in a song folder that a build could load by its name");
+        }
+    }
+    // The repo root and the book's folder have other files too (README.md, the book, its
+    // akordy.tex and cover, which are checked by themselves): only what TeX could load by name.
+    const auto checkTop = [&](const fs::path& dir, bool texToo) {
+        for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+            std::error_code statusError;
+            if (it->is_directory(statusError) && !it->is_symlink(statusError))
+                continue;
+            if (loadableByName(lowerAscii(utf8(it->path().filename())), texToo))
+                report(it->path(), "a file a build could load by its name");
+        }
+    };
+    checkTop(repoRoot, true);
+    if (!bookDir.empty()) {
+        checkTop(bookDir, false); // books and akordy.tex: checked as books
+        // A score under the book's folder stands in for a missing library score.
+        for (fs::recursive_directory_iterator it(bookDir, ec), end; !ec && it != end;
+             it.increment(ec)) {
+            const std::string name = lowerAscii(utf8(it->path().filename()));
+            if (it.depth() > 0 && (name.ends_with(".ly") || name.ends_with(".ily") ||
+                                   name.ends_with(".ly.tex")))
+                report(it->path(), "a score in the book's folder that a build could load");
+        }
+    }
+    std::ranges::sort(found);
+    found.erase(std::unique(found.begin(), found.end()), found.end());
+    return found;
+}
+
+std::vector<std::string> unreadableScoreCalls(std::string_view songText) {
+    std::vector<std::string> found;
+    for (ScoreCall& call : scoreCalls(latex::stripComments(songText)))
+        if (call.unreadable() && std::ranges::find(found, call.text) == found.end())
+            found.push_back(std::move(call.text));
+    return found;
+}
+
+std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,
+                                    const std::filesystem::path& /*songPath*/,
+                                    std::string_view songText,
+                                    const std::filesystem::path& bookDir) {
+    std::vector<std::string> risks;
+    const auto add = [&risks](std::string risk) {
+        if (std::ranges::find(risks, risk) == risks.end())
+            risks.push_back(std::move(risk));
+    };
+    // Every folder a build finds a score in: each collection (the preview and a book build
+    // search them in different orders), the book's folder and the repo root (both on a book
+    // build's TEXINPUTS), so whichever copy a build takes has been checked.
+    std::vector<std::filesystem::path> dirs;
+    for (const std::string& collection : collections(repoRoot))
+        dirs.push_back(repoRoot / "songs" / fromUtf8(collection));
+    if (!bookDir.empty())
+        dirs.push_back(bookDir);
+    dirs.push_back(repoRoot);
+
+    for (const ScoreCall& call : scoreCalls(latex::stripComments(songText))) {
+        if (call.unreadable()) {
+            add(call.text); // unreadableScoreCalls
             continue;
-        const auto closeBrace = text.find('}', i);
-        if (closeBrace == std::string::npos)
+        }
+        const auto name = resolveScoreReference(*call.target);
+        if (!name) {
+            add("\\lilypondfile{" + *call.target + "}");
             continue;
-        std::string target = trimScoreTarget(text.substr(i + 1, closeBrace - i - 1));
-        if (!target.empty() && std::ranges::find(files, target) == files.end())
-            files.push_back(std::move(target));
+        }
+        // lyluatex ends with kpse.find_file("Artist/X.ly"), which tries "Artist/X.ly.tex" before
+        // "Artist/X.ly" in every folder: both are read.
+        std::vector<std::filesystem::path> files;
+        for (const auto& dir : dirs) {
+            files.push_back(dir / fromUtf8(*name + ".tex"));
+            files.push_back(dir / fromUtf8(*name));
+        }
+        for (const auto& file : files) {
+            std::error_code ec;
+            if (!std::filesystem::exists(std::filesystem::symlink_status(file, ec)))
+                continue;
+            if (!std::filesystem::is_regular_file(file, ec)) {
+                add(utf8(file.lexically_relative(repoRoot)) + ": not a plain file");
+                continue;
+            }
+            const auto text = readTextFile(file);
+            if (!text) {
+                add(*name + ": cannot read the file");
+                continue;
+            }
+            const std::string label =
+                file.extension() == ".tex" ? *name + ".tex" : *name; // the .tex one is odd anyway
+            for (const std::string& risk : safety::lilypondRisks(*text))
+                add(label + ": " + risk);
+            if (label != *name)
+                add(label + ": would be built instead of " + *name);
+            for (const std::string& risk : includeShadows(file.parent_path()))
+                add(*name + ": " + risk);
+        }
+    }
+    return risks;
+}
+
+std::vector<std::string> referencedFiles(std::string_view songText) {
+    std::vector<std::string> files;
+    for (ScoreCall& call : scoreCalls(latex::stripComments(songText))) {
+        if (call.target && !call.target->empty() &&
+            std::ranges::find(files, *call.target) == files.end())
+            files.push_back(std::move(*call.target));
     }
     return files;
 }

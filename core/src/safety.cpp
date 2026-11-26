@@ -696,6 +696,18 @@ constexpr std::array kTrustedIncludes =
 
 } // namespace
 
+bool isPlainFilePath(std::string_view path) {
+    return plainFilePath(path);
+}
+
+bool isPlainName(std::string_view name) {
+    return plainName(name) && name.front() != '-';
+}
+
+bool isTrustedInclude(std::string_view fileName) {
+    return std::ranges::contains(kTrustedIncludes, fileName);
+}
+
 std::vector<std::string> lilypondRisks(std::string_view ly) {
     std::vector<std::string> found;
     const auto report = [&found](std::string construct) {

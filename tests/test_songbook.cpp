@@ -252,7 +252,7 @@ TEST_CASE("scoreRisks", "[songbook]") {
     CHECK(scoreRisks(root, chordsSong, "\\lilypondfile{A/Missing.ly}\n").empty());
     CHECK(scoreRisks(root, chordsSong, "\\lilypondfile{A/Evil}\n") ==
           std::vector<std::string>{"A/Evil.ly: #(system"});
-    CHECK(scoreRisks(root, chordsSong, "\\narrowlilypondfile{ A/Tin.ly }\n") ==
+    CHECK(scoreRisks(root, chordsSong, "\\narrowlilypondfile{A/Tin.ly}\n") ==
           std::vector<std::string>{"A/Tin.ly: #(system"});
     CHECK(scoreRisks(root, tinSong, "\\lilypondfile{A/Good.ly}\n").empty());
     CHECK(scoreRisks(root, chordsSong, "\\lilypondfile{../Evil.ly}\n") ==
@@ -303,6 +303,132 @@ TEST_CASE("scoreRisks checks every collection's copy of a score", "[songbook]") 
                                                  "\\lilypondfile{A/X.ly}");
     REQUIRE(risks.size() == 1);
     CHECK(risks[0].starts_with("A/X.ly: #(system"));
+    fs::remove_all(root);
+}
+
+TEST_CASE("scoreRisks: a build's other places for a score", "[songbook][safety]") {
+    namespace fs = std::filesystem;
+    using zub::songbook::scoreRisks;
+    const auto root = fs::temp_directory_path() / ("zub-scorerisks-" + zubtest::uniqueSuffix());
+    fs::remove_all(root);
+    fs::create_directories(root / "songs/chords/A");
+    fs::create_directories(root / "songs/chords/B");
+    fs::create_directories(root / "R");
+    fs::create_directories(root / "songbooks/t/Q");
+    const auto song = root / "songs/chords/A/S.tex";
+    const auto write = [](const fs::path& file, std::string_view text) {
+        std::ofstream(file, std::ios::binary) << text;
+    };
+
+    SECTION("a score in no collection: the repo root's copy and the book folder's are checked") {
+        write(root / "R/Root.ly", "#(system \"id\")\n");
+        CHECK(scoreRisks(root, song, "\\lilypondfile{R/Root.ly}") ==
+              std::vector<std::string>{"R/Root.ly: #(system"});
+        write(root / "songbooks/t/Q/Book.ly", "#(system \"id\")\n");
+        CHECK(scoreRisks(root, song, "\\lilypondfile{Q/Book.ly}").empty()); // the preview: not there
+        CHECK(scoreRisks(root, song, "\\lilypondfile{Q/Book.ly}", root / "songbooks/t") ==
+              std::vector<std::string>{"Q/Book.ly: #(system"});
+    }
+    SECTION("an include file beside the score stands in for the package's") {
+        write(root / "songs/chords/B/Tab.ly", "\\include \"zubuvzpevnik.ily\"\n{ c4 }\n");
+        CHECK(scoreRisks(root, song, "\\lilypondfile{B/Tab.ly}").empty());
+        write(root / "songs/chords/B/zubuvzpevnik.ily", "#(system \"id\")\n");
+        const auto risks = scoreRisks(root, song, "\\lilypondfile{B/Tab.ly}");
+        REQUIRE(risks.size() == 1);
+        CHECK(risks[0].starts_with("B/Tab.ly: zubuvzpevnik.ily beside the score"));
+        fs::remove(root / "songs/chords/B/zubuvzpevnik.ily");
+        write(root / "songs/chords/B/TinWhistle.ILY", "x\n"); // case-insensitive file systems
+        CHECK(scoreRisks(root, song, "\\lilypondfile{B/Tab.ly}").size() == 1);
+        CHECK(zub::songbook::includeShadows(root / "songs/chords/B") ==
+              std::vector<std::string>{
+                  "TinWhistle.ILY beside the score: it stands in for the package's"});
+        CHECK(zub::songbook::includeShadows(root / "nope").empty());
+    }
+    SECTION("a call without braces or with options loads a file the scan cannot see") {
+        write(root / "songs/chords/X.ly", "#(system \"id\")\n");
+        CHECK(scoreRisks(root, song, "\\lilypondfile X\n") ==
+              std::vector<std::string>{"\\lilypondfile X"});
+        CHECK(scoreRisks(root, song, "\\narrowlilypondfile\\x") ==
+              std::vector<std::string>{"\\narrowlilypondfile\\"});
+        CHECK(scoreRisks(root, song, "\\lilypondfile[a=b]{A/Good.ly}") ==
+              std::vector<std::string>{"\\lilypondfile[a=b]{A/Good.ly}"});
+        CHECK(scoreRisks(root, song, "\\lilypondfile{A/Open") ==
+              std::vector<std::string>{"\\lilypondfile{"});
+        CHECK(scoreRisks(root, song, "% \\lilypondfile X\n\\lilypondfile\n  {A/Fine.ly}").empty());
+        CHECK(zub::songbook::unreadableScoreCalls("\\lilypondfile X \\lilypondfile X") ==
+              std::vector<std::string>{"\\lilypondfile X"});
+        CHECK(zub::songbook::unreadableScoreCalls("\\lilypondfile{A/B.ly}").empty());
+    }
+    SECTION("blanks TeX keeps or squeezes: the name built is not the one read") {
+        for (const char* call : {"\\lilypondfile{ A/Good.ly}", "\\lilypondfile{A/Good.ly }",
+                                 "\\lilypondfile{A/B  C.ly}", "\\lilypondfile{A/B\tC.ly}",
+                                 "\\lilypondfile{A/\nGood.ly}"}) {
+            INFO(call);
+            CHECK(zub::songbook::unreadableScoreCalls(call).size() == 1);
+        }
+        CHECK(zub::songbook::unreadableScoreCalls("\\lilypondfile{A/B C.ly}").empty());
+        // A risk text is cut at 60 bytes, never inside a UTF-8 character.
+        // "\\lilypondfile[" is 14 bytes: with 45 more, byte 60 is the middle of the first "č".
+        const auto risks = zub::songbook::unreadableScoreCalls(
+            "\\lilypondfile[" + std::string(45, 'x') + "\xc4\x8d\xc4\x8d]{A/B.ly}");
+        REQUIRE(risks.size() == 1);
+        CHECK(risks[0] == "\\lilypondfile[" + std::string(45, 'x'));
+    }
+    SECTION("X.ly.tex is built before X.ly (kpathsea tries .tex first)") {
+        write(root / "songs/chords/A/Good.ly", "{ c4 }\n");
+        CHECK(scoreRisks(root, song, "\\lilypondfile{A/Good.ly}").empty());
+        write(root / "songs/chords/A/Good.ly.tex", "{ c4 }\n");
+        CHECK(scoreRisks(root, song, "\\lilypondfile{A/Good.ly}") ==
+              std::vector<std::string>{"A/Good.ly.tex: would be built instead of A/Good.ly"});
+        write(root / "songs/chords/A/Only.ly.tex", "#(system \"id\")\n");
+        CHECK(scoreRisks(root, song, "\\lilypondfile{A/Only.ly}") ==
+              std::vector<std::string>{"A/Only.ly.tex: #(system",
+                                       "A/Only.ly.tex: would be built instead of A/Only.ly"});
+    }
+    fs::remove_all(root);
+}
+
+TEST_CASE("texinputsShadows: files a build could load by name from the library", "[songbook][safety]") {
+    namespace fs = std::filesystem;
+    using zub::songbook::texinputsShadows;
+    const auto root = fs::temp_directory_path() / ("zub-shadows-" + zubtest::uniqueSuffix());
+    fs::remove_all(root);
+    fs::create_directories(root / "songs/chords/A");
+    fs::create_directories(root / "songs/tinwhistle/B");
+    fs::create_directories(root / "songbooks/t/sub");
+    fs::create_directories(root / "img");
+    const auto write = [](const fs::path& file) { std::ofstream(file, std::ios::binary) << "x"; };
+    const auto bookDir = root / "songbooks/t";
+    // What a real library has: nothing reported.
+    write(root / "README.md");
+    write(root / "LICENSE");
+    write(root / "wishes.txt");
+    write(root / "songs/chords/A/Song.tex");
+    write(root / "songs/chords/A/SongTab.ly");
+    write(bookDir / "t.tex");
+    write(bookDir / "akordy.tex");
+    write(bookDir / "build.sh");
+    write(bookDir / "cover.pdf");
+    CHECK(texinputsShadows(root, bookDir).empty());
+
+    write(root / "songs/chords/hyperref.cfg");     // any file at a collection's top
+    write(root / "songs/tinwhistle/notes.txt");
+    write(root / "bookmark.cfg");                  // loadable names in the root
+    write(root / "Evil.TEX");                      // .tex too in the root, any case
+    write(bookDir / "akordy");                     // \input{akordy} tries it after akordy.tex
+    write(bookDir / "luaotfload.lua");
+    write(bookDir / "sub/X.ly");                   // a score under the book's folder
+    CHECK(texinputsShadows(root, bookDir) ==
+          std::vector<std::string>{
+              "Evil.TEX: a file a build could load by its name",
+              "bookmark.cfg: a file a build could load by its name",
+              "songbooks/t/akordy: a file a build could load by its name",
+              "songbooks/t/luaotfload.lua: a file a build could load by its name",
+              "songbooks/t/sub/X.ly: a score in the book's folder that a build could load",
+              "songs/chords/hyperref.cfg: a file in a song folder that a build could load by its name",
+              "songs/tinwhistle/notes.txt: a file in a song folder that a build could load by its name"});
+    // The preview has no book folder on TEXINPUTS.
+    CHECK(texinputsShadows(root).size() == 4);
     fs::remove_all(root);
 }
 

@@ -249,12 +249,16 @@ std::expected<Command, std::string> prepare(const Request& request) {
                                                         : "";
     if (const auto it = std::ranges::find(names, own); it != names.end())
         std::rotate(names.begin(), it, it + 1);
-    // The repo root (img/) last: a file there cannot stand in for a checked score.
-    std::string texinputs =
-        std::string(".") + kSep + utf8(overrideDir) + kSep + utf8(request.packageDir) + kSep;
+    // TeX's own tree (the empty entry) right after the package: no folder of the song library can
+    // stand in for a file of the package or of TeX's tree (relsize.sty, lyluatex, ...). Files
+    // neither has (an optional .cfg a package probes for) are still looked for in the library's
+    // folders: zub::songbook::texinputsShadows reports those before a build. The repo root (img/)
+    // last: a file there cannot stand in for a checked score.
+    std::string texinputs = std::string(".") + kSep + utf8(overrideDir) + kSep +
+                            utf8(request.packageDir) + kSep + kSep;
     for (const auto& name : names)
         texinputs += root + "/songs/" + name + kSep;
-    texinputs += root + kSep;
+    texinputs += root;
     cmd.environment = {{"TEXINPUTS", texinputs},
                        {"max_print_line", "1000"},
                        {"error_line", "254"},

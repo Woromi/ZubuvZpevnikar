@@ -1822,38 +1822,26 @@ bool MainWindow::approveBuild(SongEditor* editor, const std::string& content, bo
 std::vector<MainWindow::RiskSource> MainWindow::songBuildRisks(SongEditor* editor,
                                                                const std::string& content) const {
     std::vector<RiskSource> sources;
-    sources.push_back({editor->path(), {}, zub::safety::unknownConstructs(content)});
+    // The song's own commands and what its scores on disk would run, every copy a build could
+    // find (zub::songbook::scoreRisks: also calls it cannot check, and files beside a score that
+    // stand in for the package's includes).
+    auto ownRisks = zub::safety::unknownConstructs(content);
+    for (std::string& risk : zub::songbook::scoreRisks(songbookRoot_, editor->path(), content))
+        ownRisks.push_back(std::move(risk));
+    sources.push_back({editor->path(), {}, std::move(ownRisks)});
+    // Files in the library's folders a build could load by name (a probed hyperref.cfg, ...).
+    if (auto shadows = zub::songbook::texinputsShadows(songbookRoot_); !shadows.empty())
+        sources.push_back({songbookRoot_, {}, std::move(shadows)});
+    // Scores open in an editor are built as they are there (unsaved ones from override/).
     for (const std::string& reference : zub::songbook::referencedFiles(content)) {
         const auto resolved = zub::songbook::resolveScoreReference(reference);
-        if (!resolved) {
-            // Built from wherever TEXINPUTS finds it, so it cannot be checked: needs confirmation.
-            // (Through QString: a path's native string is std::wstring on Windows.)
-            sources.push_back({toPath(toQString(editor->path()) + QStringLiteral("\\lilypondfile{") +
-                                      toQString(reference) + QLatin1Char('}')),
-                               {},
-                               {"\\lilypondfile{" + reference + "}"}});
+        if (!resolved)
+            continue; // reported by scoreRisks
+        const SongEditor* score = scores_->scoreEditor(*resolved);
+        if (!score)
             continue;
-        }
-        const std::string& name = *resolved;
-        // What the editor holds, and the file on disk (the converter's measuring builds that).
-        std::vector<std::string> texts;
-        std::filesystem::path key = scores_->scorePath(name);
-        if (const SongEditor* score = scores_->scoreEditor(name)) {
-            texts.push_back(score->content());
-            key = score->path();
-        }
-        if (!scores_->scorePath(name).empty()) {
-            if (auto disk = zub::readTextFile(scores_->scorePath(name)))
-                texts.push_back(std::move(*disk));
-        }
-        RiskSource source{key, toQString(name), {}};
-        for (const std::string& text : texts) {
-            for (std::string& risk : zub::safety::lilypondRisks(text)) {
-                if (std::ranges::find(source.risks, risk) == source.risks.end())
-                    source.risks.push_back(std::move(risk));
-            }
-        }
-        if (!source.risks.empty() && !key.empty())
+        RiskSource source{score->path(), toQString(*resolved), zub::safety::lilypondRisks(score->content())};
+        if (!source.risks.empty())
             sources.push_back(std::move(source));
     }
     return sources;

@@ -61,7 +61,8 @@ private:
     // finds.
     // `extra`: what the check of the book file itself found (shown first).
     // `copies`: songs (input name -> text) checked instead of their files.
-    bool confirmSafety(const zub::songbook::Resolution& resolution, const QStringList& extra = {},
+    bool confirmSafety(const zub::songbook::Resolution& resolution,
+                       const std::filesystem::path& bookDir, const QStringList& extra = {},
                        const std::map<std::string, std::string>& copies = {});
 
     QWidget* window_;

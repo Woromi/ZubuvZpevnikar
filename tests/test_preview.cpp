@@ -104,11 +104,12 @@ TEST_CASE("prepare writes the wrapper, the song copy and the command", "[preview
     const char sep = zub::preview::kPathListSeparator;
     const auto g = [](const fs::path& p) { return p.generic_string(); };
     const std::string root = g(fixtureRepo);
-    // The package, the song collections, then the repo root (nothing there can stand in for a
+    // The package, TeX's own tree (the empty entry: no song folder can stand in for a system
+    // package), the song collections, then the repo root (nothing there can stand in for a
     // checked score).
     const std::string expected = std::string(".") + sep + g(work / "override") + sep +
-                                 g(fixtureRepo / "zubuvzpevnik") + sep + root + "/songs/chords" +
-                                 sep + root + "/songs/whistle2" + sep + root + sep;
+                                 g(fixtureRepo / "zubuvzpevnik") + sep + sep + root +
+                                 "/songs/chords" + sep + root + "/songs/whistle2" + sep + root;
     REQUIRE(cmd->environment.size() == 4);
     CHECK(cmd->environment[0].first == "TEXINPUTS");
     CHECK(cmd->environment[0].second == expected);

@@ -137,10 +137,17 @@ std::vector<std::string> inputs(std::string_view text);
 
 // The build of a book of the repo from a copy <workDir>/<bookName>.tex, with the package's
 // scripts/build.sh -i <indexes> (indexFiles), writing only to workDir. TEXINPUTS: the work dir,
-// the song folders, the package, then the book's own folder `bookDir` (a Tabor book's cover.pdf
-// and akordy.tex), the repo root (img/), and the defaults (the trailing ':'). A non-empty
-// `overrideDir` (song copies `<Artist>/<Title>.tex` that differ for this build only) comes right
-// after the package, before the songs it shadows.
+// the package, a non-empty `overrideDir` (song copies `<Artist>/<Title>.tex` that differ for this
+// build only), TeX's own tree (an empty entry), the song folders, then the book's own folder
+// `bookDir` (a Tabor book's cover.pdf and akordy.tex) and the repo root (img/).
+// Every akordy.tex (or bare "akordy": TeX tries it next) a Tabor book's \input{akordy} could
+// find on the build's TEXINPUTS (in its order): each collection's top folder, the book's folder,
+// the repo root. The book's own is the
+// one meant; the others would come before it or stand in when it is missing, so a build checks
+// them all.
+std::vector<std::filesystem::path> chordChartFiles(const std::filesystem::path& repoRoot,
+                                                   const std::filesystem::path& bookDir);
+
 songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& packageDir,
                                     const std::filesystem::path& workDir,
@@ -293,9 +300,11 @@ std::expected<NewBook, std::string> newBook(const Settings&, std::string_view na
                                                 "chords", "tinwhistle"});
 
 // The build.sh newBook writes, for a book <name>.tex of that class with these build.sh -i
-// indexes (indexFiles): for a copy of a book under a new name.
-std::string buildScriptFor(std::string_view name, songbook::BookClass bookClass,
-                           const std::vector<std::string>& indexes,
-                           const std::vector<std::string>& collections = {"chords", "tinwhistle"});
+// indexes (indexFiles): for a copy of a book under a new name. An error when the name or an index
+// is not a plain name (safety::isPlainName): they go into the shell script as they are.
+std::expected<std::string, std::string>
+buildScriptFor(std::string_view name, songbook::BookClass bookClass,
+               const std::vector<std::string>& indexes,
+               const std::vector<std::string>& collections = {"chords", "tinwhistle"});
 
 } // namespace zub::bookfile

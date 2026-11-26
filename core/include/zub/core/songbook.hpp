@@ -97,14 +97,37 @@ std::vector<std::string> referencedFiles(std::string_view songText);
 // built from wherever TEXINPUTS finds it and cannot be checked.
 std::optional<std::string> resolveScoreReference(std::string_view target);
 
-// What building the song would run through LilyPond that the scan flags (lilypondRisks of every
-// score it references, read from disk: every collection's copy, as builds search the collections
-// in different orders): "Artist/X.ly: #(system", and
-// "\lilypondfile{name}" for a reference that is not an in-tree score (resolveScoreReference
-// fails) and so cannot be checked. A score that does not exist adds nothing.
+// What building the song would run through LilyPond that the scan flags: lilypondRisks of every
+// copy of every score it references that a build could find (each collection's, `bookDir`'s
+// when given, the repo root's), as "Artist/X.ly: #(system"; a file beside such a copy that stands
+// in for a trusted include (includeShadows); "\lilypondfile{name}" for a reference that is not an
+// in-tree score (resolveScoreReference fails), and the call as written for one without a braced
+// argument or with [options] (the package's \lilypondfile takes one token): neither can be
+// checked. A score that does not exist adds nothing.
 std::vector<std::string> scoreRisks(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& songPath,
-                                    std::string_view songText);
+                                    std::string_view songText,
+                                    const std::filesystem::path& bookDir = {});
+
+// The \lilypondfile / \narrowlilypondfile calls of a song (comments ignored) without a braced
+// argument or with [options], as written: the package's \lilypondfile takes a single token as
+// the file name, so what such a call builds is not what a scan reads. Each needs confirmation.
+std::vector<std::string> unreadableScoreCalls(std::string_view songText);
+
+// Files in the song library's folders on a build's TEXINPUTS that a build could load by a bare
+// name instead of what it means: a song collection's top folder holds only artist folders (any
+// file or link there is reported: \input{akordy}, a probed hyperref.cfg, a .lua module, ...); in
+// the repo root and `bookDir` (when given: a book build) files TeX, LuaTeX or LilyPond load by
+// name (.cfg, .sty, .lua, .ly, a bare "akordy", ...; .tex too in the root, not in a book's folder,
+// which has its books and akordy.tex, checked by themselves); a score anywhere under `bookDir`.
+// TeX's own tree comes before these folders, but files it does not have (an optional .cfg a
+// package probes for) are still looked for in them. "songs/chords/hyperref.cfg: ...".
+std::vector<std::string> texinputsShadows(const std::filesystem::path& repoRoot,
+                                          const std::filesystem::path& bookDir = {});
+
+// Files in a score's folder that LilyPond would include instead of the package's trusted
+// zubuvzpevnik.ily / tinwhistle.ily (it looks beside the score first); compared ignoring case.
+std::vector<std::string> includeShadows(const std::filesystem::path& scoreDir);
 
 // True when `songPath` is inside <repoRoot>/songs/tinwhistle (collectionOf == "tinwhistle").
 bool inTinwhistleTree(const std::filesystem::path& repoRoot, const std::filesystem::path& songPath);

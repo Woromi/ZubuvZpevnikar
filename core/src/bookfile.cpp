@@ -9,6 +9,7 @@
 #include <zub/core/bookfile.hpp>
 #include <zub/core/latex.hpp>
 #include <zub/core/preview.hpp>
+#include <zub/core/safety.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/song.hpp>
 #include <zub/core/textfile.hpp>
@@ -837,6 +838,28 @@ std::vector<std::string> inputs(std::string_view text) {
     return names;
 }
 
+std::vector<std::filesystem::path> chordChartFiles(const std::filesystem::path& repoRoot,
+                                                   const std::filesystem::path& bookDir) {
+    std::vector<std::filesystem::path> dirs;
+    for (const auto& collection : collections(repoRoot))
+        dirs.push_back(repoRoot / "songs" / std::filesystem::path(std::u8string(
+                                                collection.begin(), collection.end())));
+    dirs.push_back(bookDir);
+    dirs.push_back(repoRoot);
+    std::vector<std::filesystem::path> files;
+    // \input{akordy} tries "akordy.tex", then "akordy", in each folder.
+    for (const auto& dir : dirs) {
+        for (const char* name : {"akordy.tex", "akordy"}) {
+            std::error_code ec;
+            const auto file = dir / name;
+            if (std::filesystem::is_regular_file(file, ec) &&
+                std::ranges::find(files, file) == files.end())
+                files.push_back(file);
+        }
+    }
+    return files;
+}
+
 songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
                                     const std::filesystem::path& packageDir,
                                     const std::filesystem::path& workDir,
@@ -858,16 +881,19 @@ songbook::BuildCommand buildCommand(const std::filesystem::path& repoRoot,
     }
     command.arguments.push_back(utf8(workDir / (std::string(bookName) + ".tex")));
     command.workingDirectory = workDir;
-    // The package, then the songs, before anything else: no folder under songs/ can stand in for
-    // a package file (class, .sty, .cfg, Lua; song names are Artist/Title), and nothing in the
-    // book's folder or the repo root for a checked song.
+    // The package and TeX's own tree (the empty entry), then the songs, before anything else: no
+    // folder of the song library can stand in for a file of the package (class, .sty, .cfg, Lua;
+    // song names are Artist/Title) or of TeX's tree, and nothing in the book's folder or the repo
+    // root for a checked song. What neither has (a probed optional .cfg) is looked for in the
+    // library's folders: zub::songbook::texinputsShadows reports such files before a build.
     constexpr char sep = preview::kPathListSeparator;
     std::string texinputs = std::string(".") + sep + utf8(workDir) + sep + utf8(packageDir) + sep;
     if (!overrideDir.empty())
         texinputs += utf8(overrideDir) + sep;
+    texinputs += sep; // TeX's own tree
     for (const auto& collection : collections(repoRoot))
         texinputs += root + "/songs/" + collection + sep;
-    texinputs += utf8(bookDir) + sep + root + sep;
+    texinputs += utf8(bookDir) + sep + root;
     command.environment.emplace_back("TEXINPUTS", std::move(texinputs));
     command.pdf = workDir / (std::string(bookName) + ".pdf");
     command.log = workDir / (std::string(bookName) + ".log");
@@ -1689,6 +1715,7 @@ string optionList(const Settings& s) {
     return out;
 }
 
+// `name` and `indexes` are plain names (safety::isPlainName): they go into the script unquoted.
 string buildScript(string_view name, songbook::BookClass cls, const std::vector<string>& indexes,
                    const std::vector<string>& collections) {
     string songTrees;
@@ -1812,9 +1839,15 @@ std::expected<NewBook, string> newBook(const Settings& s, string_view name,
     return NewBook{tex, buildScript(name, *cls, indexFiles(*book), collections)};
 }
 
-std::string buildScriptFor(std::string_view name, songbook::BookClass bookClass,
-                           const std::vector<std::string>& indexes,
-                           const std::vector<std::string>& collections) {
+std::expected<std::string, std::string>
+buildScriptFor(std::string_view name, songbook::BookClass bookClass,
+               const std::vector<std::string>& indexes,
+               const std::vector<std::string>& collections) {
+    if (!safety::isPlainName(name))
+        return std::unexpected("not a plain book name: " + std::string(name));
+    for (const auto& index : indexes)
+        if (!safety::isPlainName(index))
+            return std::unexpected("not a plain index name: " + index);
     return buildScript(name, bookClass, indexes, collections);
 }
 

@@ -45,4 +45,16 @@ std::vector<std::string> unknownBookConstructs(std::string_view bookContent);
 // #{ ... #} is checked like the rest. This is an allowlist speed bump, not a sandbox.
 std::vector<std::string> lilypondRisks(std::string_view ly);
 
+// A relative path of plain characters (letters, digits, _ - . /) without "..": what a book's
+// cover may name (the check of \makefrontcover / \maketitlepage), safe to join to a folder.
+bool isPlainFilePath(std::string_view path);
+// A plain name (letters, digits, _ and -, not starting with -): safe on a command line and in a
+// shell script unquoted (index names, book names).
+bool isPlainName(std::string_view name);
+
+// The files a score may \include by bare name (zubuvzpevnik.ily, tinwhistle.ily): the package's
+// lilypond/ folder has them. LilyPond looks in the score's own folder first, so a file of that
+// name beside a score would stand in for the package's (zub::songbook::scoreRisks reports it).
+bool isTrustedInclude(std::string_view fileName);
+
 } // namespace zub::safety

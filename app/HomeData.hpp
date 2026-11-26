@@ -69,10 +69,11 @@ std::function<zub::songbook::SongFacts(std::string_view)>
 songFacts(const SongTableModel& model, const std::filesystem::path& root);
 
 // Is the book `file` (its `text`) ready to print? Its songs (readiness), plus what a build would
-// ask about the book's own files: the .tex and a camp book's chord chart (akordy.tex beside it)
-// and the chart's songs. nullopt when the book cannot be read (zub::bookfile::parse refuses it).
+// ask about the book's own files: the .tex and a camp book's chord chart (every akordy.tex the
+// build could find, zub::bookfile::chordChartFiles) and the chart's songs (`root`: the library). nullopt when the book cannot be read (zub::bookfile::parse refuses it).
 std::optional<zub::songbook::Readiness>
-checkSongbook(const std::filesystem::path& file, const std::string& text,
+checkSongbook(const std::filesystem::path& root, const std::filesystem::path& file,
+              const std::string& text,
               const std::function<zub::songbook::SongFacts(std::string_view)>& facts);
 // A book file's songs as a Songbook (its sections, class, title) for readiness.
 zub::songbook::Songbook songbookOf(const zub::bookfile::Book& book);

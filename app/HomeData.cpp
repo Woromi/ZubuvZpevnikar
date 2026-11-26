@@ -166,7 +166,7 @@ HomeData buildHomeData(const SongTableModel& model, const std::filesystem::path&
         if (parsed) {
             book.songs = static_cast<int>(parsed->songs().size());
             // An empty book is not "ready": no status.
-            if (const auto r = checkSongbook(root / relative, *text, facts); r && book.songs > 0)
+            if (const auto r = checkSongbook(root, root / relative, *text, facts); r && book.songs > 0)
                 book.toFix = static_cast<int>(r->toFix());
         }
         for (const auto& wish : zub::bookfile::wishes(*text)) {
@@ -408,7 +408,8 @@ std::map<std::string, int> songRows(const SongTableModel& model) {
 }
 
 std::optional<zub::songbook::Readiness>
-checkSongbook(const std::filesystem::path& file, const std::string& text,
+checkSongbook(const std::filesystem::path& root, const std::filesystem::path& file,
+              const std::string& text,
               const std::function<zub::songbook::SongFacts(std::string_view)>& facts) {
     const auto parsed = zub::bookfile::parse(text);
     if (!parsed)
@@ -423,10 +424,20 @@ checkSongbook(const std::filesystem::path& file, const std::string& text,
             what += (what.empty() ? "" : ", ") + command;
         r.files.push_back(name + ": " + what);
     };
-    addFileRisks(file.filename().string(), text);
+    addFileRisks(toStdString(toQString(file.filename())), text);
+    // What the build could load by name from the library's folders (as the exporter asks).
+    for (std::string& shadow : zub::songbook::texinputsShadows(root, file.parent_path()))
+        r.files.push_back(std::move(shadow));
     // A camp book's chord chart is LaTeX the build runs too, and its songs are built.
-    if (const auto akordy = zub::readTextFile(file.parent_path() / "akordy.tex")) {
-        addFileRisks("akordy.tex", *akordy);
+    // Every copy the build could find (zub::bookfile::chordChartFiles), as the exporter checks.
+    for (const auto& chart : zub::bookfile::chordChartFiles(root, file.parent_path())) {
+        const auto akordy = zub::readTextFile(chart);
+        if (!akordy) {
+            r.files.push_back(toStdString(toQString(chart.lexically_relative(root))) + ": " +
+                              akordy.error());
+            continue;
+        }
+        addFileRisks(toStdString(toQString(chart.lexically_relative(root))), *akordy);
         const auto inBook = parsed->songs();
         for (const std::string& name : zub::bookfile::inputs(*akordy)) {
             if (std::ranges::find(inBook, name) != inBook.end())
