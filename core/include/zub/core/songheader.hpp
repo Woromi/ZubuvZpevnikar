@@ -13,11 +13,14 @@ namespace zub::songheader {
 
 // `songText` with the `key` option of its \beginsong header set to `value`, which is written
 // verbatim (braces included: "{a4,a5}"). An existing option is replaced in place; an empty or
-// missing value removes it (with its line, or its share of the commas in a one-line header; with
-// `dropEmptyHeader` the `[...]` goes too when the option was all it held, like checkpaper.py);
-// a missing option is added after the `by=` line, or before the closing `]`, or inside a
-// one-line header, in the file's own layout. Everything else stays byte-identical, line endings
-// included. Text without \beginsong is returned unchanged.
+// missing value removes it (with its line, or its share of the commas in a one-line header; a
+// comment on its line stays; with `dropEmptyHeader` the `[...]` goes too when the option was all
+// it held, like checkpaper.py). A missing option takes the place of its commented-out
+// placeholder ("% key={},", the others of it go), else goes where the converter's order puts it
+// (prelude_rank: after the nearest option or other key's placeholder before it on a line of its
+// own, else before the nearest one after it), else after the `by=` line, before the closing `]`,
+// or inside a one-line header, in the file's own layout. Everything else stays byte-identical,
+// line endings included. Text without \beginsong is returned unchanged.
 std::string setOption(std::string_view songText, std::string_view key,
                       std::optional<std::string_view> value, bool dropEmptyHeader = false);
 

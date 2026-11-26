@@ -56,7 +56,7 @@ TEST_CASE("New Song: a new artist gets a folder, the song is written on save", "
     const auto path = fixture / "songs/chords/NovaKapelaAndSpol/ZlutouckyKun.tex";
     CHECK(editor->path() == path);
     CHECK(editor->textEdit()->toPlainText().startsWith(
-        "\\beginsong{Žluťoučký kůň}[\n    by={Nová Kapela \\& Spol},\n    % lang={},"));
+        "\\beginsong{Žluťoučký kůň}[\n    by={Nová Kapela \\& Spol},\n    tun={Standard},"));
     // The cursor waits in the verse, on its indented line; nothing is written yet.
     CHECK(editor->textEdit()->textCursor().block().text() == "    ");
     CHECK(!std::filesystem::exists(path));

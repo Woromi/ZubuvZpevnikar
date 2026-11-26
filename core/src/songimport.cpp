@@ -448,12 +448,13 @@ std::string fileNameOf(std::string_view name) {
 NewSong newSong(std::string_view title, std::string_view artist) {
     std::string text = "\\beginsong{" + songbook::escapeText(title) + "}[\n";
     text += "    by={" + songbook::escapeText(artist) + "},\n";
-    text += "    % lang={},\n"
+    // The converter's order (its LatexPrinter, prelude_rank), without src.
+    text += "    tun={Standard},\n"
             "    % tem={},\n"
             "    % met={},\n"
-            "    tun={Standard},\n"
-            "    % key={},\n"
             "    % cap={},\n"
+            "    % lang={},\n"
+            "    % key={},\n"
             "    pap={},\n"
             "]\n"
             "\n"

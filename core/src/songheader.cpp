@@ -203,8 +203,13 @@ placeholderLines(std::string_view orig, std::size_t from, std::size_t to, std::s
 
 } // namespace
 
-std::string setOption(std::string_view songText, std::string_view key,
-                      std::optional<std::string_view> value, bool dropEmptyHeader) {
+namespace {
+
+// setOption; `placeholder`: the option becomes a commented-out placeholder line (addPlaceholders),
+// so the option before it keeps its bytes (no comma is added to it).
+std::string setOptionImpl(std::string_view songText, std::string_view key,
+                          std::optional<std::string_view> value, bool dropEmptyHeader,
+                          bool placeholder) {
     const bool remove = !value || value->empty();
     const std::string masked = maskComments(songText);
     const std::string_view m = masked;
@@ -254,7 +259,7 @@ std::string setOption(std::string_view songText, std::string_view key,
         std::string stripped{orig};
         for (const auto& [from, to] : placeholders | std::views::reverse)
             stripped.erase(from, to - from);
-        return setOption(stripped, key, value, dropEmptyHeader);
+        return setOptionImpl(stripped, key, value, dropEmptyHeader, placeholder);
     }
     const auto last = [&](std::string_view name) -> const Entry* {
         const Entry* found = nullptr;
@@ -286,6 +291,19 @@ std::string setOption(std::string_view songText, std::string_view key,
         const bool restEmpty = restOfLineIsEmpty(orig, e->valEnd, commaEnd);
         if (onlyBlanks(orig, ls, e->nameBegin) && restEmpty)
             return splice(ls, nextLineStart(orig, e->valEnd), "");
+        // Alone on its line but for a comment ("    key={C}, % from the site"): the comment
+        // stays where it is, on a line of its own.
+        if (onlyBlanks(orig, ls, e->nameBegin)) {
+            std::size_t p = e->valEnd;
+            while (p < orig.size() && isBlank(orig[p]))
+                ++p;
+            if (p < orig.size() && orig[p] == ',')
+                ++p;
+            while (p < orig.size() && isBlank(orig[p]))
+                ++p;
+            if (p < orig.size() && orig[p] == '%')
+                return splice(e->nameBegin, p, "");
+        }
         const bool commaAfter = commaEnd > e->valEnd || [&] {
             std::size_t p = e->valEnd;
             while (p < *close && isBlank(m[p]))
@@ -322,6 +340,8 @@ std::string setOption(std::string_view songText, std::string_view key,
     // Inserts the option as a line before `lineBegin`, adding the comma the previous option
     // may lack. `prev` is that option (nullptr if none).
     auto insertLine = [&](std::size_t lineBegin, const Entry* prev, std::string_view indent) {
+        if (placeholder)
+            prev = nullptr; // a comment line: the option before it needs no comma
         std::string out{orig.substr(0, prev && !commaAfter(*prev) ? prev->valEnd : lineBegin)};
         if (prev && !commaAfter(*prev)) {
             out += ',';
@@ -366,34 +386,59 @@ std::string setOption(std::string_view songText, std::string_view key,
         return out;
     }
     // Where the converter's order puts it: after the nearest option before it, else before the
-    // nearest one after it (each on a line of its own).
+    // nearest one after it (each on a line of its own). Other keys' commented-out placeholders
+    // ("% tem={},") keep their place in that order too.
     if (const std::size_t rank = orderOf(key); rank < std::size(optionOrder)) {
-        const auto ownLine = [&](const Entry& e) {
-            std::size_t commaEnd = 0;
-            return onlyBlanks(orig, lineStart(m, e.nameBegin), e.nameBegin) &&
-                   restOfLineIsEmpty(m, e.valEnd, commaEnd);
+        struct Anchor {
+            std::size_t rank;
+            std::size_t lineBegin; // its line
+            std::size_t indentEnd; // its first non-blank character
+            std::size_t end;       // the end of its option or placeholder text
         };
-        const Entry* before = nullptr;
-        const Entry* after = nullptr;
+        std::vector<Anchor> anchors;
         for (const Entry& e : entries) {
-            const std::size_t r = orderOf(e.name);
-            if (r < rank && (!before || orderOf(before->name) <= r))
-                before = &e;
-            if (r > rank && r < std::size(optionOrder) && (!after || orderOf(after->name) > r))
-                after = &e;
+            std::size_t commaEnd = 0;
+            const std::size_t ls = lineStart(m, e.nameBegin);
+            if (onlyBlanks(orig, ls, e.nameBegin) && restOfLineIsEmpty(m, e.valEnd, commaEnd))
+                anchors.push_back({orderOf(e.name), ls, e.nameBegin, e.valEnd});
         }
-        if (before && ownLine(*before)) {
-            const auto next = nextLineStart(orig, before->valEnd);
-            if (next <= *close)
-                return insertLine(next, before, indentOf(before->nameBegin));
+        for (const std::string_view other : optionOrder) {
+            if (other.empty() || other == key)
+                continue;
+            for (const auto& [from, to] : placeholderLines(orig, open, *close, other)) {
+                std::size_t text = from;
+                while (isBlank(orig[text]))
+                    ++text;
+                anchors.push_back({orderOf(other), from, text, to - 1});
+            }
         }
-        if (after && ownLine(*after)) {
+        std::ranges::sort(anchors, {}, &Anchor::lineBegin);
+        const Anchor* before = nullptr;
+        const Anchor* after = nullptr;
+        for (const Anchor& a : anchors) {
+            if (a.rank < rank && (!before || before->rank <= a.rank))
+                before = &a;
+            if (a.rank > rank && (!after || after->rank > a.rank))
+                after = &a;
+        }
+        // The option before a line: the comma it may lack is added.
+        const auto entryBefore = [&](std::size_t pos) {
             const Entry* prev = nullptr;
             for (const Entry& e : entries)
-                if (e.valEnd <= after->nameBegin)
+                if (e.valEnd <= pos)
                     prev = &e;
-            return insertLine(lineStart(m, after->nameBegin), prev, indentOf(after->nameBegin));
+            return prev;
+        };
+        const auto indent = [&](const Anchor& a) {
+            return std::string{orig.substr(a.lineBegin, a.indentEnd - a.lineBegin)};
+        };
+        if (before) {
+            const auto next = nextLineStart(orig, before->end);
+            if (next <= *close)
+                return insertLine(next, entryBefore(next), indent(*before));
         }
+        if (after)
+            return insertLine(after->lineBegin, entryBefore(after->lineBegin), indent(*after));
     }
     if (const Entry* by = last("by")) {
         const auto ls = lineStart(m, by->nameBegin);
@@ -413,6 +458,13 @@ std::string setOption(std::string_view songText, std::string_view key,
     if (entries.empty())
         return splice(*close, *close, newOption);
     return splice(entries.back().valEnd, entries.back().valEnd, ", " + newOption);
+}
+
+} // namespace
+
+std::string setOption(std::string_view songText, std::string_view key,
+                      std::optional<std::string_view> value, bool dropEmptyHeader) {
+    return setOptionImpl(songText, key, value, dropEmptyHeader, false);
 }
 
 namespace {
@@ -453,7 +505,7 @@ Placeholders addPlaceholders(std::string_view songText, const std::vector<std::s
         const auto brackets = headerBrackets(masked);
         if (!brackets || !placeholderLines(text, brackets->first, brackets->second, key).empty())
             continue;
-        text = setOption(text, key, marker);
+        text = setOptionImpl(text, key, marker, false, true);
         wanted.push_back(key);
     }
     const auto ownLineAt = [&](const std::string& key) -> std::optional<std::size_t> {

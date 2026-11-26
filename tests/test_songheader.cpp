@@ -238,3 +238,49 @@ TEST_CASE("addPlaceholders writes the missing keys as the converter's placeholde
     CHECK(addPlaceholders(oneLine, {"tem"}).text == oneLine);
     CHECK(addPlaceholders("\\beginsong{T}\n", {"tem"}).added.empty());
 }
+
+TEST_CASE("new options take their place among other keys' placeholders", "[songheader]") {
+    // The converter's draft: tags goes after % key={}, not above it, so a key written later
+    // keeps the converter's order (lang, key, tags, pap).
+    const std::string draft = "\\beginsong{T}[\n    by={X},\n    lang={czech},\n    % key={},\n"
+                              "    pap={},\n]\n";
+    const std::string tagged = setOption(draft, "tags", "{fav}");
+    CHECK(tagged == "\\beginsong{T}[\n    by={X},\n    lang={czech},\n    % key={},\n"
+                    "    tags={fav},\n    pap={},\n]\n");
+    CHECK(setOption(tagged, "key", "{C}") == "\\beginsong{T}[\n    by={X},\n    lang={czech},\n"
+                                              "    key={C},\n    tags={fav},\n    pap={},\n]\n");
+    // A placeholder after another one: % met after % tem.
+    const auto r = addPlaceholders(
+        "\\beginsong{T}[\n    by={X},\n    tun={Standard},\n    % tem={},\n    pap={},\n]\n",
+        {"met"});
+    CHECK(r.text == "\\beginsong{T}[\n    by={X},\n    tun={Standard},\n    % tem={},\n"
+                    "    % met={},\n    pap={},\n]\n");
+    // Before a placeholder of a later key when nothing comes before it: cap above % lang.
+    CHECK(setOption("\\beginsong{T}[\n    % lang={},\n    pap={},\n]\n", "cap", "{2}") ==
+          "\\beginsong{T}[\n    cap={2},\n    % lang={},\n    pap={},\n]\n");
+    // The order of what was added is the header's.
+    const auto two =
+        addPlaceholders("\\beginsong{T}[\n    by={X},\n    % cap={},\n    pap={},\n]\n",
+                        {"key", "tem"});
+    CHECK(two.added == std::vector<std::string>{"tem", "key"});
+    CHECK(two.text == "\\beginsong{T}[\n    by={X},\n    % tem={},\n    % cap={},\n"
+                      "    % key={},\n    pap={},\n]\n");
+}
+
+TEST_CASE("a placeholder leaves the option above it unchanged", "[songheader]") {
+    // No comma is added to by={X}: the new line is only a comment.
+    CHECK(addPlaceholders("\\beginsong{T}[\n    by={X}\n]\n", {"tem"}).text ==
+          "\\beginsong{T}[\n    by={X}\n    % tem={},\n]\n");
+    // A real option still gets its comma before it.
+    CHECK(setOption("\\beginsong{T}[\n    by={X}\n]\n", "tem", "{90}") ==
+          "\\beginsong{T}[\n    by={X},\n    tem={90},\n]\n");
+}
+
+TEST_CASE("removing an option keeps a comment on its line", "[songheader]") {
+    CHECK(setOption("\\beginsong{T}[\n    by={X},\n    key={C}, % from the site\n    pap={},\n]\n",
+                    "key", std::nullopt) ==
+          "\\beginsong{T}[\n    by={X},\n    % from the site\n    pap={},\n]\n");
+    // The last option: the comment does not move up to the option before it.
+    CHECK(setOption("\\beginsong{T}[\n    by={X},\n    pap={} % fits\n]\n", "pap", std::nullopt) ==
+          "\\beginsong{T}[\n    by={X},\n    % fits\n]\n");
+}
