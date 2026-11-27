@@ -314,7 +314,7 @@ void SongbooksPage::buildUi() {
     connect(redoAction_, &QAction::triggered, this, &SongbooksPage::redoEdit);
     updateHistoryActions();
     bar->addSeparator();
-    check_ = bar->addAction(QIcon::fromTheme(QStringLiteral("tools-check-spelling")), tr("Check…"));
+    check_ = bar->addAction(QIcon::fromTheme(QStringLiteral("tools-check-spelling")), tr("Ready to Print?"));
     check_->setObjectName(QStringLiteral("songbookCheck"));
     check_->setToolTip(tr("Is the songbook ready to print? (the Overview tab)"));
     exportPdf_ =
@@ -539,8 +539,8 @@ QWidget* SongbooksPage::buildEditPane() {
     layout->addWidget(tree_, 1);
 
     auto* buttons = new QHBoxLayout;
-    addSection_ = new QPushButton(tr("Add Section"), editPane_);
-    renameSection_ = new QPushButton(tr("Rename Section"), editPane_);
+    addSection_ = new QPushButton(tr("Add Section…"), editPane_);
+    renameSection_ = new QPushButton(tr("Rename Section…"), editPane_);
     removeSection_ = new QPushButton(tr("Remove Section"), editPane_);
     moveUp_ = new QPushButton(tr("Move Up"), editPane_);
     moveDown_ = new QPushButton(tr("Move Down"), editPane_);
