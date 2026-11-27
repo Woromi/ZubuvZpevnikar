@@ -58,7 +58,7 @@ FindBar::FindBar(CodeTextEdit* edit, QWidget* parent) : QWidget(parent), edit_(e
     expand_->setObjectName(QStringLiteral("findExpand"));
     expand_->setCheckable(true);
     expand_->setAutoRaise(true);
-    expand_->setToolTip(keytips::withKey(tr("Find and replace"), QKeySequence(Qt::CTRL | Qt::Key_H)));
+    expand_->setToolTip(keytips::withKey(tr("Find and replace"), appkeys::replace()));
     findRow->addWidget(expand_);
     find_ = new QLineEdit(this);
     find_->setObjectName(QStringLiteral("findField"));

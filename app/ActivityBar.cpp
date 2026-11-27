@@ -30,13 +30,14 @@ ActivityBar::ActivityBar(QWidget* parent) : QWidget(parent), group_(new QButtonG
     layout->setSpacing(4);
     group_->setExclusive(true);
 
-    addButton(View::Home, icon(this, "go-home", QStyle::SP_DirHomeIcon), keytips::withKey(tr("Home"), QKeySequence(QStringLiteral("Alt+Home"))));
+    addButton(View::Home, icon(this, "go-home", QStyle::SP_DirHomeIcon),
+              keytips::withKey(tr("Home"), appkeys::home()));
     addButton(View::Songs, icon(this, "view-list-details", QStyle::SP_FileDialogListView),
-              keytips::withKey(tr("Songs"), QKeySequence(QStringLiteral("Ctrl+1"))));
+              keytips::withKey(tr("Songs"), appkeys::songs()));
     addButton(View::Song, icon(this, "document-edit", QStyle::SP_FileIcon),
-              keytips::withKey(tr("Song Editor"), QKeySequence(QStringLiteral("Ctrl+2"))));
+              keytips::withKey(tr("Song Editor"), appkeys::songEditor()));
     addButton(View::Songbooks, icon(this, "view-media-playlist", QStyle::SP_DirIcon),
-              keytips::withKey(tr("Songbooks"), QKeySequence(QStringLiteral("Ctrl+3"))));
+              keytips::withKey(tr("Songbooks"), appkeys::songbooks()));
     layout->addStretch(1);
 
     settings_ = new QToolButton(this);
@@ -44,7 +45,7 @@ ActivityBar::ActivityBar(QWidget* parent) : QWidget(parent), group_(new QButtonG
     settings_->setIcon(icon(this, "configure", QStyle::SP_FileDialogDetailedView));
     settings_->setIconSize(QSize(24, 24));
     settings_->setAutoRaise(true);
-    settings_->setToolTip(keytips::withKey(tr("Settings"), QKeySequence(QStringLiteral("Ctrl+,"))));
+    settings_->setToolTip(keytips::withKey(tr("Settings"), appkeys::settings()));
     connect(settings_, &QToolButton::clicked, this, &ActivityBar::settingsRequested);
     layout->addWidget(settings_);
 

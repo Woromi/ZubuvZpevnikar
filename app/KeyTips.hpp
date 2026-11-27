@@ -23,3 +23,29 @@ void setShownKey(QAction* action, const QKeySequence& key);
 void apply(QObject* root);
 
 } // namespace keytips
+
+// Keys that an action and another widget's tooltip both name: written once, here (the action
+// gets it from here, the tooltip too).
+namespace appkeys {
+inline QKeySequence home() {
+    return QKeySequence(Qt::ALT | Qt::Key_Home);
+}
+inline QKeySequence songs() {
+    return QKeySequence(Qt::CTRL | Qt::Key_1);
+}
+inline QKeySequence songEditor() {
+    return QKeySequence(Qt::CTRL | Qt::Key_2);
+}
+inline QKeySequence songbooks() {
+    return QKeySequence(Qt::CTRL | Qt::Key_3);
+}
+inline QKeySequence settings() {
+    return QKeySequence(Qt::CTRL | Qt::Key_Comma);
+}
+inline QKeySequence rebuildPreview() {
+    return QKeySequence(Qt::CTRL | Qt::Key_R);
+}
+inline QKeySequence replace() {
+    return QKeySequence(Qt::CTRL | Qt::Key_H);
+}
+} // namespace appkeys

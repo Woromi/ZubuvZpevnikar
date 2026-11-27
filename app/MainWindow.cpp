@@ -270,7 +270,7 @@ void MainWindow::createMenus() {
     file->addSeparator();
     QAction* settings =
         file->addAction(QIcon::fromTheme(QStringLiteral("configure")), tr("Se&ttings…"));
-    settings->setShortcut(QKeySequence(QStringLiteral("Ctrl+,")));
+    settings->setShortcut(appkeys::settings());
     connect(settings, &QAction::triggered, this, &MainWindow::openSettings);
     file->addSeparator();
     QAction* quit = file->addAction(tr("&Quit"));
@@ -284,8 +284,8 @@ void MainWindow::createMenus() {
     QMenu* library = menuBar()->addMenu(tr("Li&brary", "menu: the song library"));
     QAction* scan =
         library->addAction(QIcon::fromTheme(QStringLiteral("edit-find")), tr("&Scan Songs…"));
-    scan->setToolTip(tr("Check every song (or the ones shown): what Tidy, Find Mistakes or Make "
-                        "Smaller would change, keys, metadata"));
+    scan->setToolTip(tr("Scan every song (or the ones shown) for what Tidy, Find Mistakes or "
+                        "Make Smaller would change, keys, metadata; you decide song by song"));
     connect(scan, &QAction::triggered, this, [this] { songbookCheck_->start(); });
     // Home's actions row: the same actions.
     QAction* newBook = new QAction(QIcon::fromTheme(QStringLiteral("document-new")),
@@ -313,12 +313,10 @@ void MainWindow::createMenus() {
         connect(action, &QAction::triggered, this, [this, target] { showView(target); });
         return action;
     };
-    addView(tr("&Home"), {QKeySequence(QStringLiteral("Alt+Home"))}, ActivityBar::View::Home);
-    addView(tr("&Songs"), {QKeySequence(QStringLiteral("Ctrl+1"))}, ActivityBar::View::Songs);
-    songViewAction_ = addView(tr("Song &Editor"), {QKeySequence(QStringLiteral("Ctrl+2"))},
-                              ActivityBar::View::Song);
-    addView(tr("Song&books"),
-            {QKeySequence(QStringLiteral("Ctrl+3")), QKeySequence(QStringLiteral("Ctrl+B"))},
+    addView(tr("&Home"), {appkeys::home()}, ActivityBar::View::Home);
+    addView(tr("&Songs"), {appkeys::songs()}, ActivityBar::View::Songs);
+    songViewAction_ = addView(tr("Song &Editor"), {appkeys::songEditor()}, ActivityBar::View::Song);
+    addView(tr("Song&books"), {appkeys::songbooks(), QKeySequence(QStringLiteral("Ctrl+B"))},
             ActivityBar::View::Songbooks);
     view->addSeparator();
     // The editors' text size (songs, scores, the songbook's LaTeX, Changes).
@@ -333,7 +331,7 @@ void MainWindow::createMenus() {
     // Ctrl+R: the preview in view: the song's PDF, the score's on a score tab, the songbook's
     // on the Songbooks page.
     rebuildPreviewAction_ = view->addAction(tr("&Rebuild Preview"));
-    rebuildPreviewAction_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
+    rebuildPreviewAction_->setShortcut(appkeys::rebuildPreview());
     connect(rebuildPreviewAction_, &QAction::triggered, this, [this] {
         if (pages_->currentWidget() == songbooksPage_)
             songbooksPage_->buildPreview();
@@ -1384,7 +1382,7 @@ void MainWindow::createEditMenu() {
     findAction_->setToolTip(tr("Find in the text"));
     connect(findAction_, &QAction::triggered, this, [this] { showFind(false); });
     QAction* replaceAction = edit->addAction(tr("&Replace…"));
-    replaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_H));
+    replaceAction->setShortcut(appkeys::replace());
     connect(replaceAction, &QAction::triggered, this, [this] { showFind(true); });
     edit->addSeparator();
     // songOnly: the action edits the song's text (chords, parts), not a score's.

@@ -34,7 +34,7 @@ PreviewPane::PreviewPane(QWidget* parent)
         rebuild_->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
         rebuild_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     }
-    rebuild_->setToolTip(keytips::withKey(tr("Rebuild the preview"), QKeySequence(QStringLiteral("Ctrl+R"))));
+    rebuild_->setToolTip(keytips::withKey(tr("Rebuild the preview"), appkeys::rebuildPreview()));
 
     logButton_->setText(tr("Log"));
     logButton_->setEnabled(false);
