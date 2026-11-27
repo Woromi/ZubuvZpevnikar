@@ -280,6 +280,7 @@ void HomePage::setData(const HomeData& home) {
     addedCard_->setVisible(home.datesKnown);
     addedMore_->setText(tr("Show all %n recently added…", nullptr, home.addedTotal));
     addedMore_->setVisible(home.addedTotal > static_cast<int>(home.added.size()));
+    placeCards();
     fillSongs(todo_, home.todo, tr("No song has a TODO note."));
     todoMore_->setText(tr("Show all %n with TODOs…", nullptr, home.todoTotal));
     todoMore_->setVisible(home.todoTotal > static_cast<int>(home.todo.size()));
@@ -378,26 +379,36 @@ void HomePage::updateWishButtons() {
 
 void HomePage::placeCards() {
     const int columns = width() >= 900 ? 2 : 1;
-    if (columns == columns_)
+    // Recently added is hidden without dates: the cards left are paired so no half stays empty.
+    const bool addedShown = !addedCard_->isHidden();
+    const int key = columns * 2 + (addedShown ? 1 : 0);
+    if (key == layoutKey_)
         return;
-    columns_ = columns;
+    layoutKey_ = key;
     for (QWidget* card : {static_cast<QWidget*>(openedCard_), static_cast<QWidget*>(addedCard_),
                           static_cast<QWidget*>(todoCard_), static_cast<QWidget*>(booksCard_),
                           static_cast<QWidget*>(wishesCard_)})
         grid_->removeWidget(card);
-    if (columns == 2) {
-        grid_->addWidget(openedCard_, 0, 0);
-        grid_->addWidget(addedCard_, 0, 1);
-        grid_->addWidget(todoCard_, 1, 0);
-        grid_->addWidget(booksCard_, 1, 1);
-        grid_->addWidget(wishesCard_, 2, 0, 1, 2);
-    } else {
-        int row = 0;
-        for (QWidget* card : {static_cast<QWidget*>(openedCard_), static_cast<QWidget*>(addedCard_),
-                              static_cast<QWidget*>(todoCard_), static_cast<QWidget*>(booksCard_),
-                              static_cast<QWidget*>(wishesCard_)})
-            grid_->addWidget(card, row++, 0);
+    std::vector<QWidget*> cards{openedCard_};
+    if (addedShown)
+        cards.push_back(addedCard_);
+    cards.push_back(todoCard_);
+    cards.push_back(booksCard_);
+    int row = 0;
+    int column = 0;
+    for (std::size_t i = 0; i < cards.size(); ++i) {
+        const bool last = i + 1 == cards.size();
+        // the last card alone in its row takes both columns
+        const int span = columns == 2 && last && column == 0 ? 2 : 1;
+        grid_->addWidget(cards[i], row, column, 1, span);
+        if (++column == columns || span == 2) {
+            column = 0;
+            ++row;
+        }
     }
+    if (column != 0)
+        ++row;
+    grid_->addWidget(wishesCard_, row, 0, 1, columns);
 }
 
 void HomePage::resizeEvent(QResizeEvent* event) {

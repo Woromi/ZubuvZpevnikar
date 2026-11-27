@@ -90,5 +90,5 @@ private:
     QToolButton* wishMore_ = nullptr;
     QPushButton* wishAdd_ = nullptr;
     std::vector<HomeWish> wishList_;
-    int columns_ = 0;
+    int layoutKey_ = -1; // the columns and whether Recently added shows: what placeCards laid out
 };
