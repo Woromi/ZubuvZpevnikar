@@ -6,6 +6,7 @@
 #include "ActivityBar.hpp"
 #include "HomeData.hpp"
 #include "SongEditor.hpp"
+#include "SongFilterProxy.hpp"
 #include "SongTableModel.hpp"
 #include "Support.hpp"
 

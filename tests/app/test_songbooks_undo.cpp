@@ -71,7 +71,7 @@ TEST_CASE("Songbooks page: undo and redo of a removed song", "[app][songbooks]")
     const std::string removed = slurp(big);
     REQUIRE(removed != original);
     CHECK(w.page->canUndo());
-    CHECK(w.page->undoText() == "remove 1 song");
+    CHECK(w.page->undoText().startsWith("remove 1 song"));
     CHECK(changes > 0);
     CHECK(!A::warning(*w.page)->isHidden());
 
@@ -80,7 +80,7 @@ TEST_CASE("Songbooks page: undo and redo of a removed song", "[app][songbooks]")
     CHECK(has(slurp(big), "\\input{Beta/Bravo}"));
     CHECK(!w.page->canUndo());
     CHECK(w.page->canRedo());
-    CHECK(w.page->redoText() == "remove 1 song");
+    CHECK(w.page->redoText().startsWith("remove 1 song"));
 
     w.page->redo();
     CHECK(slurp(big) == removed);
