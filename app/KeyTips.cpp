@@ -23,6 +23,12 @@ void setShownKey(QAction* action, const QKeySequence& key) {
     QString text = action->text();
     if (const auto tab = text.indexOf(QLatin1Char('\t')); tab >= 0)
         text.truncate(tab);
+    // A toolbar shows the icon text: the name without the key (and without the mnemonic).
+    QString iconText = text;
+    iconText.replace(QStringLiteral("&&"), QStringLiteral("\x01"));
+    iconText.remove(QLatin1Char('&'));
+    iconText.replace(QStringLiteral("\x01"), QStringLiteral("&"));
+    action->setIconText(iconText);
     if (!key.isEmpty())
         text += QLatin1Char('\t') + key.toString(QKeySequence::NativeText);
     action->setText(text);
