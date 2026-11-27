@@ -26,6 +26,7 @@ public:
         std::function<std::string()> documentClass; // of the song preview (decides the paper)
         std::function<QString()> noPackageText;     // why a build cannot run
         std::function<SongEditor*()> openSong;      // the open song, or nullptr
+        std::function<bool()> unsavedEdits;         // some song has unsaved edits (optional)
     };
 
     // `window`: the parent of the dialogs, and the owner of this object.

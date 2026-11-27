@@ -214,7 +214,7 @@ void SongbookScan::next() {
             };
             break;
         case Kind::Check:
-            what = tr("Check: %1").arg(name);
+            what = tr("Find Mistakes: %1").arg(name);
             command = [converter](const std::filesystem::path& file) {
                 return zub::songsuggest::checkCommand(converter, file);
             };
@@ -278,7 +278,7 @@ void SongbookScan::onRunFinished(const QString& error, int exitCode, const std::
     };
     if (!error.isEmpty()) {
         failed(step.kind == Kind::Tidy    ? tr("Tidy")
-               : step.kind == Kind::Check ? tr("Check")
+               : step.kind == Kind::Check ? tr("Find Mistakes")
                                           : tr("Measuring"),
                error);
     } else {
@@ -296,7 +296,7 @@ void SongbookScan::onRunFinished(const QString& error, int exitCode, const std::
         case Kind::Check: {
             const auto found = zub::songsuggest::interpretProposals(exitCode, out, err);
             if (!found)
-                failed(tr("Check"), toQString(found.error()));
+                failed(tr("Find Mistakes"), toQString(found.error()));
             else
                 for (const auto& proposal : found->proposals)
                     finding_.check << toQString(proposal.description);

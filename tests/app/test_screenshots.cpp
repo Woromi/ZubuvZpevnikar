@@ -186,4 +186,13 @@ TEST_CASE("Screenshots of the screens", "[.screens]") {
                 save(&w, QStringLiteral("15-songbooks-right-%1").arg(tabs->tabText(i)));
                 tabs->setCurrentIndex(0);
             }
+
+    // Scan Songs (a modal dialog: grabbed by the answerer, then rejected).
+    {
+        auto dialog = apptest::answerTitledDialog("Scan Songs", [](QDialog* d) {
+            save(d, QStringLiteral("16-scan-songs"));
+            d->reject();
+        });
+        A::scanSongbook(w);
+    }
 }

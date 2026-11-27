@@ -310,10 +310,11 @@ TEST_CASE("Scan Songs: the key check offers the key and a nocheck comment",
     auto dialog = apptest::answerTitledDialog("Scan Songs", [](QDialog* d) {
         for (auto* box : d->findChildren<QCheckBox*>()) {
             const QString text = box->text();
-            box->setChecked(text.startsWith("Keys") || text.startsWith("Metadata"));
+            box->setChecked(text == "Missing keys" || text.startsWith("Keys") ||
+                            text == "Metadata");
         }
         for (auto* b : d->findChildren<QPushButton*>())
-            if (b->text() == "Check") {
+            if (b->text() == "Scan") {
                 b->click();
                 return;
             }

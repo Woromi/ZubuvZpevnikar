@@ -75,16 +75,15 @@ ImportDialog::ImportDialog(std::filesystem::path converter, std::filesystem::pat
     cookie_->setPlaceholderText(QStringLiteral("cf_clearance=…"));
     userAgent_ = new QLineEdit;
     userAgent_->setPlaceholderText(tr("what navigator.userAgent prints in your browser"));
-    auto* explain = new QLabel(tr("Copy both from the browser that passed the check. They are "
-                                  "used for this import only and never stored."));
-    explain->setWordWrap(true);
-    explain->setStyleSheet(QStringLiteral("color: gray;"));
     auto* botContents = new QWidget;
     auto* form = new QFormLayout(botContents);
     form->setContentsMargins(0, 0, 0, 0);
+    const QString onlyHere = tr("Copy both from the browser that passed the check. They are "
+                                "used for this import only and never stored.");
+    cookie_->setToolTip(onlyHere);
+    userAgent_->setToolTip(onlyHere);
     form->addRow(tr("Cookie:"), cookie_);
     form->addRow(tr("User agent:"), userAgent_);
-    form->addRow(explain);
     auto* botLayout = new QVBoxLayout(botCheck_);
     botLayout->addWidget(botContents);
     botContents->setVisible(false);

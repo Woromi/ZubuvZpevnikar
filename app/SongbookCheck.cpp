@@ -11,6 +11,7 @@
 #include <QCheckBox>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QGroupBox>
 #include <QLabel>
 #include <QList>
 #include <QProgressDialog>
@@ -50,31 +51,27 @@ void SongbookCheck::start() {
     QDialog dialog(window_);
     dialog.setWindowTitle(name);
     auto* layout = new QVBoxLayout(&dialog);
-    layout->addWidget(new QLabel(
-        tr("Look for songs where a song action would change something, or a check finds "
-           "something. Nothing is changed: the songs are marked in the list (this session only), "
-           "and you decide song by song."),
-        &dialog));
-    auto* tidy =
-        new QCheckBox(tr("Tidy: a chorus typed again, chords inside a syllable, spaces"), &dialog);
-    auto* check = new QCheckBox(
-        tr("Find Mistakes: typos, apostrophes typed two ways, a chorus typed as a verse"), &dialog);
-    auto* shrink = new QCheckBox(
-        tr("Make Smaller: songs that don't fit %1 (the preview's paper). Typesets every song: "
-           "about 2 seconds each, some 8 minutes for the whole song library.")
-            .arg(paperName),
-        &dialog);
+    auto* looks = new QGroupBox(tr("Look for:"), &dialog);
+    auto* looksLayout = new QVBoxLayout(looks);
+    auto* tidy = new QCheckBox(tr("Tidy"), &dialog);
+    tidy->setToolTip(tr("A chorus typed again, chords inside a syllable, spaces."));
+    auto* check = new QCheckBox(tr("Find Mistakes"), &dialog);
+    check->setToolTip(tr("Typos, apostrophes typed two ways, a chorus typed as a verse."));
+    auto* shrink = new QCheckBox(tr("Make Smaller (%1, slow)").arg(paperName), &dialog);
+    shrink->setToolTip(tr("Songs that don't fit %1 (the preview's paper). Typesets every song: "
+                          "about 2 seconds each, some 8 minutes for the whole song library.")
+                           .arg(paperName));
     QSettings settings;
     tidy->setChecked(settings.value(QStringLiteral("scan/tidy"), true).toBool());
     check->setChecked(settings.value(QStringLiteral("scan/check"), true).toBool());
     shrink->setChecked(settings.value(QStringLiteral("scan/shrink"), false).toBool());
     // The package's scripts, once for the whole songbook (a second each).
-    auto* keysMissing =
-        new QCheckBox(tr("Keys: a key for the songs that have none (from their chords)"), &dialog);
-    auto* keysStated = new QCheckBox(
-        tr("Keys: written keys the chords disagree with (unless confirmed)"), &dialog);
-    auto* metadata = new QCheckBox(
-        tr("Metadata: the header's keys and values (missing tempo, meter …)"), &dialog);
+    auto* keysMissing = new QCheckBox(tr("Missing keys"), &dialog);
+    keysMissing->setToolTip(tr("A key for the songs that have none (from their chords)."));
+    auto* keysStated = new QCheckBox(tr("Keys the chords disagree with"), &dialog);
+    keysStated->setToolTip(tr("Written keys the chords disagree with (unless confirmed)."));
+    auto* metadata = new QCheckBox(tr("Metadata"), &dialog);
+    metadata->setToolTip(tr("The header's keys and values (missing tempo, meter …)."));
     keysMissing->setChecked(settings.value(QStringLiteral("scan/keysMissing"), true).toBool());
     keysStated->setChecked(settings.value(QStringLiteral("scan/keysStated"), false).toBool());
     metadata->setChecked(settings.value(QStringLiteral("scan/metadata"), false).toBool());
@@ -94,20 +91,22 @@ void SongbookCheck::start() {
         }
     }
     for (QCheckBox* box : {tidy, check, shrink, keysMissing, keysStated, metadata})
-        layout->addWidget(box);
+        looksLayout->addWidget(box);
+    layout->addWidget(looks);
     const int shown = proxy_->rowCount();
     const int all = model_->rowCount();
     auto* allSongs = new QRadioButton(tr("All %n song(s)", nullptr, all), &dialog);
     auto* shownSongs =
         new QRadioButton(tr("The %n song(s) shown in the list", nullptr, shown), &dialog);
     allSongs->setChecked(true);
-    shownSongs->setEnabled(shown != all);
-    layout->addWidget(allSongs);
-    layout->addWidget(shownSongs);
-    layout->addWidget(
-        new QLabel(tr("Unsaved edits are not checked: the check reads the files."), &dialog));
+    if (shown != all) { // nothing filtered: there is no choice to make
+        layout->addWidget(allSongs);
+        layout->addWidget(shownSongs);
+    }
+    if (hooks_.unsavedEdits && hooks_.unsavedEdits())
+        layout->addWidget(new QLabel(tr("Unsaved edits are not scanned."), &dialog));
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, &dialog);
-    QPushButton* start = buttons->addButton(tr("Check"), QDialogButtonBox::AcceptRole);
+    QPushButton* start = buttons->addButton(tr("Scan"), QDialogButtonBox::AcceptRole);
     start->setDefault(true);
     const QList<QCheckBox*> boxes{tidy, check, shrink, keysMissing, keysStated, metadata};
     const auto updateStart = [=] {
@@ -164,7 +163,7 @@ void SongbookCheck::start() {
     found_ = 0;
     scan_ = new SongbookScan(options, std::move(songs), this);
     auto* progress =
-        new QProgressDialog(tr("Checking…"), tr("Cancel"), 0, scan_->stepCount(), window_);
+        new QProgressDialog(tr("Scanning…"), tr("Cancel"), 0, scan_->stepCount(), window_);
     progress->setWindowTitle(name);
     progress->setWindowModality(Qt::WindowModal);
     progress->setMinimumDuration(0);
@@ -189,7 +188,7 @@ void SongbookCheck::start() {
                 if (!finding.tidy.isEmpty())
                     summary << tr("Tidy %1").arg(finding.tidy.size());
                 if (!finding.check.isEmpty())
-                    summary << tr("Check %1").arg(finding.check.size());
+                    summary << tr("Find Mistakes %1").arg(finding.check.size());
                 if (!finding.shrink.isEmpty())
                     summary << (finding.pages.isEmpty() ? tr("Too big")
                                                         : tr("Too big (%1)").arg(finding.pages));
@@ -233,7 +232,7 @@ void SongbookCheck::start() {
         if (SongEditor* editor = hooks_.openSong())
             actions_->offerFindings(editor); // the open song may have findings now
         emit statusMessage(
-            (cancelled ? tr("Check cancelled. ") : QString()) +
+            (cancelled ? tr("Scan cancelled. ") : QString()) +
                 tr("%n song(s) with possible changes: open one to see them and decide.", nullptr,
                    found_),
             15000);
