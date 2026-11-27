@@ -34,7 +34,7 @@ ActivityBar::ActivityBar(QWidget* parent) : QWidget(parent), group_(new QButtonG
     addButton(View::Songs, icon(this, "view-list-details", QStyle::SP_FileDialogListView),
               keytips::withKey(tr("Songs"), QKeySequence(QStringLiteral("Ctrl+1"))));
     addButton(View::Song, icon(this, "document-edit", QStyle::SP_FileIcon),
-              keytips::withKey(tr("The open song"), QKeySequence(QStringLiteral("Ctrl+2"))));
+              keytips::withKey(tr("Song Editor"), QKeySequence(QStringLiteral("Ctrl+2"))));
     addButton(View::Songbooks, icon(this, "view-media-playlist", QStyle::SP_DirIcon),
               keytips::withKey(tr("Songbooks"), QKeySequence(QStringLiteral("Ctrl+3"))));
     layout->addStretch(1);

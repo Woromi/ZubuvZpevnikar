@@ -152,7 +152,7 @@ TEST_CASE("Views: the Edit menu's song keys work on the song page only; Insert P
     INFO(items.join(QStringLiteral(" | ")).toStdString());
     // Numbered: Ctrl+P, then a digit, the same in every language.
     CHECK(items.value(0) == QStringLiteral("&1  Verse"));
-    CHECK(items.indexOf(QStringLiteral("&9  Score (LilyPond)…")) ==
+    CHECK(items.indexOf(QStringLiteral("&9  New Score…")) ==
           items.indexOf(QStringLiteral("&8  Instrumental")) + 1);
     const std::string withoutPart = editor->content();
     QTest::keyClick(menu, Qt::Key_1);
@@ -573,6 +573,18 @@ TEST_CASE("Song list: the right-click menu copies the input name and opens the s
     INFO(name.toStdString());
     CHECK(name.count(QLatin1Char('/')) == 1);
     CHECK_FALSE(name.endsWith(QStringLiteral(".tex")));
+
+    // Ctrl+D on the list: the selected song becomes a favourite (written to its file).
+    w.activateWindow();
+    REQUIRE(QTest::qWaitForWindowActive(&w));
+    table->setFocus();
+    const auto selected =
+        A::model(w)->song(A::proxy(w)->mapToSource(A::proxy(w)->index(0, 0)).row())->path;
+    const std::string beforeFavourite = apptest::slurp(selected);
+    QTest::keyClick(&w, Qt::Key_D, Qt::ControlModifier);
+    REQUIRE(apptest::waitUntil([&] { return apptest::slurp(selected) != beforeFavourite; }));
+    CHECK(apptest::slurp(selected).find("fav") != std::string::npos);
+    table->selectRow(0);
 
     auto opened = pick(QStringLiteral("Open Song"));
     A::showTableMenu(w, at);

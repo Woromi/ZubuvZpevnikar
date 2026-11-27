@@ -158,7 +158,18 @@ MainWindow::MainWindow(QWidget* parent)
     // Labels rather than showMessage(): a temporary message is cleared by menu hover.
     countLabel_ = new QLabel(this);
     statusBar()->addWidget(countLabel_);
-    issuesLabel_ = new QLabel(this);
+    // Files of the library that could not be read: a click lists them.
+    issuesLabel_ = new QToolButton(this);
+    issuesLabel_->setAutoRaise(true);
+    issuesLabel_->hide();
+    connect(issuesLabel_, &QToolButton::clicked, this, [this] {
+        QMessageBox box(
+            QMessageBox::Warning, tr("Files with issues"),
+            tr("%n file(s) of the song library could not be read as songs.", nullptr, issueCount_),
+            QMessageBox::Close, this);
+        box.setDetailedText(issuesLabel_->toolTip());
+        box.exec();
+    });
     statusBar()->addPermanentWidget(issuesLabel_);
     updateStatus();
 
@@ -260,7 +271,7 @@ void MainWindow::createMenus() {
     connect(settings, &QAction::triggered, this, &MainWindow::openSettings);
     file->addSeparator();
     QAction* quit = file->addAction(tr("&Quit"));
-    quit->setShortcut(QKeySequence::Quit);
+    quit->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q)); // ::Quit is empty on some desktops
     connect(quit, &QAction::triggered, this, &QWidget::close);
 
     createEditMenu();
@@ -282,11 +293,9 @@ void MainWindow::createMenus() {
         if (pages_->currentWidget() == songbooksPage_)
             songbooksPage_->newSongbook();
     });
-    QAction* another = new QAction(QIcon::fromTheme(QStringLiteral("document-open")),
-                                   tr("Open Another Song Library…"), this);
-    connect(another, &QAction::triggered, this, &MainWindow::chooseSongbookFolder);
+    open->setIcon(QIcon::fromTheme(QStringLiteral("document-open")));
     library->addAction(newBook);
-    for (QAction* action : {import, newSongAction, newBook, scan, another})
+    for (QAction* action : {import, newSongAction, newBook, scan, open})
         homePage_->addQuickAction(action);
     // The Songs view's heading has the same actions as buttons.
     listPage_->addHeaderAction(newSongAction);
@@ -303,7 +312,7 @@ void MainWindow::createMenus() {
     };
     addView(tr("&Home"), {QKeySequence(QStringLiteral("Alt+Home"))}, ActivityBar::View::Home);
     addView(tr("&Songs"), {QKeySequence(QStringLiteral("Ctrl+1"))}, ActivityBar::View::Songs);
-    songViewAction_ = addView(tr("The Open S&ong"), {QKeySequence(QStringLiteral("Ctrl+2"))},
+    songViewAction_ = addView(tr("Song &Editor"), {QKeySequence(QStringLiteral("Ctrl+2"))},
                               ActivityBar::View::Song);
     addView(tr("Song&books"),
             {QKeySequence(QStringLiteral("Ctrl+3")), QKeySequence(QStringLiteral("Ctrl+B"))},
@@ -346,9 +355,12 @@ void MainWindow::createMenus() {
     });
 
     QMenu* help = menuBar()->addMenu(tr("&Help"));
-    QAction* keys = help->addAction(tr("&Keyboard Shortcuts…"));
+    QAction* keys = help->addAction(tr("&Keyboard Shortcuts"));
     keys->setShortcut(QKeySequence::HelpContents);
     connect(keys, &QAction::triggered, this, &MainWindow::showKeyboardShortcuts);
+    help->addSeparator();
+    connect(help->addAction(tr("&About Zpěvníkář")), &QAction::triggered, this,
+            &MainWindow::showAbout);
 }
 
 void MainWindow::createCentralWidget() {
@@ -362,6 +374,12 @@ void MainWindow::createCentralWidget() {
     connect(listPage_, &SongListPage::songActivated, this, &MainWindow::openSong);
     connect(listPage_, &SongListPage::favouriteClicked, this, &MainWindow::toggleFavourite);
     connect(listPage_, &SongListPage::contextMenuRequested, this, &MainWindow::showTableMenu);
+    // Favourite and Labels… (Ctrl+D, Ctrl+L) take the selected songs on the list.
+    connect(listPage_->table()->selectionModel(), &QItemSelectionModel::selectionChanged, this,
+            [this] {
+                if (pages_->currentWidget() == listPage_)
+                    updateLabelActions();
+            });
 
     createPreview();
 
@@ -854,18 +872,15 @@ void MainWindow::updateLanguageFilter() {
 void MainWindow::updateStatus() {
     if (songbookRoot_.empty()) {
         countLabel_->setText(tr("No song library open. Use File → Open Song Library…"));
-        issuesLabel_->clear();
+        issuesLabel_->hide();
         return;
     }
     const int shown = proxy_->rowCount();
     const int total = model_->rowCount();
     const QString songs = tr("%n song(s)", nullptr, total);
     countLabel_->setText(shown == total ? songs : tr("%1 of %2").arg(shown).arg(songs));
-    if (issueCount_ == 0)
-        issuesLabel_->clear();
-    else
-        issuesLabel_->setText(
-            tr("⚠ %n file(s) with issues (hover for details)", nullptr, issueCount_));
+    issuesLabel_->setVisible(issueCount_ > 0);
+    issuesLabel_->setText(tr("⚠ %n file(s) with issues", nullptr, issueCount_));
 }
 
 void MainWindow::openSong(const QModelIndex& proxyIndex) {
@@ -1161,8 +1176,8 @@ void MainWindow::createSongToolBar() {
     songToolBar_->setMovable(false);
     songToolBar_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
-    songToolBar_->addAction(closeSongAction_);
     songToolBar_->addAction(saveAction_);
+    songToolBar_->addAction(closeSongAction_);
     addToBooksAction_ = new QAction(QIcon::fromTheme(QStringLiteral("list-add")),
                                     tr("Add to Songbooks…"), this);
     addToBooksAction_->setToolTip(tr("Put the song into songbooks (where their index puts it)"));
@@ -1177,19 +1192,28 @@ void MainWindow::createSongToolBar() {
         if (auto* button = qobject_cast<QToolButton*>(songToolBar_->widgetForAction(action)))
             button->setToolButtonStyle(Qt::ToolButtonIconOnly); // their icons say it
     }
-    songToolBar_->addSeparator();
-
-    songToolBar_->addAction(songActions_->tidyAction());
+    // The actions on the song's text: buttons of their own, so that the group can hide on a
+    // score tab (where they could not be used) while the actions stay in the Song menu.
+    const auto songOnly = [this](QAction* action) {
+        auto* button = new QToolButton(songToolBar_);
+        button->setDefaultAction(action);
+        button->setAutoRaise(true);
+        button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        QAction* holder = songToolBar_->addWidget(button);
+        songOnlyButtons_.push_back(holder);
+        return std::pair{button, holder};
+    };
+    songOnlyButtons_.push_back(songToolBar_->addSeparator());
+    songOnly(songActions_->tidyAction());
     // Join Lines is a way of making the song smaller: in Make Smaller's drop-down.
-    songToolBar_->addAction(songActions_->makeSmallerAction());
-    if (auto* button = qobject_cast<QToolButton*>(
-            songToolBar_->widgetForAction(songActions_->makeSmallerAction()))) {
+    {
+        auto* button = songOnly(songActions_->makeSmallerAction()).first;
         auto* more = new QMenu(button);
         more->addAction(songActions_->joinLinesAction());
         button->setMenu(more);
         button->setPopupMode(QToolButton::MenuButtonPopup);
     }
-    songToolBar_->addAction(songActions_->checkAction());
+    songOnly(songActions_->checkAction());
 
     markCheckedAction_ =
         new QAction(QIcon::fromTheme(QStringLiteral("checkmark")), tr("Mark Checked"), this);
@@ -1205,19 +1229,22 @@ void MainWindow::createSongToolBar() {
         editor_->replaceContent(zub::todo::removeNotCheckedMark(content));
         statusBar()->showMessage(tr("Marked as checked. Save to keep it."), 8000);
     });
-    songToolBar_->addAction(markCheckedAction_);
+    // Shown only for a song marked "not checked yet" (an import): a one-off.
+    markCheckedButton_ = songOnly(markCheckedAction_).second;
 
     favouriteAction_ = new QAction(tr("&Favourite"), this);
-    favouriteAction_->setIconText(QStringLiteral("★"));
+    favouriteAction_->setIconText(QStringLiteral("☆")); // ★ when it is one (updateLabelActions)
     favouriteAction_->setCheckable(true);
     favouriteAction_->setToolTip(tr("Favourite: add or remove the label \"fav\" "
                                     "(one undo step; save to keep it)"));
     // triggered, not toggled: syncing the check with the text must not write to the text.
+    // On the song list it takes the selected songs (Ctrl+D there too).
     connect(favouriteAction_, &QAction::triggered, this, [this] {
-        if (editor_)
-            toggleFavourite(editor_->path());
+        const auto paths = labelTargets();
+        if (!paths.empty())
+            setFavourites(paths, !allFavourites(paths));
     });
-    songToolBar_->addAction(favouriteAction_);
+    songOnly(favouriteAction_);
     favouriteTimer_ = new QTimer(this);
     favouriteTimer_->setSingleShot(true);
     favouriteTimer_->setInterval(300);
@@ -1226,18 +1253,18 @@ void MainWindow::createSongToolBar() {
     labelsAction_ = new QAction(QIcon::fromTheme(QStringLiteral("tag")), tr("Labels…"), this);
     labelsAction_->setToolTip(tr("Edit the song's labels (one undo step; save to keep them)"));
     connect(labelsAction_, &QAction::triggered, this, [this] {
-        if (editor_)
-            editLabels({editor_->path()});
+        if (const auto paths = labelTargets(); !paths.empty())
+            editLabels(paths);
     });
-    songToolBar_->addAction(labelsAction_);
+    songOnly(labelsAction_);
 
     changesAction_ =
-        new QAction(QIcon::fromTheme(QStringLiteral("document-compare")), tr("Changes"), this);
+        new QAction(QIcon::fromTheme(QStringLiteral("document-compare")), tr("Show Changes"), this);
     changesAction_->setCheckable(true);
     changesAction_->setToolTip(
         tr("Show what changed since the song was saved (an import: since it was imported)"));
     connect(changesAction_, &QAction::toggled, this, &MainWindow::showChanges);
-    songToolBar_->addAction(changesAction_);
+    songOnly(changesAction_);
 
     // The song's input name ("Artist/Title"), at the right end.
     inputLabel_ = new QLabel(songToolBar_);
@@ -1330,7 +1357,7 @@ void MainWindow::createEditMenu() {
         if (editor_)
             editor_->insertRole();
     });
-    add(tr("Remove Element at Cursor"), {QKeySequence(Qt::ALT | Qt::Key_Delete)}, [this] {
+    add(tr("Remove Chord, Role or Multivoice"), {QKeySequence(Qt::ALT | Qt::Key_Delete)}, [this] {
         if (editor_ && !editor_->removeElement())
             statusBar()->showMessage(tr("Nothing to remove at the cursor"), 3000);
     });
@@ -1383,7 +1410,19 @@ void MainWindow::createEditMenu() {
     add(tr("Move Chord to Next Word"), {QKeySequence(Qt::ALT | Qt::SHIFT | Qt::Key_Right)},
         [this] { moveChord(+1, Step::Word); });
     edit->addSeparator();
-    add(tr("Insert Part…"), {QKeySequence(Qt::CTRL | Qt::Key_P)}, [this] { showPartMenu(); });
+    // Insert Part: a submenu here, and Ctrl+P pops the same menu up at the cursor.
+    QMenu* parts = edit->addMenu(tr("Insert &Part"));
+    connect(parts, &QMenu::aboutToShow, this, [this, parts] {
+        parts->clear();
+        fillPartMenu(parts);
+    });
+    songEditActions_.push_back(parts->menuAction());
+    auto* partKey = new QAction(tr("Insert Part at the Cursor"), this);
+    partKey->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_P));
+    partKey->setShortcutContext(Qt::WindowShortcut);
+    connect(partKey, &QAction::triggered, this, &MainWindow::showPartMenu);
+    addAction(partKey);
+    songEditActions_.push_back(partKey);
     // In the Song menu (createSongToolBar).
     newScoreAction_ = new QAction(tr("New &Score…"), this);
     connect(newScoreAction_, &QAction::triggered, this, [this] { scores_->newScore(); });
@@ -1411,9 +1450,17 @@ void MainWindow::moveChord(int direction, zub::songedit::Step step) {
 void MainWindow::showPartMenu() {
     if (!editor_)
         return;
-    using zub::songedit::Part;
     auto* menu = new QMenu(editor_->textEdit());
     menu->setAttribute(Qt::WA_DeleteOnClose);
+    fillPartMenu(menu);
+    QPlainTextEdit* edit = editor_->textEdit();
+    menu->popup(edit->viewport()->mapToGlobal(edit->cursorRect().bottomLeft()));
+}
+
+void MainWindow::fillPartMenu(QMenu* menu) {
+    if (!editor_)
+        return;
+    using zub::songedit::Part;
     const QPointer<SongEditor> editor = editor_;
     // Ctrl+P, then a digit: the same keys in every language.
     int digit = 1;
@@ -1436,8 +1483,8 @@ void MainWindow::showPartMenu() {
     add(tr("Intro"), Part::Intro);
     add(tr("Outro"), Part::Outro);
     add(tr("Instrumental"), Part::Instrumental);
-    // A score is a part too: its \lilypondfile line goes where a part would (New Score).
-    connect(menu->addAction(numbered(tr("Score (LilyPond)…"))), &QAction::triggered, menu,
+    // A score is a part too: its \lilypondfile line goes where a part would.
+    connect(menu->addAction(numbered(tr("New Score…"))), &QAction::triggered, menu,
             [this] { scores_->newScore(); });
     menu->addSeparator();
     add(tr("Chorus Again (\\insertchorus)"), Part::ChorusAgain);
@@ -1446,8 +1493,22 @@ void MainWindow::showPartMenu() {
         menu->addSeparator();
         add(tr("Song Header"), Part::SongHeader);
     }
-    QPlainTextEdit* edit = editor_->textEdit();
-    menu->popup(edit->viewport()->mapToGlobal(edit->cursorRect().bottomLeft()));
+}
+
+void MainWindow::showAbout() {
+    QString converter = tr("not found");
+    if (const auto path = findConverter(); !path.empty()) {
+        const auto answer = converterVersion(path);
+        converter = answer.version ? QStringLiteral("%1.%2.%3")
+                                         .arg(answer.version->major)
+                                         .arg(answer.version->minor)
+                                         .arg(answer.version->patch)
+                                   : tr("version unknown");
+    }
+    const QString package = packageDir_.empty() ? tr("not found") : toQString(packageDir_);
+    QMessageBox::about(this, tr("About Zpěvníkář"),
+                       tr("Zpěvníkář %1\n\nchords_converter %2\nThe songbook package: %3")
+                           .arg(QApplication::applicationVersion(), converter, package));
 }
 
 void MainWindow::showKeyboardShortcuts() {
@@ -1496,6 +1557,8 @@ void MainWindow::updateSongActions() {
     scores_->updateRegionActions();
     SongEditor* current = currentEditor();
     const bool songTab = onSongTab();
+    for (QAction* button : songOnlyButtons_)
+        button->setVisible(songTab); // Mark Checked's: updateMarkChecked
     closeSongAction_->setEnabled(open);
     // Ctrl+Shift+B: on the song page only (on the list, its right-click menu takes the selected).
     addToBooksAction_->setEnabled(open && !editor_->isNew() && !songbookRoot_.empty() &&
@@ -1514,8 +1577,9 @@ void MainWindow::updateSongActions() {
     // Not while Changes hides the editor: no rewriting a song nobody sees.
     songActions_->updateEnabled(songTab && onSongPage() && !changesAction_->isChecked());
     if (!open) {
-        for (QAction* action : {markCheckedAction_, favouriteAction_, labelsAction_})
-            action->setEnabled(false);
+        markCheckedAction_->setEnabled(false);
+        markCheckedButton_->setVisible(false);
+        updateLabelActions(); // the song list's selection
         for (QAction* action : editActions_)
             action->setEnabled(false);
         for (QAction* action : songEditActions_)
@@ -1535,17 +1599,49 @@ void MainWindow::updateSongActions() {
     updateLabelActions();
 }
 
+std::vector<std::filesystem::path> MainWindow::labelTargets() const {
+    if (pages_->currentWidget() == listPage_)
+        return selectedSongPaths();
+    if (editor_ && onSongTab() && onSongPage() && !editor_->textEdit()->isReadOnly() &&
+        !changesAction_->isChecked())
+        return {editor_->path()};
+    return {};
+}
+
+bool MainWindow::allFavourites(const std::vector<std::filesystem::path>& paths) const {
+    return !paths.empty() && std::ranges::all_of(paths, [this](const std::filesystem::path& path) {
+        // The open song as the editor has it: a change goes into its unsaved text.
+        const auto text = editor_ && editor_->path() == path
+                              ? std::expected<std::string, std::string>(editor_->content())
+                              : zub::readTextFile(path);
+        if (!text)
+            return false;
+        const auto meta = zub::parseSong(*text);
+        return meta && zub::tags::isFavourite(zub::tags::parse(meta->value("tags")));
+    });
+}
+
+void MainWindow::setFavourites(const std::vector<std::filesystem::path>& paths, bool favourite) {
+    changeSongTags(paths, [favourite](const std::vector<std::string>& tags) {
+        auto result = tags;
+        const std::string fav{zub::tags::kFavourite};
+        const auto it = std::ranges::find(result, fav);
+        if (!favourite && it != result.end())
+            result.erase(it);
+        else if (favourite && it == result.end())
+            result.insert(result.begin(), fav);
+        return result;
+    });
+    updateLabelActions(); // a failed change must not leave the ★ flipped
+}
+
 void MainWindow::updateLabelActions() {
-    const bool editable = editor_ && onSongTab() && onSongPage() &&
-                          !editor_->textEdit()->isReadOnly() && !changesAction_->isChecked();
-    favouriteAction_->setEnabled(editable);
-    labelsAction_->setEnabled(editable);
-    bool favourite = false;
-    if (editor_) {
-        if (const auto meta = zub::parseSong(editor_->content()))
-            favourite = zub::tags::isFavourite(zub::tags::parse(meta->value("tags")));
-    }
+    const auto paths = labelTargets();
+    favouriteAction_->setEnabled(!paths.empty());
+    labelsAction_->setEnabled(!paths.empty());
+    const bool favourite = allFavourites(paths);
     favouriteAction_->setChecked(favourite);
+    favouriteAction_->setIconText(favourite ? QStringLiteral("★") : QStringLiteral("☆"));
 }
 
 QString MainWindow::writeSongTags(
@@ -1678,8 +1774,9 @@ void MainWindow::showTableMenu(const QPoint& position) {
     open->setEnabled(one);
     menu.setDefaultAction(open);
     menu.addSeparator();
-    QAction* favourite = menu.addAction(tr("Favourite ★"));
-    QAction* labels = menu.addAction(QIcon::fromTheme(QStringLiteral("tag")), tr("Labels…"));
+    updateLabelActions(); // they take the selection
+    menu.addAction(favouriteAction_);
+    menu.addAction(labelsAction_);
     QAction* books = menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")),
                                     tr("Add to Songbooks…"));
     books->setEnabled(one && !songbookRoot_.empty());
@@ -1692,31 +1789,6 @@ void MainWindow::showTableMenu(const QPoint& position) {
     if (chosen == open) {
         if (row.isValid())
             openSong(row);
-    } else if (chosen == favourite) {
-        // All favourites: the label goes from all; else every one gets it.
-        // The open song as the editor has it: the change goes into its unsaved text.
-        const bool all = std::ranges::all_of(paths, [this](const std::filesystem::path& path) {
-            const auto text = editor_ && editor_->path() == path
-                                  ? std::expected<std::string, std::string>(editor_->content())
-                                  : zub::readTextFile(path);
-            if (!text)
-                return false;
-            const auto meta = zub::parseSong(*text);
-            return meta && zub::tags::isFavourite(zub::tags::parse(meta->value("tags")));
-        });
-        changeSongTags(paths, [all](const std::vector<std::string>& tags) {
-            auto result = tags;
-            const std::string fav{zub::tags::kFavourite};
-            const auto it = std::ranges::find(result, fav);
-            if (all && it != result.end())
-                result.erase(it);
-            else if (!all && it == result.end())
-                result.insert(result.begin(), fav);
-            return result;
-        });
-        updateLabelActions();
-    } else if (chosen == labels) {
-        editLabels(paths);
     } else if (chosen == books) {
         addToSongbooks(paths.front(), false);
     } else if (chosen == copy) {
@@ -1738,6 +1810,7 @@ void MainWindow::updateMarkChecked() {
                              ->find(QStringLiteral("% TODO: ") + toQString(zub::todo::kNotChecked))
                              .isNull();
     markCheckedAction_->setEnabled(marked);
+    markCheckedButton_->setVisible(marked);
 }
 
 void MainWindow::clearTidyChanges() {

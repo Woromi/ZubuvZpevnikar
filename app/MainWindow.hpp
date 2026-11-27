@@ -40,6 +40,7 @@ class QStackedWidget;
 class QTabWidget;
 class QTimer;
 class QToolBar;
+class QToolButton;
 class QTableView;
 class QWidget;
 class DiffView;
@@ -170,6 +171,12 @@ private:
     bool onSongTab() const;
     bool onSongPage() const; // the song page is the one shown
     void showKeyboardShortcuts();
+    void showAbout();
+    // What Favourite and Labels… act on: the list's selected songs, or the open song.
+    std::vector<std::filesystem::path> labelTargets() const;
+    bool allFavourites(const std::vector<std::filesystem::path>& paths) const;
+    void setFavourites(const std::vector<std::filesystem::path>& paths, bool favourite);
+    void fillPartMenu(QMenu* menu); // Insert Part's entries for the open song
     bool anyModified() const;
     // Labels (the `tags` header option; "fav" = favourite). `change` maps a song's current tags to
     // its new ones. An open song gets the new header in its editor (one undo step, unsaved); any
@@ -282,6 +289,9 @@ private:
     QAction* pasteAction_ = nullptr;
     QAction* newScoreAction_ = nullptr; // Song > New Score…
     QMenu* songMenu_ = nullptr;
+    // The song toolbar's song-only group (hidden on a score tab) and Mark Checked's button.
+    std::vector<QAction*> songOnlyButtons_;
+    QAction* markCheckedButton_ = nullptr;
     QAction* findAction_ = nullptr; // Edit > Find (Ctrl+F), also on the song toolbar
     QString listTitle_; // window title on the list page
     // Syntax definitions and themes, shared by all editors (must outlive them).
@@ -296,7 +306,7 @@ private:
     // Per song, the unknown commands the user agreed to build anyway (this session only).
     std::map<std::filesystem::path, std::set<std::string>> approvedConstructs_;
     QLabel* countLabel_ = nullptr;
-    QLabel* issuesLabel_ = nullptr;
+    QToolButton* issuesLabel_ = nullptr; // "⚠ N files with issues": a click lists them
 
     std::filesystem::path songbookRoot_;
     // The package that builds the songs: the songbook's own (zubuvzpevnik/, a submodule), else
