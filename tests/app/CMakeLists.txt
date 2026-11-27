@@ -26,6 +26,7 @@ add_executable(zub_app_tests
     test_pdf_links.cpp
     test_home_page.cpp
     test_wishes.cpp
+    test_screenshots.cpp
 )
 target_include_directories(zub_app_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/tests)
 target_link_libraries(zub_app_tests PRIVATE zpevnikar_app zub_warnings Qt6::Widgets Qt6::Test
