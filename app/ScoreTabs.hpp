@@ -24,6 +24,7 @@ class QAction;
 class QStackedWidget;
 class QTabWidget;
 class QTimer;
+class QToolButton;
 class QWidget;
 class FretboardWidget;
 class NoteSounds;
@@ -103,6 +104,13 @@ public:
     void newScore();                // Edit → New Score…
     void updateSoundAvailability(); // fluidsynth and a soundfont: enables Play and Sound
 
+    // Actions for the window's menus (the shortcuts live here, once); all are disabled unless a
+    // score tab is current.
+    QAction* insertStagedAction() const { return insertStagedAction_; } // Alt+N, needs staged notes
+    QAction* clearStagedAction() const { return clearStagedAction_; } // no key (Escape is per tab)
+    QAction* playAction() const { return playAction_; }               // Ctrl+Space: Play / Stop
+    QAction* rebuildAction() const { return rebuildAction_; } // Ctrl+R: Rebuild Score Preview
+
 signals:
     void statusMessage(const QString& text, int timeoutMs);
     // The song's text should become this (one undo step).
@@ -124,6 +132,9 @@ private:
         // The event (editor text range) whose positions the fretboard staging was loaded from while
         // it is the one selected note or chord: Insert replaces it then.
         std::optional<zub::scoreregion::Range> replaceTarget;
+        QWidget* editorPane = nullptr;       // the editor and the Selection row
+        QStackedWidget* regionBar = nullptr; // the Selection row: hint (0) or the buttons (1)
+        QToolButton* soundButton = nullptr;  // "Fretboard Sound": only with the fretboard
     };
 
     // Adds the tab of score `name` ("Artist/X.ly"). Without `editor` the score is loaded from
@@ -143,6 +154,8 @@ private:
     void setScoreWidth(const std::string& name, bool narrow);
 
     void updateFretboard(); // the current score tab's input panel
+    void updateKeyActions();         // enabled state of the window's score actions
+    bool regionHasSelection() const; // the Selection row shows its buttons
     // The music event the editor's selection touches, when it is exactly one.
     std::optional<zub::scoreregion::Range> singleSelectedEvent(SongEditor* editor) const;
     void insertStagedNotes(FretboardWidget* fretboard); // the staged positions as a note or chord
@@ -242,6 +255,10 @@ private:
     std::map<std::string, QStringList> staffChoices_;
     std::map<std::string, QString> chordChoices_; // the chord names' instrument per score (session)
     std::map<std::string, QString> melodyChoices_; // the hidden melody's instrument (session)
+    QAction* insertStagedAction_ = nullptr;
+    QAction* clearStagedAction_ = nullptr;
+    QAction* playAction_ = nullptr;
+    QAction* rebuildAction_ = nullptr;
     QAction* soundAction_ = nullptr;               // "Sound": clicking a fret plays the note
     std::filesystem::path scoreMidi_;              // the MIDI file of the latest successful build
     std::filesystem::path playbackCacheDir_;       // the rendered WAV files

@@ -1008,14 +1008,12 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
         rebuild_->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
         rebuild_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     }
-    rebuild_->setShortcut(QKeySequence(QStringLiteral("Ctrl+R")));
-    rebuild_->setToolTip(keytips::withKey(tr("Rebuild the score"), rebuild_->shortcut()));
+    rebuild_->setToolTip(tr("Rebuild the score"));
 
     logButton_->setText(tr("Log"));
     logButton_->setEnabled(false);
 
     play_->setObjectName(QStringLiteral("scorePlay"));
-    play_->setShortcut(QKeySequence(QStringLiteral("Ctrl+Space")));
     tempo_->setObjectName(QStringLiteral("scoreTempo"));
     tempo_->setToolTip(tr("Playback speed, as a share of the song's tempo"));
     for (const int percent : {50, 75, 100, 125})
@@ -1086,12 +1084,7 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
         menu.exec(at);
     };
     connect(rebuild_, &QToolButton::clicked, this, &ScorePreviewPane::rebuildRequested);
-    connect(play_, &QToolButton::clicked, this, [this] {
-        if (playState_ == PlayState::Idle)
-            emit playRequested();
-        else
-            emit stopRequested();
-    });
+    connect(play_, &QToolButton::clicked, this, &ScorePreviewPane::pressPlay);
     connect(tempo_, &QComboBox::currentIndexChanged, this, [this] {
         QSettings().setValue(QStringLiteral("playback/tempoPercent"), tempo_->currentData());
         emit tempoChanged();
@@ -1282,12 +1275,42 @@ void ScorePreviewPane::setPlayState(PlayState state) {
         play_->setIcon({});
         play_->setToolButtonStyle(Qt::ToolButtonTextOnly);
     }
+    const bool wasEnabled = play_->isEnabled();
     play_->setEnabled(playbackAvailable_ || !idle);
+    const QString key = playAction_ && !playAction_->shortcut().isEmpty()
+                            ? QStringLiteral(" (%1)").arg(
+                                  playAction_->shortcut().toString(QKeySequence::NativeText))
+                            : QString();
     if (idle && !playbackAvailable_)
         play_->setToolTip(unavailableReason_);
     else
-        play_->setToolTip(idle ? keytips::withKey(tr("Play the score"), play_->shortcut())
-                               : keytips::withKey(tr("Stop playing"), play_->shortcut()));
+        play_->setToolTip(idle ? tr("Play the score%1").arg(key) : tr("Stop playing%1").arg(key));
+    if (wasEnabled != play_->isEnabled())
+        emit playEnabledChanged();
+}
+
+void ScorePreviewPane::setKeyActions(QAction* play, QAction* rebuild) {
+    playAction_ = play;
+    rebuildAction_ = rebuild;
+    const QString key =
+        rebuild && !rebuild->shortcut().isEmpty()
+            ? QStringLiteral(" (%1)").arg(rebuild->shortcut().toString(QKeySequence::NativeText))
+            : QString();
+    rebuild_->setToolTip(tr("Rebuild the score%1").arg(key));
+    setPlayState(playState_);
+}
+
+bool ScorePreviewPane::playEnabled() const {
+    return play_->isEnabled();
+}
+
+void ScorePreviewPane::pressPlay() {
+    if (!play_->isEnabled())
+        return;
+    if (playState_ == PlayState::Idle)
+        emit playRequested();
+    else
+        emit stopRequested();
 }
 
 void ScorePreviewPane::showPlaybackMessage(const QString& message, bool error) {

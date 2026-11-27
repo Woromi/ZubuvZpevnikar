@@ -411,10 +411,10 @@ TEST_CASE("Fretboard shows and replaces the selected note or chord", "[.tools][a
     }
     CHECK(insertButton()->text() == "Replace");
 
-    // Toggle string 1's fret (g'\1 = fret 3 off), Ctrl+Return: <d g d'>8 only.
+    // Toggle string 1's fret (g'\1 = fret 3 off), Alt+N: <d g d'>8 only.
     const std::string before = s.text();
     fb->toggleStaged(1, 3);
-    auto* act = tab.page->findChild<QAction*>("scoreInsertStaged");
+    QAction* act = A::scores(s.window)->insertStagedAction();
     REQUIRE(act != nullptr);
     act->trigger();
     QTest::qWait(300);

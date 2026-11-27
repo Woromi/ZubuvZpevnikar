@@ -306,6 +306,11 @@ void FretboardWidget::mouseDoubleClickEvent(QMouseEvent* event) {
     emit insertRequested();
 }
 
+void FretboardWidget::setKeyHints(const QString& insertKey, const QString& clearKey) {
+    insertKey_ = insertKey;
+    clearKey_ = clearKey;
+}
+
 bool FretboardWidget::event(QEvent* event) {
     if (event->type() == QEvent::ToolTip) {
         const auto* help = static_cast<QHelpEvent*>(event);
@@ -316,10 +321,8 @@ bool FretboardWidget::event(QEvent* event) {
             QToolTip::showText(
                 help->globalPos(),
                 tr("%1: click stages the note (one per string), double-click inserts "
-                   "everything staged. Insert: %2, Clear: Escape.")
-                    .arg(
-                        name,
-                        QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)),
+                   "everything staged. Insert: %2, Clear: %3.")
+                    .arg(name, insertKey_, clearKey_),
                 this);
         } else {
             QToolTip::hideText();

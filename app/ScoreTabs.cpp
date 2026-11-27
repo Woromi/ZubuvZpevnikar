@@ -63,6 +63,11 @@ bool validScoreName(const std::string& name) {
            name[name.size() - 4] != '/';
 }
 
+// The action's key as the user sees it, for tooltips.
+QString keyOf(const QAction* action) {
+    return action->shortcut().toString(QKeySequence::NativeText);
+}
+
 } // namespace
 
 ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* songPreview,
@@ -92,21 +97,61 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
     fretboardTimer_->setSingleShot(true);
     fretboardTimer_->setInterval(80);
     connect(fretboardTimer_, &QTimer::timeout, this, &ScoreTabs::updateFretboard);
+    // The keys of these actions; the tooltips take them from here, never typed by hand.
+    insertStagedAction_ = new QAction(tr("Insert Staged Notes"), this);
+    insertStagedAction_->setObjectName(QStringLiteral("scoreInsertStaged"));
+    insertStagedAction_->setShortcut(QKeySequence(Qt::ALT | Qt::Key_N));
+    insertStagedAction_->setShortcutContext(Qt::WindowShortcut);
+    insertStagedAction_->setEnabled(false);
+    clearStagedAction_ = new QAction(tr("Clear Staged Notes"), this);
+    clearStagedAction_->setObjectName(QStringLiteral("scoreClearStagedMenu"));
+    clearStagedAction_->setEnabled(false);
+    playAction_ = new QAction(tr("Play / Stop"), this);
+    playAction_->setObjectName(QStringLiteral("scorePlayAction"));
+    playAction_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Space));
+    playAction_->setShortcutContext(Qt::WindowShortcut);
+    playAction_->setEnabled(false);
+    rebuildAction_ = new QAction(tr("Rebuild Score Preview"), this);
+    rebuildAction_->setObjectName(QStringLiteral("scoreRebuildAction"));
+    rebuildAction_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
+    rebuildAction_->setShortcutContext(Qt::WindowShortcut);
+    rebuildAction_->setEnabled(false);
+    // Window shortcuts need a widget of the window; the main window may add them to menus too.
+    for (QAction* action : {insertStagedAction_, playAction_, rebuildAction_})
+        tabs_->addAction(action);
+    connect(insertStagedAction_, &QAction::triggered, this, [this] {
+        if (const int index = tabs_->currentIndex(); index >= 1 && !onSongTab())
+            insertStagedNotes(scoreTabs_[static_cast<std::size_t>(index - 1)].fretboard);
+    });
+    connect(clearStagedAction_, &QAction::triggered, this, [this] {
+        if (const int index = tabs_->currentIndex(); index >= 1 && !onSongTab())
+            scoreTabs_[static_cast<std::size_t>(index - 1)].fretboard->clearStaged();
+    });
+    connect(playAction_, &QAction::triggered, scorePreview_, &ScorePreviewPane::pressPlay);
+    connect(rebuildAction_, &QAction::triggered, this, [this] {
+        if (!onSongTab() && tabs_->currentIndex() >= 1)
+            requestScorePreview(true);
+    });
+    scorePreview_->setKeyActions(playAction_, rebuildAction_);
+    connect(scorePreview_, &ScorePreviewPane::playEnabledChanged, this,
+            &ScoreTabs::updateKeyActions);
     fretboardAction_ = new QAction(tr("Fretboard"), this);
     fretboardAction_->setCheckable(true);
     fretboardAction_->setChecked(QSettings().value(fretboardKey, true).toBool());
     fretboardAction_->setToolTip(
-        tr("Show the fretboard: click frets to stage notes (one per string), Insert "
-           "(%1) writes them as a note or chord, Escape clears; double-click a fret "
-           "inserts at once")
-            .arg(QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)));
+        tr("Show the fretboard: click frets to stage notes (one per string), Insert (%1) writes "
+           "them as a note or chord, Escape clears; double-click a fret inserts at once")
+            .arg(keyOf(insertStagedAction_)));
     connect(fretboardAction_, &QAction::toggled, this, [this](bool shown) {
         QSettings().setValue(fretboardKey, shown);
         for (const ScoreTab& tab : scoreTabs_) {
             if (tab.inputPanel)
                 tab.inputPanel->setVisible(shown);
+            if (tab.soundButton)
+                tab.soundButton->setVisible(shown);
         }
         updateFretboard();
+        updateKeyActions();
     });
     // An on/off switch: a speaker icon shows whether a fret click sounds.
     soundAction_ = new QAction(tr("Fretboard Sound"), this);
@@ -443,12 +488,17 @@ void ScoreTabs::addScoreTab(const std::string& name, SongEditor* editor) {
     noticeLayout->addWidget(create, 0, Qt::AlignCenter);
     noticeLayout->addStretch();
     page->addWidget(notice);
-    auto* splitter = new QSplitter(Qt::Vertical, page);
-    auto* widthBar = new QWidget(splitter);
+    // The tab: the Width row (a fixed tool row) over a vertical splitter of the editor's pane
+    // (editor, Selection row) and the input panel, which hides with the fretboard.
+    auto* content = new QWidget(page);
+    auto* contentLayout = new QVBoxLayout(content);
+    contentLayout->setContentsMargins(0, 0, 0, 0);
+    contentLayout->setSpacing(0);
+    auto* widthBar = new QWidget(content);
     widthBar->setObjectName(QStringLiteral("scoreWidthBar"));
     auto* widthLayout = new QHBoxLayout(widthBar);
     widthLayout->setContentsMargins(4, 2, 4, 2);
-    widthLayout->addWidget(new QLabel(tr("Width:"), widthBar));
+    widthLayout->addWidget(new QLabel(tr("Width in song:"), widthBar));
     auto* fullButton = new QRadioButton(tr("Full"), widthBar);
     fullButton->setObjectName(QStringLiteral("scoreWidthFull"));
     auto* narrowButton = new QRadioButton(tr("Narrow"), widthBar);
@@ -461,13 +511,48 @@ void ScoreTabs::addScoreTab(const std::string& name, SongEditor* editor) {
     widthLayout->addWidget(fullButton);
     widthLayout->addWidget(narrowButton);
     widthLayout->addStretch();
-    splitter->addWidget(widthBar);
-    splitter->setCollapsible(0, false);
-    splitter->setStretchFactor(0, 0);
+    contentLayout->addWidget(widthBar);
+    auto* splitter = new QSplitter(Qt::Vertical, content);
+    contentLayout->addWidget(splitter, 1);
     connect(fullButton, &QRadioButton::clicked, this, [this, name] { setScoreWidth(name, false); });
     connect(narrowButton, &QRadioButton::clicked, this,
             [this, name] { setScoreWidth(name, true); });
-    // Under the editor: the input panel {input bar, fretboard}.
+
+    // The editor's pane: the editor (added when it is loaded) and the Selection row under it.
+    auto* editorPane = new QWidget(splitter);
+    editorPane->setObjectName(QStringLiteral("scoreEditorPane"));
+    auto* paneLayout = new QVBoxLayout(editorPane);
+    paneLayout->setContentsMargins(0, 0, 0, 0);
+    paneLayout->setSpacing(0);
+    // Page 0 says what to do while nothing is selected; page 1 has the buttons (the row keeps
+    // its height either way).
+    auto* regionBar = new QStackedWidget(editorPane);
+    regionBar->setObjectName(QStringLiteral("scoreRegionBar"));
+    auto* hint = new QLabel(tr("Select notes in the preview"), regionBar);
+    hint->setObjectName(QStringLiteral("scoreRegionHint"));
+    hint->setEnabled(false); // grey
+    hint->setContentsMargins(4, 2, 4, 2);
+    regionBar->addWidget(hint);
+    auto* regionButtons = new QWidget(regionBar);
+    auto* regionLayout = new QHBoxLayout(regionButtons);
+    regionLayout->setContentsMargins(4, 2, 4, 2);
+    regionLayout->addWidget(new QLabel(tr("Selection:"), regionButtons));
+    for (QAction* action : regionActions_) {
+        auto* button = new QToolButton(regionButtons);
+        button->setObjectName(QStringLiteral("scoreRegion") + action->objectName());
+        button->setDefaultAction(action);
+        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        button->setAutoRaise(true);
+        regionLayout->addWidget(button);
+    }
+    regionLayout->addStretch();
+    regionBar->addWidget(regionButtons);
+    regionBar->setCurrentIndex(regionHasSelection() ? 1 : 0);
+    paneLayout->addWidget(regionBar);
+    splitter->addWidget(editorPane);
+    splitter->setStretchFactor(0, 1);
+
+    // Under the editor: the input panel {input bar, fretboard}, hidden with the fretboard.
     auto* inputPanel = new QWidget(splitter);
     inputPanel->setObjectName(QStringLiteral("scoreInputPanel"));
     auto* panelLayout = new QVBoxLayout(inputPanel);
@@ -476,35 +561,14 @@ void ScoreTabs::addScoreTab(const std::string& name, SongEditor* editor) {
     auto* inputBar = new ScoreInputBar(inputPanel);
     inputBar->setObjectName(QStringLiteral("scoreInputBar"));
     auto* fretboard = new FretboardWidget(inputPanel);
+    connect(fretboard, &FretboardWidget::inputKey, this, &ScoreTabs::inputKey);
     fretboard->setObjectName(QStringLiteral("scoreFretboard"));
     panelLayout->addWidget(inputBar);
     panelLayout->addWidget(fretboard);
-    connect(fretboard, &FretboardWidget::inputKey, this, &ScoreTabs::inputKey);
     inputPanel->setVisible(fretboardAction_->isChecked());
-    // Under the editor: the row of selection actions (always shown), then the input panel.
-    auto* bottom = new QWidget(splitter);
-    auto* bottomLayout = new QVBoxLayout(bottom);
-    bottomLayout->setContentsMargins(0, 0, 0, 0);
-    bottomLayout->setSpacing(0);
-    auto* regionBar = new QWidget(bottom);
-    regionBar->setObjectName(QStringLiteral("scoreRegionBar"));
-    auto* regionLayout = new QHBoxLayout(regionBar);
-    regionLayout->setContentsMargins(4, 2, 4, 2);
-    if (!regionActions_.isEmpty()) {
-        regionLayout->addWidget(new QLabel(tr("Selection:"), regionBar));
-        for (QAction* action : regionActions_) {
-            auto* button = new QToolButton(regionBar);
-            button->setObjectName(QStringLiteral("scoreRegion") + action->objectName());
-            button->setDefaultAction(action);
-            button->setToolButtonStyle(Qt::ToolButtonTextOnly);
-            button->setAutoRaise(true);
-            regionLayout->addWidget(button);
-        }
-    }
-    regionLayout->addStretch();
-    bottomLayout->addWidget(regionBar);
-    bottomLayout->addWidget(inputPanel);
-    splitter->addWidget(bottom);
+    splitter->addWidget(inputPanel);
+    splitter->setStretchFactor(1, 0); // the input panel keeps its height
+    splitter->setCollapsible(1, false);
     // The toggle for the panel sits in the width bar (the tab's tool row).
     auto* fretboardButton = new QToolButton(widthBar);
     fretboardButton->setObjectName(QStringLiteral("scoreFretboardToggle"));
@@ -517,25 +581,19 @@ void ScoreTabs::addScoreTab(const std::string& name, SongEditor* editor) {
     soundButton->setToolButtonStyle(QIcon::hasThemeIcon(QStringLiteral("audio-volume-high"))
                                         ? Qt::ToolButtonTextBesideIcon
                                         : Qt::ToolButtonTextOnly);
+    soundButton->setVisible(fretboardAction_->isChecked()); // it is about fret clicks
     widthLayout->addWidget(soundButton);
     connect(fretboard, &FretboardWidget::fretClicked, this,
             [this, fretboard](int string, int fret) { soundFret(fretboard, string, fret); });
-    // Insert and Clear work anywhere on the tab while something is staged.
-    auto* insertAction = new QAction(tr("Insert Staged Notes"), page);
-    insertAction->setObjectName(QStringLiteral("scoreInsertStaged"));
-    insertAction->setShortcuts(
-        {QKeySequence(Qt::CTRL | Qt::Key_Return), QKeySequence(Qt::CTRL | Qt::Key_Enter)});
-    insertAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
-    insertAction->setEnabled(false);
+    // Clear works anywhere on the tab while something is staged (Insert is the window's action).
     auto* clearAction = new QAction(tr("Clear Staged Notes"), page);
     clearAction->setObjectName(QStringLiteral("scoreClearStaged"));
     clearAction->setShortcut(QKeySequence(Qt::Key_Escape));
     clearAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
     clearAction->setEnabled(false);
-    page->addAction(insertAction);
     page->addAction(clearAction);
-    connect(insertAction, &QAction::triggered, this,
-            [this, fretboard] { insertStagedNotes(fretboard); });
+    inputBar->setKeyHints(keyOf(insertStagedAction_), keyOf(clearAction));
+    fretboard->setKeyHints(keyOf(insertStagedAction_), keyOf(clearAction));
     connect(clearAction, &QAction::triggered, fretboard, &FretboardWidget::clearStaged);
     connect(fretboard, &FretboardWidget::insertRequested, this,
             [this, fretboard] { insertStagedNotes(fretboard); });
@@ -544,11 +602,11 @@ void ScoreTabs::addScoreTab(const std::string& name, SongEditor* editor) {
     connect(inputBar, &ScoreInputBar::clearRequested, fretboard, &FretboardWidget::clearStaged);
     connect(inputBar, &ScoreInputBar::tuningChoiceChanged, this, &ScoreTabs::updateFretboard);
     connect(fretboard, &FretboardWidget::stagedChanged, this,
-            [fretboard, inputBar, insertAction, clearAction] {
+            [this, fretboard, inputBar, clearAction] {
                 const int count = static_cast<int>(fretboard->staged().size());
                 inputBar->setStagedCount(count);
-                insertAction->setEnabled(count > 0);
                 clearAction->setEnabled(count > 0);
+                updateKeyActions();
             });
     connect(inputBar, &ScoreInputBar::restRequested, this, [this, fretboard] {
         if (SongEditor* current = currentEditor(); current && !onSongTab()) {
@@ -577,11 +635,20 @@ void ScoreTabs::addScoreTab(const std::string& name, SongEditor* editor) {
                 current->textEdit()->setFocus();
         }
     });
-    page->addWidget(splitter);
+    page->addWidget(content);
 
     const QString fileName = toQString(std::filesystem::path(pathOfName(name)).filename());
     const int index = tabs_->addTab(page, fileName);
-    scoreTabs_.push_back({name, page, nullptr, inputBar, fretboard, inputPanel, {}});
+    scoreTabs_.push_back({name,
+                          page,
+                          nullptr,
+                          inputBar,
+                          fretboard,
+                          inputPanel,
+                          {},
+                          editorPane,
+                          regionBar,
+                          soundButton});
     connect(create, &QPushButton::clicked, this, [this, name] { createMissingScore(name); });
 
     if (!editor) {
@@ -631,13 +698,10 @@ void ScoreTabs::setScoreWidth(const std::string& name, bool narrow) {
 void ScoreTabs::attachScoreEditor(int tabIndex, SongEditor* editor) {
     ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(tabIndex - 1)];
     auto* page = qobject_cast<QStackedWidget*>(tab.page);
-    auto* splitter = page->widget(1) ? qobject_cast<QSplitter*>(page->widget(1)) : nullptr;
     editor->setWindowTitle(toQString(editor->path().filename()));
-    splitter->insertWidget(1, editor); // under the width bar
-    splitter->setStretchFactor(1, 1);
-    splitter->setStretchFactor(2, 0); // the input panel keeps its height
-    splitter->setCollapsible(2, false);
-    page->setCurrentWidget(splitter);
+    // In the editor's pane, above the Selection row.
+    qobject_cast<QVBoxLayout*>(tab.editorPane->layout())->insertWidget(0, editor, 1);
+    page->setCurrentIndex(1);
     tab.editor = editor;
     tab.fretboard->clearStaged(); // another file's score
     tabs_->setTabText(tabIndex, toQString(editor->path().filename()) +
@@ -809,6 +873,7 @@ void ScoreTabs::onTabChanged() {
     }
     emit actionsChanged();
     updateFretboard();
+    updateKeyActions();
     if (SongEditor* editor = currentEditor())
         editor->textEdit()->setFocus();
 }
@@ -1380,6 +1445,30 @@ void ScoreTabs::updateRegionActions() {
                          editor->selectedByteRange().has_value();
     for (QAction* action : regionActions_)
         action->setEnabled(enabled);
+    for (const ScoreTab& tab : scoreTabs_) {
+        if (tab.regionBar)
+            tab.regionBar->setCurrentIndex(regionHasSelection() ? 1 : 0);
+    }
+}
+
+bool ScoreTabs::regionHasSelection() const {
+    return !regionActions_.isEmpty() && regionActions_.first()->isEnabled();
+}
+
+// The window's actions for the shown score tab: Insert/Clear Staged Notes while something is
+// staged, Play / Stop while the pane's Play button would work, Rebuild.
+void ScoreTabs::updateKeyActions() {
+    const int index = tabs_->currentIndex();
+    const bool onScore = !onSongTab() && index >= 1 && index <= static_cast<int>(scoreTabs_.size());
+    bool staged = false;
+    if (onScore) {
+        const ScoreTab& tab = scoreTabs_[static_cast<std::size_t>(index - 1)];
+        staged = tab.editor && !tab.fretboard->staged().empty() && fretboardAction_->isChecked();
+    }
+    insertStagedAction_->setEnabled(staged);
+    clearStagedAction_->setEnabled(staged);
+    playAction_->setEnabled(onScore && scorePreview_->playEnabled());
+    rebuildAction_->setEnabled(onScore);
 }
 
 // The notes of the preview whose events the editor's selection touches get a highlight box; with

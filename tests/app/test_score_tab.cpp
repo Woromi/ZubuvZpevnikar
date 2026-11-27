@@ -131,7 +131,7 @@ TEST_CASE("Fretboard: the tuning follows the staff at the cursor, the combo forc
     s.editor()->textEdit()->document()->setModified(false);
 }
 
-TEST_CASE("Fretboard: a note inserted with Ctrl+Return is named by the staff's tuning",
+TEST_CASE("Fretboard: a note inserted with Alt+N is named by the staff's tuning",
           "[app][score][fretboard]") {
     ScoreWindow s("Tun");
     FretboardWidget* fb = s.tab().fretboard;
@@ -140,7 +140,7 @@ TEST_CASE("Fretboard: a note inserted with Ctrl+Return is named by the staff's t
     const QString before = s.text();
     QTest::mouseClick(fb, Qt::LeftButton, Qt::NoModifier, fb->cellCenter(1, 2));
     REQUIRE(fb->staged().size() == 1);
-    QTest::keyClick(edit, Qt::Key_Return, Qt::ControlModifier);
+    QTest::keyClick(edit, Qt::Key_N, Qt::AltModifier);
     // Guitar string 1, fret 2 is f#' (a banjo's string 1 would give e').
     CHECK(s.text().contains("fis'\\1"));
     edit->undo();
@@ -149,15 +149,14 @@ TEST_CASE("Fretboard: a note inserted with Ctrl+Return is named by the staff's t
     // In the banjo staff the same click is another pitch.
     s.go("g'\\5");
     QTest::mouseClick(fb, Qt::LeftButton, Qt::NoModifier, fb->cellCenter(1, 2));
-    QTest::keyClick(edit, Qt::Key_Return, Qt::ControlModifier);
+    QTest::keyClick(edit, Qt::Key_N, Qt::AltModifier);
     CHECK(!s.text().contains("fis'\\1"));
     edit->undo();
     CHECK(s.text() == before);
     edit->document()->setModified(false);
 }
 
-TEST_CASE("Fretboard: staging, Insert, Clear, double-click and keypad Enter",
-          "[app][score][fretboard]") {
+TEST_CASE("Fretboard: staging, Insert, Clear, double-click and Alt+N", "[app][score][fretboard]") {
     ScoreWindow s;
     FretboardWidget* fb = s.tab().fretboard;
     auto* edit = s.editor()->textEdit();
@@ -192,21 +191,21 @@ TEST_CASE("Fretboard: staging, Insert, Clear, double-click and keypad Enter",
     QTest::keyClick(edit, Qt::Key_Escape);
     CHECK(fb->staged().empty());
 
-    // Two strings staged: Ctrl+Return writes one chord, one undo step.
+    // Two strings staged: Alt+N writes one chord, one undo step.
     click(1, 5);
     click(3, 2);
-    QTest::keyClick(edit, Qt::Key_Return, Qt::ControlModifier);
+    QTest::keyClick(edit, Qt::Key_N, Qt::AltModifier);
     CHECK(s.text() != t0);
     CHECK(s.text().mid(pos).contains(QRegularExpression(R"(<[^>]*\\3 [^>]*\\1>)")));
     CHECK(fb->staged().empty());
     edit->undo();
     CHECK(s.text() == t0);
 
-    // Keypad Enter with the focus on the fretboard.
+    // Alt+N with the focus on the fretboard.
     click(2, 1);
     click(4, 0);
     fb->setFocus();
-    QTest::keyClick(fb, Qt::Key_Enter, Qt::ControlModifier | Qt::KeypadModifier);
+    QTest::keyClick(fb, Qt::Key_N, Qt::AltModifier);
     CHECK(fb->staged().empty());
     CHECK(s.text() != t0);
     edit->undo();
@@ -751,4 +750,97 @@ TEST_CASE("Score tab: note input keys work on the preview and the fretboard, not
     QTest::keyClick(s.editor()->textEdit(), Qt::Key_8);
     CHECK(s.editor()->textEdit()->toPlainText().size() == before + 1);
     CHECK(bar->duration() == "4");
+}
+
+TEST_CASE("Score tab: no gap with the fretboard off, Selection row and Sound follow",
+          "[app][score]") {
+    ScoreWindow s;
+    auto* page = s.tab().page;
+    auto* toggle = page->findChild<QToolButton*>("scoreFretboardToggle");
+    auto* sound = page->findChild<QToolButton*>("scoreSoundToggle");
+    REQUIRE(toggle != nullptr);
+    REQUIRE(sound != nullptr);
+    if (!toggle->isChecked())
+        toggle->click();
+    QTest::qWait(50);
+    CHECK(s.tab().inputPanel->isVisible());
+    CHECK(sound->isVisible());
+    const int withPanel = s.tab().editorPane->height();
+
+    toggle->click(); // Fretboard off
+    QTest::qWait(100);
+    CHECK(!s.tab().inputPanel->isVisible());
+    CHECK(!sound->isVisible());
+    CHECK(s.tab().editorPane->height() > withPanel);
+    // The editor's pane fills the area under the width row: the editor and the
+    // Selection row.
+    auto* widthBar = page->findChild<QWidget*>("scoreWidthBar");
+    CHECK(s.tab().editorPane->height() >= page->height() - widthBar->height() - 8);
+    CHECK(s.tab().editorPane->isAncestorOf(s.tab().regionBar));
+    CHECK(s.tab().editorPane->isAncestorOf(s.editor()));
+    CHECK(!s.tab().inputPanel->isAncestorOf(s.tab().regionBar));
+
+    // Nothing selected: a grey hint instead of seven disabled buttons, the row
+    // keeps its height.
+    auto* hint = page->findChild<QLabel*>("scoreRegionHint");
+    REQUIRE(hint != nullptr);
+    s.editor()->textEdit()->moveCursor(QTextCursor::Start);
+    A::scores(s.window)->updateRegionActions();
+    CHECK(hint->isVisible());
+    CHECK(!hint->isEnabled());
+    CHECK(!page->findChild<QToolButton*>("scoreRegionTie")->isVisible());
+    const int rowHeight = s.tab().regionBar->height();
+
+    s.editor()->textEdit()->selectAll();
+    A::scores(s.window)->updateRegionActions();
+    CHECK(!hint->isVisible());
+    CHECK(page->findChild<QToolButton*>("scoreRegionTie")->isVisible());
+    CHECK(s.tab().regionBar->height() == rowHeight);
+    s.editor()->textEdit()->moveCursor(QTextCursor::Start);
+
+    toggle->click(); // back on
+    QTest::qWait(50);
+    CHECK(sound->isVisible());
+    CHECK(s.tab().inputPanel->isVisible());
+}
+
+TEST_CASE("Score tab: Alt+N inserts staged notes, Ctrl+Return opens a line", "[app][score]") {
+    ScoreWindow s;
+    FretboardWidget* fb = s.tab().fretboard;
+    auto* edit = s.editor()->textEdit();
+    s.go("e16\\4 g\\3 |\n    }", 11);
+    auto* act = A::scores(s.window)->insertStagedAction();
+    CHECK(act->shortcut() == QKeySequence(Qt::ALT | Qt::Key_N));
+    CHECK(act->shortcutContext() == Qt::WindowShortcut);
+    CHECK(!act->isEnabled());
+    fb->stage(1, 3);
+    CHECK(act->isEnabled());
+    CHECK(s.button("scoreInsert")
+              ->toolTip()
+              .contains(act->shortcut().toString(QKeySequence::NativeText)));
+
+    const QString before = s.text();
+    QTest::keyClick(edit, Qt::Key_N, Qt::AltModifier);
+    CHECK(fb->staged().empty());
+    CHECK(s.text() != before);
+    CHECK(!act->isEnabled());
+    edit->undo();
+    CHECK(s.text() == before);
+
+    // Ctrl+Return is the editor's: a line above, staged notes untouched.
+    fb->stage(1, 3);
+    const int lines = edit->document()->blockCount();
+    QTest::keyClick(edit, Qt::Key_Return, Qt::ControlModifier);
+    CHECK(edit->document()->blockCount() == lines + 1);
+    CHECK(fb->staged().size() == 1);
+    fb->clearStaged();
+    edit->undo();
+    edit->document()->setModified(false);
+
+    // The window's score actions follow the current tab.
+    CHECK(A::scores(s.window)->rebuildAction()->isEnabled());
+    A::tabs(s.window)->setCurrentIndex(0);
+    CHECK(!A::scores(s.window)->rebuildAction()->isEnabled());
+    CHECK(!A::scores(s.window)->playAction()->isEnabled());
+    CHECK(!act->isEnabled());
 }

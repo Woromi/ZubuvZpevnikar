@@ -50,15 +50,10 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
     insert_ = new QToolButton;
     insert_->setObjectName(QStringLiteral("scoreInsert"));
     insert_->setText(tr("Insert"));
-    insert_->setToolTip(
-        tr("Insert the staged fretboard notes at the cursor, as a note or a chord "
-           "(%1). Double-clicking a fret stages it and inserts at once.")
-            .arg(QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)));
     insert_->setEnabled(false);
     clear_ = new QToolButton;
     clear_->setObjectName(QStringLiteral("scoreClear"));
     clear_->setText(tr("Clear"));
-    clear_->setToolTip(keytips::withKey(tr("Remove the staged fretboard notes"), QKeySequence(Qt::Key_Escape)));
     clear_->setEnabled(false);
     layout->addSpacing(8);
     layout->addWidget(insert_);
@@ -84,6 +79,7 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
     connect(rest, &QToolButton::clicked, this, &ScoreInputBar::restRequested);
     connect(bar, &QToolButton::clicked, this, &ScoreInputBar::barCheckRequested);
     connect(tuning_, &QComboBox::currentIndexChanged, this, &ScoreInputBar::tuningChoiceChanged);
+    showInsertTip();
     showDuration();
 }
 
@@ -97,20 +93,32 @@ void ScoreInputBar::setStagedCount(int count) {
 }
 
 void ScoreInputBar::setReplaceMode(bool replace) {
-    if (replace) {
-        insert_->setText(tr("Replace"));
-        insert_->setToolTip(
-            tr("Replace the selected note or chord by the staged fretboard notes; "
-               "its length and articulations stay (%1). Double-clicking "
-               "a fret stages it and replaces at once.")
-                .arg(QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)));
-    } else {
-        insert_->setText(tr("Insert"));
-        insert_->setToolTip(
-            tr("Insert the staged fretboard notes at the cursor, as a note or a chord "
-               "(%1). Double-clicking a fret stages it and inserts at once.")
-                .arg(QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)));
-    }
+    replace_ = replace;
+    insert_->setText(replace ? tr("Replace") : tr("Insert"));
+    showInsertTip();
+}
+
+void ScoreInputBar::setKeyHints(const QString& insertKey, const QString& clearKey) {
+    insertKey_ = insertKey;
+    clearKey_ = clearKey;
+    showInsertTip();
+}
+
+void ScoreInputBar::showInsertTip() {
+    const QString insertKey =
+        insertKey_.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(insertKey_);
+    const QString clearKey =
+        clearKey_.isEmpty() ? QString() : QStringLiteral(" (%1)").arg(clearKey_);
+    if (replace_)
+        insert_->setToolTip(tr("Replace the selected note or chord by the staged fretboard notes; "
+                               "its length and articulations stay%1. Double-clicking a fret "
+                               "stages it and replaces at once.")
+                                .arg(insertKey));
+    else
+        insert_->setToolTip(tr("Insert the staged fretboard notes at the cursor, as a note or a "
+                               "chord%1. Double-clicking a fret stages it and inserts at once.")
+                                .arg(insertKey));
+    clear_->setToolTip(tr("Remove the staged fretboard notes%1").arg(clearKey));
 }
 
 void ScoreInputBar::onPicked() {

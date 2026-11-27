@@ -22,8 +22,6 @@ public:
     QString duration() const { return duration_; }
     // Shows `duration` (the one in force at the cursor) without emitting anything.
     void setDuration(const QString& duration);
-    // A row of buttons for the actions on the selected notes (tie, slur ...); the buttons follow
-    // the actions' enabled state. Owned by the caller.
     // The number of staged fretboard positions: Insert and Clear are enabled while it is not 0.
     void setStagedCount(int count);
     // The Insert button reads "Replace" while the staged notes replace the selected note or chord.
@@ -38,6 +36,8 @@ public:
     // editor): 1 2 4 8 6 (16) pick a length, . the dot, r a rest, | a bar check. True for those.
     static bool isInputKey(const QKeyEvent* event);
     bool handleKey(const QString& text);
+    // The keys named in the Insert and Clear tooltips (as shown to the user, from the actions).
+    void setKeyHints(const QString& insertKey, const QString& clearKey);
 
     enum class TuningChoice { Automatic, Guitar, Banjo };
     // The fretboard's tuning as the combo has it (per score tab, session only). Automatic follows
@@ -60,6 +60,9 @@ private:
     QToolButton* insert_ = nullptr;
     QToolButton* clear_ = nullptr;
     QComboBox* tuning_ = nullptr;
+    QString insertKey_, clearKey_;
+    bool replace_ = false;
+    void showInsertTip();
     QString duration_ = QStringLiteral("4");
     bool updating_ = false;
 };

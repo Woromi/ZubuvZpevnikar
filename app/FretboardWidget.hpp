@@ -44,6 +44,9 @@ public:
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
 
+    // The keys named in the tooltip (as shown to the user, from the tab's actions).
+    void setKeyHints(const QString& insertKey, const QString& clearKey);
+
 signals:
     void stagedChanged();
     // A fret was clicked (staged or unstaged by it): for the sound of the note. Not emitted when
@@ -78,6 +81,7 @@ private:
 
     zub::fretboard::Tuning tuning_ = zub::fretboard::guitar();
     bool german_ = false;
+    QString insertKey_, clearKey_;
     bool flats_ = false;
     int fretCount_ = 15;
     std::vector<zub::fretboard::Position> marked_;

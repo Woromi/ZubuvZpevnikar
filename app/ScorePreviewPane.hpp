@@ -39,6 +39,11 @@ public:
     enum class PlayState { Idle, Preparing, Playing };
     void setPlaybackAvailable(bool available, const QString& reason);
     void setPlayState(PlayState state);
+    // The window's Play / Stop and Rebuild actions: the keys live there (the buttons have none),
+    // their tooltips name them. The pane does not own them.
+    void setKeyActions(QAction* play, QAction* rebuild);
+    bool playEnabled() const; // the Play / Stop button would work now
+    void pressPlay();         // what the button does: Play when idle, else Stop
     void showPlaybackMessage(const QString& message, bool error); // in the status line
     double tempoFactor() const; // 0.5 ... 1.25 of the song's tempo
     // The staves of the shown score (zub::score::staves), one instrument choice each. A score with
@@ -108,6 +113,7 @@ public:
     enum class KeyCommand { Left, Right, Home, End, Backspace, Delete, Undo, Redo };
 
 signals:
+    void playEnabledChanged(); // Play / Stop was enabled or disabled
     void rebuildRequested();
     void tempoChanged();      // the playback speed combo changed: the MIDI file must be built again
     void instrumentChanged(); // ... and so did a staff's instrument choice
@@ -155,6 +161,8 @@ private:
     QString chordChoice_ = QStringLiteral("silent");
     QList<StaffInstrumentRow*> staffRows_;
     PlayState playState_ = PlayState::Idle;
+    QAction* playAction_ = nullptr;
+    QAction* rebuildAction_ = nullptr;
     bool playbackAvailable_ = true;
     QString unavailableReason_;
     QLabel* status_ = nullptr;
