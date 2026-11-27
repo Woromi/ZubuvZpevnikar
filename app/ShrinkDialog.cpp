@@ -4,7 +4,6 @@
 
 #include <QAbstractItemView>
 #include <QDialogButtonBox>
-#include <QFrame>
 #include <QHBoxLayout>
 #include <QItemSelectionModel>
 #include <QLabel>
@@ -86,36 +85,32 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     setSizeGripEnabled(true);
 
     auto* layout = new QVBoxLayout(this);
+    // The measurement, and beside it Make It Fit: an alternative to picking changes, so not
+    // next to Apply (where it would read as applying the picked ones). Explained on hover.
+    auto* top = new QHBoxLayout;
     const QString header = summary(suggestions_);
     if (!header.isEmpty()) {
         auto* label = new QLabel(header, this);
         label->setWordWrap(true);
-        layout->addWidget(label);
+        top->addWidget(label, 1);
+    } else {
+        top->addStretch(1);
     }
-    // Not an option of the picked changes: an alternative to picking them, so apart from Apply.
     if (!fitPaper.isEmpty()) {
-        auto* row = new QHBoxLayout;
-        auto* fitText = new QLabel(
-            tr("Or don't pick: chords_converter applies the changes itself, the most readable "
-               "first, typesetting the song after each, until it fits %1. One undo step; a song "
-               "it cannot fit stays as it is; it asks before a last resort.")
-                .arg(fitPaper),
-            this);
-        fitText->setWordWrap(true);
         auto* fitAll = new QPushButton(tr("Make It Fit %1").arg(fitPaper), this);
         fitAll->setAutoDefault(false);
+        fitAll->setToolTip(
+            tr("Instead of picking: chords_converter applies the changes itself, the most "
+               "readable first, until the song fits %1. One undo step; asks before a last "
+               "resort.")
+                .arg(fitPaper));
         connect(fitAll, &QPushButton::clicked, this, [this] {
             untilItFits_ = true;
             accept();
         });
-        row->addWidget(fitText, 1);
-        row->addWidget(fitAll);
-        layout->addLayout(row);
-        auto* line = new QFrame(this);
-        line->setFrameShape(QFrame::HLine);
-        line->setFrameShadow(QFrame::Sunken);
-        layout->addWidget(line);
+        top->addWidget(fitAll, 0, Qt::AlignTop);
     }
+    layout->addLayout(top);
     auto* headingLabel =
         new QLabel(heading + QStringLiteral(" ") + tr("(Ctrl+click or Shift+click picks several.)"),
                    this);
@@ -157,7 +152,7 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     if (canDismiss) {
         dismiss_ = buttons->addButton(tr("Mark as Correct"), QDialogButtonBox::ActionRole);
         dismiss_->setToolTip(tr("The selected findings are right as they are: add a \"% nocheck\" "
-                                "line so Check Song leaves them out"));
+                                "line so Find Mistakes leaves them out"));
         connect(dismiss_, &QPushButton::clicked, this, [this] {
             dismissed_ = true;
             accept();
