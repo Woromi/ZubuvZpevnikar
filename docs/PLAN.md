@@ -209,6 +209,7 @@ Asked by the user 2026-11-12: edit the songs' LilyPond scores (40 of the 47 `.ly
 - [x] Keys in tooltips written from the actions (`keytips`).
 - [x] Score tab: the selection buttons always shown; note keys 1 2 4 8 6 . R | on the preview and the fretboard; Ctrl+Enter a line below like VS Code (Ctrl+Shift+Enter above).
 - [x] Song list right-click: Open Song, Favourite, Labels…, Add to Songbooks…, Copy "Artist/Title".
+- [x] View menu: more than the left bar: text size of the editors, Show Preview, Full Screen.
 - [x] Home's wishes: only the buttons for the selected wish, the rest in More (⋯) and on right-click.
 
 ## 9. The package as a repository of its own

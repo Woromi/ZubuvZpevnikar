@@ -820,6 +820,15 @@ void CodeTextEdit::processKey(QKeyEvent* event) {
     ensureCursorVisible();
 }
 
+void CodeTextEdit::changeEvent(QEvent* event) {
+    QPlainTextEdit::changeEvent(event);
+    if (event->type() == QEvent::FontChange) {
+        setTabStopDistance(QFontMetricsF(font()).horizontalAdvance(QLatin1Char(' ')) * 4);
+        area_->setFont(font());
+        updateAreaWidth();
+    }
+}
+
 void CodeTextEdit::resizeEvent(QResizeEvent* event) {
     QPlainTextEdit::resizeEvent(event);
     const QRect cr = contentsRect();

@@ -1,6 +1,7 @@
 #include "SongEditor.hpp"
 
 #include "CodeTextEdit.hpp"
+#include "EditorFont.hpp"
 #include "FindBar.hpp"
 #include "convert.hpp"
 
@@ -99,10 +100,8 @@ SongEditor::SongEditor(std::filesystem::path path, KSyntaxHighlighting::Reposito
     findBar_ = new FindBar(codeEdit, this);
     layout->addWidget(findBar_);
 
-    const QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    edit_->setFont(font);
+    edit_->setFont(editorfont::font()); // CodeTextEdit keeps tabs at 4 spaces of it
     edit_->setLineWrapMode(QPlainTextEdit::NoWrap);
-    edit_->setTabStopDistance(QFontMetricsF(font).horizontalAdvance(QLatin1Char(' ')) * 4);
 
     highlighter_ = new KSyntaxHighlighting::SyntaxHighlighter(edit_->document());
     KSyntaxHighlighting::Definition definition;

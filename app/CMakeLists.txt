@@ -26,6 +26,8 @@ qt_add_library(zpevnikar_app STATIC
     ImportDialog.hpp
     ImportDialog.cpp
     MainWindow.hpp
+    EditorFont.hpp
+    EditorFont.cpp
     KeyTips.hpp
     KeyTips.cpp
     ShortcutsDialog.hpp

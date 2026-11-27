@@ -583,3 +583,41 @@ TEST_CASE("Song list: the right-click menu copies the input name and opens the s
                                            static_cast<qsizetype>(u8.size()));
     CHECK(path.endsWith(name + QStringLiteral(".tex")));
 }
+
+TEST_CASE("View menu: the editors' text size, the preview hidden", "[app][views]") {
+    apptest::Fixture fixture;
+    MainWindow w;
+    w.resize(1300, 560);
+    w.show();
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    A::openSong(w, A::proxy(w)->index(0, 0));
+    SongEditor* editor = A::editor(w);
+    REQUIRE(editor != nullptr);
+    const auto action = [&w](const QString& text) -> QAction* {
+        for (QAction* a : w.findChildren<QAction*>())
+            if (a->text() == text)
+                return a;
+        return nullptr;
+    };
+    QAction* bigger = action(QStringLiteral("&Bigger Text"));
+    QAction* normal = action(QStringLiteral("&Normal Text Size"));
+    QAction* preview = action(QStringLiteral("Show &Preview"));
+    REQUIRE(bigger != nullptr);
+    REQUIRE(normal != nullptr);
+    REQUIRE(preview != nullptr);
+    const qreal size = editor->textEdit()->font().pointSizeF();
+    bigger->trigger();
+    bigger->trigger();
+    CHECK(editor->textEdit()->font().pointSizeF() == size + 2);
+    normal->trigger();
+    CHECK(editor->textEdit()->font().pointSizeF() == size);
+
+    CHECK(preview->isChecked());
+    QWidget* pane = A::preview(w)->parentWidget(); // the preview's stack
+    REQUIRE(pane != nullptr);
+    CHECK(pane->isVisible());
+    preview->trigger();
+    CHECK_FALSE(pane->isVisible());
+    preview->trigger();
+    CHECK(pane->isVisible());
+}

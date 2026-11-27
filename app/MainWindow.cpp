@@ -6,6 +6,7 @@
 #include "ConverterVersion.hpp"
 #include "DesktopIntegration.hpp"
 #include "DiffView.hpp"
+#include "EditorFont.hpp"
 #include "ExternalTools.hpp"
 #include "FindBar.hpp"
 #include "HomeData.hpp"
@@ -39,6 +40,7 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QClipboard>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDesktopServices>
@@ -48,11 +50,10 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QGuiApplication>
 #include <QHeaderView>
 #include <QIcon>
 #include <QInputDialog>
-#include <QClipboard>
-#include <QGuiApplication>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
@@ -123,6 +124,7 @@ const auto geometryKey = QStringLiteral("window/geometry");
 const auto languageKey = QStringLiteral("ui/language");
 const auto soundfontKey = QStringLiteral("playback/soundfont"); // read by findSoundTools
 const auto songSplitterKey = QStringLiteral("window/songSplitter");
+const auto showPreviewKey = QStringLiteral("window/showPreview");
 
 } // namespace
 
@@ -305,6 +307,42 @@ void MainWindow::createMenus() {
     addView(tr("Song&books"),
             {QKeySequence(QStringLiteral("Ctrl+3")), QKeySequence(QStringLiteral("Ctrl+B"))},
             ActivityBar::View::Songbooks);
+    view->addSeparator();
+    // The editors' text size (songs, scores, the songbook's LaTeX, Changes).
+    const auto textSize = [this, view](const QString& text, QKeySequence::StandardKey key,
+                                       int change) {
+        QAction* action = view->addAction(text);
+        action->setShortcut(key);
+        connect(action, &QAction::triggered, this, [this, change] {
+            editorfont::setSizeStep(change == 0 ? 0 : editorfont::sizeStep() + change, this);
+        });
+    };
+    textSize(tr("&Bigger Text"), QKeySequence::ZoomIn, +1);
+    textSize(tr("S&maller Text"), QKeySequence::ZoomOut, -1);
+    QAction* normalSize = view->addAction(tr("&Normal Text Size"));
+    normalSize->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+    connect(normalSize, &QAction::triggered, this, [this] { editorfont::setSizeStep(0, this); });
+    view->addSeparator();
+    // The song's PDF preview: hidden, the editor has the whole width.
+    QAction* showPreview = view->addAction(tr("Show &Preview"));
+    showPreview->setCheckable(true);
+    showPreview->setShortcut(QKeySequence(Qt::Key_F9));
+    showPreview->setChecked(QSettings{}.value(showPreviewKey, true).toBool());
+    previewStack_->setVisible(showPreview->isChecked());
+    connect(showPreview, &QAction::toggled, this, [this](bool shown) {
+        previewStack_->setVisible(shown);
+        if (shown)
+            QSettings{}.remove(showPreviewKey);
+        else
+            QSettings{}.setValue(showPreviewKey, false);
+    });
+    QAction* fullScreen = view->addAction(tr("&Full Screen"));
+    fullScreen->setCheckable(true);
+    fullScreen->setShortcut(QKeySequence::FullScreen);
+    connect(fullScreen, &QAction::toggled, this, [this](bool on) {
+        setWindowState(on ? windowState() | Qt::WindowFullScreen
+                          : windowState() & ~Qt::WindowFullScreen);
+    });
 
     QMenu* help = menuBar()->addMenu(tr("&Help"));
     QAction* keys = help->addAction(tr("&Keyboard Shortcuts…"));

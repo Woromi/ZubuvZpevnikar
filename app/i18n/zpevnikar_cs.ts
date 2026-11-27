@@ -942,6 +942,26 @@ Použijte vestavěný.</translation>
         <translation>&amp;Zpěvníky</translation>
     </message>
     <message>
+        <source>&amp;Bigger Text</source>
+        <translation>&amp;Větší text</translation>
+    </message>
+    <message>
+        <source>S&amp;maller Text</source>
+        <translation>&amp;Menší text</translation>
+    </message>
+    <message>
+        <source>&amp;Normal Text Size</source>
+        <translation>N&amp;ormální velikost textu</translation>
+    </message>
+    <message>
+        <source>Show &amp;Preview</source>
+        <translation>Zobrazit &amp;náhled</translation>
+    </message>
+    <message>
+        <source>&amp;Full Screen</source>
+        <translation>&amp;Celá obrazovka</translation>
+    </message>
+    <message>
         <source>No song with possible changes was found.</source>
         <translation>Nenašla se žádná píseň s možnými změnami.</translation>
     </message>

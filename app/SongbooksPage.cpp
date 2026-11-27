@@ -5,6 +5,7 @@
 #include "BookPreview.hpp"
 #include "CodeTextEdit.hpp"
 #include "CollectionTabs.hpp"
+#include "EditorFont.hpp"
 #include "FindBar.hpp"
 #include "HomeData.hpp"
 #include "LabelFilterBox.hpp"
@@ -657,10 +658,8 @@ QWidget* SongbooksPage::buildLatexPane() {
     layout->addWidget(hint);
     latex_ = new CodeTextEdit(pane);
     latex_->setObjectName(QStringLiteral("songbookLatex"));
-    QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    latex_->setFont(font);
+    latex_->setFont(editorfont::font());
     latex_->setLineWrapMode(QPlainTextEdit::NoWrap);
-    latex_->setTabStopDistance(QFontMetricsF(font).horizontalAdvance(QLatin1Char(' ')) * 4);
     layout->addWidget(latex_, 1);
     latexFind_ = new FindBar(latex_, pane);
     layout->addWidget(latexFind_);

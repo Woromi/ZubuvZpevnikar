@@ -1,5 +1,6 @@
 #include "DiffView.hpp"
 
+#include "EditorFont.hpp"
 #include "convert.hpp"
 
 #include <QFontDatabase>
@@ -28,7 +29,7 @@ QColor blend(const QColor& base, const QColor& tint, qreal amount) {
 DiffView::DiffView(QWidget* parent) : QPlainTextEdit(parent) {
     setReadOnly(true);
     setLineWrapMode(QPlainTextEdit::NoWrap);
-    setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    setFont(editorfont::font());
 }
 
 void DiffView::setTexts(const std::string& before, const std::string& after,
