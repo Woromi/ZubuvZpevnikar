@@ -1,9 +1,9 @@
 #include "ScoreInputBar.hpp"
 
-#include <QAction>
 #include <QButtonGroup>
 #include <QComboBox>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -17,9 +17,6 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
     auto* layout = new QHBoxLayout;
     layout->setContentsMargins(0, 0, 0, 0);
     outer->addLayout(layout);
-    regionRow_ = new QHBoxLayout;
-    regionRow_->setContentsMargins(0, 0, 0, 0);
-    outer->addLayout(regionRow_);
     layout->addWidget(new QLabel(tr("Length:")));
     for (const int length : {1, 2, 4, 8, 16}) {
         auto* button = new QToolButton;
@@ -27,7 +24,9 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
         button->setText(QString::number(length));
         button->setCheckable(true);
         button->setAutoRaise(true);
-        button->setToolTip(tr("Note length 1/%1").arg(length));
+        button->setToolTip(tr("Note length 1/%1 (%2)")
+                               .arg(length)
+                               .arg(QString::number(length == 16 ? 6 : length)));
         group_->addButton(button, length);
         layout->addWidget(button);
     }
@@ -35,13 +34,13 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
     dot_->setText(tr("Dot"));
     dot_->setCheckable(true);
     dot_->setAutoRaise(true);
-    dot_->setToolTip(tr("Dotted note: one and a half times as long"));
+    dot_->setToolTip(tr("Dotted note: one and a half times as long (.)"));
     layout->addWidget(dot_);
 
     auto* rest = new QToolButton;
     rest->setObjectName(QStringLiteral("scoreRest"));
     rest->setText(tr("Rest"));
-    rest->setToolTip(tr("Insert a rest of the chosen length"));
+    rest->setToolTip(tr("Insert a rest of the chosen length (R)"));
     auto* bar = new QToolButton;
     bar->setObjectName(QStringLiteral("scoreBarCheck"));
     bar->setText(tr("Bar line"));
@@ -139,21 +138,39 @@ void ScoreInputBar::showDuration() {
     updating_ = false;
 }
 
-void ScoreInputBar::setRegionActions(const QList<QAction*>& actions) {
-    while (QLayoutItem* item = regionRow_->takeAt(0)) {
-        delete item->widget();
-        delete item;
+bool ScoreInputBar::isInputKey(const QKeyEvent* event) {
+    if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))
+        return false;
+    static const QString keys = QStringLiteral("12486.rR|");
+    return event->text().size() == 1 && keys.contains(event->text());
+}
+
+bool ScoreInputBar::handleKey(const QString& text) {
+    if (text == QLatin1String(".")) {
+        toggleDot();
+    } else if (text == QLatin1String("r") || text == QLatin1String("R")) {
+        emit restRequested();
+    } else if (text == QLatin1String("|")) {
+        emit barCheckRequested();
+    } else if (text == QLatin1String("6")) {
+        pickLength(QStringLiteral("16"));
+    } else if (text == QLatin1String("1") || text == QLatin1String("2") ||
+               text == QLatin1String("4") || text == QLatin1String("8")) {
+        pickLength(text);
+    } else {
+        return false;
     }
-    if (actions.isEmpty())
+    return true;
+}
+
+void ScoreInputBar::pickLength(const QString& length) {
+    bool ok = false;
+    const int value = length.toInt(&ok);
+    if (!ok || !group_->button(value))
         return;
-    regionRow_->addWidget(new QLabel(tr("Selection:")));
-    for (QAction* action : actions) {
-        auto* button = new QToolButton;
-        button->setObjectName(QStringLiteral("scoreRegion") + action->objectName());
-        button->setDefaultAction(action);
-        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
-        button->setAutoRaise(true);
-        regionRow_->addWidget(button);
-    }
-    regionRow_->addStretch();
+    group_->button(value)->click();
+}
+
+void ScoreInputBar::toggleDot() {
+    dot_->click();
 }

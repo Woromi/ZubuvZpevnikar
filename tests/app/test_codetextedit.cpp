@@ -1,4 +1,4 @@
-// CodeTextEdit: Enter, Shift+Enter and Ctrl+Enter, also with several cursors.
+// CodeTextEdit: Enter, Shift+Enter, Ctrl+Enter and Ctrl+Shift+Enter, also with several cursors.
 #include <QApplication>
 #include <QClipboard>
 #include <QFontMetricsF>
@@ -29,7 +29,8 @@ TEST_CASE("CodeTextEdit: Enter keeps the indent", "[app][editor]") {
     CHECK(e.toPlainText() == "a\n    b\n    c\nd");
 }
 
-TEST_CASE("CodeTextEdit: Shift+Enter opens a line below, Ctrl+Enter above", "[app][editor]") {
+TEST_CASE("CodeTextEdit: Ctrl+Enter and Shift+Enter open a line below, Ctrl+Shift+Enter above",
+          "[app][editor]") {
     CodeTextEdit e;
     e.show();
 
@@ -40,6 +41,11 @@ TEST_CASE("CodeTextEdit: Shift+Enter opens a line below, Ctrl+Enter above", "[ap
 
     reset(e);
     QTest::keyClick(&e, Qt::Key_Return, Qt::ControlModifier);
+    CHECK(e.toPlainText() == "a\n    bc\n    \nd");
+    CHECK(e.textCursor().blockNumber() == 2);
+
+    reset(e);
+    QTest::keyClick(&e, Qt::Key_Return, Qt::ControlModifier | Qt::ShiftModifier);
     CHECK(e.toPlainText() == "a\n    \n    bc\nd");
     CHECK(e.textCursor().blockNumber() == 1);
     CHECK(e.textCursor().positionInBlock() == 4);

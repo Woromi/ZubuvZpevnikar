@@ -184,6 +184,7 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
     connect(scorePreview_, &ScorePreviewPane::notesDragged, this, &ScoreTabs::selectScoreNotes);
     connect(scorePreview_, &ScorePreviewPane::noteClicked, this, &ScoreTabs::clickScoreNote);
     connect(scorePreview_, &ScorePreviewPane::keyCommand, this, &ScoreTabs::scoreKey);
+    connect(scorePreview_, &ScorePreviewPane::inputKey, this, &ScoreTabs::inputKey);
     connect(scorePreview_, &ScorePreviewPane::noteDoubleClicked, this,
             &ScoreTabs::doubleClickScoreNote);
     scoreRunner_ = new ScoreRunner(this);
@@ -476,9 +477,32 @@ void ScoreTabs::addScoreTab(const std::string& name, SongEditor* editor) {
     fretboard->setObjectName(QStringLiteral("scoreFretboard"));
     panelLayout->addWidget(inputBar);
     panelLayout->addWidget(fretboard);
-    inputBar->setRegionActions(regionActions_);
+    connect(fretboard, &FretboardWidget::inputKey, this, &ScoreTabs::inputKey);
     inputPanel->setVisible(fretboardAction_->isChecked());
-    splitter->addWidget(inputPanel);
+    // Under the editor: the row of selection actions (always shown), then the input panel.
+    auto* bottom = new QWidget(splitter);
+    auto* bottomLayout = new QVBoxLayout(bottom);
+    bottomLayout->setContentsMargins(0, 0, 0, 0);
+    bottomLayout->setSpacing(0);
+    auto* regionBar = new QWidget(bottom);
+    regionBar->setObjectName(QStringLiteral("scoreRegionBar"));
+    auto* regionLayout = new QHBoxLayout(regionBar);
+    regionLayout->setContentsMargins(4, 2, 4, 2);
+    if (!regionActions_.isEmpty()) {
+        regionLayout->addWidget(new QLabel(tr("Selection:"), regionBar));
+        for (QAction* action : regionActions_) {
+            auto* button = new QToolButton(regionBar);
+            button->setObjectName(QStringLiteral("scoreRegion") + action->objectName());
+            button->setDefaultAction(action);
+            button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+            button->setAutoRaise(true);
+            regionLayout->addWidget(button);
+        }
+    }
+    regionLayout->addStretch();
+    bottomLayout->addWidget(regionBar);
+    bottomLayout->addWidget(inputPanel);
+    splitter->addWidget(bottom);
     // The toggle for the panel sits in the width bar (the tab's tool row).
     auto* fretboardButton = new QToolButton(widthBar);
     fretboardButton->setObjectName(QStringLiteral("scoreFretboardToggle"));
@@ -1434,6 +1458,14 @@ void ScoreTabs::clickScoreNote(const QPoint& position, bool after, bool extend) 
 // links of the preview, which are stale after an edit): Left/Right move by one event, Shift
 // selects, Home/End go to the start/end of the staff (Ctrl: of the score), Backspace/Delete
 // delete the selected events or the one before/after the cursor, Ctrl+Z / Ctrl+Shift+Z undo.
+void ScoreTabs::inputKey(const QString& text) {
+    if (onSongTab() || tabs_->currentIndex() < 1)
+        return;
+    const auto index = static_cast<std::size_t>(tabs_->currentIndex() - 1);
+    if (index < scoreTabs_.size() && scoreTabs_[index].inputBar)
+        scoreTabs_[index].inputBar->handleKey(text);
+}
+
 void ScoreTabs::scoreKey(ScorePreviewPane::KeyCommand command, bool extend, bool wholeScore) {
     using Key = ScorePreviewPane::KeyCommand;
     SongEditor* editor = currentEditor();

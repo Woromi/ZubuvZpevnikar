@@ -51,8 +51,11 @@ signals:
     void fretClicked(int string, int fret);
     // A fret was double-clicked: it is staged, insert everything staged.
     void insertRequested();
+    // A key of note input (see ScoreInputBar::isInputKey) was typed on the fretboard.
+    void inputKey(const QString& text);
 
 protected:
+    void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;

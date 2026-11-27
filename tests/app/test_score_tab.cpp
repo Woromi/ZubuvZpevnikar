@@ -10,12 +10,12 @@
 
 #include <QAction>
 #include <QComboBox>
-#include <QPushButton>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QPushButton>
 #include <QRegularExpression>
 #include <QSignalSpy>
 #include <QTabWidget>
@@ -297,7 +297,8 @@ TEST_CASE("Score tab: Play starts at the cursor's note and the cursor follows th
     CHECK(A::startSeconds(s.window) == 2.0);
     ed->setCursorByteOffset(events[1].begin + 1, false); // inside the repeated note
     CHECK(A::startSeconds(s.window) == 1.0);
-    ed->setCursorByteOffset(events[1].end, false); // right behind it: that note (where Stop leaves it)
+    ed->setCursorByteOffset(events[1].end,
+                            false); // right behind it: that note (where Stop leaves it)
     CHECK(A::startSeconds(s.window) == 1.0);
     ed->setCursorByteOffset(events[1].end + 1, false); // in the gap before the next: the next one
     CHECK(A::startSeconds(s.window) == 2.0);
@@ -415,7 +416,7 @@ TEST_CASE("Score tab: Play passes the start to the player; Stop and the end leav
     A::stopPlayback(s.window);
     CHECK(!A::following(s.window));
     CHECK(A::startSeconds(s.window) == 0.0); // Play again: at the note that was sounding
-    A::followAt(s.window, 2.6); // no longer following
+    A::followAt(s.window, 2.6);              // no longer following
     CHECK(ed->cursorByteOffset() == events[0].end);
 
     // An edit while playing ends the following too.
@@ -476,14 +477,16 @@ QPoint linkPosition(const std::string& text, std::size_t offset) {
 TEST_CASE("Score tab: the sounding box covers the rendered text", "[app][score][playback]") {
     ScoreWindow s("Sing");
     const fs::path copy = "/nonexistent/copy/Test/Sing.ly";
-    const std::vector<std::string> words{"la", "nejkrásnější", "WWWWMMMM", "Cmaj7/G#", "iiiiiiiiii"};
+    const std::vector<std::string> words{"la", "nejkrásnější", "WWWWMMMM", "Cmaj7/G#",
+                                         "iiiiiiiiii"};
     QByteArray svg =
         "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
         "width=\"400\" height=\"200\" viewBox=\"0 0 400 200\">";
     for (std::size_t i = 0; i < words.size(); ++i)
-        svg += QStringLiteral("<a xlink:href=\"textedit://%1:%2:0:2\"><g transform=\"translate(10, %3)\">"
-                              "<text font-family=\"%4\" font-size=\"10\" text-anchor=\"start\" "
-                              "fill=\"currentColor\"><tspan>%5</tspan></text></g></a>")
+        svg += QStringLiteral(
+                   "<a xlink:href=\"textedit://%1:%2:0:2\"><g transform=\"translate(10, %3)\">"
+                   "<text font-family=\"%4\" font-size=\"10\" text-anchor=\"start\" "
+                   "fill=\"currentColor\"><tspan>%5</tspan></text></g></a>")
                    .arg(toQString(copy))
                    .arg(i + 1)
                    .arg(20 + 35 * i)
@@ -693,10 +696,59 @@ TEST_CASE("Instruments: the distorted guitar can be saved to the file", "[app][s
         return pane->findChildren<QComboBox*>(QStringLiteral("scoreInstrument")).size() >= 2;
     }));
     QComboBox* combo = pane->findChildren<QComboBox*>(QStringLiteral("scoreInstrument")).front();
-    QPushButton* save = pane->findChildren<QPushButton*>(QStringLiteral("scoreInstrumentSave")).front();
+    QPushButton* save =
+        pane->findChildren<QPushButton*>(QStringLiteral("scoreInstrumentSave")).front();
     combo->setCurrentIndex(combo->findData(QStringLiteral("amp")));
     REQUIRE(save->isEnabled());
     save->click();
-    CHECK(apptest::waitUntil(
-        [&] { return w.text().contains(QStringLiteral("midiInstrument = \"distorted guitar\"")); }));
+    CHECK(apptest::waitUntil([&] {
+        return w.text().contains(QStringLiteral("midiInstrument = \"distorted guitar\""));
+    }));
+}
+
+TEST_CASE("Score tab: note input keys work on the preview and the fretboard, not in the text",
+          "[app][score]") {
+    ScoreWindow s;
+    ScoreInputBar* bar = s.tab().inputBar;
+    REQUIRE(bar != nullptr);
+    // The selection buttons are shown even with the fretboard off.
+    auto* toggle = s.tab().page->findChild<QToolButton*>("scoreFretboardToggle");
+    REQUIRE(toggle != nullptr);
+    if (toggle->isChecked())
+        toggle->click();
+    CHECK(s.tab().inputPanel->isHidden());
+    auto* tie = s.tab().page->findChild<QToolButton*>("scoreRegionTie");
+    REQUIRE(tie != nullptr);
+    CHECK(!tie->isHidden());
+    toggle->click();
+    CHECK(!s.tab().inputPanel->isHidden());
+
+    QSignalSpy rests(bar, &ScoreInputBar::restRequested);
+    QSignalSpy bars(bar, &ScoreInputBar::barCheckRequested);
+
+    QWidget* canvas = A::scorePreview(s.window)->canvasWidget();
+    canvas->setFocus();
+    QTest::keyClick(canvas, Qt::Key_8);
+    CHECK(bar->duration() == "8");
+    QTest::keyClick(canvas, Qt::Key_Period);
+    CHECK(bar->duration() == "8.");
+    QTest::keyClick(canvas, Qt::Key_6);
+    CHECK(bar->duration() == "16.");
+    QTest::keyClick(canvas, Qt::Key_Period);
+    QTest::keyClick(canvas, Qt::Key_2);
+    CHECK(bar->duration() == "2");
+    QTest::keyClick(canvas, Qt::Key_R);
+    CHECK(rests.size() == 1);
+    QTest::keyClick(canvas, Qt::Key_Bar, Qt::ShiftModifier);
+    CHECK(bars.size() == 1);
+
+    QTest::keyClick(s.tab().fretboard, Qt::Key_4);
+    CHECK(bar->duration() == "4");
+
+    // In the text editor the digit is text.
+    s.editor()->textEdit()->setFocus();
+    const auto before = s.editor()->textEdit()->toPlainText().size();
+    QTest::keyClick(s.editor()->textEdit(), Qt::Key_8);
+    CHECK(s.editor()->textEdit()->toPlainText().size() == before + 1);
+    CHECK(bar->duration() == "4");
 }

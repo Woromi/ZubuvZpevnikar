@@ -324,8 +324,8 @@ void insertLineBreak(QTextCursor& cursor) {
     cursor.insertText(line.left(indent));
 }
 
-// A new empty line below (Shift+Enter) or above (Ctrl+Enter) the cursor's line, indented like
-// it, the cursor on it; the line itself is not split.
+// A new empty line below (Ctrl+Enter, Shift+Enter) or above (Ctrl+Shift+Enter) the cursor's line,
+// indented like it, the cursor on it; the line itself is not split.
 void openLine(QTextCursor& cursor, bool above) {
     const QString line = cursor.block().text();
     int indent = 0;
@@ -492,12 +492,9 @@ bool CodeTextEdit::multiCursorKey(QKeyEvent* event) {
         }
         case Qt::Key_Return:
         case Qt::Key_Enter:
-            if (ctrl && !shift) {
-                editAtCursors([](QTextCursor& cursor) { openLine(cursor, true); });
-                return true;
-            }
-            if (shift && !ctrl) {
-                editAtCursors([](QTextCursor& cursor) { openLine(cursor, false); });
+            if (ctrl || shift) {
+                const bool above = ctrl && shift;
+                editAtCursors([above](QTextCursor& cursor) { openLine(cursor, above); });
                 return true;
             }
             if (!ctrl) {
@@ -787,12 +784,13 @@ void CodeTextEdit::dropEvent(QDropEvent* event) {
 void CodeTextEdit::processKey(QKeyEvent* event) {
     const bool enter = event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter;
     const auto modifiers = event->modifiers() & ~Qt::KeypadModifier;
-    // Shift+Enter: a new line below this one; Ctrl+Enter: a new line above it.
+    // Shift+Enter and Ctrl+Enter: a new line below this one; Ctrl+Shift+Enter: above it.
     if (enter && !isReadOnly() &&
-        (modifiers == Qt::ShiftModifier || modifiers == Qt::ControlModifier)) {
+        (modifiers == Qt::ShiftModifier || modifiers == Qt::ControlModifier ||
+         modifiers == (Qt::ControlModifier | Qt::ShiftModifier))) {
         QTextCursor cursor = textCursor();
         cursor.beginEditBlock();
-        openLine(cursor, modifiers == Qt::ControlModifier);
+        openLine(cursor, modifiers == (Qt::ControlModifier | Qt::ShiftModifier));
         cursor.endEditBlock();
         setTextCursor(cursor);
         ensureCursorVisible();

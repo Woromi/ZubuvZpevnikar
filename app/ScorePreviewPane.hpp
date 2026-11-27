@@ -128,6 +128,8 @@ signals:
     // A key of the score cursor: `extend` is Shift (select), `wholeScore` is Ctrl (Home/End go to
     // the whole score's start/end instead of the staff's).
     void keyCommand(ScorePreviewPane::KeyCommand command, bool extend, bool wholeScore);
+    // A key of note input (ScoreInputBar::isInputKey) with the score focused: its text.
+    void inputKey(const QString& text);
     // A note was double-clicked: select exactly it.
     void noteDoubleClicked(const QPoint& position);
 

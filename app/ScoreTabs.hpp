@@ -179,6 +179,7 @@ private:
     void doubleClickScoreNote(const QPoint& position); // selects that event
     // A key pressed while the preview has the focus: moves the score cursor, extends the
     // selection, deletes events, undoes.
+    void inputKey(const QString& text); // a note-input key on the preview or the fretboard
     void scoreKey(ScorePreviewPane::KeyCommand command, bool extend, bool wholeScore);
     void selectScoreOffsets(std::size_t anchor, std::size_t current); // caret offsets, any order
     std::optional<std::size_t> caretOffsetOf(const QPoint& position, bool after) const;

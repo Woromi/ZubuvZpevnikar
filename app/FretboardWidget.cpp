@@ -1,10 +1,12 @@
 #include "FretboardWidget.hpp"
 
+#include "ScoreInputBar.hpp"
 #include "convert.hpp"
 
 #include <QEvent>
 #include <QFontMetrics>
 #include <QHelpEvent>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QToolTip>
@@ -22,6 +24,7 @@ constexpr int marginBottom = 18; // fret numbers
 
 FretboardWidget::FretboardWidget(QWidget* parent) : QWidget(parent) {
     setMouseTracking(true);
+    setFocusPolicy(Qt::ClickFocus);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 }
 
@@ -321,4 +324,13 @@ bool FretboardWidget::event(QEvent* event) {
         return true;
     }
     return QWidget::event(event);
+}
+
+void FretboardWidget::keyPressEvent(QKeyEvent* event) {
+    if (ScoreInputBar::isInputKey(event)) {
+        event->accept();
+        emit inputKey(event->text());
+        return;
+    }
+    QWidget::keyPressEvent(event);
 }

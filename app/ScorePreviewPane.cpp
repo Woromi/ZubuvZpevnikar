@@ -1,5 +1,6 @@
 #include "ScorePreviewPane.hpp"
 
+#include "ScoreInputBar.hpp"
 #include "ScoreRunner.hpp"
 #include "convert.hpp"
 
@@ -268,6 +269,7 @@ public:
     // Keys that edit like a text cursor (see ScorePreviewPane::KeyCommand): `extend` is Shift,
     // `wholeScore` is Ctrl.
     std::function<void(int command, bool extend, bool wholeScore)> onKeyCommand;
+    std::function<void(const QString& text)> onInputKey;
 
     // The leftmost (rightmost) selectable note on the staff the caret is on; none without a caret
     // or when it is not on a staff.
@@ -519,6 +521,11 @@ protected:
             command = static_cast<int>(ScorePreviewPane::KeyCommand::Backspace);
         else if (!others && !shift && !ctrl && event->key() == Qt::Key_Delete)
             command = static_cast<int>(ScorePreviewPane::KeyCommand::Delete);
+        if (command < 0 && onInputKey && ScoreInputBar::isInputKey(event)) {
+            event->accept();
+            onInputKey(event->text());
+            return;
+        }
         if (command < 0 || !onKeyCommand) {
             QWidget::keyPressEvent(event);
             return;
@@ -1068,6 +1075,7 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
     canvas_->onKeyCommand = [this](int command, bool extend, bool wholeScore) {
         emit keyCommand(static_cast<KeyCommand>(command), extend, wholeScore);
     };
+    canvas_->onInputKey = [this](const QString& text) { emit inputKey(text); };
     canvas_->onContextMenu = [this](const QPoint& at) {
         if (regionActions_.isEmpty())
             return;

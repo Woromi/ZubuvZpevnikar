@@ -1,13 +1,12 @@
 #pragma once
 
-#include <QList>
 #include <QString>
 #include <QWidget>
 
 class QAction;
 class QButtonGroup;
 class QComboBox;
-class QHBoxLayout;
+class QKeyEvent;
 class QToolButton;
 
 // The note length for the next note and the buttons for a rest and a bar check, above the
@@ -29,7 +28,16 @@ public:
     void setStagedCount(int count);
     // The Insert button reads "Replace" while the staged notes replace the selected note or chord.
     void setReplaceMode(bool replace);
-    void setRegionActions(const QList<QAction*>& actions);
+
+    // Picks a length ("1" ... "16", "8." with the dot) as a click on its button would; the dot
+    // stays as it is when `length` has none of its own. Lengths without a button are ignored.
+    void pickLength(const QString& length);
+    // Toggles the dot like a click on its button.
+    void toggleDot();
+    // The keys of note input while the score preview or the fretboard has the focus (not the text
+    // editor): 1 2 4 8 6 (16) pick a length, . the dot, r a rest, | a bar check. True for those.
+    static bool isInputKey(const QKeyEvent* event);
+    bool handleKey(const QString& text);
 
     enum class TuningChoice { Automatic, Guitar, Banjo };
     // The fretboard's tuning as the combo has it (per score tab, session only). Automatic follows
@@ -52,7 +60,6 @@ private:
     QToolButton* insert_ = nullptr;
     QToolButton* clear_ = nullptr;
     QComboBox* tuning_ = nullptr;
-    QHBoxLayout* regionRow_ = nullptr;
     QString duration_ = QStringLiteral("4");
     bool updating_ = false;
 };
