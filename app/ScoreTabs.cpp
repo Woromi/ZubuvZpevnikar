@@ -133,6 +133,9 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
             requestScorePreview(true);
     });
     scorePreview_->setKeyActions(playAction_, rebuildAction_);
+    // The key (shown in the Rebuild button's tooltip above) is View > Rebuild Preview's
+    // (MainWindow): one Ctrl+R for the song's PDF, a score and a songbook.
+    rebuildAction_->setShortcut({});
     connect(scorePreview_, &ScorePreviewPane::playEnabledChanged, this,
             &ScoreTabs::updateKeyActions);
     fretboardAction_ = new QAction(tr("Fretboard"), this);

@@ -146,8 +146,8 @@
         <translation>Sestavení bylo zrušeno.</translation>
     </message>
     <message>
-        <source>Not built yet: Build Preview typesets the whole songbook.</source>
-        <translation>Ještě nesestaveno: Sestavit náhled vysází celý zpěvník.</translation>
+        <source>Not built yet.</source>
+        <translation>Ještě nesestaveno.</translation>
     </message>
     <message>
         <source>Out of date: the songbook changed since this preview. %1</source>
@@ -910,6 +910,11 @@ Použijte vestavěný.</translation>
         <translation>Na&amp;stavení…</translation>
     </message>
     <message>
+        <source>Li&amp;brary</source>
+        <comment>menu: the song library</comment>
+        <translation>&amp;Knihovna</translation>
+    </message>
+    <message>
         <source>New Song&amp;book…</source>
         <translation>Nový &amp;zpěvník…</translation>
     </message>
@@ -1233,11 +1238,6 @@ Použijte vestavěný.</translation>
         <translation>&amp;Píseň</translation>
     </message>
     <message>
-        <source>&amp;Library</source>
-        <comment>menu: the song library</comment>
-        <translation>&amp;Knihovna</translation>
-    </message>
-    <message>
         <source>&amp;Scan Songs…</source>
         <translation>&amp;Projít písně…</translation>
     </message>
@@ -1251,7 +1251,7 @@ Použijte vestavěný.</translation>
     </message>
     <message>
         <source>&amp;Help</source>
-        <translation>Nápo&amp;Nápovědaamp;věda</translation>
+        <translation>Nápo&amp;věda</translation>
     </message>
     <message>
         <source>Scan Songs</source>
@@ -2266,6 +2266,10 @@ Balíček zpěvníku: %3</translation>
         <translation>Délka noty (6 je šestnáctinová; v notách nebo na hmatníku)</translation>
     </message>
     <message>
+        <source>Clear Staged Notes</source>
+        <translation>Vymazat připravené noty</translation>
+    </message>
+    <message>
         <source>the mouse&apos;s back button</source>
         <translation>tlačítko Zpět na myši</translation>
     </message>
@@ -2296,14 +2300,6 @@ Balíček zpěvníku: %3</translation>
     <message>
         <source>Rest / bar check</source>
         <translation>Pauza / kontrola taktu</translation>
-    </message>
-    <message>
-        <source>Insert the notes picked on the fretboard</source>
-        <translation>Vložit noty vybrané na hmatníku</translation>
-    </message>
-    <message>
-        <source>Drop the notes picked on the fretboard</source>
-        <translation>Zahodit noty vybrané na hmatníku</translation>
     </message>
     <message>
         <source>Pick and insert a note at once</source>
@@ -3756,6 +3752,10 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         </translation>
     </message>
     <message>
+        <source>%1 (not in the song library)</source>
+        <translation>%1 (není v knihovně písní)</translation>
+    </message>
+    <message>
         <source>remove a section</source>
         <translation>odebrání sekce</translation>
     </message>
@@ -4000,10 +4000,6 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
             <numerusform>%n písně</numerusform>
             <numerusform>%n písní</numerusform>
         </translation>
-    </message>
-    <message>
-        <source>%1 (not in the songbook)</source>
-        <translation>%1 (není ve zpěvníku)</translation>
     </message>
     <message numerus="yes">
         <source>in %n section(s)</source>

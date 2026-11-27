@@ -403,18 +403,13 @@ void SongbooksPage::buildUi() {
         if (latexModified())
             saveLatex();
     });
-    // Ctrl+R builds the preview. The File menu's Reload may use the same key: then Qt calls the
-    // shortcut ambiguous, which still builds here.
-    auto* buildKey = new QShortcut(QKeySequence(QStringLiteral("Ctrl+R")), this);
-    buildKey->setContext(Qt::WidgetWithChildrenShortcut);
-    const auto buildPreview = [this] {
-        if (id_.isEmpty() || text_.empty() || preview_->building())
-            return;
-        rightTabs_->setCurrentIndex(1);
-        preview_->build();
-    };
-    connect(buildKey, &QShortcut::activated, this, buildPreview);
-    connect(buildKey, &QShortcut::activatedAmbiguously, this, buildPreview);
+}
+
+void SongbooksPage::buildPreview() {
+    if (id_.isEmpty() || text_.empty() || preview_->building())
+        return;
+    rightTabs_->setCurrentIndex(1);
+    preview_->build();
 }
 
 QWidget* SongbooksPage::buildListPane() {
@@ -501,7 +496,10 @@ QWidget* SongbooksPage::buildEditPane() {
     campYear_->setPlaceholderText(tr("this year"));
     form_->addRow(tr("Title"), title_);
     form_->addRow(tr("Author"), author_);
-    form_->addRow(tr("Class"), class_);
+    // The class is shown, not chosen: it never changes here (loadBook).
+    class_->hide();
+    classLabel_ = new QLabel(editPane_);
+    form_->addRow(tr("Class"), classLabel_);
     form_->addRow(chorded_);
     form_->addRow(twoColumns_);
     form_->addRow(shading_);
@@ -1518,8 +1516,10 @@ void SongbooksPage::loadBook() {
     // The class is chosen when a songbook is made: the classes take different title pages and
     // covers, so a switch here would leave a book that does not build.
     class_->setEnabled(false);
-    class_->setToolTip(tr("Chosen when the songbook is made (New Songbook…); to change it, edit "
-                          "the LaTeX tab, including the cover and title page commands"));
+    classLabel_->setText(class_->currentIndex() >= 0 ? class_->currentText()
+                                                     : toQString(settings_.bookClass));
+    classLabel_->setToolTip(tr("Chosen when the songbook is made (New Songbook…); to change it, "
+                               "edit the LaTeX tab, including the cover and title page commands"));
     lockBar_->setVisible(shown && settings_.locked);
     loading_ = false;
     refreshFileViews();
@@ -2024,7 +2024,7 @@ void SongbooksPage::rebuildTree() {
                         item->setForeground(0, palette().brush(QPalette::Disabled, QPalette::Text));
                 } else {
                     tree_->addSong(header, sectionUids_[s], name,
-                                   tr("%1 (not in the songbook)").arg(toQString(name)), true);
+                                   tr("%1 (not in the song library)").arg(toQString(name)), true);
                 }
                 ++total;
             }

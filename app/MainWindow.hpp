@@ -293,6 +293,7 @@ private:
     // The song toolbar's song-only group (hidden on a score tab) and Mark Checked's button.
     std::vector<QAction*> songOnlyButtons_;
     QAction* markCheckedButton_ = nullptr;
+    QAction* changesButton_ = nullptr;
     QAction* findAction_ = nullptr; // Edit > Find (Ctrl+F), also on the song toolbar
     QString listTitle_; // window title on the list page
     // Syntax definitions and themes, shared by all editors (must outlive them).

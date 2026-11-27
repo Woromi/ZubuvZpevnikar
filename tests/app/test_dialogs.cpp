@@ -81,10 +81,10 @@ TEST_CASE("Keyboard Shortcuts: the filter hides rows and headings without a matc
         return texts;
     };
     const auto all = visible();
-    filter->setText(QStringLiteral("alt+n"));
+    filter->setText(QStringLiteral("staged"));
     const auto some = visible();
     REQUIRE(some.size() == 2); // the Score tab heading and its one row
-    CHECK(some.back() == QStringLiteral("Insert the notes picked on the fretboard"));
+    CHECK(some.back() == QStringLiteral("Clear Staged Notes"));
     filter->setText(QStringLiteral("no such shortcut"));
     CHECK(visible().isEmpty());
     filter->clear();

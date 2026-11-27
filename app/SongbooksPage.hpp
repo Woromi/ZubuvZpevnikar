@@ -80,7 +80,9 @@ public:
     // The book (id) whose LaTeX tab has unsaved edits, "" none: others must not write it.
     QString bookWithUnsavedLatex() const;
     bool buildingPdf() const; // a book's PDF is being built (its work dir is in use)
-    void showOverview(); // the Overview tab of the shown book
+    void showOverview();
+    // View > Rebuild Preview (Ctrl+R) here: the Preview tab, built.
+    void buildPreview(); // the Overview tab of the shown book
     // The book edits' history (every write of a book is a step; the Edit menu drives it).
     bool canUndo() const { return !undoList_.empty(); }
     bool canRedo() const { return !redoList_.empty(); }
@@ -295,7 +297,8 @@ private:
     QLabel* latexState_ = nullptr;
     QLineEdit* title_ = nullptr;
     QLineEdit* author_ = nullptr;
-    QComboBox* class_ = nullptr;
+    QComboBox* class_ = nullptr; // hidden: holds the classes' names
+    QLabel* classLabel_ = nullptr;
     QCheckBox* chorded_ = nullptr;
     QCheckBox* twoColumns_ = nullptr;
     QCheckBox* shading_ = nullptr;

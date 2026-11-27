@@ -24,7 +24,8 @@ BookPreview::BookPreview(SongbookExporter* exporter, QWidget* parent)
     row_ = new QHBoxLayout;
     auto* row = row_;
     status_ = new QLabel(this);
-    status_->setWordWrap(true);
+    // One line beside the transpose combos: cut off when too long, the whole text on hover.
+    status_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     build_ = new QPushButton(tr("Build Preview"), this);
     build_->setToolTip(tr("Build the whole songbook as a PDF (this can take minutes)"));
     cancel_ = new QPushButton(tr("Cancel"), this);
@@ -228,7 +229,7 @@ void BookPreview::updateView() {
     else if (it != results_.end() && it->second.cancelled && it->second.pdf.isEmpty())
         status = tr("The build was cancelled.");
     else if (pdf.isEmpty())
-        status = tr("Not built yet: Build Preview typesets the whole songbook.");
+        status = tr("Not built yet.");
     else if (it->second.text != text_)
         status =
             tr("Out of date: the songbook changed since this preview. %1").arg(it->second.report);
@@ -242,4 +243,5 @@ void BookPreview::updateView() {
     else
         status = it->second.report;
     status_->setText(status);
+    status_->setToolTip(status);
 }

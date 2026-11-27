@@ -179,7 +179,10 @@ MainWindow::MainWindow(QWidget* parent)
     // Window size and pane widths as the user left them.
     const QSettings settings;
     restoreGeometry(settings.value(geometryKey).toByteArray());
-    songSplitter_->restoreState(settings.value(songSplitterKey).toByteArray());
+    // Fixed sizes from the start: without them the splitter re-divides by size hints whenever a
+    // pane's content changes (the score tab's fretboard hidden).
+    if (!songSplitter_->restoreState(settings.value(songSplitterKey).toByteArray()))
+        songSplitter_->setSizes({600, 600});
 
     // The first answers of `chords_converter --version` and (on Windows) of the Python probes
     // take seconds; asked now on a worker thread, Import and Check Songs find them ready.
@@ -278,7 +281,7 @@ void MainWindow::createMenus() {
     // Filled by createSongToolBar: the song toolbar's actions with their keys.
     songMenu_ = menuBar()->addMenu(tr("S&ong"));
 
-    QMenu* library = menuBar()->addMenu(tr("&Library", "menu: the song library"));
+    QMenu* library = menuBar()->addMenu(tr("Li&brary", "menu: the song library"));
     QAction* scan =
         library->addAction(QIcon::fromTheme(QStringLiteral("edit-find")), tr("&Scan Songs…"));
     scan->setToolTip(tr("Check every song (or the ones shown): what Tidy, Find Mistakes or Make "
@@ -327,14 +330,20 @@ void MainWindow::createMenus() {
             editorfont::setSizeStep(change == 0 ? 0 : editorfont::sizeStep() + change, this);
         });
     };
-    // Ctrl+R: the song's PDF on the song tab, the score's on a score tab (the score tab's own
-    // action); never both enabled.
+    // Ctrl+R: the preview in view: the song's PDF, the score's on a score tab, the songbook's
+    // on the Songbooks page.
     rebuildPreviewAction_ = view->addAction(tr("&Rebuild Preview"));
     rebuildPreviewAction_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
-    rebuildPreviewAction_->setShortcutContext(Qt::WidgetWithChildrenShortcut);
-    songPage_->addAction(rebuildPreviewAction_);
-    connect(rebuildPreviewAction_, &QAction::triggered, this, [this] { requestPreview(true); });
-    view->addAction(scores_->rebuildAction());
+    connect(rebuildPreviewAction_, &QAction::triggered, this, [this] {
+        if (pages_->currentWidget() == songbooksPage_)
+            songbooksPage_->buildPreview();
+        else if (!onSongPage() || !editor_)
+            return;
+        else if (onSongTab())
+            requestPreview(true);
+        else
+            scores_->rebuildAction()->trigger();
+    });
     view->addSeparator();
     textSize(tr("&Bigger Text"), QKeySequence::ZoomIn, +1);
     textSize(tr("S&maller Text"), QKeySequence::ZoomOut, -1);
@@ -1289,7 +1298,7 @@ void MainWindow::createSongToolBar() {
     changesAction_->setToolTip(
         tr("Show what changed since the song was saved (an import: since it was imported)"));
     connect(changesAction_, &QAction::toggled, this, &MainWindow::showChanges);
-    songOnly(changesAction_);
+    changesButton_ = songOnly(changesAction_).second; // shown only for a changed song
 
     // The song's input name ("Artist/Title"), at the right end.
     inputLabel_ = new QLabel(songToolBar_);
@@ -1327,7 +1336,7 @@ void MainWindow::createSongToolBar() {
     // The score tab's window keys work on the song page only (Ctrl+R is the Songbooks
     // page's Build there).
     for (QAction* action : {scores_->insertStagedAction(), scores_->clearStagedAction(),
-                            scores_->playAction(), scores_->rebuildAction()}) {
+                            scores_->playAction()}) {
         action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
         songPage_->addAction(action);
     }
@@ -1624,7 +1633,8 @@ void MainWindow::updateSongActions() {
     for (QAction* button : songOnlyButtons_)
         button->setVisible(songTab); // Mark Checked's: updateMarkChecked
     closeSongAction_->setEnabled(open);
-    rebuildPreviewAction_->setEnabled(open && songTab);
+    rebuildPreviewAction_->setEnabled((open && onSongPage()) ||
+                                      pages_->currentWidget() == songbooksPage_);
     // Ctrl+Shift+B: on the song page only (on the list, its right-click menu takes the selected).
     addToBooksAction_->setEnabled(open && !editor_->isNew() && !songbookRoot_.empty() &&
                                   onSongPage());
@@ -1636,6 +1646,7 @@ void MainWindow::updateSongActions() {
     saveAction_->setText(current && !songTab ? tr("&Save Score") : tr("&Save Song"));
     const bool modified = open && editor_->isModified();
     changesAction_->setEnabled(modified && songTab && onSongPage());
+    changesButton_->setVisible(modified && songTab);
     if (!modified && changesAction_->isChecked())
         changesAction_->setChecked(false);
     updateEditState();
@@ -1644,6 +1655,7 @@ void MainWindow::updateSongActions() {
     if (!open) {
         markCheckedAction_->setEnabled(false);
         markCheckedButton_->setVisible(false);
+        changesButton_->setVisible(false);
         updateLabelActions(); // the song list's selection
         for (QAction* action : editActions_)
             action->setEnabled(false);
