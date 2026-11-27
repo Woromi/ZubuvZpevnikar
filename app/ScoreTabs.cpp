@@ -97,8 +97,9 @@ ScoreTabs::ScoreTabs(QTabWidget* tabs, QStackedWidget* previewStack, QWidget* so
     fretboardAction_->setChecked(QSettings().value(fretboardKey, true).toBool());
     fretboardAction_->setToolTip(
         tr("Show the fretboard: click frets to stage notes (one per string), Insert "
-           "(Ctrl+Return) writes them as a note or chord, Escape clears; double-click a fret "
-           "inserts at once"));
+           "(%1) writes them as a note or chord, Escape clears; double-click a fret "
+           "inserts at once")
+            .arg(QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)));
     connect(fretboardAction_, &QAction::toggled, this, [this](bool shown) {
         QSettings().setValue(fretboardKey, shown);
         for (const ScoreTab& tab : scoreTabs_) {

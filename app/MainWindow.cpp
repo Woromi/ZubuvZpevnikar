@@ -224,7 +224,8 @@ void MainWindow::createMenus() {
     connect(open, &QAction::triggered, this, &MainWindow::chooseSongbookFolder);
 
     QAction* reload = file->addAction(tr("&Reload"));
-    reload->setShortcut(QKeySequence::Refresh);
+    // F5 everywhere: QKeySequence::Refresh is Ctrl+R on some desktops, the previews' Rebuild.
+    reload->setShortcut(QKeySequence(Qt::Key_F5));
     connect(reload, &QAction::triggered, this, &MainWindow::reloadSongbook);
 
     file->addSeparator();
@@ -1496,19 +1497,22 @@ void MainWindow::updateSongActions() {
     SongEditor* current = currentEditor();
     const bool songTab = onSongTab();
     closeSongAction_->setEnabled(open);
-    addToBooksAction_->setEnabled(open && !editor_->isNew() && !songbookRoot_.empty());
+    // Ctrl+Shift+B: on the song page only (on the list, its right-click menu takes the selected).
+    addToBooksAction_->setEnabled(open && !editor_->isNew() && !songbookRoot_.empty() &&
+                                  onSongPage());
     activityBar_->setSongEnabled(open);
     songViewAction_->setEnabled(open); // like the bar's button
     // The Songbooks page has its own Ctrl+S (the LaTeX tab); the hidden song is not saved by it.
     saveAction_->setEnabled(current && current->isModified() &&
-                            pages_->currentWidget() == songPage_);
+                            pages_->currentWidget() != songbooksPage_);
     saveAction_->setText(current && !songTab ? tr("&Save Score") : tr("&Save Song"));
     const bool modified = open && editor_->isModified();
     changesAction_->setEnabled(modified && songTab && onSongPage());
     if (!modified && changesAction_->isChecked())
         changesAction_->setChecked(false);
     updateEditState();
-    songActions_->updateEnabled(songTab && onSongPage());
+    // Not while Changes hides the editor: no rewriting a song nobody sees.
+    songActions_->updateEnabled(songTab && onSongPage() && !changesAction_->isChecked());
     if (!open) {
         for (QAction* action : {markCheckedAction_, favouriteAction_, labelsAction_})
             action->setEnabled(false);
@@ -1682,13 +1686,19 @@ void MainWindow::showTableMenu(const QPoint& position) {
     menu.addSeparator();
     QAction* copy = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy")),
                                    tr("Copy \"Artist/Title\"", "the input name of a song"));
+    // The model may be reset or re-sorted while the menu is open.
+    const QPersistentModelIndex row(index);
     QAction* chosen = menu.exec(table->viewport()->mapToGlobal(position));
     if (chosen == open) {
-        openSong(index);
+        if (row.isValid())
+            openSong(row);
     } else if (chosen == favourite) {
         // All favourites: the label goes from all; else every one gets it.
-        const bool all = std::ranges::all_of(paths, [](const std::filesystem::path& path) {
-            const auto text = zub::readTextFile(path);
+        // The open song as the editor has it: the change goes into its unsaved text.
+        const bool all = std::ranges::all_of(paths, [this](const std::filesystem::path& path) {
+            const auto text = editor_ && editor_->path() == path
+                                  ? std::expected<std::string, std::string>(editor_->content())
+                                  : zub::readTextFile(path);
             if (!text)
                 return false;
             const auto meta = zub::parseSong(*text);

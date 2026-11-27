@@ -313,11 +313,14 @@ bool FretboardWidget::event(QEvent* event) {
         if (position.string > 0) {
             const QString name = toQString(
                 zub::fretboard::pitchName(midiAt(position.string, position.fret), german_, flats_));
-            QToolTip::showText(help->globalPos(),
-                               tr("%1: click stages the note (one per string), double-click inserts "
-                                  "everything staged. Insert: Ctrl+Return, Clear: Escape.")
-                                   .arg(name),
-                               this);
+            QToolTip::showText(
+                help->globalPos(),
+                tr("%1: click stages the note (one per string), double-click inserts "
+                   "everything staged. Insert: %2, Clear: Escape.")
+                    .arg(
+                        name,
+                        QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)),
+                this);
         } else {
             QToolTip::hideText();
         }

@@ -283,10 +283,10 @@
         </translation>
     </message>
     <message numerus="yes">
-        <source>Removed %n song(s) — Ctrl+Z brings them back</source>
+        <source>Removed %n song(s) — %1 brings them back</source>
         <translation>
-            <numerusform>Removed %n song — Ctrl+Z brings it back</numerusform>
-            <numerusform>Removed %n songs — Ctrl+Z brings them back</numerusform>
+            <numerusform>Removed %n song — %1 brings it back</numerusform>
+            <numerusform>Removed %n songs — %1 brings them back</numerusform>
         </translation>
     </message>
     <message numerus="yes">

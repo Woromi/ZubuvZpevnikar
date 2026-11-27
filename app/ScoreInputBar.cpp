@@ -50,8 +50,10 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
     insert_ = new QToolButton;
     insert_->setObjectName(QStringLiteral("scoreInsert"));
     insert_->setText(tr("Insert"));
-    insert_->setToolTip(tr("Insert the staged fretboard notes at the cursor, as a note or a chord "
-                           "(Ctrl+Return). Double-clicking a fret stages it and inserts at once."));
+    insert_->setToolTip(
+        tr("Insert the staged fretboard notes at the cursor, as a note or a chord "
+           "(%1). Double-clicking a fret stages it and inserts at once.")
+            .arg(QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)));
     insert_->setEnabled(false);
     clear_ = new QToolButton;
     clear_->setObjectName(QStringLiteral("scoreClear"));
@@ -97,14 +99,17 @@ void ScoreInputBar::setStagedCount(int count) {
 void ScoreInputBar::setReplaceMode(bool replace) {
     if (replace) {
         insert_->setText(tr("Replace"));
-        insert_->setToolTip(tr("Replace the selected note or chord by the staged fretboard notes; "
-                               "its length and articulations stay (Ctrl+Return). Double-clicking "
-                               "a fret stages it and replaces at once."));
+        insert_->setToolTip(
+            tr("Replace the selected note or chord by the staged fretboard notes; "
+               "its length and articulations stay (%1). Double-clicking "
+               "a fret stages it and replaces at once.")
+                .arg(QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)));
     } else {
         insert_->setText(tr("Insert"));
         insert_->setToolTip(
             tr("Insert the staged fretboard notes at the cursor, as a note or a chord "
-               "(Ctrl+Return). Double-clicking a fret stages it and inserts at once."));
+               "(%1). Double-clicking a fret stages it and inserts at once.")
+                .arg(QKeySequence(Qt::CTRL | Qt::Key_Return).toString(QKeySequence::NativeText)));
     }
 }
 
@@ -141,7 +146,10 @@ void ScoreInputBar::showDuration() {
 }
 
 bool ScoreInputBar::isInputKey(const QKeyEvent* event) {
-    if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))
+    const auto modifiers = event->modifiers();
+    // Ctrl+Alt is AltGr on Windows ("|" is AltGr+W on a Czech keyboard).
+    const bool altGr = (modifiers & Qt::ControlModifier) && (modifiers & Qt::AltModifier);
+    if ((modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) && !altGr)
         return false;
     static const QString keys = QStringLiteral("12486.rR|");
     return event->text().size() == 1 && keys.contains(event->text());

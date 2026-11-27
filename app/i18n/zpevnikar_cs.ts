@@ -315,8 +315,8 @@ Použijte vestavěný.</translation>
 <context>
     <name>FretboardWidget</name>
     <message>
-        <source>%1: click stages the note (one per string), double-click inserts everything staged. Insert: Ctrl+Return, Clear: Escape.</source>
-        <translation>%1: klik připraví notu (jednu na strunu), dvojklik vloží vše připravené. Vložit: Ctrl+Return, Vymazat: Escape.</translation>
+        <source>%1: click stages the note (one per string), double-click inserts everything staged. Insert: %2, Clear: Escape.</source>
+        <translation>%1: klik připraví notu (jednu na strunu), dvojklik vloží vše připravené. Vložit: %2, Vymazat: Escape.</translation>
     </message>
 </context>
 <context>
@@ -1616,10 +1616,6 @@ Použijte vestavěný.</translation>
         <translation>Vložit</translation>
     </message>
     <message>
-        <source>Insert the staged fretboard notes at the cursor, as a note or a chord (Ctrl+Return). Double-clicking a fret stages it and inserts at once.</source>
-        <translation>Vloží připravené noty z hmatníku na místo kurzoru jako notu nebo akord (Ctrl+Return). Dvojklik na pražec ho připraví a vloží hned.</translation>
-    </message>
-    <message>
         <source>Clear</source>
         <translation>Vymazat</translation>
     </message>
@@ -1634,6 +1630,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Insert a rest of the chosen length (R)</source>
         <translation>Vložit pauzu zvolené délky (R)</translation>
+    </message>
+    <message>
+        <source>Insert the staged fretboard notes at the cursor, as a note or a chord (%1). Double-clicking a fret stages it and inserts at once.</source>
+        <translation>Vloží připravené noty z hmatníku na místo kurzoru jako notu nebo akord (%1). Dvojklik na pražec ho připraví a vloží hned.</translation>
     </message>
     <message>
         <source>Remove the staged fretboard notes</source>
@@ -1664,8 +1664,8 @@ Použijte vestavěný.</translation>
         <translation>Nahradit</translation>
     </message>
     <message>
-        <source>Replace the selected note or chord by the staged fretboard notes; its length and articulations stay (Ctrl+Return). Double-clicking a fret stages it and replaces at once.</source>
-        <translation>Nahradí vybranou notu nebo akord připravenými notami z hmatníku; délka a artikulace zůstanou (Ctrl+Return). Dvojklik na pražec ho připraví a nahradí hned.</translation>
+        <source>Replace the selected note or chord by the staged fretboard notes; its length and articulations stay (%1). Double-clicking a fret stages it and replaces at once.</source>
+        <translation>Nahradí vybranou notu nebo akord připravenými notami z hmatníku; délka a artikulace zůstanou (%1). Dvojklik na pražec ho připraví a nahradí hned.</translation>
     </message>
 </context>
 <context>
@@ -1833,8 +1833,8 @@ Použijte vestavěný.</translation>
         <translation>Hmatník</translation>
     </message>
     <message>
-        <source>Show the fretboard: click frets to stage notes (one per string), Insert (Ctrl+Return) writes them as a note or chord, Escape clears; double-click a fret inserts at once</source>
-        <translation>Zobrazí hmatník: kliky na pražce připraví noty (jednu na strunu), Vložit (Ctrl+Return) je zapíše jako notu nebo akord, Escape je zruší; dvojklik na pražec vloží hned</translation>
+        <source>Show the fretboard: click frets to stage notes (one per string), Insert (%1) writes them as a note or chord, Escape clears; double-click a fret inserts at once</source>
+        <translation>Zobrazí hmatník: kliky na pražce připraví noty (jednu na strunu), Vložit (%1) je zapíše jako notu nebo akord, Escape je zruší; dvojklik na pražec vloží hned</translation>
     </message>
     <message>
         <source>Fretboard Sound</source>
@@ -3758,11 +3758,11 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         </translation>
     </message>
     <message numerus="yes">
-        <source>Removed %n song(s) — Ctrl+Z brings them back</source>
+        <source>Removed %n song(s) — %1 brings them back</source>
         <translation>
-            <numerusform>Odebrána %n píseň — Ctrl+Z ji vrátí</numerusform>
-            <numerusform>Odebrány %n písně — Ctrl+Z je vrátí</numerusform>
-            <numerusform>Odebráno %n písní — Ctrl+Z je vrátí</numerusform>
+            <numerusform>Odebrána %n píseň — %1 ji vrátí</numerusform>
+            <numerusform>Odebrány %n písně — %1 je vrátí</numerusform>
+            <numerusform>Odebráno %n písní — %1 je vrátí</numerusform>
         </translation>
     </message>
     <message>

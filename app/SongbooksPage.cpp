@@ -1012,6 +1012,7 @@ bool SongbooksPage::writeFile(const std::string& text) {
 
 bool SongbooksPage::applyEdit(const std::expected<std::string, std::string>& edited) {
     if (!edited) {
+        nextDescription_.clear(); // nothing written: not the next edit's name
         showWarning(tr("Not saved: %1").arg(toQString(edited.error())));
         return false;
     }
@@ -2132,7 +2133,9 @@ void SongbooksPage::removeSelectedSongs() {
     if (changed) {
         nextDescription_ = tr("remove %n song(s)", nullptr, count);
         if (commit() && !undoList_.empty())
-            showWarning(tr("Removed %n song(s) — Ctrl+Z brings them back", nullptr, count));
+            showWarning(
+                tr("Removed %n song(s) — %1 brings them back", nullptr, count)
+                    .arg(QKeySequence(QKeySequence::Undo).toString(QKeySequence::NativeText)));
         nextDescription_.clear();
     }
 }
@@ -2180,7 +2183,8 @@ void SongbooksPage::stepHistory(std::deque<HistoryEntry>& from, std::deque<Histo
                         .arg(toQString(path.filename())));
         return;
     }
-    if (zub::bookfile::readSettings(*onDisk).locked && zub::bookfile::readSettings(target).locked) {
+    // A released book: undo never unlocks it (Unlock asks first) nor changes it.
+    if (zub::bookfile::readSettings(*onDisk).locked) {
         showWarning(tr("%1 is locked: unlock it first.").arg(toQString(path.filename())));
         return;
     }

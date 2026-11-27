@@ -109,12 +109,24 @@ TEST_CASE("Songbooks page: undo goes back to the book it changed", "[app][songbo
     BooksWindow w(fixture);
     const auto big = fixture / "songbooks/big/big.tex";
     const std::string original = slurp(big);
-    A::toggleLock(*w.page);
+    REQUIRE(selectSong(*w.page, "Beta/Bravo"));
+    A::removeSelectedSongs(*w.page);
     REQUIRE(slurp(big) != original);
     w.select("songbooks/whistle/whistle.tex");
     A::undoEdit(*w.page);
     CHECK(slurp(big) == original);
     CHECK(A::id(*w.page) == "songbooks/big/big.tex");
+}
+
+TEST_CASE("Songbooks page: undo never unlocks a released book", "[app][songbooks]") {
+    apptest::Fixture fixture;
+    BooksWindow w(fixture);
+    const auto big = fixture / "songbooks/big/big.tex";
+    A::toggleLock(*w.page);
+    const std::string locked = slurp(big);
+    A::undoEdit(*w.page);
+    CHECK(slurp(big) == locked); // Unlock asks first; undo does not go around it
+    CHECK(!A::warning(*w.page)->isHidden());
 }
 
 TEST_CASE("Songbooks page: Ctrl+S saves the LaTeX tab, Ctrl+Z there is the editor's",
