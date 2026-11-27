@@ -88,6 +88,7 @@ ShortcutsDialog::ShortcutsDialog(const QMenuBar* menus, QWidget* parent) : QDial
     // Keys without a menu entry: handled by the widgets themselves.
     const QList<QPair<QString, QString>> sections[] = {
         {{tr("Text editor"), {}},
+         {tr("Insert a part at the cursor (then its number)"), keys({Qt::CTRL | Qt::Key_P})},
          {tr("Add a cursor above / below"),
           keys({Qt::ALT | Qt::SHIFT | Qt::Key_Up, Qt::ALT | Qt::SHIFT | Qt::Key_Down})},
          {tr("New line below / above"),

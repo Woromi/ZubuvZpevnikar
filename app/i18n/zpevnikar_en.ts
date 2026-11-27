@@ -80,6 +80,13 @@
 <context>
     <name>MainWindow</name>
     <message numerus="yes">
+        <source>%n file(s) of the song library could not be read as songs.</source>
+        <translation>
+            <numerusform>%n file of the song library could not be read as a song.</numerusform>
+            <numerusform>%n files of the song library could not be read as songs.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>%n song(s)</source>
         <translation>
             <numerusform>%n song</numerusform>
@@ -87,10 +94,10 @@
         </translation>
     </message>
     <message numerus="yes">
-        <source>⚠ %n file(s) with issues (hover for details)</source>
+        <source>⚠ %n file(s) with issues</source>
         <translation>
-            <numerusform>⚠ %n file with issues (hover for details)</numerusform>
-            <numerusform>⚠ %n files with issues (hover for details)</numerusform>
+            <numerusform>⚠ %n file with issues</numerusform>
+            <numerusform>⚠ %n files with issues</numerusform>
         </translation>
     </message>
 </context>
@@ -125,6 +132,13 @@
         <translation>
             <numerusform>%n chorus line</numerusform>
             <numerusform>%n chorus lines</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n page(s)</source>
+        <translation>
+            <numerusform>%n page</numerusform>
+            <numerusform>%n pages</numerusform>
         </translation>
     </message>
     <message numerus="yes">
@@ -301,6 +315,20 @@
         <translation>
             <numerusform>%n note</numerusform>
             <numerusform>%n notes</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>move %n song(s)</source>
+        <translation>
+            <numerusform>move %n song</numerusform>
+            <numerusform>move %n songs</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>add %n song(s)</source>
+        <translation>
+            <numerusform>add %n song</numerusform>
+            <numerusform>add %n songs</numerusform>
         </translation>
     </message>
 </context>

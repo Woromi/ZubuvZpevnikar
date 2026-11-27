@@ -2068,7 +2068,7 @@ void MainWindow::addToSongbooks(const std::filesystem::path& path, bool afterNew
                                    : toQString(path.stem());
     const std::string name = inputNameOfPath(path);
     AddToBooksDialog dialog(songbookRoot_, name, title, songbooksPage_->bookWithUnsavedLatex(),
-                            this);
+                            this, afterNew);
     if (afterNew && !dialog.anyAvailable())
         return;
     if (dialog.exec() != QDialog::Accepted)
