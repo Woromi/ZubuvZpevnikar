@@ -215,6 +215,9 @@ TEST_CASE("Make Smaller, Make It Fit: one undo step, a last resort asked for",
     REQUIRE(A::openSongbook(w, fixture.root()));
     if (A::packageDir(w).empty())
         SKIP("the bundled package is not checked out");
+    // The combo shows the display name; the class itself is its data.
+    CHECK(A::preview(w)->documentClass() == "malyzpevnik");
+    CHECK(A::classes(*A::preview(w))->currentText() == "Malý zpěvník (A5 book)");
 
     REQUIRE(A::openExistingSong(w, longSong));
     A::tabs(w)->setCurrentIndex(0);

@@ -7,6 +7,7 @@
 #include <QFont>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
 #include <QPushButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -33,11 +34,9 @@ BookOverview::BookOverview(QWidget* parent) : QWidget(parent) {
     tree_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     layout->addWidget(tree_, 1);
     auto* buttons = new QHBoxLayout;
-    open_ = new QPushButton(tr("Open Song"), this);
     remove_ = new QPushButton(tr("Remove from Songbook"), this);
     refresh_ = new QPushButton(tr("Refresh", "check the songbook again"), this);
     refresh_->setToolTip(tr("Check the songbook again (songs edited outside the app)"));
-    buttons->addWidget(open_);
     buttons->addWidget(remove_);
     buttons->addStretch(1);
     buttons->addWidget(refresh_);
@@ -49,10 +48,25 @@ BookOverview::BookOverview(QWidget* parent) : QWidget(parent) {
         if (item->parent() && !path.isEmpty())
             emit openSongRequested(toPath(path));
     });
-    connect(open_, &QPushButton::clicked, this, [this] {
-        const auto items = tree_->selectedItems();
-        if (items.size() == 1 && !items.front()->data(0, pathRole).toString().isEmpty())
-            emit openSongRequested(toPath(items.front()->data(0, pathRole).toString()));
+    tree_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(tree_, &QWidget::customContextMenuRequested, this, [this](const QPoint& at) {
+        QTreeWidgetItem* item = tree_->itemAt(at);
+        if (!item || !item->parent())
+            return; // a check's row, not a song
+        if (!item->isSelected()) {
+            tree_->clearSelection();
+            item->setSelected(true);
+        }
+        QMenu menu(tree_);
+        const QString path = item->data(0, pathRole).toString();
+        if (!path.isEmpty())
+            connect(menu.addAction(tr("Open Song")), &QAction::triggered, this,
+                    [this, path] { emit openSongRequested(toPath(path)); });
+        if (removeEnabled_ && !selectedNames().empty())
+            connect(menu.addAction(remove_->text()), &QAction::triggered, this,
+                    [this] { emit removeRequested(selectedNames()); });
+        if (!menu.isEmpty())
+            menu.exec(tree_->viewport()->mapToGlobal(at));
     });
     connect(remove_, &QPushButton::clicked, this, [this] {
         const auto names = selectedNames();
@@ -134,8 +148,5 @@ std::vector<std::string> BookOverview::selectedNames() const {
 }
 
 void BookOverview::updateButtons() {
-    const auto items = tree_->selectedItems();
-    open_->setEnabled(items.size() == 1 && items.front()->parent() &&
-                      !items.front()->data(0, pathRole).toString().isEmpty());
-    remove_->setEnabled(removeEnabled_ && !selectedNames().empty());
+    remove_->setVisible(removeEnabled_ && !selectedNames().empty());
 }

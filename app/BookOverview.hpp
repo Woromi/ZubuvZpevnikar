@@ -48,7 +48,6 @@ private:
 
     QLabel* heading_ = nullptr;
     QTreeWidget* tree_ = nullptr;
-    QPushButton* open_ = nullptr;
     QPushButton* remove_ = nullptr;
     QPushButton* refresh_ = nullptr;
     bool removeEnabled_ = false;

@@ -5,6 +5,8 @@ qt_standard_project_setup(REQUIRES 6.5)
 # Everything but main() is a static library, so the app tests (tests/app) link the same code.
 qt_add_library(zpevnikar_app STATIC
     ActivityBar.hpp
+    DocumentClasses.hpp
+    DocumentClasses.cpp
     FindBar.hpp
     FindBar.cpp
     FindMatches.hpp

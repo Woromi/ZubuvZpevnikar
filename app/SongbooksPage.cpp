@@ -5,6 +5,7 @@
 #include "BookPreview.hpp"
 #include "CodeTextEdit.hpp"
 #include "CollectionTabs.hpp"
+#include "DocumentClasses.hpp"
 #include "EditorFont.hpp"
 #include "FindBar.hpp"
 #include "HomeData.hpp"
@@ -485,9 +486,8 @@ QWidget* SongbooksPage::buildEditPane() {
     for (QLineEdit* edit : {title_, author_})
         edit->setToolTip(tr("LaTeX: write \\& for &, \\# for #"));
     class_ = new QComboBox(editPane_);
-    class_->addItem(tr("Velký zpěvník (A4)"), QStringLiteral("velkyzpevnik"));
-    class_->addItem(tr("Malý zpěvník (A5 book)"), QStringLiteral("malyzpevnik"));
-    class_->addItem(tr("Táborový zpěvník (A5 camp booklet)"), QStringLiteral("taborovyzpevnik"));
+    for (const auto& entry : documentclasses::known())
+        class_->addItem(entry.display, entry.name);
     chorded_ = new QCheckBox(tr("Chords"), editPane_);
     twoColumns_ = new QCheckBox(tr("Two song columns"), editPane_);
     shading_ = new QCheckBox(tr("Shading"), editPane_);
@@ -716,9 +716,9 @@ QWidget* SongbooksPage::buildPickerPane() {
     target_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     const QString howToAdd =
         tr("Select songs (Ctrl/Shift for several), then Add — or drag them onto the songbook.");
-    addPicked_ = new QPushButton(tr("Add"), pickerPane_);
+    addPicked_ = new QPushButton(tr("Add to Section"), pickerPane_);
     addPicked_->setToolTip(howToAdd);
-    removePicked_ = new QPushButton(tr("Remove"), pickerPane_);
+    removePicked_ = new QPushButton(tr("Remove from Section"), pickerPane_);
     targetRow->addWidget(new QLabel(tr("Add to:"), pickerPane_));
     targetRow->addWidget(target_, 1);
     targetRow->addWidget(addPicked_);
@@ -782,6 +782,8 @@ QWidget* SongbooksPage::buildPickerPane() {
                                                           QHeaderView::Stretch);
     pickerView_->horizontalHeader()->setSectionResizeMode(SongTableModel::Artist,
                                                           QHeaderView::Stretch);
+    pickerView_->horizontalHeader()->setSectionResizeMode(SongTableModel::Favourite,
+                                                          QHeaderView::ResizeToContents);
     pickerView_->setToolTip(howToAdd);
     layout->addWidget(pickerView_, 1);
 
@@ -818,8 +820,15 @@ QWidget* SongbooksPage::buildPickerPane() {
         QMenu menu(pickerView_);
         connect(menu.addAction(tr("Open Song")), &QAction::triggered, this,
                 [this, name] { openSongNamed(name); });
+        const bool can = canEdit() && !book_.sections.empty();
+        menu.addAction(addPicked_->text(), this, &SongbooksPage::addPicked)->setEnabled(can);
+        if (pickedInSection())
+            menu.addAction(removePicked_->text(), this, &SongbooksPage::removePicked)
+                ->setEnabled(can);
         menu.exec(pickerView_->viewport()->mapToGlobal(at));
     });
+    connect(pickerView_->selectionModel(), &QItemSelectionModel::selectionChanged, this,
+            [this] { updateButtons(); });
     connect(addPicked_, &QPushButton::clicked, this, &SongbooksPage::addPicked);
     connect(removePicked_, &QPushButton::clicked, this, &SongbooksPage::removePicked);
     connect(target_, &QComboBox::currentIndexChanged, this, [this](int index) {
@@ -1199,9 +1208,8 @@ void SongbooksPage::newSongbook() {
     auto* stem = new QLineEdit(&dialog);
     stem->setPlaceholderText(tr("letters, digits, - and _"));
     auto* bookClass = new QComboBox(&dialog);
-    bookClass->addItem(tr("Velký zpěvník (A4)"), QStringLiteral("velkyzpevnik"));
-    bookClass->addItem(tr("Malý zpěvník (A5 book)"), QStringLiteral("malyzpevnik"));
-    bookClass->addItem(tr("Táborový zpěvník (A5 camp booklet)"), QStringLiteral("taborovyzpevnik"));
+    for (const auto& entry : documentclasses::known())
+        bookClass->addItem(entry.display, entry.name);
     auto* title = new QLineEdit(&dialog);
     auto* author = new QLineEdit(&dialog);
     auto* campYear = new QLineEdit(&dialog);
@@ -1230,13 +1238,10 @@ void SongbooksPage::newSongbook() {
     form->addRow(chordChart);
     form->addRow(tr("Cover image"), coverRow);
     layout->addLayout(form);
-    auto* note = new QLabel(tr("Writes <file>.tex and a build.sh into the folder. To build it in "
-                               "the song library's CI as well, add it to .github/workflows."),
-                            &dialog);
-    note->setWordWrap(true);
-    note->setStyleSheet(QStringLiteral("color: gray;"));
-    layout->addWidget(note);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    buttons->button(QDialogButtonBox::Ok)
+        ->setToolTip(tr("Writes <file>.tex and a build.sh into the folder. To build it in "
+                        "the song library's CI as well, add it to .github/workflows."));
     layout->addWidget(buttons);
     const auto updateRows = [=] {
         const QString name = bookClass->currentData().toString();
@@ -2115,8 +2120,20 @@ void SongbooksPage::updateButtons() {
     removeSong_->setVisible(can && !tree_->selectedSongs().empty());
     moveUp_->setEnabled(can && section > 0);
     moveDown_->setEnabled(can && section + 1 < count);
-    addPicked_->setEnabled(can && count > 0);
+    addPicked_->setEnabled(can && count > 0 && !pickerSelection().empty());
+    removePicked_->setVisible(pickedInSection());
     removePicked_->setEnabled(can && count > 0);
+}
+
+bool SongbooksPage::pickedInSection() const {
+    const int section = currentSection();
+    if (section < 0 || section >= static_cast<int>(book_.sections.size()))
+        return false;
+    const auto& songs = book_.sections[static_cast<std::size_t>(section)].songs;
+    const auto names = pickerSelection();
+    return std::ranges::any_of(names, [&](const std::string& name) {
+        return std::ranges::find(songs, name) != songs.end();
+    });
 }
 
 bool SongbooksPage::askSectionName(const QString& title, const QString& initial, int ignoreSection,

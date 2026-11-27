@@ -1,10 +1,10 @@
 // The Songbooks page (milestone 7): the books of the songbook repo, their form, sections, songs,
 // lock and LaTeX tab, New Songbook, Duplicate and Check.
+#include "ActivityBar.hpp"
 #include "AppTestAccess.hpp"
 #include "BuildFiles.hpp"
-#include "HomePage.hpp"
-#include "ActivityBar.hpp"
 #include "HomeData.hpp"
+#include "HomePage.hpp"
 #include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongTableModel.hpp"
@@ -17,19 +17,20 @@
 #include <QDialogButtonBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPlainTextEdit>
-#include <QListWidget>
 #include <QPushButton>
 #include <QSettings>
 #include <QStackedWidget>
 #include <QTabWidget>
-#include <QMenu>
+#include <QTableView>
 #include <QToolButton>
 #include <QTreeWidget>
-#include <ranges>
 #include <catch2/catch_test_macros.hpp>
 #include <map>
+#include <ranges>
 #include <zub/core/preview.hpp>
 
 using apptest::has;
@@ -372,7 +373,7 @@ TEST_CASE("Songbooks page: the Overview says what keeps a book from printing", "
     // Remove from the Songbook: the missing song goes; the overview follows.
     QTreeWidgetItem* missingRow = overviewRow(*w.page, "Not in the song library");
     A::overviewTree(*overview)->setCurrentItem(missingRow->child(0));
-    REQUIRE(A::overviewRemove(*overview)->isEnabled());
+    REQUIRE(!A::overviewRemove(*overview)->isHidden());
     A::overviewRemove(*overview)->click();
     CHECK(!has(slurp(fixture / "songbooks/check/check.tex"), "Gone/Missing"));
     CHECK(childTexts(overviewRow(*w.page, "Not in the song library")).isEmpty());
@@ -389,8 +390,13 @@ TEST_CASE("Songbooks page: the Overview says what keeps a book from printing", "
 
     // Open Song: the song page with that song.
     QTreeWidgetItem* todoRow = overviewRow(*w.page, "TODO notes");
+    // No Open Song button (double-click and the menu open it); Remove only with a selection.
+    for (const QPushButton* button : overview->findChildren<QPushButton*>())
+        CHECK(button->text() != "Open Song");
+    A::overviewTree(*overview)->clearSelection();
+    CHECK(A::overviewRemove(*overview)->isHidden());
     A::overviewTree(*overview)->setCurrentItem(todoRow->child(0));
-    A::overviewOpen(*overview)->click();
+    emit A::overviewTree(*overview)->itemDoubleClicked(todoRow->child(0), 0);
     REQUIRE(A::editor(w.window) != nullptr);
     CHECK(A::editor(w.window)->path() == montgomery);
     CHECK(A::pages(w.window)->currentWidget() == A::songPage(w.window));
@@ -975,6 +981,31 @@ TEST_CASE("Songbooks page: the section buttons are one row, the rest is under "
   CHECK(!remove->isHidden());
   song->setSelected(false);
   CHECK(remove->isHidden());
+}
+
+TEST_CASE("Songbooks page: Add and Remove from Section follow the picker's selection",
+          "[app][songbooks]") {
+    apptest::Fixture fixture;
+    BooksWindow w(fixture, "songbooks/bands/one/one.tex");
+    SongbooksPage& page = *w.page;
+    QTableView* view = A::pickerView(page);
+    view->clearSelection();
+    CHECK(!A::addPicked(page)->isEnabled());
+    CHECK(A::addPicked(page)->text() == "Add to Section");
+    CHECK(A::removePicked(page)->isHidden());
+    // A song that is not in the section: Add, no Remove.
+    REQUIRE(view->model()->rowCount() > 0);
+    view->selectRow(0);
+    CHECK(A::addPicked(page)->isEnabled());
+    CHECK(A::removePicked(page)->isHidden());
+    A::addPicked(page)->click();
+    // Now it is in the section: Remove shows.
+    view->clearSelection();
+    view->selectRow(0);
+    CHECK(!A::removePicked(page)->isHidden());
+    CHECK(A::removePicked(page)->text() == "Remove from Section");
+    view->clearSelection();
+    CHECK(A::removePicked(page)->isHidden());
 }
 
 TEST_CASE("Songbooks page: the cover's Remove button shows only with a cover",

@@ -220,6 +220,7 @@ struct AppTestAccess {
 
     // ---- PreviewPane
     static QLabel* status(PreviewPane& p) { return p.status_; }
+    static QComboBox* classes(PreviewPane& p) { return p.classes_; }
 
     // ---- SongListPage
     static CollectionTabs* collections(SongListPage& p) { return p.collections_; }
@@ -230,6 +231,9 @@ struct AppTestAccess {
     // ---- SongbooksPage
     static SongFilterProxy* pickerFilter(SongbooksPage& p) { return p.pickerFilter_; }
     static QComboBox* pickerShow(SongbooksPage& p) { return p.pickerShow_; }
+    static QTableView* pickerView(SongbooksPage& p) { return p.pickerView_; }
+    static QPushButton* addPicked(SongbooksPage& p) { return p.addPicked_; }
+    static QPushButton* removePicked(SongbooksPage& p) { return p.removePicked_; }
     static QTreeWidget* list(SongbooksPage& p) { return p.list_; }
     static QTreeWidgetItem* listItemOf(SongbooksPage& p, const QString& id) {
         return p.listItemOf(id);
@@ -284,7 +288,6 @@ struct AppTestAccess {
     static QWidget* latexPane(SongbooksPage& p) { return p.latexPane_; }
     static QTreeWidget* overviewTree(BookOverview& o) { return o.tree_; }
     static QLabel* overviewHeading(BookOverview& o) { return o.heading_; }
-    static QPushButton* overviewOpen(BookOverview& o) { return o.open_; }
     static QPushButton* overviewRemove(BookOverview& o) { return o.remove_; }
     static bool canEdit(SongbooksPage& p) { return p.canEdit(); }
     static int currentSection(SongbooksPage& p) { return p.currentSection(); }

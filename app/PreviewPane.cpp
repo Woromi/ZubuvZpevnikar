@@ -1,7 +1,8 @@
 #include "PreviewPane.hpp"
 
+#include "DocumentClasses.hpp"
 #include "KeyTips.hpp"
-
+#include "PdfLinkView.hpp"
 #include "PreviewRunner.hpp"
 #include "convert.hpp"
 
@@ -15,7 +16,6 @@
 #include <QListWidget>
 #include <QPdfDocument>
 #include <QPdfPageNavigator>
-#include "PdfLinkView.hpp"
 #include <QPlainTextEdit>
 #include <QShortcut>
 #include <QSignalBlocker>
@@ -28,6 +28,7 @@ PreviewPane::PreviewPane(QWidget* parent)
       logButton_(new QToolButton), status_(new QLabel), view_(new PdfLinkView),
       document_(new QPdfDocument(this)), errors_(new QListWidget) {
     classes_->setToolTip(tr("Document class used for the preview"));
+    classes_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
 
     rebuild_->setText(tr("Rebuild"));
     if (QIcon::hasThemeIcon(QStringLiteral("view-refresh"))) {
@@ -68,7 +69,8 @@ PreviewPane::PreviewPane(QWidget* parent)
 
     // Ctrl+R: View > Rebuild Preview (MainWindow).
 
-    connect(classes_, &QComboBox::currentTextChanged, this, &PreviewPane::documentClassChanged);
+    connect(classes_, &QComboBox::currentIndexChanged, this,
+            [this] { emit documentClassChanged(documentClass()); });
     connect(rebuild_, &QToolButton::clicked, this, &PreviewPane::rebuildRequested);
     connect(logButton_, &QToolButton::clicked, this, [this] { showLog(); });
     connect(errors_, &QListWidget::itemActivated, this, [this](QListWidgetItem* item) {
@@ -83,13 +85,13 @@ void PreviewPane::setDocumentClasses(const std::vector<std::string>& classes,
     const QSignalBlocker blocker(classes_);
     classes_->clear();
     for (const std::string& name : classes)
-        classes_->addItem(toQString(name));
-    const int index = classes_->findText(current);
+        classes_->addItem(documentclasses::displayName(toQString(name)), toQString(name));
+    const int index = classes_->findData(current);
     classes_->setCurrentIndex(index >= 0 ? index : (classes_->count() > 0 ? 0 : -1));
 }
 
 QString PreviewPane::documentClass() const {
-    return classes_->currentText();
+    return classes_->currentData().toString();
 }
 
 void PreviewPane::showBuilding() {

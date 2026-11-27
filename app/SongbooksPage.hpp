@@ -196,6 +196,7 @@ private:
     int indexOfUid(quint64 uid) const; // -1: none
     void fillTargetCombo();
     void updatePicker();
+    bool pickedInSection() const; // a selected picker song is in the target section
     void updateButtons();
     void refreshLanguages();
 
