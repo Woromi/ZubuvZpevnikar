@@ -17,12 +17,12 @@
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
-#include <QTimer>
-#include <optional>
 #include <QStackedLayout>
+#include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
+#include <optional>
 
 namespace {
 
@@ -113,6 +113,7 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     wishMore_->setToolTip(tr("More"));
     wishMore_->setMenu(moreMenu);
     wishMore_->setPopupMode(QToolButton::InstantPopup);
+    wishMore_->setStyleSheet(QStringLiteral("QToolButton::menu-indicator { image: none; }"));
     wishes_->setContextMenuPolicy(Qt::CustomContextMenu);
     wishAdd_ = new QPushButton(tr("Add Wish…"), wishesCard_);
     wishAdd_->setToolTip(tr("A song you want: a new line of the wish list (wishes.txt in the song "
@@ -332,8 +333,7 @@ void HomePage::setData(const HomeData& home) {
     if (chosen)
         for (QTreeWidgetItemIterator it(wishes_); *it; ++it) {
             const int index = (*it)->data(0, wishRole).toInt();
-            if (index >= 0 &&
-                wishList_[static_cast<std::size_t>(index)].bookId == chosen->first &&
+            if (index >= 0 && wishList_[static_cast<std::size_t>(index)].bookId == chosen->first &&
                 wishList_[static_cast<std::size_t>(index)].line == chosen->second) {
                 wishes_->setCurrentItem(*it);
                 break;
