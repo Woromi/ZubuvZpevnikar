@@ -311,7 +311,7 @@ TEST_CASE("Wishes: New Song writes a wish by hand, the first save fulfils it", "
     REQUIRE(editor != nullptr);
     CHECK(editor->textEdit()->toPlainText().startsWith("\\beginsong{Neco O Lasce}[\n    by={Pavel Dobes},"));
 
-    auto later = apptest::answerTitledDialog("Add to Songbooks", [](QDialog* d) { d->reject(); });
+    auto later = apptest::answerDialog<AddToBooksDialog>([](AddToBooksDialog* d) { d->reject(); });
     A::saveCurrent(w.window);
     CHECK(slurp(fixture / "wishes.txt") == "Wabi/Montgomery\n");
     apptest::waitUntil([&] { return later.fired(); }, 2000);

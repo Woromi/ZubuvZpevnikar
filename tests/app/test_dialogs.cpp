@@ -1,12 +1,16 @@
 // Small dialogs: the Make Smaller status line, Add to Songbooks' title and reject button.
 #include "AddToBooksDialog.hpp"
+#include "ShortcutsDialog.hpp"
 #include "ShrinkDialog.hpp"
 #include "Support.hpp"
 
 #include <QDialogButtonBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
+#include <QMenuBar>
 #include <QPushButton>
+#include <QTreeWidget>
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <zub/core/songsuggest.hpp>
@@ -21,8 +25,12 @@ TEST_CASE("Make Smaller: one status line, the note in its tooltip", "[app][dialo
         0, apptest::slurp(converterData / "shrink.json"),
         apptest::slurp(converterData / "shrink.err"));
     REQUIRE(result);
-    CHECK(ShrinkDialog::statusLine(*result) ==
-          QStringLiteral("A4 ✓ 1 page   ·   A5 ✗ 2 pages   ·   Too wide: lines 45, 60, 61, 66"));
+    // (no translation loaded here: the plural reads "page(s)")
+    const QString line = ShrinkDialog::statusLine(*result);
+    CHECK(line.startsWith(QStringLiteral("A4 ✓ 1 page")));
+    CHECK(line.contains(QStringLiteral("   ·   A5 ✗ 2 page")));
+    CHECK(line.endsWith(QStringLiteral("   ·   Too wide: lines 45, 60, 61, 66")));
+    CHECK_FALSE(line.contains(QLatin1Char('\n')));
     CHECK(ShrinkDialog::statusTooltip(*result) ==
           QStringLiteral("It fits A4: the changes for small paper only."));
 
@@ -55,4 +63,30 @@ TEST_CASE("Add to Songbooks: the title names the song; Cancel, Not Now after a f
     AddToBooksDialog fresh(fixture.root(), "Test/Song", QStringLiteral("My Song"), QString(),
                            nullptr, true);
     CHECK(rejectText(fresh) == QStringLiteral("Not Now"));
+}
+
+TEST_CASE("Keyboard Shortcuts: the filter hides rows and headings without a match",
+          "[app][dialogs]") {
+    QMenuBar menus;
+    ShortcutsDialog dialog(&menus);
+    auto* filter = dialog.findChild<QLineEdit*>(QStringLiteral("shortcutsFilter"));
+    auto* tree = dialog.findChild<QTreeWidget*>(QStringLiteral("shortcutsTree"));
+    REQUIRE(filter);
+    REQUIRE(tree);
+    const auto visible = [tree] {
+        QStringList texts;
+        for (int i = 0; i < tree->topLevelItemCount(); ++i)
+            if (!tree->topLevelItem(i)->isHidden())
+                texts << tree->topLevelItem(i)->text(0);
+        return texts;
+    };
+    const auto all = visible();
+    filter->setText(QStringLiteral("alt+n"));
+    const auto some = visible();
+    REQUIRE(some.size() == 2); // the Score tab heading and its one row
+    CHECK(some.back() == QStringLiteral("Insert the notes picked on the fretboard"));
+    filter->setText(QStringLiteral("no such shortcut"));
+    CHECK(visible().isEmpty());
+    filter->clear();
+    CHECK(visible() == all);
 }

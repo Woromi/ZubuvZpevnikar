@@ -5,6 +5,8 @@
 #include <QAction>
 #include <QDialogButtonBox>
 #include <QHeaderView>
+#include <QKeySequence>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QTreeWidget>
@@ -33,12 +35,27 @@ QString keyText(const QAction* action) {
     return keys.join(QStringLiteral(", "));
 }
 
+// Keys in the platform's notation, joined; words (a gesture) can stand among them.
+QString keys(std::initializer_list<QKeyCombination> combinations,
+             const QStringList& words = {}) {
+    QStringList parts;
+    for (const QKeyCombination& combination : combinations)
+        parts << QKeySequence(combination).toString(QKeySequence::NativeText);
+    parts << words;
+    return parts.join(QStringLiteral(" / "));
+}
+
 } // namespace
 
 ShortcutsDialog::ShortcutsDialog(const QMenuBar* menus, QWidget* parent) : QDialog(parent) {
     setWindowTitle(tr("Keyboard Shortcuts"));
     resize(640, 640);
     auto* layout = new QVBoxLayout(this);
+    auto* filter = new QLineEdit(this);
+    filter->setObjectName(QStringLiteral("shortcutsFilter"));
+    filter->setPlaceholderText(tr("Filter"));
+    filter->setClearButtonEnabled(true);
+    layout->addWidget(filter);
     auto* tree = new QTreeWidget(this);
     tree->setObjectName(QStringLiteral("shortcutsTree"));
     tree->setColumnCount(2);
@@ -71,27 +88,30 @@ ShortcutsDialog::ShortcutsDialog(const QMenuBar* menus, QWidget* parent) : QDial
     // Keys without a menu entry: handled by the widgets themselves.
     const QList<QPair<QString, QString>> sections[] = {
         {{tr("Text editor"), {}},
-         {tr("Add a cursor above / below"), tr("Alt+Shift+Up / Down")},
-         {tr("New line below / above"), tr("Ctrl+Enter / Ctrl+Shift+Enter")},
-         {tr("Scroll by a line"), tr("Ctrl+Up / Down")},
-         {tr("Find next / previous"), tr("F3 / Shift+F3")}},
+         {tr("Add a cursor above / below"),
+          keys({Qt::ALT | Qt::SHIFT | Qt::Key_Up, Qt::ALT | Qt::SHIFT | Qt::Key_Down})},
+         {tr("New line below / above"),
+          keys({Qt::CTRL | Qt::Key_Enter, Qt::CTRL | Qt::SHIFT | Qt::Key_Enter})},
+         {tr("Scroll by a line"), keys({Qt::CTRL | Qt::Key_Up, Qt::CTRL | Qt::Key_Down})},
+         {tr("Find next / previous"), keys({Qt::Key_F3, Qt::SHIFT | Qt::Key_F3})}},
         {{tr("Score tab"), {}},
-         {tr("Note length (on the score or the fretboard)"), tr("1, 2, 4, 8, 6 (16)")},
-         {tr("Dotted note"), QStringLiteral(".")},
-         {tr("Rest / bar check"), tr("R / |")},
-         {tr("Insert the notes picked on the fretboard"), tr("Ctrl+Enter")},
-         {tr("Drop the notes picked on the fretboard"), tr("Escape")},
+         {tr("Note length (6 is a sixteenth; on the score or the fretboard)"),
+          keys({Qt::Key_1, Qt::Key_2, Qt::Key_4, Qt::Key_8, Qt::Key_6})},
+         {tr("Dotted note"), keys({Qt::Key_Period})},
+         {tr("Rest / bar check"), keys({Qt::Key_R, Qt::Key_Bar})},
+         {tr("Insert the notes picked on the fretboard"), keys({Qt::ALT | Qt::Key_N})},
+         {tr("Drop the notes picked on the fretboard"), keys({Qt::Key_Escape})},
          {tr("Pick and insert a note at once"), tr("Double-click a fret")},
-         {tr("Move between notes, select"), tr("Left / Right, Shift+Left / Right, Home / End")},
-         {tr("Delete notes"), tr("Backspace / Delete")},
-         {tr("Actions on the selected notes"), tr("Right-click the score")},
-         {tr("Play / stop"), tr("Ctrl+Space")},
-         {tr("Rebuild the preview"), tr("Ctrl+R")}},
+         {tr("Move between notes, select"),
+          keys({Qt::Key_Left, Qt::Key_Right, Qt::SHIFT | Qt::Key_Left, Qt::SHIFT | Qt::Key_Right,
+                Qt::Key_Home, Qt::Key_End})},
+         {tr("Delete notes"), keys({Qt::Key_Backspace, Qt::Key_Delete})},
+         {tr("Actions on the selected notes"), tr("Right-click the score")}},
         {{tr("Songs and songbooks"), {}},
-         {tr("Back"), tr("Alt+Left, the mouse's back button")},
+         {tr("Back"), keys({Qt::ALT | Qt::Key_Left}, {tr("the mouse's back button")})},
          {tr("Favourite in the song list"), tr("Click the ★ column")},
          {tr("Add songs to a songbook"), tr("Drag them from Add Songs onto the songbook")},
-         {tr("Remove songs from a songbook"), tr("Delete (Ctrl+Z brings them back)")},
+         {tr("Remove songs from a songbook (Ctrl+Z brings them back)"), keys({Qt::Key_Delete})},
          {tr("Go to a change in Tidy's list"), tr("Double-click it")}},
     };
     for (const auto& section : sections) {
@@ -103,6 +123,28 @@ ShortcutsDialog::ShortcutsDialog(const QMenuBar* menus, QWidget* parent) : QDial
     tree->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     tree->header()->setStretchLastSection(false);
     layout->addWidget(tree);
+    // The filter matches an action's or its keys' text; a heading stays while a row below it does.
+    connect(filter, &QLineEdit::textChanged, tree, [tree](const QString& text) {
+        QTreeWidgetItem* lastHeading = nullptr;
+        bool any = false;
+        for (int i = 0; i < tree->topLevelItemCount(); ++i) {
+            QTreeWidgetItem* item = tree->topLevelItem(i);
+            if (item->text(1).isEmpty() && item->isFirstColumnSpanned()) {
+                if (lastHeading)
+                    lastHeading->setHidden(!any && !text.isEmpty());
+                lastHeading = item;
+                any = false;
+                continue;
+            }
+            const bool match = text.isEmpty() ||
+                               item->text(0).contains(text, Qt::CaseInsensitive) ||
+                               item->text(1).contains(text, Qt::CaseInsensitive);
+            item->setHidden(!match);
+            any = any || match;
+        }
+        if (lastHeading)
+            lastHeading->setHidden(!any && !text.isEmpty());
+    });
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     layout->addWidget(buttons);
