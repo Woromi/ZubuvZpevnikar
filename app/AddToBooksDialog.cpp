@@ -4,7 +4,6 @@
 
 #include <QDialogButtonBox>
 #include <QHeaderView>
-#include <QLabel>
 #include <QPalette>
 #include <QPushButton>
 #include <QTreeWidget>
@@ -19,18 +18,14 @@ constexpr int targetRole = Qt::UserRole; // index into all_, -1: not a target
 
 AddToBooksDialog::AddToBooksDialog(const std::filesystem::path& root, const std::string& inputName,
                                    const QString& songTitle, const QString& busyBookId,
-                                   QWidget* parent)
+                                   QWidget* parent, bool afterFirstSave)
     : QDialog(parent) {
-    setWindowTitle(tr("Add to Songbooks"));
+    setWindowTitle(tr("Add %1 to Songbooks").arg(songTitle));
     resize(520, 480);
     auto* layout = new QVBoxLayout(this);
-    auto* intro = new QLabel(tr("Which songbooks should %1 be in? It goes where the index puts it "
-                                "(by title); unchecking a list takes it out of that one.")
-                                 .arg(songTitle),
-                             this);
-    intro->setWordWrap(true);
-    layout->addWidget(intro);
     tree_ = new QTreeWidget(this);
+    tree_->setToolTip(tr("It goes where the index puts it (by title); unchecking a list takes it "
+                         "out of that one."));
     tree_->setObjectName(QStringLiteral("addToBooksTree"));
     tree_->setHeaderHidden(true);
     layout->addWidget(tree_, 1);
@@ -100,7 +95,7 @@ AddToBooksDialog::AddToBooksDialog(const std::filesystem::path& root, const std:
     QPushButton* add = buttons->addButton(
         tr("Apply", "add the song to the checked lists, take it out of the unchecked ones"),
         QDialogButtonBox::AcceptRole);
-    buttons->addButton(tr("Not Now"), QDialogButtonBox::RejectRole);
+    buttons->addButton(afterFirstSave ? tr("Not Now") : tr("Cancel"), QDialogButtonBox::RejectRole);
     add->setDefault(true);
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);

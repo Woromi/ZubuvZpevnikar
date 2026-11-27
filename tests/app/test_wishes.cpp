@@ -1,6 +1,7 @@
 // Wishes: the wish list (wishes.txt), wishes done and removed from Home, a wish fulfilled by the
 // first save of its imported song; Add to Songbooks after the first save of a new song.
 #include "AppTestAccess.hpp"
+#include "AddToBooksDialog.hpp"
 #include "HomeData.hpp"
 #include "HomePage.hpp"
 #include "NewSongDialog.hpp"
@@ -153,7 +154,7 @@ TEST_CASE("Wishes: the first save of an imported wish fulfils it, then Add to So
     // The first save: the wish line becomes the song, then the dialog offers the books; the
     // wish book has it already (checked, and can be unchecked). Not Now.
     bool offered = false, wishBookHasIt = false;
-    auto dialog = apptest::answerTitledDialog("Add to Songbooks", [&](QDialog* d) {
+    auto dialog = apptest::answerDialog<AddToBooksDialog>([&](AddToBooksDialog* d) {
         offered = true;
         for (QTreeWidgetItemIterator it(d->findChild<QTreeWidget*>("addToBooksTree")); *it; ++it)
             if ((*it)->text(0).startsWith("Wish Book"))
@@ -184,7 +185,7 @@ TEST_CASE("Wishes: Add to Songbooks puts the song into the chosen section", "[ap
     REQUIRE(A::openExistingSong(w.window, fixture / "songs/chords/Ayreon/EMc2.tex"));
 
     bool lockedDisabled = false;
-    auto dialog = apptest::answerTitledDialog("Add to Songbooks", [&](QDialog* d) {
+    auto dialog = apptest::answerDialog<AddToBooksDialog>([&](AddToBooksDialog* d) {
         for (QTreeWidgetItemIterator it(d->findChild<QTreeWidget*>("addToBooksTree")); *it; ++it) {
             const QString text = (*it)->text(0);
             if (text.contains("locked/locked.tex") && text.contains("locked)"))
@@ -225,7 +226,7 @@ TEST_CASE("Wishes: Add to Songbooks writes no book locked while its dialog was o
                                warning = m->text();
                                m->button(QMessageBox::Ok)->click();
                            });
-    auto dialog = apptest::answerTitledDialog("Add to Songbooks", [&](QDialog* d) {
+    auto dialog = apptest::answerDialog<AddToBooksDialog>([&](AddToBooksDialog* d) {
         for (QTreeWidgetItemIterator it(d->findChild<QTreeWidget*>("addToBooksTree")); *it; ++it)
             if ((*it)->text(0).startsWith("Wish Book") &&
                 (*it)->text(0).contains("wish/wish.tex"))
@@ -253,7 +254,7 @@ TEST_CASE("Wishes: unchecking a list in Add to Songbooks takes the song out", "[
     REQUIRE(A::openExistingSong(w.window, fixture / "songs/chords/WabiDanek/Montgomery.tex"));
 
     bool lockedStays = false;
-    auto dialog = apptest::answerTitledDialog("Add to Songbooks", [&](QDialog* d) {
+    auto dialog = apptest::answerDialog<AddToBooksDialog>([&](AddToBooksDialog* d) {
         for (QTreeWidgetItemIterator it(d->findChild<QTreeWidget*>("addToBooksTree")); *it; ++it) {
             const QString text = (*it)->text(0);
             // The locked book has it too: checked, and it cannot be unchecked.
