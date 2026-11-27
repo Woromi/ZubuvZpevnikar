@@ -45,14 +45,14 @@ SongActions::SongActions(QWidget* window, Hooks hooks)
     connect(tidyAction_, &QAction::triggered, this, [this] { startTidy(); });
 
     makeSmallerAction_ =
-        new QAction(QIcon::fromTheme(QStringLiteral("zoom-out")), tr("Make Smaller"), this);
+        new QAction(QIcon::fromTheme(QStringLiteral("zoom-out")), tr("Make Smaller…"), this);
     makeSmallerAction_->setToolTip(tr("Ask chords_converter for changes that make the song print "
                                       "smaller; apply one (one undo step), then ask again"));
     connect(makeSmallerAction_, &QAction::triggered, this,
             [this] { startProposals(SongAction::Shrink); });
 
     joinLinesAction_ = new QAction(QIcon::fromTheme(QStringLiteral("format-justify-fill")),
-                                   tr("Join Lines"), this);
+                                   tr("Join Lines…"), this);
     joinLinesAction_->setToolTip(
         tr("Join every two lines of a kind of part into one, where they still fit the column "
            "(typesets the song on A4 and A5: a few seconds)"));
@@ -60,7 +60,7 @@ SongActions::SongActions(QWidget* window, Hooks hooks)
             [this] { startProposals(SongAction::Join); });
 
     checkAction_ = new QAction(QIcon::fromTheme(QStringLiteral("tools-check-spelling")),
-                               tr("Check Song"), this);
+                               tr("Find Mistakes…"), this);
     checkAction_->setToolTip(
         tr("Look for mistakes: typos where a line's copies differ, apostrophes typed two ways, "
            "a chorus typed as a verse"));
@@ -260,7 +260,7 @@ QString SongActions::actionName(SongAction action) const {
     case SongAction::Shrink:
         return tr("Make Smaller");
     case SongAction::Check:
-        return tr("Check Song");
+        return tr("Find Mistakes");
     case SongAction::Join:
         return tr("Join Lines");
     }
@@ -729,7 +729,7 @@ void SongActions::showMetadataNote(SongEditor* editor) {
     if (text.isEmpty())
         return;
     const QPointer<SongEditor> guard = editor;
-    editor->showSuggestion(tr("Check Songs, metadata:"), text, tr("OK"), [this, guard] {
+    editor->showSuggestion(tr("Scan Songs, metadata:"), text, tr("OK"), [this, guard] {
         if (guard)
             metadataNotes_.erase(guard->path());
     });

@@ -281,7 +281,7 @@ TEST_CASE("Make Smaller, Make It Fit: one undo step, a last resort asked for",
     QSettings{}.remove(QStringLiteral("preview/class"));
 }
 
-TEST_CASE("Check Songs: the key check offers the key and a nocheck comment",
+TEST_CASE("Scan Songs: the key check offers the key and a nocheck comment",
           "[.tools][app][converter]") {
     REQUIRE_TOOL("python3");
     useBuiltConverter();
@@ -307,7 +307,7 @@ TEST_CASE("Check Songs: the key check offers the key and a nocheck comment",
         SKIP("the bundled package is not checked out");
 
     // The dialog: only the Keys and Metadata script checks.
-    auto dialog = apptest::answerTitledDialog("Check Songs", [](QDialog* d) {
+    auto dialog = apptest::answerTitledDialog("Scan Songs", [](QDialog* d) {
         for (auto* box : d->findChildren<QCheckBox*>()) {
             const QString text = box->text();
             box->setChecked(text.startsWith("Keys") || text.startsWith("Metadata"));

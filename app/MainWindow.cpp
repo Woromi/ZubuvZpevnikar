@@ -1,46 +1,47 @@
 #include "MainWindow.hpp"
 
+#include "AddToBooksDialog.hpp"
+#include "BookAdder.hpp"
 #include "BuildFiles.hpp"
+#include "ConverterVersion.hpp"
 #include "DesktopIntegration.hpp"
 #include "DiffView.hpp"
+#include "ExternalTools.hpp"
 #include "FindBar.hpp"
+#include "HomeData.hpp"
+#include "HomePage.hpp"
 #include "ImportDialog.hpp"
+#include "KeyTips.hpp"
 #include "LabelFilterBox.hpp"
 #include "LabelsDialog.hpp"
+#include "LibraryDialog.hpp"
 #include "NewSongDialog.hpp"
 #include "PreviewPane.hpp"
 #include "PreviewRunner.hpp"
 #include "ScoreTabs.hpp"
 #include "SettingsDialog.hpp"
+#include "ShortcutsDialog.hpp"
 #include "SongActions.hpp"
+#include "SongDatesRunner.hpp"
 #include "SongEditor.hpp"
 #include "SongFilterProxy.hpp"
 #include "SongListPage.hpp"
 #include "SongTableModel.hpp"
-#include "SongbookExporter.hpp"
-#include "SongDatesRunner.hpp"
 #include "SongbookCheck.hpp"
+#include "SongbookExporter.hpp"
 #include "SongbookSorter.hpp"
 #include "SongbooksPage.hpp"
-#include "LibraryDialog.hpp"
-#include "AddToBooksDialog.hpp"
-#include "BookAdder.hpp"
-#include "HomeData.hpp"
-#include "HomePage.hpp"
-#include "WelcomePage.hpp"
 #include "SoundTools.hpp"
-#include "ConverterVersion.hpp"
-#include "ExternalTools.hpp"
+#include "WelcomePage.hpp"
 #include "convert.hpp"
 
 #include <KSyntaxHighlighting/Repository>
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
-#include <QDesktopServices>
-#include <QUrl>
 #include <QCloseEvent>
 #include <QComboBox>
+#include <QDesktopServices>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -80,6 +81,7 @@
 #include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <algorithm>
 #include <array>
@@ -169,6 +171,7 @@ MainWindow::MainWindow(QWidget* parent)
     // The Edit menu's song actions work on the song page only (updateSongActions).
     connect(pages_, &QStackedWidget::currentChanged, this, &MainWindow::updateSongActions);
     updateSongActions();
+    keytips::apply(this); // every action's key in its tooltip
 
     // Quitting meanwhile skips what has not begun (the app waits for the task at exit).
     QThreadPool::globalInstance()->start([converter = findConverter(), windowGone = windowGone_] {
@@ -228,8 +231,8 @@ void MainWindow::createMenus() {
 
     closeSongAction_ = file->addAction(tr("&Close Song"));
     closeSongAction_->setShortcut(QKeySequence::Close);
-    closeSongAction_->setIcon(QIcon::fromTheme(QStringLiteral("go-previous")));
-    closeSongAction_->setToolTip(tr("Close the song (Ctrl+W)"));
+    closeSongAction_->setIcon(QIcon::fromTheme(QStringLiteral("document-close")));
+    closeSongAction_->setToolTip(tr("Close the song"));
     connect(closeSongAction_, &QAction::triggered, this, &MainWindow::closeSong);
 
     QAction* newSongAction =
@@ -242,7 +245,7 @@ void MainWindow::createMenus() {
     QAction* import =
         file->addAction(QIcon::fromTheme(QStringLiteral("document-import")), tr("&Import Song…"));
     import->setShortcut(QKeySequence(QStringLiteral("Ctrl+I")));
-    import->setToolTip(tr("Convert a song from a chords website or a saved page (Ctrl+I)"));
+    import->setToolTip(tr("Convert a song from a chords website or a saved page"));
     connect(import, &QAction::triggered, this, &MainWindow::importSong);
 
     file->addSeparator();
@@ -252,14 +255,19 @@ void MainWindow::createMenus() {
     connect(settings, &QAction::triggered, this, &MainWindow::openSettings);
     file->addSeparator();
     QAction* quit = file->addAction(tr("&Quit"));
-    QMenu* songs = menuBar()->addMenu(tr("&Songs"));
-    QAction* scan =
-        songs->addAction(QIcon::fromTheme(QStringLiteral("edit-find")), tr("&Check Songs…"));
-    scan->setToolTip(tr("Check every song (or the ones shown): what Tidy, Check Song or Make "
-                        "Smaller would change, keys, metadata"));
-    connect(scan, &QAction::triggered, this, [this] { songbookCheck_->start(); });
     quit->setShortcut(QKeySequence::Quit);
     connect(quit, &QAction::triggered, this, &QWidget::close);
+
+    createEditMenu();
+    // Filled by createSongToolBar: the song toolbar's actions with their keys.
+    songMenu_ = menuBar()->addMenu(tr("S&ong"));
+
+    QMenu* library = menuBar()->addMenu(tr("&Library", "menu: the song library"));
+    QAction* scan =
+        library->addAction(QIcon::fromTheme(QStringLiteral("edit-find")), tr("&Scan Songs…"));
+    scan->setToolTip(tr("Check every song (or the ones shown): what Tidy, Find Mistakes or Make "
+                        "Smaller would change, keys, metadata"));
+    connect(scan, &QAction::triggered, this, [this] { songbookCheck_->start(); });
     // Home's actions row: the same actions.
     QAction* newBook = new QAction(QIcon::fromTheme(QStringLiteral("document-new")),
                                    tr("New Song&book…"), this);
@@ -272,6 +280,7 @@ void MainWindow::createMenus() {
     QAction* another = new QAction(QIcon::fromTheme(QStringLiteral("document-open")),
                                    tr("Open Another Song Library…"), this);
     connect(another, &QAction::triggered, this, &MainWindow::chooseSongbookFolder);
+    library->addAction(newBook);
     for (QAction* action : {import, newSongAction, newBook, scan, another})
         homePage_->addQuickAction(action);
     // The Songs view's heading has the same actions as buttons.
@@ -295,7 +304,10 @@ void MainWindow::createMenus() {
             {QKeySequence(QStringLiteral("Ctrl+3")), QKeySequence(QStringLiteral("Ctrl+B"))},
             ActivityBar::View::Songbooks);
 
-    createEditMenu();
+    QMenu* help = menuBar()->addMenu(tr("&Help"));
+    QAction* keys = help->addAction(tr("&Keyboard Shortcuts…"));
+    keys->setShortcut(QKeySequence::HelpContents);
+    connect(keys, &QAction::triggered, this, &MainWindow::showKeyboardShortcuts);
 }
 
 void MainWindow::createCentralWidget() {
@@ -404,7 +416,7 @@ void MainWindow::createCentralWidget() {
             if (pages_->currentWidget() != songPage_)
                 showView(ActivityBar::View::Songs);
         } else if (!cancelled) {
-            QMessageBox::information(this, tr("Check Songs"),
+            QMessageBox::information(this, tr("Scan Songs"),
                                      tr("No song with possible changes was found."));
         }
     });
@@ -1108,18 +1120,6 @@ void MainWindow::createSongToolBar() {
     songToolBar_->setMovable(false);
     songToolBar_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
-    const auto editAction = [this](const QString& text, const QString& icon, const QString& toolTip,
-                                   auto&& slot) {
-        auto* action = new QAction(QIcon::fromTheme(icon), text, this);
-        action->setToolTip(toolTip);
-        connect(action, &QAction::triggered, this, [this, slot] {
-            if (SongEditor* editor = currentEditor())
-                slot(editor->textEdit());
-        });
-        songToolBar_->addAction(action);
-        return action;
-    };
-
     songToolBar_->addAction(closeSongAction_);
     songToolBar_->addAction(saveAction_);
     addToBooksAction_ = new QAction(QIcon::fromTheme(QStringLiteral("list-add")),
@@ -1131,23 +1131,24 @@ void MainWindow::createSongToolBar() {
     });
     songToolBar_->addAction(addToBooksAction_);
     songToolBar_->addSeparator();
-    undoAction_ = editAction(tr("Undo"), QStringLiteral("edit-undo"), tr("Undo (Ctrl+Z)"),
-                             [](QPlainTextEdit* e) { e->undo(); });
-    redoAction_ = editAction(tr("Redo"), QStringLiteral("edit-redo"), tr("Redo (Ctrl+Shift+Z)"),
-                             [](QPlainTextEdit* e) { e->redo(); });
-    songToolBar_->addSeparator();
-    cutAction_ = editAction(tr("Cut"), QStringLiteral("edit-cut"), tr("Cut (Ctrl+X)"),
-                            [](QPlainTextEdit* e) { e->cut(); });
-    copyAction_ = editAction(tr("Copy"), QStringLiteral("edit-copy"), tr("Copy (Ctrl+C)"),
-                             [](QPlainTextEdit* e) { e->copy(); });
-    pasteAction_ = editAction(tr("Paste"), QStringLiteral("edit-paste"), tr("Paste (Ctrl+V)"),
-                              [](QPlainTextEdit* e) { e->paste(); });
-    songToolBar_->addAction(findAction_);
+    for (QAction* action : {undoAction_, redoAction_, findAction_}) {
+        songToolBar_->addAction(action);
+        if (auto* button = qobject_cast<QToolButton*>(songToolBar_->widgetForAction(action)))
+            button->setToolButtonStyle(Qt::ToolButtonIconOnly); // their icons say it
+    }
     songToolBar_->addSeparator();
 
-    for (QAction* action : {songActions_->tidyAction(), songActions_->makeSmallerAction(),
-                            songActions_->joinLinesAction(), songActions_->checkAction()})
-        songToolBar_->addAction(action);
+    songToolBar_->addAction(songActions_->tidyAction());
+    // Join Lines is a way of making the song smaller: in Make Smaller's drop-down.
+    songToolBar_->addAction(songActions_->makeSmallerAction());
+    if (auto* button = qobject_cast<QToolButton*>(
+            songToolBar_->widgetForAction(songActions_->makeSmallerAction()))) {
+        auto* more = new QMenu(button);
+        more->addAction(songActions_->joinLinesAction());
+        button->setMenu(more);
+        button->setPopupMode(QToolButton::MenuButtonPopup);
+    }
+    songToolBar_->addAction(songActions_->checkAction());
 
     markCheckedAction_ =
         new QAction(QIcon::fromTheme(QStringLiteral("checkmark")), tr("Mark Checked"), this);
@@ -1165,7 +1166,8 @@ void MainWindow::createSongToolBar() {
     });
     songToolBar_->addAction(markCheckedAction_);
 
-    favouriteAction_ = new QAction(QStringLiteral("★"), this);
+    favouriteAction_ = new QAction(tr("&Favourite"), this);
+    favouriteAction_->setIconText(QStringLiteral("★"));
     favouriteAction_->setCheckable(true);
     favouriteAction_->setToolTip(tr("Favourite: add or remove the label \"fav\" "
                                     "(one undo step; save to keep it)"));
@@ -1202,15 +1204,65 @@ void MainWindow::createSongToolBar() {
     inputLabel_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     songToolBar_->addWidget(inputLabel_);
 
+    // The Song menu: the same actions, with keys (window-wide, on the song page only:
+    // updateSongActions).
+    const auto key = [](QAction* action, const QKeySequence& sequence) {
+        action->setShortcut(sequence);
+        action->setShortcutContext(Qt::WindowShortcut);
+    };
+    key(addToBooksAction_, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_B));
+    key(songActions_->tidyAction(), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T));
+    key(songActions_->makeSmallerAction(), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_M));
+    key(songActions_->joinLinesAction(), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_J));
+    key(songActions_->checkAction(), QKeySequence(Qt::Key_F7)); // like a spelling check
+    key(markCheckedAction_, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_K));
+    key(favouriteAction_, QKeySequence(Qt::CTRL | Qt::Key_D)); // like a browser's bookmark
+    key(labelsAction_, QKeySequence(Qt::CTRL | Qt::Key_L));
+    key(changesAction_, QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
+    songMenu_->addAction(addToBooksAction_);
+    songMenu_->addSeparator();
+    for (QAction* action : {songActions_->tidyAction(), songActions_->makeSmallerAction(),
+                            songActions_->joinLinesAction(), songActions_->checkAction()})
+        songMenu_->addAction(action);
+    songMenu_->addSeparator();
+    for (QAction* action : {markCheckedAction_, favouriteAction_, labelsAction_, changesAction_})
+        songMenu_->addAction(action);
+    songMenu_->addSeparator();
+    songMenu_->addAction(newScoreAction_);
+
     static_cast<QVBoxLayout*>(songPage_->layout())->insertWidget(0, songToolBar_);
 }
 
 void MainWindow::createEditMenu() {
     QMenu* edit = menuBar()->addMenu(tr("Ed&it"));
+    // Undo … Paste: the text editor in view has the keys itself; the menu and the song toolbar
+    // only show them.
+    const auto editAction = [this, edit](const QString& text, const QString& icon,
+                                         QKeySequence::StandardKey shownKey, auto&& slot) {
+        auto* action = edit->addAction(QIcon::fromTheme(icon), text);
+        keytips::setShownKey(action, QKeySequence(shownKey));
+        connect(action, &QAction::triggered, this, [this, slot] {
+            if (SongEditor* editor = currentEditor())
+                slot(editor->textEdit());
+        });
+        return action;
+    };
+    undoAction_ = editAction(tr("&Undo"), QStringLiteral("edit-undo"), QKeySequence::Undo,
+                             [](QPlainTextEdit* e) { e->undo(); });
+    redoAction_ = editAction(tr("&Redo"), QStringLiteral("edit-redo"), QKeySequence::Redo,
+                             [](QPlainTextEdit* e) { e->redo(); });
+    edit->addSeparator();
+    cutAction_ = editAction(tr("Cu&t"), QStringLiteral("edit-cut"), QKeySequence::Cut,
+                            [](QPlainTextEdit* e) { e->cut(); });
+    copyAction_ = editAction(tr("&Copy"), QStringLiteral("edit-copy"), QKeySequence::Copy,
+                             [](QPlainTextEdit* e) { e->copy(); });
+    pasteAction_ = editAction(tr("&Paste"), QStringLiteral("edit-paste"), QKeySequence::Paste,
+                              [](QPlainTextEdit* e) { e->paste(); });
+    edit->addSeparator();
     // Find works on every page: the Songs page's search, or the find bar of the editor in view.
     findAction_ = edit->addAction(QIcon::fromTheme(QStringLiteral("edit-find")), tr("&Find…"));
     findAction_->setShortcut(QKeySequence::Find);
-    findAction_->setToolTip(tr("Find in the text (Ctrl+F)"));
+    findAction_->setToolTip(tr("Find in the text"));
     connect(findAction_, &QAction::triggered, this, [this] { showFind(false); });
     QAction* replaceAction = edit->addAction(tr("&Replace…"));
     replaceAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_H));
@@ -1291,8 +1343,10 @@ void MainWindow::createEditMenu() {
         [this] { moveChord(+1, Step::Word); });
     edit->addSeparator();
     add(tr("Insert Part…"), {QKeySequence(Qt::CTRL | Qt::Key_P)}, [this] { showPartMenu(); });
-    edit->addSeparator();
-    add(tr("New Score…"), {}, [this] { scores_->newScore(); });
+    // In the Song menu (createSongToolBar).
+    newScoreAction_ = new QAction(tr("New &Score…"), this);
+    connect(newScoreAction_, &QAction::triggered, this, [this] { scores_->newScore(); });
+    songEditActions_.push_back(newScoreAction_);
 }
 
 void MainWindow::showFind(bool replaceMode) {
@@ -1320,8 +1374,15 @@ void MainWindow::showPartMenu() {
     auto* menu = new QMenu(editor_->textEdit());
     menu->setAttribute(Qt::WA_DeleteOnClose);
     const QPointer<SongEditor> editor = editor_;
+    // Ctrl+P, then a digit: the same keys in every language.
+    int digit = 1;
+    const auto numbered = [&digit](const QString& text) {
+        if (digit > 10)
+            return text;
+        return QStringLiteral("&%1  %2").arg(digit++ % 10).arg(text);
+    };
     const auto add = [&](const QString& text, Part part) {
-        connect(menu->addAction(text), &QAction::triggered, menu, [editor, part] {
+        connect(menu->addAction(numbered(text)), &QAction::triggered, menu, [editor, part] {
             if (editor)
                 editor->insertPart(part);
         });
@@ -1335,7 +1396,7 @@ void MainWindow::showPartMenu() {
     add(tr("Outro"), Part::Outro);
     add(tr("Instrumental"), Part::Instrumental);
     // A score is a part too: its \lilypondfile line goes where a part would (New Score).
-    connect(menu->addAction(tr("Score (LilyPond)…")), &QAction::triggered, menu,
+    connect(menu->addAction(numbered(tr("Score (LilyPond)…"))), &QAction::triggered, menu,
             [this] { scores_->newScore(); });
     menu->addSeparator();
     add(tr("Chorus Again (\\insertchorus)"), Part::ChorusAgain);
@@ -1348,8 +1409,17 @@ void MainWindow::showPartMenu() {
     menu->popup(edit->viewport()->mapToGlobal(edit->cursorRect().bottomLeft()));
 }
 
+void MainWindow::showKeyboardShortcuts() {
+    ShortcutsDialog dialog(menuBar(), this);
+    dialog.exec();
+}
+
 SongEditor* MainWindow::currentEditor() const {
     return scores_->currentEditor();
+}
+
+bool MainWindow::onSongPage() const {
+    return pages_->currentWidget() == songPage_;
 }
 
 bool MainWindow::onSongTab() const {
@@ -1368,10 +1438,10 @@ void MainWindow::updateEditState() {
         return;
     }
     const QPlainTextEdit* edit = current->textEdit();
-    const bool selection = edit->textCursor().hasSelection();
+    const bool selection = onSongPage() && edit->textCursor().hasSelection();
     // While the Changes view is shown, the song editor is hidden: no edits it can't show.
     const bool editable =
-        !edit->isReadOnly() && !(current == editor_ && changesAction_->isChecked());
+        onSongPage() && !edit->isReadOnly() && !(current == editor_ && changesAction_->isChecked());
     undoAction_->setEnabled(editable && edit->document()->isUndoAvailable());
     redoAction_->setEnabled(editable && edit->document()->isRedoAvailable());
     copyAction_->setEnabled(selection);
@@ -1392,11 +1462,11 @@ void MainWindow::updateSongActions() {
     saveAction_->setEnabled(current && current->isModified());
     saveAction_->setText(current && !songTab ? tr("&Save Score") : tr("&Save Song"));
     const bool modified = open && editor_->isModified();
-    changesAction_->setEnabled(modified && songTab);
+    changesAction_->setEnabled(modified && songTab && onSongPage());
     if (!modified && changesAction_->isChecked())
         changesAction_->setChecked(false);
     updateEditState();
-    songActions_->updateEnabled(songTab);
+    songActions_->updateEnabled(songTab && onSongPage());
     if (!open) {
         for (QAction* action : {markCheckedAction_, favouriteAction_, labelsAction_})
             action->setEnabled(false);
@@ -1420,8 +1490,8 @@ void MainWindow::updateSongActions() {
 }
 
 void MainWindow::updateLabelActions() {
-    const bool editable = editor_ && onSongTab() && !editor_->textEdit()->isReadOnly() &&
-                          !changesAction_->isChecked();
+    const bool editable = editor_ && onSongTab() && onSongPage() &&
+                          !editor_->textEdit()->isReadOnly() && !changesAction_->isChecked();
     favouriteAction_->setEnabled(editable);
     labelsAction_->setEnabled(editable);
     bool favourite = false;
@@ -1560,7 +1630,7 @@ void MainWindow::showTableMenu(const QPoint& position) {
 
 void MainWindow::updateMarkChecked() {
     // Searched in the document: cheap enough for every keystroke of a song-sized text.
-    const bool marked = onSongTab() && !editor_->textEdit()->isReadOnly() &&
+    const bool marked = onSongTab() && onSongPage() && !editor_->textEdit()->isReadOnly() &&
                         !changesAction_->isChecked() &&
                         !editor_->textEdit()
                              ->document()

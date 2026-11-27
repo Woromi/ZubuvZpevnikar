@@ -26,6 +26,10 @@ qt_add_library(zpevnikar_app STATIC
     ImportDialog.hpp
     ImportDialog.cpp
     MainWindow.hpp
+    KeyTips.hpp
+    KeyTips.cpp
+    ShortcutsDialog.hpp
+    ShortcutsDialog.cpp
     MainWindow.cpp
     ScoreTabs.hpp
     ScoreTabs.cpp

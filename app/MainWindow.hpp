@@ -30,6 +30,7 @@ class QComboBox;
 class QLabel;
 class QListWidget;
 class QListWidgetItem;
+class QMenu;
 class QLockFile;
 class QLineEdit;
 class QModelIndex;
@@ -167,6 +168,8 @@ private:
     // tab whose file is missing).
     SongEditor* currentEditor() const;
     bool onSongTab() const;
+    bool onSongPage() const; // the song page is the one shown
+    void showKeyboardShortcuts();
     bool anyModified() const;
     // Labels (the `tags` header option; "fav" = favourite). `change` maps a song's current tags to
     // its new ones. An open song gets the new header in its editor (one undo step, unsaved); any
@@ -277,6 +280,8 @@ private:
     QAction* cutAction_ = nullptr;
     QAction* copyAction_ = nullptr;
     QAction* pasteAction_ = nullptr;
+    QAction* newScoreAction_ = nullptr; // Song > New Score…
+    QMenu* songMenu_ = nullptr;
     QAction* findAction_ = nullptr; // Edit > Find (Ctrl+F), also on the song toolbar
     QString listTitle_; // window title on the list page
     // Syntax definitions and themes, shared by all editors (must outlive them).

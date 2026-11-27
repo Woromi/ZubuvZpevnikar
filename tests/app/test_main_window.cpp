@@ -117,8 +117,22 @@ TEST_CASE("Views: the Edit menu's song keys work on the song page only; Insert P
     CHECK_FALSE(moveLeft->isEnabled());
     QTest::keyClick(&w, Qt::Key_A, Qt::AltModifier);
     CHECK(editor->content() == before);
+    // The Song menu's keys too (Ctrl+D: the favourite).
+    QAction* favourite = editAction(QStringLiteral("&Favourite"));
+    REQUIRE(favourite != nullptr);
+    CHECK_FALSE(favourite->isEnabled());
+    QTest::keyClick(&w, Qt::Key_D, Qt::ControlModifier);
+    CHECK(editor->content() == before);
     A::showView(w, V::Song);
     CHECK(insertChord->isEnabled());
+    CHECK(favourite->isEnabled());
+    CHECK(favourite->toolTip().endsWith(QStringLiteral("(Ctrl+D)"))); // written from the key
+    editor->textEdit()->setFocus();
+    QTest::keyClick(&w, Qt::Key_D, Qt::ControlModifier);
+    REQUIRE(apptest::waitUntil([&] { return editor->content() != before; }));
+    CHECK(editor->content().find("fav") != std::string::npos);
+    editor->textEdit()->undo();
+    REQUIRE(editor->content() == before);
 
     // Insert Part (Ctrl+P) offers a score among the parts.
     editor->textEdit()->setFocus();
@@ -132,10 +146,14 @@ TEST_CASE("Views: the Edit menu's song keys work on the song page only; Insert P
     for (QAction* action : menu->actions())
         items << action->text();
     INFO(items.join(QStringLiteral(" | ")).toStdString());
-    CHECK(items.contains(QStringLiteral("Score (LilyPond)…")));
-    CHECK(items.indexOf(QStringLiteral("Score (LilyPond)…")) ==
-          items.indexOf(QStringLiteral("Instrumental")) + 1);
-    menu->close();
+    // Numbered: Ctrl+P, then a digit, the same in every language.
+    CHECK(items.value(0) == QStringLiteral("&1  Verse"));
+    CHECK(items.indexOf(QStringLiteral("&9  Score (LilyPond)…")) ==
+          items.indexOf(QStringLiteral("&8  Instrumental")) + 1);
+    const std::string withoutPart = editor->content();
+    QTest::keyClick(menu, Qt::Key_1);
+    REQUIRE(apptest::waitUntil([&] { return editor->content() != withoutPart; }));
+    CHECK(editor->content().find("\\beginverse") != std::string::npos);
 }
 
 TEST_CASE("Package: the app builds with its own copy, never with the song library's",
@@ -471,8 +489,7 @@ TEST_CASE("Build files: kept scores stay while builds use them; unused ones go a
     CHECK(fs::exists(cache / "preview")); // this instance's own
 }
 
-TEST_CASE("Check Songs: opening a song adds its missing fields as placeholders",
-          "[app][scan]") {
+TEST_CASE("Scan Songs: opening a song adds its missing fields as placeholders", "[app][scan]") {
     apptest::Fixture fixture(apptest::Fixture::Extras::Yes);
     MainWindow w;
     w.show();

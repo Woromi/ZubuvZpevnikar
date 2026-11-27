@@ -154,7 +154,7 @@ void SongListPage::showScanResults(bool found) {
     if (show_->findData(Show::Changes) < 0) {
         show_->addItem(tr("With possible changes"), Show::Changes);
         show_->setItemData(show_->count() - 1,
-                           tr("Songs the last Check Songs found something in (this session)"),
+                           tr("Songs the last Scan Songs found something in (this session)"),
                            Qt::ToolTipRole);
     }
     if (found)

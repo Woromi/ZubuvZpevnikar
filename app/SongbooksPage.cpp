@@ -2144,7 +2144,7 @@ void SongbooksPage::refreshOverview() {
                       songsOf(r.todo, [](const zub::songbook::SongFacts& f) {
                           return f.todos.empty() ? QString() : toQString(f.todos.front());
                       })});
-    checks.push_back({Severity::Note, tr("Possible changes (Check Songs)"),
+    checks.push_back({Severity::Note, tr("Possible changes (Scan Songs)"),
                       songsOf(r.changes, [](const zub::songbook::SongFacts& f) {
                           return toQString(f.changes);
                       })});

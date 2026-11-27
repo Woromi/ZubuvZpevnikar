@@ -39,7 +39,7 @@ void SongbookCheck::setSongbook(const std::filesystem::path& root,
 void SongbookCheck::start() {
     if (scan_ || songbookRoot_.empty())
         return;
-    const QString name = tr("Check Songs");
+    const QString name = tr("Scan Songs");
     const std::filesystem::path converter = hooks_.findConverter();
     const auto paper = zub::preview::paperOf(packageDir_, hooks_.documentClass());
     const QString paperName = !paper                                  ? tr("its paper")
@@ -58,7 +58,7 @@ void SongbookCheck::start() {
     auto* tidy =
         new QCheckBox(tr("Tidy: a chorus typed again, chords inside a syllable, spaces"), &dialog);
     auto* check = new QCheckBox(
-        tr("Check Song: typos, apostrophes typed two ways, a chorus typed as a verse"), &dialog);
+        tr("Find Mistakes: typos, apostrophes typed two ways, a chorus typed as a verse"), &dialog);
     auto* shrink = new QCheckBox(
         tr("Make Smaller: songs that don't fit %1 (the preview's paper). Typesets every song: "
            "about 2 seconds each, some 8 minutes for the whole song library.")
@@ -201,7 +201,7 @@ void SongbookCheck::start() {
                 if (!finding.errors.isEmpty())
                     summary << tr("Errors %1").arg(finding.errors.size());
                 section(tr("Tidy:"), finding.tidy);
-                section(tr("Check Song:"), finding.check);
+                section(tr("Find Mistakes:"), finding.check);
                 section(finding.pages.isEmpty() ? tr("Make Smaller:")
                                                 : tr("Make Smaller (%1):").arg(finding.pages),
                         finding.shrink);
