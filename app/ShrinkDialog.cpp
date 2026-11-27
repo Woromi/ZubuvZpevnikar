@@ -2,10 +2,11 @@
 
 #include "convert.hpp"
 
-#include <QItemSelectionModel>
 #include <QAbstractItemView>
 #include <QDialogButtonBox>
-#include <algorithm>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QItemSelectionModel>
 #include <QLabel>
 #include <QListWidget>
 #include <QPalette>
@@ -14,6 +15,7 @@
 #include <QStringList>
 #include <QTextBrowser>
 #include <QVBoxLayout>
+#include <algorithm>
 
 namespace {
 
@@ -77,7 +79,7 @@ QString ShrinkDialog::summary(const zub::songsuggest::Suggestions& suggestions) 
 ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
                            const std::string& songText, const QString& title,
                            const QString& heading, QWidget* parent, bool canDismiss,
-                           bool canFitAll)
+                           const QString& fitPaper)
     : QDialog(parent), suggestions_(suggestions), songText_(songText) {
     setWindowTitle(title);
     resize(1180, 600);
@@ -89,6 +91,30 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
         auto* label = new QLabel(header, this);
         label->setWordWrap(true);
         layout->addWidget(label);
+    }
+    // Not an option of the picked changes: an alternative to picking them, so apart from Apply.
+    if (!fitPaper.isEmpty()) {
+        auto* row = new QHBoxLayout;
+        auto* fitText = new QLabel(
+            tr("Or don't pick: chords_converter applies the changes itself, the most readable "
+               "first, typesetting the song after each, until it fits %1. One undo step; a song "
+               "it cannot fit stays as it is; it asks before a last resort.")
+                .arg(fitPaper),
+            this);
+        fitText->setWordWrap(true);
+        auto* fitAll = new QPushButton(tr("Make It Fit %1").arg(fitPaper), this);
+        fitAll->setAutoDefault(false);
+        connect(fitAll, &QPushButton::clicked, this, [this] {
+            untilItFits_ = true;
+            accept();
+        });
+        row->addWidget(fitText, 1);
+        row->addWidget(fitAll);
+        layout->addLayout(row);
+        auto* line = new QFrame(this);
+        line->setFrameShape(QFrame::HLine);
+        line->setFrameShadow(QFrame::Sunken);
+        layout->addWidget(line);
     }
     auto* headingLabel =
         new QLabel(heading + QStringLiteral(" ") + tr("(Ctrl+click or Shift+click picks several.)"),
@@ -134,17 +160,6 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
                                 "line so Check Song leaves them out"));
         connect(dismiss_, &QPushButton::clicked, this, [this] {
             dismissed_ = true;
-            accept();
-        });
-    }
-    if (canFitAll) {
-        auto* fitAll = buttons->addButton(tr("Apply Until It Fits"), QDialogButtonBox::ActionRole);
-        fitAll->setToolTip(
-            tr("Let chords_converter take these changes itself, the most readable first, "
-               "typesetting the song after each, until it fits (one undo step; a song it cannot "
-               "fit stays as it is; it asks before a last resort). A few seconds a change."));
-        connect(fitAll, &QPushButton::clicked, this, [this] {
-            untilItFits_ = true;
             accept();
         });
     }

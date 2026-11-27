@@ -194,7 +194,7 @@ TEST_CASE("Converter: Measure offers pap, is cancelled by typing and by Tidy",
     ed->textEdit()->document()->setModified(false);
 }
 
-TEST_CASE("Make Smaller, Apply Until It Fits: one undo step, a last resort asked for",
+TEST_CASE("Make Smaller, Make It Fit: one undo step, a last resort asked for",
           "[.tools][app][converter]") {
     REQUIRE_TOOL("lualatex");
     REQUIRE_TOOL("python3");
@@ -221,11 +221,11 @@ TEST_CASE("Make Smaller, Apply Until It Fits: one undo step, a last resort asked
     SongEditor* ed = A::editor(w);
     REQUIRE(ed != nullptr);
     const std::string before = ed->content();
-    // Make Smaller lists the changes; Apply Until It Fits lets the converter take them.
+    // Make Smaller lists the changes; Make It Fit lets the converter take them.
     const auto untilItFits = [&w] {
         return apptest::answerDialog<ShrinkDialog>([](ShrinkDialog* d) {
             for (auto* b : d->findChildren<QPushButton*>())
-                if (b->text() == QStringLiteral("Apply Until It Fits"))
+                if (b->text().startsWith(QStringLiteral("Make It Fit")))
                     b->click();
         });
     };

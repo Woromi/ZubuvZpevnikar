@@ -62,7 +62,7 @@ public:
 
     // Tidy the open song (chords_converter tidy, one undo step); `note` ends the status message.
     void startTidy(const QString& note = {});
-    // The background measurement or Apply Until It Fits, if one runs (the text changed, another
+    // The background measurement or Make It Fit, if one runs (the text changed, another
     // action starts ...).
     void cancelMeasure();
     // False and a message box when the converter is older than zub::converter::kRequired.
@@ -101,7 +101,7 @@ signals:
     void lineRequested(int line); // show this line of the song
     void stateChanged();          // the window's actions depend on the run state
     // The list under the editor after a Tidy: line and text of each change (replaces the old one).
-    // What Tidy or Apply Until It Fits changed ("line N: ..."), under `title`.
+    // What Tidy or Make It Fit changed ("line N: ..."), under `title`.
     void changesListed(const QString& title, const std::vector<std::pair<int, QString>>& changes);
 
 private:
@@ -136,7 +136,7 @@ private:
     // --fit --measure; no dialog) and offers the `pap` header from its result alone.
     void startMeasure(SongEditor* editor);
     void onMeasureFinished(const std::expected<ConverterOutput, QString>& output);
-    // Make Smaller's Apply Until It Fits: shrink --apply (converter 0.16.0) takes the best
+    // Make Smaller's Make It Fit: shrink --apply (converter 0.16.0) takes the best
     // proposal, tidies and measures, until the song fits fitPaper_; all or nothing. One undo
     // step, the steps listed. Stopped before a last resort, it asks whether to allow it
     // (`lastResort`: a run that may).
@@ -167,7 +167,7 @@ private:
     QAction* makeSmallerAction_ = nullptr;
     QAction* joinLinesAction_ = nullptr;
     QAction* checkAction_ = nullptr;
-    // Of Apply Until It Fits: the paper Make Smaller listed its proposals for.
+    // Of Make It Fit: the paper Make Smaller listed its proposals for.
     zub::songsuggest::Paper fitPaper_ = zub::songsuggest::Paper::A5;
     bool fitLastResort_ = false;                                   // the running fit may use one
     // Keys the last Check Songs found, by song path (this session; dropped when acted on).

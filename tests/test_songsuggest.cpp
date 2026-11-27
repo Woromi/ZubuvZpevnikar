@@ -388,7 +388,7 @@ TEST_CASE("paperOf reads the base class options", "[songsuggest][preview]") {
     CHECK_FALSE(zub::preview::paperOf(root.path / "zubuvzpevnik", ""));
 }
 
-TEST_CASE("Apply Until It Fits: shrink --apply's command line", "[songsuggest]") {
+TEST_CASE("Make It Fit: shrink --apply's command line", "[songsuggest]") {
     CHECK(ss::fitCommand("/opt/cc", "/tmp/x/S.tex", ss::Paper::A5, false, "/sb", "/pkg",
                          "/tmp/x/out.tex")
               .arguments == std::vector<std::string>{"shrink", "/tmp/x/S.tex", "--apply", "--fit",
@@ -399,7 +399,7 @@ TEST_CASE("Apply Until It Fits: shrink --apply's command line", "[songsuggest]")
                                    "--songbook", "/sb", "--json", "-o", "o.tex"});
 }
 
-TEST_CASE("Apply Until It Fits reads real runs: fits, a last resort held back, nothing left",
+TEST_CASE("Make It Fit reads real runs: fits, a last resort held back, nothing left",
           "[songsuggest]") {
     // join-input.tex fits A5 after 14 steps (joined lines, reminders, chords hidden inside parts).
     const auto fits = ss::interpretFit(exitCode("fit"), slurp(converterData / "fit.json"),

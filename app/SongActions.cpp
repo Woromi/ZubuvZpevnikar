@@ -108,7 +108,7 @@ void SongActions::updateEnabled(bool songTab) {
     }
     // The song actions work on the song's text.
     // The background re-measure does not block them: starting one cancels it.
-    // Nor Apply Until It Fits (minutes): typing or another action stops it.
+    // Nor Make It Fit (minutes): typing or another action stops it.
     const bool busy = converterRunner_->isRunning() && runKind_ != RunKind::Measure &&
                       runKind_ != RunKind::Fit;
     const bool converterFree =
@@ -304,7 +304,7 @@ void SongActions::startProposals(SongAction action) {
             previewRequested(); // approved now: the pane's "Not built automatically" message goes
         // No paper known (a class without a paper option): no --fit, the converter measures both.
         const auto paper = zub::preview::paperOf(packageDir_, hooks_.documentClass());
-        // Apply Until It Fits fits the same paper (without one A5, which means A4 too).
+        // Make It Fit fits the same paper (without one A5, which means A4 too).
         fitPaper_ = paper.value_or(zub::songsuggest::Paper::A5);
         command = [converter, paper, measure, root,
                    package = packageDir_](const std::filesystem::path& file) {
@@ -445,8 +445,11 @@ void SongActions::onSuggestFinished(const std::expected<ConverterOutput, QString
     // the changes itself until it fits.
     const bool canFitAll = action == SongAction::Shrink && !packageDir_.empty() &&
                            suggestions.fits != std::optional<bool>(true);
+    const QString fitPaper = !canFitAll                                 ? QString()
+                             : fitPaper_ == zub::songsuggest::Paper::A4 ? QStringLiteral("A4")
+                                                                        : QStringLiteral("A5");
     ShrinkDialog dialog(suggestions, input, name, heading, window_, action == SongAction::Check,
-                        canFitAll);
+                        fitPaper);
     // Show where each proposal is (moving the cursor does not change the text).
     connect(&dialog, &ShrinkDialog::proposalSelected, this, &SongActions::lineRequested);
     if (const int line = suggestions.proposals.front().line; line > 0)
@@ -893,8 +896,7 @@ void SongActions::cancelMeasure() {
     runInput_.clear();
     emit statusCleared();
     if (fit)
-        showStatus(tr("Apply Until It Fits stopped: the song changed (or another action started)."),
-                   8000);
+        showStatus(tr("Make It Fit stopped: the song changed (or another action started)."), 8000);
     emit stateChanged();
 }
 
@@ -909,7 +911,7 @@ void SongActions::startFit(bool lastResort) {
     if (!editor || editor->textEdit()->isReadOnly() || converterRunner_->isRunning() ||
         songbookRoot_.empty())
         return;
-    const QString name = tr("Apply Until It Fits");
+    const QString name = tr("Make It Fit");
     const std::filesystem::path converter = hooks_.findConverter();
     if (converter.empty()) {
         showStatus(tr("%1 needs chords_converter, which was not found: it is built with the app "
@@ -956,7 +958,7 @@ void SongActions::startFit(bool lastResort) {
 }
 
 void SongActions::onFitFinished(const std::expected<ConverterOutput, QString>& output) {
-    const QString name = tr("Apply Until It Fits");
+    const QString name = tr("Make It Fit");
     std::string input;
     QPointer<SongEditor> editor = takeRun(input, name);
     const auto finishUp = [this] { emit stateChanged(); };
@@ -978,7 +980,7 @@ void SongActions::onFitFinished(const std::expected<ConverterOutput, QString>& o
         result = std::unexpected(tr("chords_converter wrote no song."));
     if (!result) {
         emit statusCleared();
-        QMessageBox::warning(window_, tr("Apply Until It Fits failed"), result.error());
+        QMessageBox::warning(window_, tr("Make It Fit failed"), result.error());
         finishUp();
         return;
     }

@@ -20,17 +20,17 @@ class ShrinkDialog : public QDialog {
     Q_OBJECT
 
 public:
-    // `songText` is the text the proposals were listed for (the proposals' edits point into it). `title` and
-    // `heading` name the action (Make Smaller, Restructure, Join Lines). `canDismiss` adds the
-    // Mark as Correct button.
+    // `songText` is the text the proposals were listed for (the proposals' edits point into it).
+    // `title` and `heading` name the action (Make Smaller, Restructure, Join Lines). `canDismiss`
+    // adds the Mark as Correct button. A `fitPaper` ("A5") offers Make It Fit above the list.
     ShrinkDialog(const zub::songsuggest::Suggestions& suggestions, const std::string& songText,
                  const QString& title, const QString& heading, QWidget* parent = nullptr,
-                 bool canDismiss = false, bool canFitAll = false);
+                 bool canDismiss = false, const QString& fitPaper = {});
 
     // True when the dialog was closed with Mark as Correct (only offered with `canDismiss`, for
     // Check Song): the caller adds the selected proposals' dismiss edits instead of applying them.
     bool dismissed() const { return dismissed_; }
-    // True when the dialog was closed with Apply Until It Fits (only offered with `canFitAll`, for
+    // True when the dialog was closed with Make It Fit (only offered with a `fitPaper`, for
     // Make Smaller): the caller lets the converter take the proposals one by one until the song
     // fits, instead of applying the selected ones.
     bool untilItFits() const { return untilItFits_; }
