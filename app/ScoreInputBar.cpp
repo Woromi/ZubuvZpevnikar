@@ -1,5 +1,7 @@
 #include "ScoreInputBar.hpp"
 
+#include "KeyTips.hpp"
+
 #include <QButtonGroup>
 #include <QComboBox>
 #include <QHBoxLayout>
@@ -54,7 +56,7 @@ ScoreInputBar::ScoreInputBar(QWidget* parent)
     clear_ = new QToolButton;
     clear_->setObjectName(QStringLiteral("scoreClear"));
     clear_->setText(tr("Clear"));
-    clear_->setToolTip(tr("Remove the staged fretboard notes (Escape)"));
+    clear_->setToolTip(keytips::withKey(tr("Remove the staged fretboard notes"), QKeySequence(Qt::Key_Escape)));
     clear_->setEnabled(false);
     layout->addSpacing(8);
     layout->addWidget(insert_);

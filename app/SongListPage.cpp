@@ -1,5 +1,7 @@
 #include "SongListPage.hpp"
 
+#include "KeyTips.hpp"
+
 #include "CollectionTabs.hpp"
 #include "LabelFilterBox.hpp"
 #include "PageHeader.hpp"
@@ -32,7 +34,7 @@ SongListPage::SongListPage(SongTableModel* model, SongFilterProxy* proxy, QWidge
     auto* filters = new QToolBar(tr("Filter"), this);
     filters->setMovable(false);
     search_ = new QLineEdit(filters);
-    search_->setPlaceholderText(tr("Search title, artist, key… (Ctrl+F)"));
+    search_->setPlaceholderText(keytips::withKey(tr("Search title, artist, key…"), QKeySequence::Find));
     search_->setClearButtonEnabled(true);
     search_->setMinimumWidth(320);
     connect(search_, &QLineEdit::textChanged, proxy_, &SongFilterProxy::setSearchText);

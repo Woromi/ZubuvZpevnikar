@@ -1,5 +1,7 @@
 #include "PreviewPane.hpp"
 
+#include "KeyTips.hpp"
+
 #include "PreviewRunner.hpp"
 #include "convert.hpp"
 
@@ -32,7 +34,7 @@ PreviewPane::PreviewPane(QWidget* parent)
         rebuild_->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
         rebuild_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     }
-    rebuild_->setToolTip(tr("Rebuild the preview (Ctrl+R)"));
+    rebuild_->setToolTip(keytips::withKey(tr("Rebuild the preview"), QKeySequence(QStringLiteral("Ctrl+R"))));
 
     logButton_->setText(tr("Log"));
     logButton_->setEnabled(false);

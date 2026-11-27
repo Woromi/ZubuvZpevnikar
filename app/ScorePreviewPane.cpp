@@ -1,5 +1,7 @@
 #include "ScorePreviewPane.hpp"
 
+#include "KeyTips.hpp"
+
 #include "ScoreInputBar.hpp"
 #include "ScoreRunner.hpp"
 #include "convert.hpp"
@@ -1006,8 +1008,8 @@ ScorePreviewPane::ScorePreviewPane(QWidget* parent)
         rebuild_->setIcon(QIcon::fromTheme(QStringLiteral("view-refresh")));
         rebuild_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     }
-    rebuild_->setToolTip(tr("Rebuild the score (Ctrl+R)"));
     rebuild_->setShortcut(QKeySequence(QStringLiteral("Ctrl+R")));
+    rebuild_->setToolTip(keytips::withKey(tr("Rebuild the score"), rebuild_->shortcut()));
 
     logButton_->setText(tr("Log"));
     logButton_->setEnabled(false);
@@ -1284,8 +1286,8 @@ void ScorePreviewPane::setPlayState(PlayState state) {
     if (idle && !playbackAvailable_)
         play_->setToolTip(unavailableReason_);
     else
-        play_->setToolTip(idle ? tr("Play the score (Ctrl+Space)")
-                               : tr("Stop playing (Ctrl+Space)"));
+        play_->setToolTip(idle ? keytips::withKey(tr("Play the score"), play_->shortcut())
+                               : keytips::withKey(tr("Stop playing"), play_->shortcut()));
 }
 
 void ScorePreviewPane::showPlaybackMessage(const QString& message, bool error) {
