@@ -11,6 +11,7 @@
 #include <QHeaderView>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QStandardItemModel>
 #include <QStandardPaths>
 #include <QTableView>
 #include <catch2/catch_test_macros.hpp>
@@ -142,24 +143,30 @@ TEST_CASE("Song dates: the Recently added choice of the song list", "[app][dates
     CHECK(table->horizontalHeader()->sortIndicatorOrder() == Qt::DescendingOrder);
 }
 
-TEST_CASE("Song dates: Only recently added in the Songbooks picker", "[app][dates][songbooks]") {
+TEST_CASE("Song dates: Recently added in the Songbooks picker's Show choice",
+          "[app][dates][songbooks]") {
     apptest::Fixture fixture;
     DatesWindow w(fixture);
     A::showView(w.window, ActivityBar::View::Songbooks);
     SongbooksPage* page = A::songbooksPage(w.window);
-    QCheckBox* box = A::recentOnly(*page);
-    REQUIRE(box != nullptr);
-    CHECK(box->objectName() == "pickerRecentOnly");
-    CHECK_FALSE(box->isEnabledTo(box->parentWidget())); // its own state: the pane may be off
+    QComboBox* show = A::pickerShow(*page);
+    REQUIRE(show != nullptr);
+    CHECK(show->objectName() == "pickerShow");
+    const int recent = show->findText("Recently added");
+    REQUIRE(recent >= 0);
+    const auto enabled = [&] {
+        return qobject_cast<QStandardItemModel*>(show->model())->item(recent)->isEnabled();
+    };
+    CHECK_FALSE(enabled()); // no dates yet
 
     w.inject();
-    CHECK(box->isEnabledTo(box->parentWidget()));
+    CHECK(enabled());
     SongFilterProxy* filter = A::pickerFilter(*page);
     const int all = filter->rowCount();
     CHECK(all >= 4);
-    box->setChecked(true);
+    show->setCurrentIndex(recent);
     CHECK(filter->rowCount() == 2);
-    box->setChecked(false);
+    show->setCurrentIndex(0);
     CHECK(filter->rowCount() == all);
 }
 

@@ -238,7 +238,7 @@ void SongbookTree::showMenu(const QPoint& position) {
                 [this, name] { emit openSongRequested(name); });
         connect(menu.addAction(tr("Transpose…")), &QAction::triggered, this,
                 [this, name] { emit transposeSongRequested(name); });
-        connect(menu.addAction(tr("Remove from the Songbook")), &QAction::triggered, this,
+        connect(menu.addAction(tr("Remove from Songbook")), &QAction::triggered, this,
                 [this] { emit removeSelectedRequested(); });
     }
     menu.exec(viewport()->mapToGlobal(position));

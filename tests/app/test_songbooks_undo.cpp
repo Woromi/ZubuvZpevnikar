@@ -62,29 +62,48 @@ TEST_CASE("Songbooks page: undo and redo of a removed song", "[app][songbooks]")
     BooksWindow w(fixture);
     const auto big = fixture / "songbooks/big/big.tex";
     const std::string original = slurp(big);
-    CHECK(!A::undoAction(*w.page)->isEnabled());
+    CHECK(!w.page->canUndo());
+    int changes = 0;
+    QObject::connect(w.page, &SongbooksPage::historyChanged, w.page, [&] { ++changes; });
 
     REQUIRE(selectSong(*w.page, "Beta/Bravo"));
     A::removeSelectedSongs(*w.page);
     const std::string removed = slurp(big);
     REQUIRE(removed != original);
-    CHECK(A::undoAction(*w.page)->isEnabled());
-    CHECK(A::undoAction(*w.page)->toolTip().contains("remove 1 song"));
+    CHECK(w.page->canUndo());
+    CHECK(w.page->undoText() == "remove 1 song");
+    CHECK(changes > 0);
     CHECK(!A::warning(*w.page)->isHidden());
 
-    A::undoEdit(*w.page);
+    w.page->undo();
     CHECK(slurp(big) == original);
     CHECK(has(slurp(big), "\\input{Beta/Bravo}"));
-    CHECK(!A::undoAction(*w.page)->isEnabled());
-    CHECK(A::redoAction(*w.page)->isEnabled());
+    CHECK(!w.page->canUndo());
+    CHECK(w.page->canRedo());
+    CHECK(w.page->redoText() == "remove 1 song");
 
-    A::redoEdit(*w.page);
+    w.page->redo();
     CHECK(slurp(big) == removed);
+    CHECK(!w.page->canRedo());
 
-    // Ctrl+Z on the tree does the same.
+    // The page has no Ctrl+Z of its own any more (the Edit menu's key does it).
     A::tree(*w.page)->setFocus();
     QTest::keyClick(A::tree(*w.page), Qt::Key_Z, Qt::ControlModifier);
-    CHECK(slurp(big) == original);
+    CHECK(slurp(big) == removed);
+}
+
+TEST_CASE("Songbooks page: edits are named in the history", "[app][songbooks]") {
+    apptest::Fixture fixture;
+    BooksWindow w(fixture);
+    A::applyTitle(*w.page); // nothing changed: no step
+    CHECK(!w.page->canUndo());
+    A::title(*w.page)->setText("A new title");
+    A::applyTitle(*w.page);
+    CHECK(w.page->undoText() == "change the title");
+    w.page->undo();
+    CHECK(w.page->redoText() == "change the title");
+    A::toggleLock(*w.page);
+    CHECK(w.page->undoText() == "lock");
 }
 
 TEST_CASE("Songbooks page: undo is refused after the file changed on disk", "[app][songbooks]") {
@@ -100,7 +119,7 @@ TEST_CASE("Songbooks page: undo is refused after the file changed on disk", "[ap
     const std::string changed = slurp(big);
     A::undoEdit(*w.page);
     CHECK(slurp(big) == changed);
-    CHECK(!A::undoAction(*w.page)->isEnabled());
+    CHECK(!w.page->canUndo());
     CHECK(!A::warning(*w.page)->isHidden());
 }
 

@@ -34,7 +34,7 @@ BookOverview::BookOverview(QWidget* parent) : QWidget(parent) {
     layout->addWidget(tree_, 1);
     auto* buttons = new QHBoxLayout;
     open_ = new QPushButton(tr("Open Song"), this);
-    remove_ = new QPushButton(tr("Remove from the Songbook"), this);
+    remove_ = new QPushButton(tr("Remove from Songbook"), this);
     refresh_ = new QPushButton(tr("Refresh", "check the songbook again"), this);
     refresh_->setToolTip(tr("Check the songbook again (songs edited outside the app)"));
     buttons->addWidget(open_);

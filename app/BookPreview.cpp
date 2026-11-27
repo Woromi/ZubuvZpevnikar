@@ -21,7 +21,8 @@ BookPreview::BookPreview(SongbookExporter* exporter, QWidget* parent)
     : QWidget(parent), exporter_(exporter) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 6, 6, 6);
-    auto* row = new QHBoxLayout;
+    row_ = new QHBoxLayout;
+    auto* row = row_;
     status_ = new QLabel(this);
     status_->setWordWrap(true);
     build_ = new QPushButton(tr("Build Preview"), this);
@@ -31,6 +32,7 @@ BookPreview::BookPreview(SongbookExporter* exporter, QWidget* parent)
     row->addWidget(build_);
     row->addWidget(cancel_);
     layout->addLayout(row);
+    layout->setAlignment(row, Qt::AlignTop); // the row stays on top while the view is hidden
     view_ = new PdfLinkView(this);
     document_ = new QPdfDocument(this);
     view_->setDocument(document_);
@@ -58,6 +60,10 @@ BookPreview::~BookPreview() {
         process_->disconnect(this);
         SongbookExporter::stopBuild(process_);
     }
+}
+
+void BookPreview::setLeading(QWidget* widget) {
+    row_->insertWidget(0, widget);
 }
 
 void BookPreview::setBook(const QString& id, const std::filesystem::path& file,

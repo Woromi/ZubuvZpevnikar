@@ -27,6 +27,8 @@ class CodeTextEdit;
 class CollectionTabs;
 class FindBar;
 class QAction;
+class QToolButton;
+class QStackedWidget;
 class QTabWidget;
 class QTimer;
 class QCheckBox;
@@ -79,17 +81,28 @@ public:
     QString bookWithUnsavedLatex() const;
     bool buildingPdf() const; // a book's PDF is being built (its work dir is in use)
     void showOverview(); // the Overview tab of the shown book
+    // The book edits' history (every write of a book is a step; the Edit menu drives it).
+    bool canUndo() const { return !undoList_.empty(); }
+    bool canRedo() const { return !redoList_.empty(); }
+    QString undoText() const { return undoList_.empty() ? QString() : undoList_.back().description; }
+    QString redoText() const { return redoList_.empty() ? QString() : redoList_.back().description; }
+    void undo();
+    void redo();
     // Ctrl+F / Ctrl+H: opens the find bar of the LaTeX tab when that tab is the current one;
     // false otherwise.
     bool showFind(bool replaceMode);
 
 signals:
+    // canUndo/canRedo/undoText/redoText may have changed.
+    void historyChanged();
     // The book check's Open Song: show that song (MainWindow opens it).
     void openSongRequested(const std::filesystem::path& path);
 
+protected:
+    void showEvent(QShowEvent* event) override;
+
 private:
     void buildUi();
-    void checkBook(); // Check…: the Overview tab
     // The Overview tab of the shown book again (only while it is shown).
     void refreshOverview();
     QWidget* buildListPane();
@@ -113,7 +126,8 @@ private:
     // The song lists of book_ into the file (setSongs per changed section).
     bool saveSongs();
     // A bookfile edit of text_ (setSetting, addSection, ...): written, or its error shown.
-    bool applyEdit(const std::expected<std::string, std::string>& edited);
+    bool applyEdit(const std::expected<std::string, std::string>& edited,
+                   const QString& description = {});
     bool canEdit() const; // a book is shown, it can be edited and it is not locked
     void toggleLock();
     // Export PDF: the preview's PDF when it is of the current text, else built first.
@@ -188,7 +202,7 @@ private:
     void removeSection(int index);
     void moveSection(int delta);
     void removeSelectedSongs();
-    bool commit(); // save, then show the changes; false if nothing was saved
+    bool commit(const QString& description = {}); // save, then show the changes; false if nothing was saved
     // The undo history: every write of a book that changed it (writeFile) is an entry.
     struct HistoryEntry {
         QString id;
@@ -196,12 +210,12 @@ private:
         std::string after;
         QString description; // "remove 2 songs"; may be empty
     };
-    void undoEdit();
-    void redoEdit();
     // Writes the newest entry of `from` back (undo: its `before`, redo: its `after`) and moves it
     // to `to`.
     void stepHistory(std::deque<HistoryEntry>& from, std::deque<HistoryEntry>& to, bool undo);
-    void updateHistoryActions();
+    void updateHistoryActions(); // emits historyChanged
+    void selectDefaultBook();    // the last used book, else the first
+    void showEmptyState();       // the "No songbooks yet" page while there is no book
     void openSongNamed(const std::string& inputName); // openSongRequested for an input name
     bool askSectionName(const QString& title, const QString& initial, int ignoreSection,
                         QString* name);
@@ -258,12 +272,12 @@ private:
     bool loading_ = false;            // filling widgets: ignore their change signals
 
     QSplitter* splitter_ = nullptr;
+    QStackedWidget* stack_ = nullptr; // the panes, or the empty state
+    QPushButton* emptyNew_ = nullptr;
     QTreeWidget* list_ = nullptr;
     QAction* newBook_ = nullptr;
     QAction* duplicate_ = nullptr;
     QAction* lock_ = nullptr;
-    QAction* undoAction_ = nullptr;
-    QAction* redoAction_ = nullptr;
     std::deque<HistoryEntry> undoList_; // newest last
     std::deque<HistoryEntry> redoList_;
     QString nextDescription_; // what the next writeFile does, for its entry
@@ -298,12 +312,13 @@ private:
     bool packageTransposes_ = false; // the package in use defines \transposesong
     QLabel* sorterWarning_ = nullptr;
     SongbookTree* tree_ = nullptr;
-    QPushButton* removeSection_ = nullptr;
-    QPushButton* renameSection_ = nullptr;
-    QPushButton* moveUp_ = nullptr;
-    QPushButton* moveDown_ = nullptr;
-    QPushButton* removeSong_ = nullptr;
-    QPushButton* sortAll_ = nullptr;
+    QAction* removeSection_ = nullptr;
+    QAction* renameSection_ = nullptr;
+    QAction* moveUp_ = nullptr;
+    QAction* moveDown_ = nullptr;
+    QAction* sortAll_ = nullptr;
+    QToolButton* sectionMore_ = nullptr; // the ⋯ menu
+    QPushButton* removeSong_ = nullptr;  // only while songs are selected
     QLabel* count_ = nullptr;
 
     QTabWidget* rightTabs_ = nullptr; // Add Songs | Preview
@@ -313,20 +328,17 @@ private:
     QTimer* overviewTimer_ = nullptr; // refreshes the Overview a moment after the songs changed
     QString pendingExport_; // the book whose preview build ends in Export PDF
     QWidget* pickerPane_ = nullptr;
-    QLabel* pickerHeader_ = nullptr;
     QComboBox* target_ = nullptr;
     QPushButton* addPicked_ = nullptr;
     QPushButton* removePicked_ = nullptr;
     QLineEdit* search_ = nullptr;
     QComboBox* language_ = nullptr;
-    QCheckBox* favouritesOnly_ = nullptr;
-    QCheckBox* recentOnly_ = nullptr;
+    QComboBox* pickerShow_ = nullptr;
     LabelFilterBox* labelFilter_ = nullptr;
     QCheckBox* onlyInSection_ = nullptr;
     SongFilterProxy* pickerFilter_ = nullptr;
     CollectionTabs* pickerCollections_ = nullptr;
     SongPickerModel* picker_ = nullptr;
     QTableView* pickerView_ = nullptr;
-    QAction* check_ = nullptr;
     QAction* exportPdf_ = nullptr;
 };

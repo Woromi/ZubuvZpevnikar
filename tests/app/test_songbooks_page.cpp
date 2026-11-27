@@ -20,8 +20,11 @@
 #include <QPlainTextEdit>
 #include <QListWidget>
 #include <QPushButton>
+#include <QSettings>
 #include <QStackedWidget>
 #include <QTabWidget>
+#include <QMenu>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <ranges>
 #include <catch2/catch_test_macros.hpp>
@@ -79,7 +82,7 @@ TEST_CASE("Songbooks page: the list shows the books in their folders", "[app][so
     for (const char* id : {"songbooks/big/big.tex", "songbooks/bands/one/one.tex",
                            "songbooks/camps/2025/camp2025.tex", "songbooks/whistle/whistle.tex"})
         CHECK(A::listItemOf(*w.page, QString::fromUtf8(id)) != nullptr);
-    CHECK(has(shown, "big  [songbooks/big/big.tex]"));
+    CHECK(has(shown, "Big Test Book  [songbooks/big/big.tex]"));
 }
 
 TEST_CASE("Songbooks page: a book shows its settings, sections and songs", "[app][songbooks]") {
@@ -344,8 +347,7 @@ TEST_CASE("Songbooks page: the Overview says what keeps a book from printing", "
                        "    \\input{WabiDanek/Montgomery}\n    \\input{Gone/Missing}\n"
                        "\\end{songs}\n\n\\end{document}\n");
     BooksWindow w(fixture, "songbooks/check/check.tex");
-    REQUIRE(A::check(*w.page)->isEnabled());
-    A::checkBook(*w.page); // Check… shows the Overview tab
+    w.page->showOverview();
     BookOverview* overview = A::overview(*w.page);
     REQUIRE(A::bookTabs(*w.page)->currentWidget() == static_cast<QWidget*>(overview));
     CHECK(A::bookTabs(*w.page)->tabText(1) == "Overview");
@@ -400,7 +402,7 @@ TEST_CASE("Songbooks page: a book with nothing to fix is ready to print", "[app]
                        "\\begin{document}\n\\begin{songs}{obsah}\n"
                        "    \\input{WabiDanek/Montgomery}\n\\end{songs}\n\\end{document}\n");
     BooksWindow w(fixture, "songbooks/ready/ready.tex");
-    A::checkBook(*w.page);
+    w.page->showOverview();
     CHECK(A::overviewHeading(*A::overview(*w.page))->text().startsWith("Ready to print"));
     // Home says so too.
     const auto data = buildHomeData(*A::model(w.window), fixture.root(), {});
@@ -431,7 +433,7 @@ TEST_CASE("Songbooks page: the Overview of an unreadable, an empty and a risky b
                        "\\begin{songs}{obsah}\n    \\input{WabiDanek/Montgomery}\n"
                        "\\end{songs}\n\\end{document}\n");
     BooksWindow w(fixture, "songbooks/broken/broken.tex");
-    A::checkBook(*w.page);
+    w.page->showOverview();
     BookOverview* overview = A::overview(*w.page);
     CHECK(A::overviewHeading(*overview)->text().startsWith("The songbook cannot be read"));
     w.select("songbooks/empty/empty.tex");
@@ -875,4 +877,152 @@ TEST_CASE("Songbooks page: a song copy for a song not in the book is refused", "
         CHECK(!exporter->prepareRepoBuild(f.book(), keyedBook, {{name, "\\beginsong{X}\\endsong"}}));
         CHECK(ok.fired());
     }
+}
+
+TEST_CASE(
+    "Songbooks page: the list shows the titles, the file path is the tooltip",
+    "[app][songbooks]") {
+  apptest::Fixture fixture;
+  apptest::writeFile(fixture / "songbooks/untitled/untitled.tex",
+                     "\\documentclass{velkyzpevnik}\n\\begin{document}\n"
+                     "\\begin{songs}{obsah}\n\\end{songs}\n\\end{document}\n");
+  BooksWindow w(fixture, nullptr);
+  auto *big = A::listItemOf(*w.page, "songbooks/big/big.tex");
+  REQUIRE(big != nullptr);
+  CHECK(big->text(0) == "Big Test Book");
+  CHECK(big->toolTip(0) == "big/big.tex");
+  auto *untitled = A::listItemOf(*w.page, "songbooks/untitled/untitled.tex");
+  REQUIRE(untitled != nullptr);
+  CHECK(untitled->text(0) == "untitled"); // no title: the file's name
+  CHECK(untitled->toolTip(0) == "untitled/untitled.tex");
+}
+
+TEST_CASE("Songbooks page: shown without a book it selects the last used, else "
+          "the first",
+          "[app][songbooks]") {
+  apptest::Fixture fixture(apptest::Fixture::Extras::Yes);
+  QSettings().setValue("songbooks/lastBook", "songbooks/whistle/whistle.tex");
+  {
+    BooksWindow w(fixture, nullptr);
+    CHECK(A::id(*w.page) == "songbooks/whistle/whistle.tex");
+    // A selection is remembered.
+    w.select("songbooks/big/big.tex");
+    CHECK(QSettings().value("songbooks/lastBook").toString() ==
+          "songbooks/big/big.tex");
+  }
+  QSettings().remove("songbooks/lastBook");
+  BooksWindow w(fixture, nullptr);
+  CHECK(A::id(*w.page) ==
+        "songbooks/bands/one/one.tex"); // the first book of the list
+}
+
+TEST_CASE(
+    "Songbooks page: with no songbooks it shows one line and New Songbook",
+    "[app][songbooks]") {
+  apptest::Fixture fixture;
+  std::filesystem::remove_all(fixture / "songbooks");
+  BooksWindow w(fixture, nullptr);
+  CHECK(A::id(*w.page).isEmpty());
+  CHECK(A::stack(*w.page)->currentIndex() == 1);
+  auto *text = w.page->findChild<QLabel *>("songbooksEmpty");
+  REQUIRE(text != nullptr);
+  CHECK(text->text() == "No songbooks yet");
+  CHECK(text->isVisible());
+  CHECK(A::emptyNew(*w.page)->isVisible());
+  CHECK(A::emptyNew(*w.page)->isEnabled());
+  // A book shows the panes again.
+  apptest::writeFile(fixture / "songbooks/new/new.tex",
+                     "\\documentclass{velkyzpevnik}\n\\begin{document}\n"
+                     "\\begin{songs}{obsah}\n\\end{songs}\n\\end{document}\n");
+  A::reloadList(*w.page);
+  CHECK(A::stack(*w.page)->currentIndex() == 0);
+}
+
+TEST_CASE("Songbooks page: the section buttons are one row, the rest is under "
+          "the dots",
+          "[app][songbooks]") {
+  apptest::Fixture fixture;
+  BooksWindow w(fixture, "songbooks/bands/one/one.tex");
+  SongbooksPage &page = *w.page;
+  QToolButton *more = A::sectionMore(page);
+  REQUIRE(more != nullptr);
+  CHECK(more->popupMode() == QToolButton::InstantPopup);
+  REQUIRE(more->menu() != nullptr);
+  QStringList texts;
+  for (const QAction *action : more->menu()->actions())
+    texts << action->text();
+  CHECK(texts == QStringList{"Rename Section…", "Remove Section",
+                             "Sort Alphabetically"});
+  CHECK(A::moveUpAction(page)->text() == "Move Section Up");
+  CHECK(A::moveDownAction(page)->toolTip() == "Move Section Down");
+  const auto centreY = [&](QWidget *widget) {
+    return widget->mapTo(A::editPane(page), widget->rect().center()).y();
+  };
+  CHECK(std::abs(centreY(A::addSectionButton(page)) - centreY(more)) < 8);
+
+  // Remove from Songbook is there while songs are selected.
+  QWidget *remove = A::removeSongButton(page);
+  CHECK(remove->isHidden());
+  CHECK(A::removeSongButton(page)->text() == "Remove from Songbook");
+  QTreeWidgetItem *song = nullptr;
+  for (QTreeWidgetItemIterator it(A::tree(page)); *it && !song; ++it)
+    if (!A::tree(page)->isSection(*it))
+      song = *it;
+  REQUIRE(song != nullptr);
+  A::tree(page)->setCurrentItem(song);
+  song->setSelected(true);
+  CHECK(!remove->isHidden());
+  song->setSelected(false);
+  CHECK(remove->isHidden());
+}
+
+TEST_CASE("Songbooks page: the cover's Remove button shows only with a cover",
+          "[app][songbooks]") {
+  apptest::Fixture fixture;
+  BooksWindow w(fixture);
+  CHECK(A::coverClear(*w.page)->text() == "Remove");
+  CHECK(A::coverClear(*w.page)->isHidden() ==
+        A::settings(*w.page).cover.empty());
+}
+
+TEST_CASE("Songbooks page: the picker's Show choice filters the favourites",
+          "[app][songbooks]") {
+  apptest::Fixture fixture;
+  const auto montgomery = fixture / "songs/chords/WabiDanek/Montgomery.tex";
+  std::string text = slurp(montgomery);
+  const auto at = text.find("    key={D},\n");
+  REQUIRE(at != std::string::npos);
+  text.insert(at, "    tags={fav},\n");
+  apptest::writeFile(montgomery, text);
+  BooksWindow w(fixture);
+  QComboBox *show = A::pickerShow(*w.page);
+  REQUIRE(show != nullptr);
+  const int all = A::pickerFilter(*w.page)->rowCount();
+  CHECK(all > 1);
+  const int favourites = show->findText("★ Favourites");
+  REQUIRE(favourites >= 0);
+  show->setCurrentIndex(favourites);
+  CHECK(A::pickerFilter(*w.page)->rowCount() == 1);
+  show->setCurrentIndex(0);
+  CHECK(A::pickerFilter(*w.page)->rowCount() == all);
+}
+
+TEST_CASE("Songbooks page: the Preview's Build button is in the top row",
+          "[app][songbooks]") {
+  apptest::Fixture fixture;
+  BooksWindow w(fixture);
+  A::rightTabs(*w.page)->setCurrentIndex(1);
+  BookPreview *preview = A::bookPreview(*w.page);
+  QPushButton *build = A::buildPreviewButton(*preview);
+  QComboBox *key = A::bookKey(*w.page);
+  QComboBox *mode = A::transposeMode(*w.page);
+  REQUIRE(build->isVisible());
+  const auto at = [&](QWidget *widget) {
+    return widget->mapTo(preview->window(), QPoint(0, 0));
+  };
+  // The same row as the Transpose choices, after them, at the top (no view
+  // yet).
+  CHECK(std::abs(at(build).y() - at(key).y()) < 10);
+  CHECK(at(build).x() > at(mode).x() + mode->width());
+  CHECK(build->mapTo(preview, QPoint(0, 0)).y() < 40);
 }

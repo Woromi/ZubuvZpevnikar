@@ -11,6 +11,7 @@
 #include <zub/core/songbook.hpp>
 
 class QBuffer;
+class QHBoxLayout;
 class QLabel;
 class QPdfDocument;
 class PdfLinkView;
@@ -47,6 +48,10 @@ public:
     // What the composer does to the shown book now: `variant` for people ("" nothing), and a
     // `signature` that tells the variants apart (a PDF built with another one is out of date).
     void setVariant(const QString& variant, const std::string& signature);
+
+    // A widget at the start of the top row (the page's Transpose choices), before the status
+    // and the Build Preview button.
+    void setLeading(QWidget* widget);
 
     // A build of the shown book (after the safety checks); false if it did not start.
     bool build();
@@ -91,6 +96,7 @@ private:
     QByteArray output_;
     bool cancelled_ = false; // the running build was stopped by Cancel
 
+    QHBoxLayout* row_ = nullptr; // the top row: leading widget, status, Build Preview, Cancel
     QLabel* status_ = nullptr;
     QPushButton* build_ = nullptr;
     QPushButton* cancel_ = nullptr;

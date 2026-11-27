@@ -229,7 +229,7 @@ struct AppTestAccess {
 
     // ---- SongbooksPage
     static SongFilterProxy* pickerFilter(SongbooksPage& p) { return p.pickerFilter_; }
-    static QCheckBox* recentOnly(SongbooksPage& p) { return p.recentOnly_; }
+    static QComboBox* pickerShow(SongbooksPage& p) { return p.pickerShow_; }
     static QTreeWidget* list(SongbooksPage& p) { return p.list_; }
     static QTreeWidgetItem* listItemOf(SongbooksPage& p, const QString& id) {
         return p.listItemOf(id);
@@ -272,7 +272,14 @@ struct AppTestAccess {
         b.updateView();
     }
     static QPushButton* addSectionButton(SongbooksPage& p) { return p.addSection_; }
-    static QAction* check(SongbooksPage& p) { return p.check_; }
+    static QPushButton* removeSongButton(SongbooksPage& p) { return p.removeSong_; }
+    static QToolButton* sectionMore(SongbooksPage& p) { return p.sectionMore_; }
+    static QAction* moveUpAction(SongbooksPage& p) { return p.moveUp_; }
+    static QAction* moveDownAction(SongbooksPage& p) { return p.moveDown_; }
+    static QPushButton* coverClear(SongbooksPage& p) { return p.coverClear_; }
+    static QStackedWidget* stack(SongbooksPage& p) { return p.stack_; }
+    static QPushButton* emptyNew(SongbooksPage& p) { return p.emptyNew_; }
+    static QPushButton* buildPreviewButton(BookPreview& b) { return b.build_; }
     static BookOverview* overview(SongbooksPage& p) { return p.overview_; }
     static QWidget* latexPane(SongbooksPage& p) { return p.latexPane_; }
     static QTreeWidget* overviewTree(BookOverview& o) { return o.tree_; }
@@ -297,13 +304,10 @@ struct AppTestAccess {
     static bool commit(SongbooksPage& p) { return p.commit(); }
     static void newSongbook(SongbooksPage& p) { p.newSongbook(); }
     static void duplicateSongbook(SongbooksPage& p) { p.duplicateSongbook(); }
-    static void checkBook(SongbooksPage& p) { p.checkBook(); }
     static void sortAll(SongbooksPage& p) { p.sortAll(); }
     static QTabWidget* rightTabs(SongbooksPage& p) { return p.rightTabs_; }
-    static void undoEdit(SongbooksPage& p) { p.undoEdit(); }
-    static void redoEdit(SongbooksPage& p) { p.redoEdit(); }
-    static QAction* undoAction(SongbooksPage& p) { return p.undoAction_; }
-    static QAction* redoAction(SongbooksPage& p) { return p.redoAction_; }
+    static void undoEdit(SongbooksPage& p) { p.undo(); }
+    static void redoEdit(SongbooksPage& p) { p.redo(); }
     static void removeSelectedSongs(SongbooksPage& p) { p.removeSelectedSongs(); }
     static bool sorting(SongbooksPage& p) { return !p.jobs_.empty(); }
     static QLabel* sorterWarning(SongbooksPage& p) { return p.sorterWarning_; }
