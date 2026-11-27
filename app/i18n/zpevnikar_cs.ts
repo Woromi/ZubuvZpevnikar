@@ -4,24 +4,24 @@
 <context>
     <name>ActivityBar</name>
     <message>
-        <source>Home (Alt+Home)</source>
-        <translation>Domů (Alt+Home)</translation>
+        <source>Home</source>
+        <translation>Domů</translation>
     </message>
     <message>
-        <source>Songs (Ctrl+1)</source>
-        <translation>Písně (Ctrl+1)</translation>
+        <source>Songs</source>
+        <translation>Písně</translation>
     </message>
     <message>
-        <source>The open song (Ctrl+2)</source>
-        <translation>Otevřená píseň (Ctrl+2)</translation>
+        <source>The open song</source>
+        <translation>Otevřená píseň</translation>
     </message>
     <message>
-        <source>Songbooks (Ctrl+3)</source>
-        <translation>Zpěvníky (Ctrl+3)</translation>
+        <source>Songbooks</source>
+        <translation>Zpěvníky</translation>
     </message>
     <message>
-        <source>Settings (Ctrl+,)</source>
-        <translation>Nastavení (Ctrl+,)</translation>
+        <source>Settings</source>
+        <translation>Nastavení</translation>
     </message>
 </context>
 <context>
@@ -228,8 +228,8 @@ Použijte vestavěný.</translation>
 <context>
     <name>FindBar</name>
     <message>
-        <source>Find and replace (Ctrl+H)</source>
-        <translation>Najít a nahradit (Ctrl+H)</translation>
+        <source>Find and replace</source>
+        <translation>Najít a nahradit</translation>
     </message>
     <message>
         <source>Find</source>
@@ -427,6 +427,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>Remove the wish (its line)</source>
         <translation>Odebrat přání (jeho řádek)</translation>
+    </message>
+    <message>
+        <source>More</source>
+        <translation>Další</translation>
     </message>
     <message>
         <source>Add Wish…</source>
@@ -910,14 +914,6 @@ Použijte vestavěný.</translation>
         <translation>&amp;Otevřít knihovnu písní…</translation>
     </message>
     <message>
-        <source>Close the song (Ctrl+W)</source>
-        <translation>Zavřít píseň (Ctrl+W)</translation>
-    </message>
-    <message>
-        <source>Convert a song from a chords website or a saved page (Ctrl+I)</source>
-        <translation>Převést píseň z webu s akordy nebo z uložené stránky (Ctrl+I)</translation>
-    </message>
-    <message>
         <source>Se&amp;ttings…</source>
         <translation>Na&amp;stavení…</translation>
     </message>
@@ -944,10 +940,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>Song&amp;books</source>
         <translation>&amp;Zpěvníky</translation>
-    </message>
-    <message>
-        <source>Check Songs</source>
-        <translation>Zkontrolovat písně</translation>
     </message>
     <message>
         <source>No song with possible changes was found.</source>
@@ -1008,46 +1000,6 @@ Použijte vestavěný.</translation>
         <translation>Zařadit píseň do zpěvníků (tam, kam ji dá jejich rejstřík)</translation>
     </message>
     <message>
-        <source>Undo</source>
-        <translation>Vrátit</translation>
-    </message>
-    <message>
-        <source>Undo (Ctrl+Z)</source>
-        <translation>Vrátit (Ctrl+Z)</translation>
-    </message>
-    <message>
-        <source>Redo</source>
-        <translation>Znovu</translation>
-    </message>
-    <message>
-        <source>Redo (Ctrl+Shift+Z)</source>
-        <translation>Znovu (Ctrl+Shift+Z)</translation>
-    </message>
-    <message>
-        <source>Cut</source>
-        <translation>Vyjmout</translation>
-    </message>
-    <message>
-        <source>Cut (Ctrl+X)</source>
-        <translation>Vyjmout (Ctrl+X)</translation>
-    </message>
-    <message>
-        <source>Copy</source>
-        <translation>Kopírovat</translation>
-    </message>
-    <message>
-        <source>Copy (Ctrl+C)</source>
-        <translation>Kopírovat (Ctrl+C)</translation>
-    </message>
-    <message>
-        <source>Paste</source>
-        <translation>Vložit</translation>
-    </message>
-    <message>
-        <source>Paste (Ctrl+V)</source>
-        <translation>Vložit (Ctrl+V)</translation>
-    </message>
-    <message>
         <source>Mark Checked</source>
         <translation>Označit jako zkontrolované</translation>
     </message>
@@ -1070,10 +1022,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>&amp;Find…</source>
         <translation>&amp;Najít…</translation>
-    </message>
-    <message>
-        <source>Find in the text (Ctrl+F)</source>
-        <translation>Hledat v textu (Ctrl+F)</translation>
     </message>
     <message>
         <source>&amp;Replace…</source>
@@ -1126,10 +1074,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>Insert Part…</source>
         <translation>Vložit část…</translation>
-    </message>
-    <message>
-        <source>New Score…</source>
-        <translation>Nová notová ukázka…</translation>
     </message>
     <message>
         <source>No chord at the cursor</source>
@@ -1244,14 +1188,6 @@ Použijte vestavěný.</translation>
         <translation>Začít píseň ručně: název, interpret a jazyk, pak prázdná sloka</translation>
     </message>
     <message>
-        <source>&amp;Check Songs…</source>
-        <translation>&amp;Zkontrolovat písně…</translation>
-    </message>
-    <message>
-        <source>Check every song (or the ones shown): what Tidy, Check Song or Make Smaller would change, keys, metadata</source>
-        <translation>Zkontrolovat všechny písně (nebo zobrazené): co by změnilo Učesat, Zkontrolovat píseň nebo Zmenšit, tóniny, metadata</translation>
-    </message>
-    <message>
         <source>chords</source>
         <comment>a word of a web search</comment>
         <translation>akordy</translation>
@@ -1259,6 +1195,47 @@ Použijte vestavěný.</translation>
     <message>
         <source>Favourite: add or remove the label &quot;fav&quot; (one undo step; save to keep it)</source>
         <translation>Oblíbená: přidá nebo odebere štítek „fav“ (jeden krok zpět; uložením se zachová)</translation>
+    </message>
+    <message>
+        <source>Close the song</source>
+        <translation>Zavřít píseň</translation>
+    </message>
+    <message>
+        <source>Convert a song from a chords website or a saved page</source>
+        <translation>Převést píseň z webu s akordy nebo z uložené stránky</translation>
+    </message>
+    <message>
+        <source>S&amp;ong</source>
+        <translation>&amp;Píseň</translation>
+    </message>
+    <message>
+        <source>&amp;Library</source>
+        <comment>menu: the song library</comment>
+        <translation>&amp;Knihovna</translation>
+    </message>
+    <message>
+        <source>&amp;Scan Songs…</source>
+        <translation>&amp;Projít písně…</translation>
+    </message>
+    <message>
+        <source>Check every song (or the ones shown): what Tidy, Find Mistakes or Make Smaller would change, keys, metadata</source>
+        <translation>Zkontrolovat všechny písně (nebo zobrazené): co by změnilo Učesat, Najít chyby nebo Zmenšit, tóniny, metadata</translation>
+    </message>
+    <message>
+        <source>&amp;Help</source>
+        <translation>&amp;Nápověda</translation>
+    </message>
+    <message>
+        <source>&amp;Keyboard Shortcuts…</source>
+        <translation>&amp;Klávesové zkratky…</translation>
+    </message>
+    <message>
+        <source>Scan Songs</source>
+        <translation>Projít písně</translation>
+    </message>
+    <message>
+        <source>&amp;Favourite</source>
+        <translation>&amp;Oblíbená</translation>
     </message>
     <message>
         <source>Labels…</source>
@@ -1269,8 +1246,36 @@ Použijte vestavěný.</translation>
         <translation>Upravit štítky písně (jeden krok zpět; uložením se zachovají)</translation>
     </message>
     <message>
+        <source>&amp;Undo</source>
+        <translation>&amp;Zpět</translation>
+    </message>
+    <message>
+        <source>&amp;Redo</source>
+        <translation>Zn&amp;ovu</translation>
+    </message>
+    <message>
+        <source>Cu&amp;t</source>
+        <translation>Vyj&amp;mout</translation>
+    </message>
+    <message>
+        <source>&amp;Copy</source>
+        <translation>&amp;Kopírovat</translation>
+    </message>
+    <message>
+        <source>&amp;Paste</source>
+        <translation>&amp;Vložit</translation>
+    </message>
+    <message>
+        <source>Find in the text</source>
+        <translation>Najít v textu</translation>
+    </message>
+    <message>
         <source>Toggle Comment</source>
         <translation>Zakomentovat/odkomentovat</translation>
+    </message>
+    <message>
+        <source>New &amp;Score…</source>
+        <translation>Nová &amp;notová ukázka…</translation>
     </message>
     <message>
         <source>%1: the song is open read-only.</source>
@@ -1295,6 +1300,19 @@ Použijte vestavěný.</translation>
     <message>
         <source>Labels changed. Save to keep them.</source>
         <translation>Štítky změněny. Uložením je zachováte.</translation>
+    </message>
+    <message>
+        <source>Open Song</source>
+        <translation>Otevřít píseň</translation>
+    </message>
+    <message>
+        <source>Favourite ★</source>
+        <translation>Oblíbená ★</translation>
+    </message>
+    <message>
+        <source>Copy &quot;Artist/Title&quot;</source>
+        <comment>the input name of a song</comment>
+        <translation>Kopírovat „Interpret/Název“</translation>
     </message>
     <message>
         <source>The score %1 does not exist: create it, or remove its \lilypondfile line from the song.</source>
@@ -1453,8 +1471,8 @@ Použijte vestavěný.</translation>
         <translation>Sestavit znovu</translation>
     </message>
     <message>
-        <source>Rebuild the preview (Ctrl+R)</source>
-        <translation>Znovu sestavit náhled (Ctrl+R)</translation>
+        <source>Rebuild the preview</source>
+        <translation>Sestavit náhled znovu</translation>
     </message>
     <message>
         <source>Log</source>
@@ -1558,24 +1576,12 @@ Použijte vestavěný.</translation>
         <translation>Délka:</translation>
     </message>
     <message>
-        <source>Note length 1/%1</source>
-        <translation>Délka noty 1/%1</translation>
-    </message>
-    <message>
         <source>Dot</source>
         <translation>Tečka</translation>
     </message>
     <message>
-        <source>Dotted note: one and a half times as long</source>
-        <translation>Nota s tečkou: o polovinu delší</translation>
-    </message>
-    <message>
         <source>Rest</source>
         <translation>Pauza</translation>
-    </message>
-    <message>
-        <source>Insert a rest of the chosen length</source>
-        <translation>Vloží pauzu zvolené délky</translation>
     </message>
     <message>
         <source>Bar line</source>
@@ -1598,8 +1604,20 @@ Použijte vestavěný.</translation>
         <translation>Vymazat</translation>
     </message>
     <message>
-        <source>Remove the staged fretboard notes (Escape)</source>
-        <translation>Zruší připravené noty z hmatníku (Escape)</translation>
+        <source>Note length 1/%1 (%2)</source>
+        <translation>Délka noty 1/%1 (%2)</translation>
+    </message>
+    <message>
+        <source>Dotted note: one and a half times as long (.)</source>
+        <translation>Tečka: o polovinu delší nota (.)</translation>
+    </message>
+    <message>
+        <source>Insert a rest of the chosen length (R)</source>
+        <translation>Vložit pauzu zvolené délky (R)</translation>
+    </message>
+    <message>
+        <source>Remove the staged fretboard notes</source>
+        <translation>Odebrat připravené noty z hmatníku</translation>
     </message>
     <message>
         <source>Tuning:</source>
@@ -1629,20 +1647,12 @@ Použijte vestavěný.</translation>
         <source>Replace the selected note or chord by the staged fretboard notes; its length and articulations stay (Ctrl+Return). Double-clicking a fret stages it and replaces at once.</source>
         <translation>Nahradí vybranou notu nebo akord připravenými notami z hmatníku; délka a artikulace zůstanou (Ctrl+Return). Dvojklik na pražec ho připraví a nahradí hned.</translation>
     </message>
-    <message>
-        <source>Selection:</source>
-        <translation>Výběr:</translation>
-    </message>
 </context>
 <context>
     <name>ScorePreviewPane</name>
     <message>
         <source>Rebuild</source>
         <translation>Sestavit znovu</translation>
-    </message>
-    <message>
-        <source>Rebuild the score (Ctrl+R)</source>
-        <translation>Sestavit notovou ukázku znovu (Ctrl+R)</translation>
     </message>
     <message>
         <source>Log</source>
@@ -1713,6 +1723,10 @@ Použijte vestavěný.</translation>
         <translation>Melodie (text)</translation>
     </message>
     <message>
+        <source>Rebuild the score</source>
+        <translation>Sestavit noty znovu</translation>
+    </message>
+    <message>
         <source>Instruments…</source>
         <translation>Nástroje…</translation>
     </message>
@@ -1761,12 +1775,12 @@ Použijte vestavěný.</translation>
         <translation>Zastavit</translation>
     </message>
     <message>
-        <source>Play the score (Ctrl+Space)</source>
-        <translation>Přehrát notovou ukázku (Ctrl+Mezerník)</translation>
+        <source>Play the score</source>
+        <translation>Přehrát noty</translation>
     </message>
     <message>
-        <source>Stop playing (Ctrl+Space)</source>
-        <translation>Zastavit přehrávání (Ctrl+Mezerník)</translation>
+        <source>Stop playing</source>
+        <translation>Zastavit přehrávání</translation>
     </message>
     <message>
         <source>Build log</source>
@@ -1925,6 +1939,10 @@ Použijte vestavěný.</translation>
     <message>
         <source>On A4 the score is narrowed to 80 % of the width, so that it does not run into the song&apos;s details on the right (chord diagrams, tuning, tempo). On A5 it is full width anyway (\narrowlilypondfile).</source>
         <translation>Na A4 se notová ukázka zúží na 80 % šířky, aby nezasahovala do údajů o písni vpravo (diagramy akordů, ladění, tempo). Na A5 má i tak plnou šířku (\narrowlilypondfile).</translation>
+    </message>
+    <message>
+        <source>Selection:</source>
+        <translation>Výběr:</translation>
     </message>
     <message>
         <source>Insert Staged Notes</source>
@@ -2136,6 +2154,189 @@ Použijte vestavěný.</translation>
     </message>
 </context>
 <context>
+    <name>ShortcutsDialog</name>
+    <message>
+        <source>Keyboard Shortcuts</source>
+        <translation>Klávesové zkratky</translation>
+    </message>
+    <message>
+        <source>Action</source>
+        <translation>Akce</translation>
+    </message>
+    <message>
+        <source>Keys</source>
+        <translation>Klávesy</translation>
+    </message>
+    <message>
+        <source>Text editor</source>
+        <translation>Textový editor</translation>
+    </message>
+    <message>
+        <source>Add a cursor above / below</source>
+        <translation>Přidat kurzor nad / pod</translation>
+    </message>
+    <message>
+        <source>Alt+Shift+Up / Down</source>
+        <translation>Alt+Shift+Nahoru / Dolů</translation>
+    </message>
+    <message>
+        <source>New line below / above</source>
+        <translation>Nový řádek pod / nad</translation>
+    </message>
+    <message>
+        <source>Ctrl+Enter / Ctrl+Shift+Enter</source>
+        <translation>Ctrl+Enter / Ctrl+Shift+Enter</translation>
+    </message>
+    <message>
+        <source>Scroll by a line</source>
+        <translation>Posunout o řádek</translation>
+    </message>
+    <message>
+        <source>Ctrl+Up / Down</source>
+        <translation>Ctrl+Nahoru / Dolů</translation>
+    </message>
+    <message>
+        <source>Find next / previous</source>
+        <translation>Najít další / předchozí</translation>
+    </message>
+    <message>
+        <source>F3 / Shift+F3</source>
+        <translation>F3 / Shift+F3</translation>
+    </message>
+    <message>
+        <source>Score tab</source>
+        <translation>Karta not</translation>
+    </message>
+    <message>
+        <source>Note length (on the score or the fretboard)</source>
+        <translation>Délka noty (v notách nebo na hmatníku)</translation>
+    </message>
+    <message>
+        <source>1, 2, 4, 8, 6 (16)</source>
+        <translation>1, 2, 4, 8, 6 (16)</translation>
+    </message>
+    <message>
+        <source>Dotted note</source>
+        <translation>Nota s tečkou</translation>
+    </message>
+    <message>
+        <source>Rest / bar check</source>
+        <translation>Pauza / kontrola taktu</translation>
+    </message>
+    <message>
+        <source>R / |</source>
+        <translation>R / |</translation>
+    </message>
+    <message>
+        <source>Insert the notes picked on the fretboard</source>
+        <translation>Vložit noty vybrané na hmatníku</translation>
+    </message>
+    <message>
+        <source>Ctrl+Enter</source>
+        <translation>Ctrl+Enter</translation>
+    </message>
+    <message>
+        <source>Drop the notes picked on the fretboard</source>
+        <translation>Zahodit noty vybrané na hmatníku</translation>
+    </message>
+    <message>
+        <source>Escape</source>
+        <translation>Escape</translation>
+    </message>
+    <message>
+        <source>Pick and insert a note at once</source>
+        <translation>Vybrat a hned vložit notu</translation>
+    </message>
+    <message>
+        <source>Double-click a fret</source>
+        <translation>Dvojklik na pražec</translation>
+    </message>
+    <message>
+        <source>Move between notes, select</source>
+        <translation>Pohyb mezi notami, výběr</translation>
+    </message>
+    <message>
+        <source>Left / Right, Shift+Left / Right, Home / End</source>
+        <translation>Vlevo / Vpravo, Shift+Vlevo / Vpravo, Home / End</translation>
+    </message>
+    <message>
+        <source>Delete notes</source>
+        <translation>Smazat noty</translation>
+    </message>
+    <message>
+        <source>Backspace / Delete</source>
+        <translation>Backspace / Delete</translation>
+    </message>
+    <message>
+        <source>Actions on the selected notes</source>
+        <translation>Akce s vybranými notami</translation>
+    </message>
+    <message>
+        <source>Right-click the score</source>
+        <translation>Pravé tlačítko na notách</translation>
+    </message>
+    <message>
+        <source>Play / stop</source>
+        <translation>Přehrát / zastavit</translation>
+    </message>
+    <message>
+        <source>Ctrl+Space</source>
+        <translation>Ctrl+Mezerník</translation>
+    </message>
+    <message>
+        <source>Rebuild the preview</source>
+        <translation>Sestavit náhled znovu</translation>
+    </message>
+    <message>
+        <source>Ctrl+R</source>
+        <translation>Ctrl+R</translation>
+    </message>
+    <message>
+        <source>Songs and songbooks</source>
+        <translation>Písně a zpěvníky</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>Zpět</translation>
+    </message>
+    <message>
+        <source>Alt+Left, the mouse&apos;s back button</source>
+        <translation>Alt+Vlevo, tlačítko Zpět na myši</translation>
+    </message>
+    <message>
+        <source>Favourite in the song list</source>
+        <translation>Oblíbená v seznamu písní</translation>
+    </message>
+    <message>
+        <source>Click the ★ column</source>
+        <translation>Klik do sloupce ★</translation>
+    </message>
+    <message>
+        <source>Add songs to a songbook</source>
+        <translation>Přidat písně do zpěvníku</translation>
+    </message>
+    <message>
+        <source>Drag them from Add Songs onto the songbook</source>
+        <translation>Přetáhnout je z Přidat písně na zpěvník</translation>
+    </message>
+    <message>
+        <source>Remove songs from a songbook</source>
+        <translation>Odebrat písně ze zpěvníku</translation>
+    </message>
+    <message>
+        <source>Delete (Ctrl+Z brings them back)</source>
+        <translation>Delete (Ctrl+Z je vrátí)</translation>
+    </message>
+    <message>
+        <source>Go to a change in Tidy&apos;s list</source>
+        <translation>Přejít na změnu v seznamu Učesat</translation>
+    </message>
+    <message>
+        <source>Double-click it</source>
+        <translation>Dvojklik na ni</translation>
+    </message>
+</context>
+<context>
     <name>ShrinkDialog</name>
     <message numerus="yes">
         <source>fits (%n page(s))</source>
@@ -2190,6 +2391,14 @@ Použijte vestavěný.</translation>
         <translation>Nenabídnuto:</translation>
     </message>
     <message>
+        <source>Make It Fit %1</source>
+        <translation>Vměstnat na %1</translation>
+    </message>
+    <message>
+        <source>Instead of picking: chords_converter applies the changes itself, the most readable first, until the song fits %1. One undo step; asks before a last resort.</source>
+        <translation>Místo vybírání: chords_converter použije změny sám, nejčitelnější první, dokud se píseň nevejde na %1. Jeden krok zpět; před krajním řešením se zeptá.</translation>
+    </message>
+    <message>
         <source>(Ctrl+click or Shift+click picks several.)</source>
         <translation>(Ctrl+klik nebo Shift+klik vybere více.)</translation>
     </message>
@@ -2222,16 +2431,8 @@ Použijte vestavěný.</translation>
         <translation>Označit jako správné</translation>
     </message>
     <message>
-        <source>The selected findings are right as they are: add a &quot;% nocheck&quot; line so Check Song leaves them out</source>
-        <translation>Vybrané nálezy jsou správně tak, jak jsou: přidá se řádek &quot;% nocheck&quot; a Zkontrolovat píseň je příště vynechá</translation>
-    </message>
-    <message>
-        <source>Apply Until It Fits</source>
-        <translation>Použít, dokud se nevejde</translation>
-    </message>
-    <message>
-        <source>Let chords_converter take these changes itself, the most readable first, typesetting the song after each, until it fits (one undo step; a song it cannot fit stays as it is; it asks before a last resort). A few seconds a change.</source>
-        <translation>Nechat chords_converter použít tyto změny sám, nejčitelnější první, a po každé píseň znovu vysázet, dokud se nevejde (jeden krok zpět; píseň, kterou nedokáže vtěsnat, zůstane, jak je; před krajním řešením se zeptá). Pár sekund na změnu.</translation>
+        <source>The selected findings are right as they are: add a &quot;% nocheck&quot; line so Find Mistakes leaves them out</source>
+        <translation>Vybrané nálezy jsou správně tak, jak jsou: přidat řádek „% nocheck“, aby je Najít chyby vynechalo</translation>
     </message>
     <message numerus="yes">
         <source>Apply %n Changes</source>
@@ -2325,10 +2526,6 @@ Použijte vestavěný.</translation>
         <translation>Spojit vždy dva řádky v částech jednoho druhu do jednoho, pokud se ještě vejdou do sloupce (vysází píseň na A4 i A5: pár sekund)</translation>
     </message>
     <message>
-        <source>Check Song</source>
-        <translation>Zkontrolovat píseň</translation>
-    </message>
-    <message>
         <source>Look for mistakes: typos where a line&apos;s copies differ, apostrophes typed two ways, a chorus typed as a verse</source>
         <translation>Hledat chyby: překlepy, kde se kopie řádku liší, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
     </message>
@@ -2373,8 +2570,24 @@ Použijte vestavěný.</translation>
         <translation>Učesání potřebuje chords_converter, který nebyl nalezen: sestavuje se s aplikací (ZUB_BUILD_CONVERTER).</translation>
     </message>
     <message>
+        <source>Make Smaller…</source>
+        <translation>Zmenšit…</translation>
+    </message>
+    <message>
+        <source>Join Lines…</source>
+        <translation>Spojit řádky…</translation>
+    </message>
+    <message>
+        <source>Find Mistakes…</source>
+        <translation>Najít chyby…</translation>
+    </message>
+    <message>
         <source>Tidy changed:</source>
         <translation>Učesání změnilo:</translation>
+    </message>
+    <message>
+        <source>Find Mistakes</source>
+        <translation>Najít chyby</translation>
     </message>
     <message>
         <source>%1 needs chords_converter, which was not found: it is built with the app (ZUB_BUILD_CONVERTER).</source>
@@ -2529,12 +2742,12 @@ Použijte vestavěný.</translation>
         <translation>stále bez hodnoty: %1.</translation>
     </message>
     <message>
-        <source>Check Songs, metadata:</source>
-        <translation>Zkontrolovat písně, metadata:</translation>
-    </message>
-    <message>
         <source>OK</source>
         <translation>OK</translation>
+    </message>
+    <message>
+        <source>Scan Songs, metadata:</source>
+        <translation>Projít písně, metadata:</translation>
     </message>
     <message>
         <source>Key written. Save to keep it.</source>
@@ -2581,20 +2794,8 @@ Použijte vestavěný.</translation>
         <translation>Měřím…</translation>
     </message>
     <message>
-        <source>Apply Until It Fits stopped: the song changed (or another action started).</source>
-        <translation>Použít, dokud se nevejde: zastaveno, píseň se změnila (nebo začala jiná akce).</translation>
-    </message>
-    <message>
-        <source>Apply Until It Fits</source>
-        <translation>Použít, dokud se nevejde</translation>
-    </message>
-    <message>
         <source>Applying changes until the song fits %1 (typesetting it after each change, this can take minutes; typing stops it)…</source>
         <translation>Používají se změny, dokud se píseň nevejde na %1 (po každé změně se znovu sází, může to trvat minuty; psaní to zastaví)…</translation>
-    </message>
-    <message>
-        <source>Apply Until It Fits failed</source>
-        <translation>Použít, dokud se nevejde: nepodařilo se</translation>
     </message>
     <message>
         <source>Make Smaller changed:</source>
@@ -2603,6 +2804,18 @@ Použijte vestavěný.</translation>
     <message>
         <source>chords_converter wrote no song.</source>
         <translation>chords_converter nezapsal žádnou píseň.</translation>
+    </message>
+    <message>
+        <source>Make It Fit stopped: the song changed (or another action started).</source>
+        <translation>Vměstnání zastaveno: píseň se změnila (nebo začala jiná akce).</translation>
+    </message>
+    <message>
+        <source>Make It Fit</source>
+        <translation>Vměstnat</translation>
+    </message>
+    <message>
+        <source>Make It Fit failed</source>
+        <translation>Vměstnání se nepodařilo</translation>
     </message>
     <message numerus="yes">
         <source>It fits %1 after %n change(s). Check them, then save.</source>
@@ -2749,8 +2962,8 @@ Použijte vestavěný.</translation>
         <translation>Filtr</translation>
     </message>
     <message>
-        <source>Search title, artist, key… (Ctrl+F)</source>
-        <translation>Hledat název, interpreta, tóninu… (Ctrl+F)</translation>
+        <source>Search title, artist, key…</source>
+        <translation>Hledat název, interpreta, tóninu…</translation>
     </message>
     <message>
         <source>All songs</source>
@@ -2793,8 +3006,8 @@ Použijte vestavěný.</translation>
         <translation>S možnými změnami</translation>
     </message>
     <message>
-        <source>Songs the last Check Songs found something in (this session)</source>
-        <translation>Písně, ve kterých poslední kontrola něco našla (jen v tomto sezení)</translation>
+        <source>Songs the last Scan Songs found something in (this session)</source>
+        <translation>Písně, ve kterých poslední Projít písně něco našlo (v tomto sezení)</translation>
     </message>
 </context>
 <context>
@@ -2888,10 +3101,6 @@ Použijte vestavěný.</translation>
 <context>
     <name>SongbookCheck</name>
     <message>
-        <source>Check Songs</source>
-        <translation>Zkontrolovat písně</translation>
-    </message>
-    <message>
         <source>its paper</source>
         <translation>svůj papír</translation>
     </message>
@@ -2904,8 +3113,12 @@ Použijte vestavěný.</translation>
         <translation>Učesat: znovu vypsaný refrén, akordy uvnitř slabiky, mezery</translation>
     </message>
     <message>
-        <source>Check Song: typos, apostrophes typed two ways, a chorus typed as a verse</source>
-        <translation>Zkontrolovat píseň: překlepy, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
+        <source>Scan Songs</source>
+        <translation>Projít písně</translation>
+    </message>
+    <message>
+        <source>Find Mistakes: typos, apostrophes typed two ways, a chorus typed as a verse</source>
+        <translation>Najít chyby: překlepy, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
     </message>
     <message>
         <source>Make Smaller: songs that don&apos;t fit %1 (the preview&apos;s paper). Typesets every song: about 2 seconds each, some 8 minutes for the whole song library.</source>
@@ -2992,8 +3205,8 @@ Použijte vestavěný.</translation>
         <translation>Učesat:</translation>
     </message>
     <message>
-        <source>Check Song:</source>
-        <translation>Zkontrolovat píseň:</translation>
+        <source>Find Mistakes:</source>
+        <translation>Najít chyby:</translation>
     </message>
     <message>
         <source>Make Smaller:</source>
@@ -3268,6 +3481,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Seřadit písně mimo sekce</translation>
     </message>
     <message>
+        <source>Open Song</source>
+        <translation>Otevřít píseň</translation>
+    </message>
+    <message>
         <source>Transpose…</source>
         <translation>Transponovat…</translation>
     </message>
@@ -3383,6 +3600,26 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Odebrat sekci</translation>
     </message>
     <message>
+        <source>Undo</source>
+        <translation>Zpět</translation>
+    </message>
+    <message>
+        <source>Redo</source>
+        <translation>Znovu</translation>
+    </message>
+    <message>
+        <source>Ready to Print?</source>
+        <translation>Připraven k tisku?</translation>
+    </message>
+    <message>
+        <source>Add Section…</source>
+        <translation>Přidat sekci…</translation>
+    </message>
+    <message>
+        <source>Rename Section…</source>
+        <translation>Přejmenovat sekci…</translation>
+    </message>
+    <message>
         <source>Move Up</source>
         <translation>Posunout nahoru</translation>
     </message>
@@ -3481,6 +3718,50 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         <translation>Písně označené ★</translation>
     </message>
     <message>
+        <source>Open Song</source>
+        <translation>Otevřít píseň</translation>
+    </message>
+    <message>
+        <source>unlock</source>
+        <translation>odemknutí</translation>
+    </message>
+    <message>
+        <source>lock</source>
+        <translation>zamknutí</translation>
+    </message>
+    <message numerus="yes">
+        <source>remove %n song(s)</source>
+        <translation>
+            <numerusform>odebrání %n písně</numerusform>
+            <numerusform>odebrání %n písní</numerusform>
+            <numerusform>odebrání %n písní</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Removed %n song(s) — Ctrl+Z brings them back</source>
+        <translation>
+            <numerusform>Odebrána %n píseň — Ctrl+Z ji vrátí</numerusform>
+            <numerusform>Odebrány %n písně — Ctrl+Z je vrátí</numerusform>
+            <numerusform>Odebráno %n písní — Ctrl+Z je vrátí</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>The LaTeX tab has unsaved text: save or revert it first.</source>
+        <translation>Karta LaTeX má neuložený text: nejdřív ho uložte nebo vraťte.</translation>
+    </message>
+    <message>
+        <source>%1 was changed outside the app since: the change is not undone.</source>
+        <translation>%1 se mezitím změnil mimo aplikaci: změna se nevrací.</translation>
+    </message>
+    <message>
+        <source>%1 is locked: unlock it first.</source>
+        <translation>%1 je zamčený: nejdřív ho odemkněte.</translation>
+    </message>
+    <message>
+        <source>%1 is not in the song library.</source>
+        <translation>%1 není v knihovně písní.</translation>
+    </message>
+    <message>
         <source>The songbook cannot be read: see the LaTeX tab.</source>
         <translation>Zpěvník nejde přečíst: podívejte se na kartu LaTeX.</translation>
     </message>
@@ -3517,8 +3798,8 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
         <translation>Poznámky TODO</translation>
     </message>
     <message>
-        <source>Possible changes (Check Songs)</source>
-        <translation>Možné změny (Kontrola písní)</translation>
+        <source>Possible changes (Scan Songs)</source>
+        <translation>Možné změny (Projít písně)</translation>
     </message>
     <message>
         <source>No key</source>
@@ -3544,10 +3825,6 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
             <numerusform>%n poznámky</numerusform>
             <numerusform>%n poznámek</numerusform>
         </translation>
-    </message>
-    <message>
-        <source>Check…</source>
-        <translation>Zkontrolovat…</translation>
     </message>
     <message>
         <source>New Songbook…</source>

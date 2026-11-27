@@ -276,6 +276,20 @@
         </translation>
     </message>
     <message numerus="yes">
+        <source>remove %n song(s)</source>
+        <translation>
+            <numerusform>remove %n song</numerusform>
+            <numerusform>remove %n songs</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Removed %n song(s) — Ctrl+Z brings them back</source>
+        <translation>
+            <numerusform>Removed %n song — Ctrl+Z brings it back</numerusform>
+            <numerusform>Removed %n songs — Ctrl+Z brings them back</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
         <source>%n to fix before printing</source>
         <translation>
             <numerusform>%n to fix before printing</numerusform>

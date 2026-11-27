@@ -199,6 +199,18 @@ Asked by the user 2026-11-12: edit the songs' LilyPond scores (40 of the 47 `.ly
   - Bends and slides (2026-11-14): LilyPond's MIDI has no pitch bends (`a'\^ \grace h'` is two notes, `\glissando` two notes, which jumped). `zub::score::markBends` puts `\once \set Staff.midiInstrument = "<sound effect>"` before each `\grace` (bend; `\preBend` before it = pre-bend; `\^` after its note = release to the next note) and before the note after `\glissando`, which LilyPond writes as a program change (127 gunshot, 126 applause, 125 helicopter, 124 telephone ring, 122 seashore) at that tick and reverts at the next moment (no Scheme, so `appendIsNeutral` holds; velocity or `midiExtraVelocity` do not work: no such property). `zub::midi::smoothBends` (core, `midibend.cpp`) reads the SMF, merges the marked note into the one before it (graces steal the time of the previous note; the release note too) and writes pitch bend events (RPN 0 range 12, one step per ~10 ms; bend: glide from 10% to 60% of the note, pre-bend: starts at the target and stays, release: glide back over 40% of the next note, slide: from 25% to the target's onset, which then holds), resets the bend before the next note of the channel; chords at the marked moment, jumps over 12 semitones and unpairable notes stay as they were. `PlaybackRunner` plays the rewritten `<key>.mid` (key includes `bendVersion`). Limit: pitch bend is per channel, so other notes sounding with a bent one bend too (the slide into a chord is not smoothed).
 - Later: `zubuvzpevnik/lilypond` may move into the app; `score::Request::includeDir` is a parameter, so only the caller changes.
 
+## UI review (2026-11-27, with the user)
+
+- [x] Make It Fit beside Make Smaller's measurement (one button, the explanation on hover).
+- [x] Menus File, Edit, Song, Library, View, Help; the Song menu with keys; Help > Keyboard Shortcuts.
+- [x] Insert Part numbered (1–9, 0), the score in it.
+- [x] Names: Find Mistakes…, Scan Songs…, Ready to Print?, ellipses on dialog actions; Close Song's icon.
+- [x] Songbooks page: Undo/Redo, Ctrl+S/Ctrl+R, double-click opens a song.
+- [x] Keys in tooltips written from the actions (`keytips`).
+- [x] Score tab: the selection buttons always shown; note keys 1 2 4 8 6 . R | on the preview and the fretboard; Ctrl+Enter a line below like VS Code (Ctrl+Shift+Enter above).
+- [x] Song list right-click: Open Song, Favourite, Labels…, Add to Songbooks…, Copy "Artist/Title".
+- [x] Home's wishes: only the buttons for the selected wish, the rest in More (⋯) and on right-click.
+
 ## 9. The package as a repository of its own
 Decided with the user 2026-11-15: the LaTeX package and its scripts are their own repository, the songs stay in the songbook, and the app bundles the package (option A of three; a TEXMF-installed package was considered and not chosen: the submodule pins the exact version a book is built with).
 - [x] `Woromi/zubuvzpevnik-package` (the name `zubuvzpevnik` collides with `ZubuvZpevnik`: GitHub names ignore case): the package, `scripts/` (build.sh, songidx.lua, checkpaper.py, the linters), `docs/building.md`, `docs/tools.md`, `docs/internals.md`, `latexindent.yaml`, `img/kane.jpg`, with their history (git filter-repo). The scripts take `--songbook DIR`, else find the songbook above the package or the working directory.
