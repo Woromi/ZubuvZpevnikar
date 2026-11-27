@@ -1,12 +1,16 @@
 // MainWindow: the views, the package lookup, the language filter and the papers offer.
 #include <QAbstractButton>
+#include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <QLabel>
 #include <QMenu>
 #include <QTest>
+#include <QTimer>
+#include <memory>
 #include <QFile>
 #include <QLocale>
 #include <QSettings>
@@ -530,4 +534,52 @@ TEST_CASE("Scan Songs: opening a song adds its missing fields as placeholders", 
     INFO(again.toStdString());
     CHECK_FALSE(again.contains(QStringLiteral("added")));
     CHECK(again.contains(QStringLiteral("line 12: chord diagram without finger numbers: Am")));
+}
+
+TEST_CASE("Song list: the right-click menu copies the input name and opens the song",
+          "[app][views]") {
+    apptest::Fixture fixture;
+    MainWindow w;
+    w.resize(1300, 560);
+    w.show();
+    REQUIRE(A::openSongbook(w, fixture.root()));
+    QTableView* table = A::listPage(w)->table();
+    table->selectRow(0);
+    const QPoint at = table->visualRect(A::proxy(w)->index(0, 0)).center();
+    // Picks the entry whose text starts with `text` from the menu once it shows.
+    const auto pick = [](const QString& text) {
+        auto fired = std::make_shared<bool>(false);
+        auto* timer = new QTimer;
+        QObject::connect(timer, &QTimer::timeout, timer, [timer, text, fired] {
+            auto* menu = qobject_cast<QMenu*>(QApplication::activePopupWidget());
+            if (!menu)
+                return;
+            for (QAction* action : menu->actions())
+                if (action->text().startsWith(text)) {
+                    *fired = true;
+                    menu->setActiveAction(action); // chosen like a user does: exec returns it
+                    QTest::keyClick(menu, Qt::Key_Return);
+                    break;
+                }
+            timer->deleteLater();
+        });
+        timer->start(20);
+        return fired;
+    };
+    auto copied = pick(QStringLiteral("Copy"));
+    A::showTableMenu(w, at);
+    REQUIRE(*copied);
+    const QString name = QApplication::clipboard()->text();
+    INFO(name.toStdString());
+    CHECK(name.count(QLatin1Char('/')) == 1);
+    CHECK_FALSE(name.endsWith(QStringLiteral(".tex")));
+
+    auto opened = pick(QStringLiteral("Open Song"));
+    A::showTableMenu(w, at);
+    REQUIRE(*opened);
+    REQUIRE(A::editor(w) != nullptr);
+    const auto u8 = A::editor(w)->path().generic_u8string();
+    const QString path = QString::fromUtf8(reinterpret_cast<const char*>(u8.data()),
+                                           static_cast<qsizetype>(u8.size()));
+    CHECK(path.endsWith(name + QStringLiteral(".tex")));
 }

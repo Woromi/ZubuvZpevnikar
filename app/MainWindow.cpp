@@ -51,6 +51,8 @@
 #include <QHeaderView>
 #include <QIcon>
 #include <QInputDialog>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
@@ -231,7 +233,7 @@ void MainWindow::createMenus() {
 
     closeSongAction_ = file->addAction(tr("&Close Song"));
     closeSongAction_->setShortcut(QKeySequence::Close);
-    closeSongAction_->setIcon(QIcon::fromTheme(QStringLiteral("document-close")));
+    closeSongAction_->setIcon(QIcon::fromTheme(QStringLiteral("tab-close"))); // a plain ✕, not a red one
     closeSongAction_->setToolTip(tr("Close the song"));
     connect(closeSongAction_, &QAction::triggered, this, &MainWindow::closeSong);
 
@@ -1624,10 +1626,59 @@ void MainWindow::showTableMenu(const QPoint& position) {
         return;
     if (!table->selectionModel()->isRowSelected(index.row(), {}))
         table->selectRow(index.row());
+    const std::vector<std::filesystem::path> paths = selectedSongPaths();
+    if (paths.empty())
+        return;
+    const bool one = paths.size() == 1;
     QMenu menu(this);
-    QAction* labels = menu.addAction(tr("Labels…"));
-    if (menu.exec(table->viewport()->mapToGlobal(position)) == labels)
-        editLabels(selectedSongPaths());
+    QAction* open = menu.addAction(QIcon::fromTheme(QStringLiteral("document-open")),
+                                   tr("Open Song"));
+    open->setEnabled(one);
+    menu.setDefaultAction(open);
+    menu.addSeparator();
+    QAction* favourite = menu.addAction(tr("Favourite ★"));
+    QAction* labels = menu.addAction(QIcon::fromTheme(QStringLiteral("tag")), tr("Labels…"));
+    QAction* books = menu.addAction(QIcon::fromTheme(QStringLiteral("list-add")),
+                                    tr("Add to Songbooks…"));
+    books->setEnabled(one && !songbookRoot_.empty());
+    menu.addSeparator();
+    QAction* copy = menu.addAction(QIcon::fromTheme(QStringLiteral("edit-copy")),
+                                   tr("Copy \"Artist/Title\"", "the input name of a song"));
+    QAction* chosen = menu.exec(table->viewport()->mapToGlobal(position));
+    if (chosen == open) {
+        openSong(index);
+    } else if (chosen == favourite) {
+        // All favourites: the label goes from all; else every one gets it.
+        const bool all = std::ranges::all_of(paths, [](const std::filesystem::path& path) {
+            const auto text = zub::readTextFile(path);
+            if (!text)
+                return false;
+            const auto meta = zub::parseSong(*text);
+            return meta && zub::tags::isFavourite(zub::tags::parse(meta->value("tags")));
+        });
+        changeSongTags(paths, [all](const std::vector<std::string>& tags) {
+            auto result = tags;
+            const std::string fav{zub::tags::kFavourite};
+            const auto it = std::ranges::find(result, fav);
+            if (all && it != result.end())
+                result.erase(it);
+            else if (!all && it == result.end())
+                result.insert(result.begin(), fav);
+            return result;
+        });
+        updateLabelActions();
+    } else if (chosen == labels) {
+        editLabels(paths);
+    } else if (chosen == books) {
+        addToSongbooks(paths.front(), false);
+    } else if (chosen == copy) {
+        // The name a songbook's \input uses: relative to the song's collection.
+        QStringList names;
+        for (const auto& path : paths)
+            names << toQString(path.parent_path().filename()) + QLatin1Char('/') +
+                         toQString(path.stem());
+        QGuiApplication::clipboard()->setText(names.join(QLatin1Char('\n')));
+    }
 }
 
 void MainWindow::updateMarkChecked() {

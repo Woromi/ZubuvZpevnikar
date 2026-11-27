@@ -66,6 +66,7 @@ struct AppTestAccess {
     static void showView(MainWindow& w, ActivityBar::View view) { w.showView(view); }
     static SongbooksPage* songbooksPage(MainWindow& w) { return w.songbooksPage_; }
     static SongListPage* listPage(MainWindow& w) { return w.listPage_; }
+    static void showTableMenu(MainWindow& w, const QPoint& at) { w.showTableMenu(at); }
     static HomePage* homePage(MainWindow& w) { return w.homePage_; }
     static const std::filesystem::path& songbookRoot(MainWindow& w) { return w.songbookRoot_; }
     static void refreshHome(MainWindow& w) { w.refreshHome(); }
