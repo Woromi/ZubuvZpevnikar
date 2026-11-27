@@ -471,6 +471,7 @@ void MainWindow::createCentralWidget() {
     checkHooks.documentClass = [this] { return toStdString(preview_->documentClass()); };
     checkHooks.noPackageText = [this] { return noPackageText(); };
     checkHooks.openSong = [this] { return editor_; };
+    checkHooks.unsavedEdits = [this] { return anyModified(); }; // "Unsaved edits are not scanned."
     songDates_ = new SongDatesRunner(this);
     connect(songDates_, &SongDatesRunner::datesReady, this,
             [this](const std::filesystem::path& root, const auto& dates) {
