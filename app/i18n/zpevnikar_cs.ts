@@ -915,6 +915,10 @@ Použijte vestavěný.</translation>
         <translation>&amp;Knihovna</translation>
     </message>
     <message>
+        <source>Scan every song (or the ones shown) for what Tidy, Find Mistakes or Make Smaller would change, keys, metadata; you decide song by song</source>
+        <translation>Projít všechny písně (nebo zobrazené) a najít, co by změnilo Učesat, Najít chyby nebo Zmenšit, tóniny, metadata; rozhodujete píseň po písni</translation>
+    </message>
+    <message>
         <source>New Song&amp;book…</source>
         <translation>Nový &amp;zpěvník…</translation>
     </message>
@@ -1240,10 +1244,6 @@ Použijte vestavěný.</translation>
     <message>
         <source>&amp;Scan Songs…</source>
         <translation>&amp;Projít písně…</translation>
-    </message>
-    <message>
-        <source>Check every song (or the ones shown): what Tidy, Find Mistakes or Make Smaller would change, keys, metadata</source>
-        <translation>Zkontrolovat všechny písně (nebo zobrazené): co by změnilo Učesat, Najít chyby nebo Zmenšit, tóniny, metadata</translation>
     </message>
     <message>
         <source>Song &amp;Editor</source>
@@ -3155,36 +3155,8 @@ Balíček zpěvníku: %3</translation>
         <translation>svůj papír</translation>
     </message>
     <message>
-        <source>Look for songs where a song action would change something, or a check finds something. Nothing is changed: the songs are marked in the list (this session only), and you decide song by song.</source>
-        <translation>Najde písně, ve kterých by akce s písní něco změnila nebo kontrola něco našla. Nic se nemění: písně se označí v seznamu (jen v tomto sezení) a rozhodujete píseň po písni.</translation>
-    </message>
-    <message>
-        <source>Tidy: a chorus typed again, chords inside a syllable, spaces</source>
-        <translation>Učesat: znovu vypsaný refrén, akordy uvnitř slabiky, mezery</translation>
-    </message>
-    <message>
         <source>Scan Songs</source>
         <translation>Projít písně</translation>
-    </message>
-    <message>
-        <source>Find Mistakes: typos, apostrophes typed two ways, a chorus typed as a verse</source>
-        <translation>Najít chyby: překlepy, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka</translation>
-    </message>
-    <message>
-        <source>Make Smaller: songs that don&apos;t fit %1 (the preview&apos;s paper). Typesets every song: about 2 seconds each, some 8 minutes for the whole song library.</source>
-        <translation>Zmenšit: písně, které se nevejdou na %1 (papír náhledu). Vysází každou píseň: asi 2 sekundy na píseň, zhruba 8 minut pro celou knihovnu písní.</translation>
-    </message>
-    <message>
-        <source>Keys: a key for the songs that have none (from their chords)</source>
-        <translation>Tóniny: tónina pro písně, které ji nemají (podle akordů)</translation>
-    </message>
-    <message>
-        <source>Keys: written keys the chords disagree with (unless confirmed)</source>
-        <translation>Tóniny: zapsané tóniny, se kterými akordy nesouhlasí (pokud nejsou potvrzené)</translation>
-    </message>
-    <message>
-        <source>Metadata: the header&apos;s keys and values (missing tempo, meter …)</source>
-        <translation>Metadata: klíče a hodnoty hlavičky (chybějící tempo, takt …)</translation>
     </message>
     <message>
         <source>Needs chords_converter, which was not found: it is built with the app (ZUB_BUILD_CONVERTER).</source>
@@ -3207,18 +3179,6 @@ Balíček zpěvníku: %3</translation>
         </translation>
     </message>
     <message>
-        <source>Unsaved edits are not checked: the check reads the files.</source>
-        <translation>Neuložené úpravy se nekontrolují: kontrola čte soubory.</translation>
-    </message>
-    <message>
-        <source>Check</source>
-        <translation>Zkontrolovat</translation>
-    </message>
-    <message>
-        <source>Checking…</source>
-        <translation>Kontroluji…</translation>
-    </message>
-    <message>
         <source>Cancel</source>
         <translation>Zrušit</translation>
     </message>
@@ -3227,8 +3187,72 @@ Balíček zpěvníku: %3</translation>
         <translation>Učesání %1</translation>
     </message>
     <message>
-        <source>Check %1</source>
-        <translation>Kontrola %1</translation>
+        <source>Look for:</source>
+        <translation>Hledat:</translation>
+    </message>
+    <message>
+        <source>Tidy</source>
+        <translation>Učesat</translation>
+    </message>
+    <message>
+        <source>A chorus typed again, chords inside a syllable, spaces.</source>
+        <translation>Znovu napsaný refrén, akordy uvnitř slabiky, mezery.</translation>
+    </message>
+    <message>
+        <source>Find Mistakes</source>
+        <translation>Najít chyby</translation>
+    </message>
+    <message>
+        <source>Typos, apostrophes typed two ways, a chorus typed as a verse.</source>
+        <translation>Překlepy, apostrofy psané dvojím způsobem, refrén zapsaný jako sloka.</translation>
+    </message>
+    <message>
+        <source>Make Smaller (%1, slow)</source>
+        <translation>Zmenšit (%1, pomalé)</translation>
+    </message>
+    <message>
+        <source>Songs that don&apos;t fit %1 (the preview&apos;s paper). Typesets every song: about 2 seconds each, some 8 minutes for the whole song library.</source>
+        <translation>Písně, které se nevejdou na %1 (papír náhledu). Vysází každou píseň: asi 2 sekundy na píseň, zhruba 8 minut na celou knihovnu.</translation>
+    </message>
+    <message>
+        <source>Missing keys</source>
+        <translation>Chybějící tóniny</translation>
+    </message>
+    <message>
+        <source>A key for the songs that have none (from their chords).</source>
+        <translation>Tónina pro písně, které žádnou nemají (podle akordů).</translation>
+    </message>
+    <message>
+        <source>Keys the chords disagree with</source>
+        <translation>Tóniny, se kterými nesouhlasí akordy</translation>
+    </message>
+    <message>
+        <source>Written keys the chords disagree with (unless confirmed).</source>
+        <translation>Zapsané tóniny, se kterými akordy nesouhlasí (pokud nejsou potvrzené).</translation>
+    </message>
+    <message>
+        <source>Metadata</source>
+        <translation>Metadata</translation>
+    </message>
+    <message>
+        <source>The header&apos;s keys and values (missing tempo, meter …).</source>
+        <translation>Klíče a hodnoty hlavičky (chybějící tempo, takt …).</translation>
+    </message>
+    <message>
+        <source>Unsaved edits are not scanned.</source>
+        <translation>Neuložené úpravy se neprocházejí.</translation>
+    </message>
+    <message>
+        <source>Scan</source>
+        <translation>Projít</translation>
+    </message>
+    <message>
+        <source>Scanning…</source>
+        <translation>Procházím…</translation>
+    </message>
+    <message>
+        <source>Find Mistakes %1</source>
+        <translation>Najít chyby %1</translation>
     </message>
     <message>
         <source>Too big</source>
@@ -3279,8 +3303,8 @@ Balíček zpěvníku: %3</translation>
         <translation>Problémy:</translation>
     </message>
     <message>
-        <source>Check cancelled. </source>
-        <translation>Kontrola zrušena. </translation>
+        <source>Scan cancelled. </source>
+        <translation>Procházení zrušeno. </translation>
     </message>
     <message numerus="yes">
         <source>%n song(s) with possible changes: open one to see them and decide.</source>
@@ -3397,10 +3421,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Učesání: %1</translation>
     </message>
     <message>
-        <source>Check: %1</source>
-        <translation>Kontrola: %1</translation>
-    </message>
-    <message>
         <source>not measured: commands outside the song format</source>
         <translation>neměřeno: příkazy mimo formát písní</translation>
     </message>
@@ -3441,6 +3461,10 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>zapsaná %1, podle akordů %2 (rozdíl %3)</translation>
     </message>
     <message>
+        <source>Find Mistakes: %1</source>
+        <translation>Najít chyby: %1</translation>
+    </message>
+    <message>
         <source>not measured: the package measures only Chords and Tin whistle songs</source>
         <translation>neměřeno: balíček měří jen písně sbírek Akordy a Tin whistle</translation>
     </message>
@@ -3449,16 +3473,16 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
         <translation>Učesání</translation>
     </message>
     <message>
-        <source>Check</source>
-        <translation>Kontrola</translation>
-    </message>
-    <message>
         <source>Measuring</source>
         <translation>Měření</translation>
     </message>
     <message>
         <source>line %1: %2</source>
         <translation>řádek %1: %2</translation>
+    </message>
+    <message>
+        <source>Find Mistakes</source>
+        <translation>Najít chyby</translation>
     </message>
     <message numerus="yes">
         <source>%1: %n pages</source>
@@ -3568,18 +3592,6 @@ Přesto sestavit? Tyto příkazy poběží s vašimi oprávněními (lualatex -s
     <message>
         <source>Preview</source>
         <translation>Náhled</translation>
-    </message>
-    <message>
-        <source>Velký zpěvník (A4)</source>
-        <translation>Velký zpěvník (A4)</translation>
-    </message>
-    <message>
-        <source>Malý zpěvník (A5 book)</source>
-        <translation>Malý zpěvník (A5, kniha)</translation>
-    </message>
-    <message>
-        <source>Táborový zpěvník (A5 camp booklet)</source>
-        <translation>Táborový zpěvník (A5, brožura)</translation>
     </message>
     <message>
         <source>Chords</source>
@@ -3710,14 +3722,6 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
     <message>
         <source>Select songs (Ctrl/Shift for several), then Add — or drag them onto the songbook.</source>
         <translation>Vyberte písně (více pomocí Ctrl/Shift) a pak Přidat — nebo je přetáhněte do zpěvníku.</translation>
-    </message>
-    <message>
-        <source>Add</source>
-        <translation>Přidat</translation>
-    </message>
-    <message>
-        <source>Remove</source>
-        <translation>Odebrat</translation>
     </message>
     <message>
         <source>Add to:</source>
@@ -3896,6 +3900,14 @@ Změní se jen tento náhled a export; zpěvník i písně zůstávají, jak jso
     <message>
         <source>Remove from Songbook</source>
         <translation>Odebrat ze zpěvníku</translation>
+    </message>
+    <message>
+        <source>Add to Section</source>
+        <translation>Přidat do sekce</translation>
+    </message>
+    <message>
+        <source>Remove from Section</source>
+        <translation>Odebrat ze sekce</translation>
     </message>
     <message>
         <source>Cannot read the songbook %1: %2</source>
@@ -4332,6 +4344,21 @@ Pokud je na disku, který není připojený, připojte ho a zkuste to znovu.</tr
     <message>
         <source>Choose Another…</source>
         <translation>Vybrat jinou…</translation>
+    </message>
+</context>
+<context>
+    <name>documentclasses</name>
+    <message>
+        <source>Velký zpěvník (A4)</source>
+        <translation>Velký zpěvník (A4)</translation>
+    </message>
+    <message>
+        <source>Malý zpěvník (A5 book)</source>
+        <translation>Malý zpěvník (A5, kniha)</translation>
+    </message>
+    <message>
+        <source>Táborový zpěvník (A5 camp booklet)</source>
+        <translation>Táborový zpěvník (A5, brožura)</translation>
     </message>
 </context>
 <context>
