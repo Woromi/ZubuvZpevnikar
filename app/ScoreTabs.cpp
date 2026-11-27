@@ -12,6 +12,7 @@
 
 #include <KSyntaxHighlighting/Repository>
 #include <QAction>
+#include <QApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -548,7 +549,7 @@ void ScoreTabs::addScoreTab(const std::string& name, SongEditor* editor) {
                 insertAction->setEnabled(count > 0);
                 clearAction->setEnabled(count > 0);
             });
-    connect(inputBar, &ScoreInputBar::restRequested, this, [this] {
+    connect(inputBar, &ScoreInputBar::restRequested, this, [this, fretboard] {
         if (SongEditor* current = currentEditor(); current && !onSongTab()) {
             const auto& tab = scoreTabs_[static_cast<std::size_t>(tabs_->currentIndex() - 1)];
             if (current->cursorInScoreComment()) {
@@ -556,17 +557,23 @@ void ScoreTabs::addScoreTab(const std::string& name, SongEditor* editor) {
                 return;
             }
             current->insertScoreRest(toStdString(tab.inputBar->duration()));
-            current->textEdit()->setFocus();
+            // The note keys on the preview or the fretboard keep the focus there.
+            if (QWidget* focus = QApplication::focusWidget();
+                !focus || !(focus == fretboard || scorePreview_->isAncestorOf(focus)))
+                current->textEdit()->setFocus();
         }
     });
-    connect(inputBar, &ScoreInputBar::barCheckRequested, this, [this] {
+    connect(inputBar, &ScoreInputBar::barCheckRequested, this, [this, fretboard] {
         if (SongEditor* current = currentEditor(); current && !onSongTab()) {
             if (current->cursorInScoreComment()) {
                 emit statusMessage(tr("The cursor is in a comment."), 5000);
                 return;
             }
             current->insertScoreBarCheck();
-            current->textEdit()->setFocus();
+            // The note keys on the preview or the fretboard keep the focus there.
+            if (QWidget* focus = QApplication::focusWidget();
+                !focus || !(focus == fretboard || scorePreview_->isAncestorOf(focus)))
+                current->textEdit()->setFocus();
         }
     });
     page->addWidget(splitter);
