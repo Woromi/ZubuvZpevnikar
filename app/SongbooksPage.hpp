@@ -1,8 +1,11 @@
 #pragma once
 
+#include "BookPreview.hpp"
+
 #include <QString>
 #include <QStringList>
 #include <QWidget>
+#include <deque>
 #include <expected>
 #include <filesystem>
 #include <map>
@@ -11,7 +14,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include "BookPreview.hpp"
 #include <zub/core/bookfile.hpp>
 #include <zub/core/booktranspose.hpp>
 #include <zub/core/songbook.hpp>
@@ -187,6 +189,20 @@ private:
     void moveSection(int delta);
     void removeSelectedSongs();
     bool commit(); // save, then show the changes; false if nothing was saved
+    // The undo history: every write of a book that changed it (writeFile) is an entry.
+    struct HistoryEntry {
+        QString id;
+        std::string before;
+        std::string after;
+        QString description; // "remove 2 songs"; may be empty
+    };
+    void undoEdit();
+    void redoEdit();
+    // Writes the newest entry of `from` back (undo: its `before`, redo: its `after`) and moves it
+    // to `to`.
+    void stepHistory(std::deque<HistoryEntry>& from, std::deque<HistoryEntry>& to, bool undo);
+    void updateHistoryActions();
+    void openSongNamed(const std::string& inputName); // openSongRequested for an input name
     bool askSectionName(const QString& title, const QString& initial, int ignoreSection,
                         QString* name);
 
@@ -246,6 +262,11 @@ private:
     QAction* newBook_ = nullptr;
     QAction* duplicate_ = nullptr;
     QAction* lock_ = nullptr;
+    QAction* undoAction_ = nullptr;
+    QAction* redoAction_ = nullptr;
+    std::deque<HistoryEntry> undoList_; // newest last
+    std::deque<HistoryEntry> redoList_;
+    QString nextDescription_; // what the next writeFile does, for its entry
 
     QTabWidget* bookTabs_ = nullptr; // Songbook | LaTeX
     QWidget* editPane_ = nullptr;

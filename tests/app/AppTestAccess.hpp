@@ -298,6 +298,12 @@ struct AppTestAccess {
     static void duplicateSongbook(SongbooksPage& p) { p.duplicateSongbook(); }
     static void checkBook(SongbooksPage& p) { p.checkBook(); }
     static void sortAll(SongbooksPage& p) { p.sortAll(); }
+    static QTabWidget* rightTabs(SongbooksPage& p) { return p.rightTabs_; }
+    static void undoEdit(SongbooksPage& p) { p.undoEdit(); }
+    static void redoEdit(SongbooksPage& p) { p.redoEdit(); }
+    static QAction* undoAction(SongbooksPage& p) { return p.undoAction_; }
+    static QAction* redoAction(SongbooksPage& p) { return p.redoAction_; }
+    static void removeSelectedSongs(SongbooksPage& p) { p.removeSelectedSongs(); }
     static bool sorting(SongbooksPage& p) { return !p.jobs_.empty(); }
     static QLabel* sorterWarning(SongbooksPage& p) { return p.sorterWarning_; }
 };

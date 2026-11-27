@@ -1459,7 +1459,9 @@ void MainWindow::updateSongActions() {
     addToBooksAction_->setEnabled(open && !editor_->isNew() && !songbookRoot_.empty());
     activityBar_->setSongEnabled(open);
     songViewAction_->setEnabled(open); // like the bar's button
-    saveAction_->setEnabled(current && current->isModified());
+    // The Songbooks page has its own Ctrl+S (the LaTeX tab); the hidden song is not saved by it.
+    saveAction_->setEnabled(current && current->isModified() &&
+                            pages_->currentWidget() == songPage_);
     saveAction_->setText(current && !songTab ? tr("&Save Score") : tr("&Save Song"));
     const bool modified = open && editor_->isModified();
     changesAction_->setEnabled(modified && songTab && onSongPage());

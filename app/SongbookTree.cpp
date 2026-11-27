@@ -32,6 +32,10 @@ SongbookTree::SongbookTree(QWidget* parent) : QTreeWidget(parent) {
     setDropIndicatorShown(true);
     setDragDropMode(QAbstractItemView::DragDrop);
     setDefaultDropAction(Qt::MoveAction);
+    connect(this, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* item) {
+        if (item && !isSection(item))
+            emit openSongRequested(toStdString(item->data(0, nameRole).toString()));
+    });
     setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, &QWidget::customContextMenuRequested, this, &SongbookTree::showMenu);
 }
@@ -197,6 +201,12 @@ void SongbookTree::keyPressEvent(QKeyEvent* event) {
         emit removeSelectedRequested();
         return;
     }
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        QTreeWidgetItem* item = currentItem();
+        if (item && !isSection(item))
+            emit openSongRequested(toStdString(item->data(0, nameRole).toString()));
+        return;
+    }
     QTreeWidget::keyPressEvent(event);
 }
 
@@ -224,6 +234,8 @@ void SongbookTree::showMenu(const QPoint& position) {
             connect(menu.addAction(tr("Sort the Songs Outside Sections")), &QAction::triggered,
                     this, [this, uid] { emit sortSectionRequested(uid); });
         const std::string name = toStdString(item->data(0, nameRole).toString());
+        connect(menu.addAction(tr("Open Song")), &QAction::triggered, this,
+                [this, name] { emit openSongRequested(name); });
         connect(menu.addAction(tr("Transpose…")), &QAction::triggered, this,
                 [this, name] { emit transposeSongRequested(name); });
         connect(menu.addAction(tr("Remove from the Songbook")), &QAction::triggered, this,

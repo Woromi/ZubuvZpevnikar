@@ -40,6 +40,7 @@ signals:
     void removeSectionRequested(quint64 uid);
     void removeSelectedRequested();
     void transposeSongRequested(std::string inputName); // the menu's Transpose…
+    void openSongRequested(std::string inputName);      // double-click, Enter, the menu's Open Song
 
 protected:
     QStringList mimeTypes() const override;

@@ -2,11 +2,11 @@
 
 #include "BookAdder.hpp"
 #include "BookOverview.hpp"
-#include "HomeData.hpp"
 #include "BookPreview.hpp"
 #include "CodeTextEdit.hpp"
 #include "CollectionTabs.hpp"
 #include "FindBar.hpp"
+#include "HomeData.hpp"
 #include "LabelFilterBox.hpp"
 #include "PageHeader.hpp"
 #include "SongEditor.hpp"
@@ -46,20 +46,21 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QRegularExpression>
-#include <QSpinBox>
 #include <QScrollBar>
 #include <QSettings>
 #include <QShortcut>
+#include <QSpinBox>
 #include <QSplitter>
 #include <QStyle>
 #include <QStyleOptionViewItem>
 #include <QTabWidget>
-#include <QTimer>
 #include <QTableView>
+#include <QTimer>
 #include <QToolBar>
 #include <QTreeWidget>
 #include <QUrl>
@@ -73,8 +74,8 @@
 #include <zub/core/latex.hpp>
 #include <zub/core/library.hpp>
 #include <zub/core/package.hpp>
-#include <zub/core/score.hpp>
 #include <zub/core/safety.hpp>
+#include <zub/core/score.hpp>
 #include <zub/core/songbook.hpp>
 #include <zub/core/songheader.hpp>
 #include <zub/core/songtodo.hpp>
@@ -285,6 +286,9 @@ void SongbooksPage::setSongbookRoot(const std::filesystem::path& root) {
     if (root == root_)
         return;
     root_ = root;
+    undoList_.clear();
+    redoList_.clear();
+    updateHistoryActions();
     fillList(id_);
 }
 
@@ -302,6 +306,13 @@ void SongbooksPage::buildUi() {
     duplicate_->setToolTip(tr("A copy of this songbook under another name, e.g. next year's camp"));
     lock_ = bar->addAction(QIcon::fromTheme(QStringLiteral("object-locked")), tr("Lock"));
     lock_->setToolTip(tr("A released or printed songbook: lock it so that nothing changes it"));
+    undoAction_ = bar->addAction(QIcon::fromTheme(QStringLiteral("edit-undo")), tr("Undo"));
+    redoAction_ = bar->addAction(QIcon::fromTheme(QStringLiteral("edit-redo")), tr("Redo"));
+    undoAction_->setObjectName(QStringLiteral("songbookUndo"));
+    redoAction_->setObjectName(QStringLiteral("songbookRedo"));
+    connect(undoAction_, &QAction::triggered, this, &SongbooksPage::undoEdit);
+    connect(redoAction_, &QAction::triggered, this, &SongbooksPage::redoEdit);
+    updateHistoryActions();
     bar->addSeparator();
     check_ = bar->addAction(QIcon::fromTheme(QStringLiteral("tools-check-spelling")), tr("Check…"));
     check_->setObjectName(QStringLiteral("songbookCheck"));
@@ -368,6 +379,37 @@ void SongbooksPage::buildUi() {
     connect(splitter_, &QSplitter::splitterMoved, this,
             [this] { QSettings{}.setValue(splitterKey, splitter_->saveState()); });
     outer->addWidget(splitter_, 1);
+
+    // Ctrl+Z / Ctrl+Y undo the songbook's edits where the song lists are (not in the LaTeX tab's
+    // editor, which has its own; a line edit keeps its own undo too).
+    for (QWidget* where : {static_cast<QWidget*>(editPane_), static_cast<QWidget*>(pickerView_),
+                           static_cast<QWidget*>(overview_)}) {
+        auto* undoKey = new QShortcut(QKeySequence::Undo, where);
+        undoKey->setContext(Qt::WidgetWithChildrenShortcut);
+        connect(undoKey, &QShortcut::activated, this, &SongbooksPage::undoEdit);
+        auto* redoKey = new QShortcut(QKeySequence::Redo, where);
+        redoKey->setContext(Qt::WidgetWithChildrenShortcut);
+        connect(redoKey, &QShortcut::activated, this, &SongbooksPage::redoEdit);
+    }
+    // Ctrl+S saves the LaTeX tab (the File menu's Save is for the song page).
+    auto* saveKey = new QShortcut(QKeySequence::Save, this);
+    saveKey->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(saveKey, &QShortcut::activated, this, [this] {
+        if (latexModified())
+            saveLatex();
+    });
+    // Ctrl+R builds the preview. The File menu's Reload may use the same key: then Qt calls the
+    // shortcut ambiguous, which still builds here.
+    auto* buildKey = new QShortcut(QKeySequence(QStringLiteral("Ctrl+R")), this);
+    buildKey->setContext(Qt::WidgetWithChildrenShortcut);
+    const auto buildPreview = [this] {
+        if (id_.isEmpty() || text_.empty() || preview_->building())
+            return;
+        rightTabs_->setCurrentIndex(1);
+        preview_->build();
+    };
+    connect(buildKey, &QShortcut::activated, this, buildPreview);
+    connect(buildKey, &QShortcut::activatedAmbiguously, this, buildPreview);
 }
 
 QWidget* SongbooksPage::buildListPane() {
@@ -529,6 +571,8 @@ QWidget* SongbooksPage::buildEditPane() {
     connect(tree_, &QTreeWidget::itemSelectionChanged, this, &SongbooksPage::updateButtons);
     connect(tree_, &SongbookTree::removeSelectedRequested, this,
             &SongbooksPage::removeSelectedSongs);
+    connect(tree_, &SongbookTree::openSongRequested, this,
+            [this](const std::string& name) { openSongNamed(name); });
     connect(tree_, &SongbookTree::transposeSongRequested, this,
             [this](const std::string& name) { chooseSongTranspose(name); });
     connect(tree_, &SongbookTree::songsDropped, this,
@@ -724,6 +768,20 @@ QWidget* SongbooksPage::buildPickerPane() {
     connect(labelFilter_, &LabelFilterBox::labelChanged, pickerFilter_, &SongFilterProxy::setLabel);
     connect(onlyInSection_, &QCheckBox::toggled, this, [this] { updatePicker(); });
     connect(pickerView_, &QTableView::clicked, this, &SongbooksPage::onPickerClicked);
+    connect(pickerView_, &QTableView::doubleClicked, this, [this](const QModelIndex& index) {
+        openSongNamed(index.data(SongTableModel::InputNameRole).toString().toStdString());
+    });
+    pickerView_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(pickerView_, &QWidget::customContextMenuRequested, this, [this](const QPoint& at) {
+        const QModelIndex index = pickerView_->indexAt(at);
+        if (!index.isValid())
+            return;
+        const std::string name = index.data(SongTableModel::InputNameRole).toString().toStdString();
+        QMenu menu(pickerView_);
+        connect(menu.addAction(tr("Open Song")), &QAction::triggered, this,
+                [this, name] { openSongNamed(name); });
+        menu.exec(pickerView_->viewport()->mapToGlobal(at));
+    });
     connect(addPicked_, &QPushButton::clicked, this, &SongbooksPage::addPicked);
     connect(removePicked_, &QPushButton::clicked, this, &SongbooksPage::removePicked);
     connect(target_, &QComboBox::currentIndexChanged, this, [this](int index) {
@@ -922,6 +980,7 @@ bool SongbooksPage::writeFile(const std::string& text) {
     const auto onDisk = zub::readTextFile(path);
     if (!onDisk || *onDisk != text_) {
         // Changed elsewhere (an editor, git): never overwrite it.
+        nextDescription_.clear();
         const QString id = id_;
         fillList(id);
         showWarning(tr("%1 was changed outside the app: it is read again, and the last change "
@@ -934,7 +993,13 @@ bool SongbooksPage::writeFile(const std::string& text) {
             showWarning(tr("Not saved: %1").arg(toQString(written.error())));
             return false;
         }
+        undoList_.push_back({id_, text_, text, nextDescription_});
+        while (undoList_.size() > 100)
+            undoList_.pop_front();
+        redoList_.clear();
+        updateHistoryActions();
     }
+    nextDescription_.clear();
     // What the file now says (a keep-order block keeps its order whatever was asked).
     const auto keepUids = sectionUids_;
     if (!loadFile())
@@ -990,6 +1055,7 @@ void SongbooksPage::toggleLock() {
                 .arg(toQString(book_.title.empty() ? toStdString(id_) : book_.title))) !=
             QMessageBox::Yes)
         return;
+    nextDescription_ = settings_.locked ? tr("unlock") : tr("lock");
     if (applyEdit(zub::bookfile::setLocked(text_, !settings_.locked))) {
         const QString id = id_;
         fillList(id); // the lock in the list
@@ -2051,6 +2117,7 @@ void SongbooksPage::removeSelectedSongs() {
     if (!canEdit())
         return;
     bool changed = false;
+    int count = 0;
     for (const auto& [uid, name] : tree_->selectedSongs()) {
         const int s = indexOfUid(uid);
         if (s < 0)
@@ -2061,9 +2128,81 @@ void SongbooksPage::removeSelectedSongs() {
             continue;
         songs.erase(it);
         changed = true;
+        ++count;
     }
-    if (changed)
-        commit();
+    if (changed) {
+        nextDescription_ = tr("remove %n song(s)", nullptr, count);
+        if (commit() && !undoList_.empty())
+            showWarning(tr("Removed %n song(s) — Ctrl+Z brings them back", nullptr, count));
+        nextDescription_.clear();
+    }
+}
+
+void SongbooksPage::updateHistoryActions() {
+    if (!undoAction_)
+        return;
+    const auto set = [](QAction* action, const std::deque<HistoryEntry>& list,
+                        const QString& name) {
+        action->setEnabled(!list.empty());
+        action->setToolTip(list.empty() || list.back().description.isEmpty()
+                               ? name
+                               : name + QStringLiteral(": ") + list.back().description);
+    };
+    set(undoAction_, undoList_, tr("Undo"));
+    set(redoAction_, redoList_, tr("Redo"));
+}
+
+void SongbooksPage::undoEdit() {
+    stepHistory(undoList_, redoList_, true);
+}
+
+void SongbooksPage::redoEdit() {
+    stepHistory(redoList_, undoList_, false);
+}
+
+void SongbooksPage::stepHistory(std::deque<HistoryEntry>& from, std::deque<HistoryEntry>& to,
+                                bool undo) {
+    if (from.empty() || root_.empty())
+        return;
+    if (latexModified()) {
+        showWarning(tr("The LaTeX tab has unsaved text: save or revert it first."));
+        return;
+    }
+    const HistoryEntry entry = from.back();
+    const auto path = pathOf(entry.id);
+    const std::string& target = undo ? entry.before : entry.after;
+    const std::string& expected = undo ? entry.after : entry.before;
+    const auto onDisk = zub::readTextFile(path);
+    if (!onDisk || *onDisk != expected) {
+        // Changed elsewhere since: this step no longer applies.
+        from.pop_back();
+        updateHistoryActions();
+        showWarning(tr("%1 was changed outside the app since: the change is not undone.")
+                        .arg(toQString(path.filename())));
+        return;
+    }
+    if (zub::bookfile::readSettings(*onDisk).locked && zub::bookfile::readSettings(target).locked) {
+        showWarning(tr("%1 is locked: unlock it first.").arg(toQString(path.filename())));
+        return;
+    }
+    if (const auto written = zub::writeTextFileAtomic(path, target); !written) {
+        showWarning(tr("Not saved: %1").arg(toQString(written.error())));
+        return;
+    }
+    from.pop_back();
+    to.push_back(entry);
+    updateHistoryActions();
+    fillList(entry.id); // shows that book, read again
+}
+
+void SongbooksPage::openSongNamed(const std::string& inputName) {
+    for (int row = 0; row < model_->rowCount(); ++row) {
+        if (const zub::SongEntry* song = model_->song(row); song && song->inputName == inputName) {
+            emit openSongRequested(song->path);
+            return;
+        }
+    }
+    showWarning(tr("%1 is not in the song library.").arg(toQString(inputName)));
 }
 
 void SongbooksPage::checkBook() {
