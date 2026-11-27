@@ -43,6 +43,12 @@ public:
     // Empty when nothing was measured and there is no note.
     static QString summary(const zub::songsuggest::Suggestions& suggestions);
 
+    // The one status line above the list: "A4 ✓ 1 page   ·   A5 ✗ 2 pages   ·   Too wide: lines 45".
+    // Empty when nothing was measured and there is no note. Its tooltip: statusTooltip().
+    static QString statusLine(const zub::songsuggest::Suggestions& suggestions);
+    // What the status line leaves out: the converter's note and join's reasons for not offering.
+    static QString statusTooltip(const zub::songsuggest::Suggestions& suggestions);
+
 signals:
     // The user moved to a proposal at this line of the song (not for the initial selection).
     void proposalSelected(int line);

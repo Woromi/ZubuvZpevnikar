@@ -75,6 +75,55 @@ QString ShrinkDialog::summary(const zub::songsuggest::Suggestions& suggestions) 
     return parts.join(QStringLiteral("\n"));
 }
 
+QString ShrinkDialog::statusLine(const zub::songsuggest::Suggestions& suggestions) {
+    QStringList parts;
+    std::vector<int> wide;
+    int chorus = 0;
+    const auto add = [&](const QString& paper, const zub::songsuggest::Measured& measured) {
+        parts << paper + (measured.fits ? QStringLiteral(" ✓ ") : QStringLiteral(" ✗ ")) +
+                     tr("%n page(s)", nullptr, measured.pages);
+        wide.insert(wide.end(), measured.wrapLines.begin(), measured.wrapLines.end());
+        chorus = std::max(chorus, measured.chorusWraps);
+    };
+    if (suggestions.a4)
+        add(QStringLiteral("A4"), *suggestions.a4);
+    if (suggestions.a5)
+        add(QStringLiteral("A5"), *suggestions.a5);
+    std::ranges::sort(wide);
+    wide.erase(std::ranges::unique(wide).begin(), wide.end());
+    QStringList tooWide;
+    for (const int line : wide)
+        tooWide << QString::number(line);
+    QString wideText;
+    if (!tooWide.isEmpty())
+        wideText = tr("lines %1").arg(tooWide.join(QStringLiteral(", ")));
+    if (chorus > 0)
+        wideText += (wideText.isEmpty() ? QString() : QStringLiteral(", ")) +
+                    tr("%n chorus line(s)", nullptr, chorus);
+    if (!wideText.isEmpty())
+        parts << tr("Too wide: %1").arg(wideText);
+    QString line = parts.join(QStringLiteral("   ·   "));
+    if (parts.isEmpty() && !suggestions.note.empty())
+        line = toQString(suggestions.note); // nothing measured: the note is all there is
+    if (!suggestions.notJoined.empty())
+        line += (line.isEmpty() ? QString() : QStringLiteral("   ")) + tr("(some parts not offered)");
+    return line;
+}
+
+QString ShrinkDialog::statusTooltip(const zub::songsuggest::Suggestions& suggestions) {
+    QStringList parts;
+    const bool measured = suggestions.a4 || suggestions.a5;
+    if (measured && !suggestions.note.empty())
+        parts << toQString(suggestions.note);
+    if (!suggestions.notJoined.empty()) {
+        QStringList reasons;
+        for (const auto& reason : suggestions.notJoined)
+            reasons << QStringLiteral("• ") + toQString(reason);
+        parts << tr("Not offered:") + QStringLiteral("\n") + reasons.join(QStringLiteral("\n"));
+    }
+    return parts.join(QStringLiteral("\n\n"));
+}
+
 ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
                            const std::string& songText, const QString& title,
                            const QString& heading, QWidget* parent, bool canDismiss,
@@ -88,10 +137,12 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
     // The measurement, and beside it Make It Fit: an alternative to picking changes, so not
     // next to Apply (where it would read as applying the picked ones). Explained on hover.
     auto* top = new QHBoxLayout;
-    const QString header = summary(suggestions_);
+    const QString header = statusLine(suggestions_);
     if (!header.isEmpty()) {
         auto* label = new QLabel(header, this);
+        label->setObjectName(QStringLiteral("shrinkStatus"));
         label->setWordWrap(true);
+        label->setToolTip(statusTooltip(suggestions_));
         top->addWidget(label, 1);
     } else {
         top->addStretch(1);
@@ -111,20 +162,17 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
         top->addWidget(fitAll, 0, Qt::AlignTop);
     }
     layout->addLayout(top);
-    auto* headingLabel =
-        new QLabel(heading + QStringLiteral(" ") + tr("(Ctrl+click or Shift+click picks several.)"),
-                   this);
-    headingLabel->setWordWrap(true);
+    // The caller's long heading is the tooltip; the label says what the list is.
+    auto* headingLabel = new QLabel(canDismiss ? tr("Findings:") : tr("Changes:"), this);
+    headingLabel->setToolTip(heading);
     layout->addWidget(headingLabel);
 
     list_ = new QListWidget(this);
     for (std::size_t i = 0; i < suggestions_.proposals.size(); ++i) {
         const auto& proposal = suggestions_.proposals[i];
-        // "57 fair: the pre-chorus repeats ... — saves 1 line (small paper only)"
-        // A correction (check) has no score: only shrink's proposals are rated.
-        QString text = proposal.grade == "correction"
-                           ? QString()
-                           : tr("%1 %2: ").arg(proposal.score).arg(toQString(proposal.grade));
+        // "the pre-chorus repeats ... — saves 1 line (small paper only)", best first; only a
+        // last resort is marked.
+        QString text = proposal.grade == "last resort" ? tr("last resort: ") : QString();
         text += toQString(proposal.description);
         if (proposal.gainLines > 0) // a restructuring saves nothing by itself
             text += QStringLiteral(" — ") + tr("saves %n line(s)", nullptr, proposal.gainLines);
@@ -135,6 +183,7 @@ ShrinkDialog::ShrinkDialog(const zub::songsuggest::Suggestions& suggestions,
             item->setToolTip(tr("Line %1").arg(proposal.line));
     }
     list_->setWordWrap(true);
+    list_->setToolTip(tr("Ctrl+click or Shift+click picks several."));
     list_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     outline_ = new QTextBrowser(this);
     outline_->setOpenLinks(false);
