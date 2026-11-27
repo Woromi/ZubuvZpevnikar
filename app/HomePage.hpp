@@ -8,6 +8,7 @@
 
 class QAction;
 class QGroupBox;
+class QToolButton;
 class QGridLayout;
 class QLabel;
 class QListWidget;
@@ -84,8 +85,9 @@ private:
     QPushButton* wishOpen_ = nullptr;
     QPushButton* wishDone_ = nullptr;
     QPushButton* wishNew_ = nullptr;
-    QPushButton* wishRemove_ = nullptr;
-    QPushButton* wishMove_ = nullptr;
+    QAction* wishRemove_ = nullptr; // in the More menu and the list's right-click menu
+    QAction* wishMove_ = nullptr;
+    QToolButton* wishMore_ = nullptr;
     QPushButton* wishAdd_ = nullptr;
     std::vector<HomeWish> wishList_;
     int columns_ = 0;

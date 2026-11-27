@@ -12,6 +12,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QListWidget>
+#include <QMenu>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollArea>
@@ -96,22 +97,35 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
     wishDone_ = new QPushButton(tr("Done", "a wish is fulfilled"), wishesCard_);
     wishDone_->setToolTip(tr("The song is in the library: a book's wish becomes the song in that "
                              "book, a wish of the wish list goes"));
-    wishMove_ = new QPushButton(tr("Move to Wish List"), wishesCard_);
+    // Rarer: in a menu behind the row's More button, and on right-click.
+    wishMove_ = new QAction(tr("Move to Wish List"), wishesCard_);
     wishMove_->setToolTip(tr("Move this wish from its songbook (a % TODO: line) to the wish list "
                              "(wishes.txt)"));
-    wishRemove_ = new QPushButton(tr("Remove", "a wish"), wishesCard_);
+    wishRemove_ = new QAction(QIcon::fromTheme(QStringLiteral("edit-delete")),
+                              tr("Remove", "a wish"), wishesCard_);
     wishRemove_->setToolTip(tr("Remove the wish (its line)"));
+    auto* moreMenu = new QMenu(wishesCard_);
+    moreMenu->setToolTipsVisible(true);
+    moreMenu->addAction(wishMove_);
+    moreMenu->addAction(wishRemove_);
+    wishMore_ = new QToolButton(wishesCard_);
+    wishMore_->setText(QStringLiteral("⋯"));
+    wishMore_->setToolTip(tr("More"));
+    wishMore_->setMenu(moreMenu);
+    wishMore_->setPopupMode(QToolButton::InstantPopup);
+    wishes_->setContextMenuPolicy(Qt::CustomContextMenu);
     wishAdd_ = new QPushButton(tr("Add Wish…"), wishesCard_);
     wishAdd_->setToolTip(tr("A song you want: a new line of the wish list (wishes.txt in the song "
                             "library)"));
     wishNew_ = new QPushButton(tr("New Song…", "Home: write a wished song by hand"), wishesCard_);
     wishNew_->setToolTip(tr("Write the song by hand: a new song with the wish's title and artist"));
+    // Only the buttons for the selected wish show: a song still to get (Find Online, Import, New
+    // Song) or one the library has (Open Song, Done).
     wishButtons->addWidget(wishImport_);
     wishButtons->addWidget(wishNew_);
     wishButtons->addWidget(wishOpen_);
     wishButtons->addWidget(wishDone_);
-    wishButtons->addWidget(wishMove_);
-    wishButtons->addWidget(wishRemove_);
+    wishButtons->addWidget(wishMore_);
     wishButtons->addStretch(1);
     wishButtons->addWidget(wishAdd_);
     wishLayout->addLayout(wishButtons);
@@ -160,11 +174,26 @@ HomePage::HomePage(QWidget* parent) : QWidget(parent) {
         if (const HomeWish* wish = selectedWish(); wish && !wish->song.empty())
             emit wishDoneRequested(*wish);
     });
-    connect(wishMove_, &QPushButton::clicked, this, [this] {
+    connect(wishes_, &QWidget::customContextMenuRequested, this, [this](const QPoint& at) {
+        const HomeWish* wish = selectedWish();
+        if (!wish || !wishes_->itemAt(at))
+            return;
+        QMenu menu(this);
+        for (QPushButton* button : {wishSearch_, wishImport_, wishNew_, wishOpen_, wishDone_})
+            if (button->isVisible() && button->isEnabled())
+                connect(menu.addAction(button->text()), &QAction::triggered, button,
+                        &QPushButton::click);
+        menu.addSeparator();
+        for (QAction* action : {wishMove_, wishRemove_})
+            if (action->isVisible() && action->isEnabled())
+                menu.addAction(action);
+        menu.exec(wishes_->viewport()->mapToGlobal(at));
+    });
+    connect(wishMove_, &QAction::triggered, this, [this] {
         if (const HomeWish* wish = selectedWish(); wish && !wish->bookId.isEmpty())
             emit wishMoveRequested(*wish);
     });
-    connect(wishRemove_, &QPushButton::clicked, this, [this] {
+    connect(wishRemove_, &QAction::triggered, this, [this] {
         if (const HomeWish* wish = selectedWish())
             emit wishRemoveRequested(*wish);
     });
@@ -335,16 +364,16 @@ const HomeWish* HomePage::selectedWish() const {
 
 void HomePage::updateWishButtons() {
     const HomeWish* wish = selectedWish();
-    wishSearch_->setEnabled(wish != nullptr);
-    wishImport_->setEnabled(wish != nullptr);
-    wishOpen_->setEnabled(wish && !wish->song.empty());
-    wishDone_->setEnabled(wish && !wish->song.empty());
-    wishNew_->setEnabled(wish && wish->song.empty());
+    const bool inLibrary = wish && !wish->song.empty();
+    for (QPushButton* button : {wishSearch_, wishImport_, wishNew_}) {
+        button->setVisible(!inLibrary);
+        button->setEnabled(wish != nullptr);
+    }
+    wishOpen_->setVisible(inLibrary);
+    wishDone_->setVisible(inLibrary);
     wishRemove_->setEnabled(wish != nullptr);
-    wishMove_->setVisible(std::ranges::any_of(wishList_, [](const HomeWish& w) {
-        return !w.bookId.isEmpty();
-    })); // only while a book has wishes
-    wishMove_->setEnabled(wish && !wish->bookId.isEmpty());
+    wishMove_->setVisible(wish && !wish->bookId.isEmpty()); // a book's wish only
+    wishMore_->setEnabled(wish != nullptr);
 }
 
 void HomePage::placeCards() {

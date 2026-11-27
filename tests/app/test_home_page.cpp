@@ -117,9 +117,10 @@ TEST_CASE("Home: the app starts on Home with the songbook's cards", "[app][home]
     REQUIRE(titleOnly != nullptr);
     CHECK(inLibrary->text(0).contains("in the library"));
     wishes->setCurrentItem(titleOnly);
-    CHECK(!A::homeWishOpen(*w.page)->isEnabled());
+    // Only the buttons that fit the wish show.
+    CHECK(A::homeWishOpen(*w.page)->isHidden());
     wishes->setCurrentItem(inLibrary);
-    REQUIRE(A::homeWishOpen(*w.page)->isEnabled());
+    REQUIRE(!A::homeWishOpen(*w.page)->isHidden());
     A::homeWishOpen(*w.page)->click();
     REQUIRE(A::editor(w.window) != nullptr);
     CHECK(A::editor(w.window)->path() == fixture / "songs/chords/Abba/OurLastSummer.tex");
