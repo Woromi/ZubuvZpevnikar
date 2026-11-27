@@ -66,9 +66,7 @@ PreviewPane::PreviewPane(QWidget* parent)
     layout->addWidget(view_, 1);
     layout->addWidget(errors_);
 
-    auto* shortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+R")), this);
-    shortcut->setContext(Qt::WindowShortcut);
-    connect(shortcut, &QShortcut::activated, this, &PreviewPane::rebuildRequested);
+    // Ctrl+R: View > Rebuild Preview (MainWindow).
 
     connect(classes_, &QComboBox::currentTextChanged, this, &PreviewPane::documentClassChanged);
     connect(rebuild_, &QToolButton::clicked, this, &PreviewPane::rebuildRequested);

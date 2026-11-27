@@ -327,6 +327,15 @@ void MainWindow::createMenus() {
             editorfont::setSizeStep(change == 0 ? 0 : editorfont::sizeStep() + change, this);
         });
     };
+    // Ctrl+R: the song's PDF on the song tab, the score's on a score tab (the score tab's own
+    // action); never both enabled.
+    rebuildPreviewAction_ = view->addAction(tr("&Rebuild Preview"));
+    rebuildPreviewAction_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_R));
+    rebuildPreviewAction_->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+    songPage_->addAction(rebuildPreviewAction_);
+    connect(rebuildPreviewAction_, &QAction::triggered, this, [this] { requestPreview(true); });
+    view->addAction(scores_->rebuildAction());
+    view->addSeparator();
     textSize(tr("&Bigger Text"), QKeySequence::ZoomIn, +1);
     textSize(tr("S&maller Text"), QKeySequence::ZoomOut, -1);
     QAction* normalSize = view->addAction(tr("&Normal Text Size"));
@@ -557,6 +566,22 @@ void MainWindow::createCentralWidget() {
         new SongbooksPage(model_, songbookSorter_, songbookExporter_, *repository_, pages_);
     connect(songbooksPage_, &SongbooksPage::openSongRequested, this,
             [this](const std::filesystem::path& path) { openExistingSong(path); });
+    // Ctrl+Z / Ctrl+Y on the Songbooks page undo its book edits (its LaTeX editor and line edits
+    // keep their own: a text widget takes its undo key first).
+    for (const auto& [key, undo] :
+         {std::pair{QKeySequence::Undo, true}, std::pair{QKeySequence::Redo, false}}) {
+        auto* action = new QAction(songbooksPage_);
+        action->setShortcuts(key);
+        action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+        connect(action, &QAction::triggered, this, [this, undo] {
+            if (undo)
+                songbooksPage_->undo();
+            else
+                songbooksPage_->redo();
+        });
+        songbooksPage_->addAction(action);
+    }
+    connect(songbooksPage_, &SongbooksPage::historyChanged, this, &MainWindow::updateEditState);
     connect(songbookExporter_, &SongbookExporter::finished, this,
             [this](const QString& message) { statusBar()->showMessage(message, 15000); });
 
@@ -1297,6 +1322,15 @@ void MainWindow::createSongToolBar() {
         songMenu_->addAction(action);
     songMenu_->addSeparator();
     songMenu_->addAction(newScoreAction_);
+    songMenu_->addAction(scores_->playAction()); // Ctrl+Space, on a score tab
+
+    // The score tab's window keys work on the song page only (Ctrl+R is the Songbooks
+    // page's Build there).
+    for (QAction* action : {scores_->insertStagedAction(), scores_->clearStagedAction(),
+                            scores_->playAction(), scores_->rebuildAction()}) {
+        action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+        songPage_->addAction(action);
+    }
 
     static_cast<QVBoxLayout*>(songPage_->layout())->insertWidget(0, songToolBar_);
 }
@@ -1309,7 +1343,15 @@ void MainWindow::createEditMenu() {
                                          QKeySequence::StandardKey shownKey, auto&& slot) {
         auto* action = edit->addAction(QIcon::fromTheme(icon), text);
         keytips::setShownKey(action, QKeySequence(shownKey));
-        connect(action, &QAction::triggered, this, [this, slot] {
+        connect(action, &QAction::triggered, this, [this, slot, action] {
+            // The Songbooks page: Undo and Redo of its book edits.
+            if (pages_->currentWidget() == songbooksPage_) {
+                if (action == undoAction_)
+                    songbooksPage_->undo();
+                else if (action == redoAction_)
+                    songbooksPage_->redo();
+                return;
+            }
             if (SongEditor* editor = currentEditor())
                 slot(editor->textEdit());
         });
@@ -1427,6 +1469,10 @@ void MainWindow::createEditMenu() {
     newScoreAction_ = new QAction(tr("New &Score…"), this);
     connect(newScoreAction_, &QAction::triggered, this, [this] { scores_->newScore(); });
     songEditActions_.push_back(newScoreAction_);
+    // The notes picked on a score tab's fretboard (Alt+N; Escape clears on the tab).
+    edit->addSeparator();
+    edit->addAction(scores_->insertStagedAction());
+    edit->addAction(scores_->clearStagedAction());
 }
 
 void MainWindow::showFind(bool replaceMode) {
@@ -1533,6 +1579,24 @@ bool MainWindow::anyModified() const {
 }
 
 void MainWindow::updateEditState() {
+    // "Undo remove 2 songs" on the Songbooks page, plain "Undo" elsewhere.
+    const bool books = pages_->currentWidget() == songbooksPage_;
+    const auto name = [](QAction* action, const QString& plain, const QString& step,
+                         QKeySequence::StandardKey key) {
+        action->setText(step.isEmpty() ? plain : plain + QLatin1Char(' ') + step);
+        keytips::setShownKey(action, QKeySequence(key));
+    };
+    name(undoAction_, tr("&Undo"), books ? songbooksPage_->undoText() : QString(),
+         QKeySequence::Undo);
+    name(redoAction_, tr("&Redo"), books ? songbooksPage_->redoText() : QString(),
+         QKeySequence::Redo);
+    if (books) {
+        undoAction_->setEnabled(songbooksPage_->canUndo());
+        redoAction_->setEnabled(songbooksPage_->canRedo());
+        for (QAction* action : {cutAction_, copyAction_, pasteAction_})
+            action->setEnabled(false);
+        return;
+    }
     SongEditor* current = currentEditor();
     if (!current) {
         for (QAction* action : {undoAction_, redoAction_, cutAction_, copyAction_, pasteAction_})
@@ -1560,6 +1624,7 @@ void MainWindow::updateSongActions() {
     for (QAction* button : songOnlyButtons_)
         button->setVisible(songTab); // Mark Checked's: updateMarkChecked
     closeSongAction_->setEnabled(open);
+    rebuildPreviewAction_->setEnabled(open && songTab);
     // Ctrl+Shift+B: on the song page only (on the list, its right-click menu takes the selected).
     addToBooksAction_->setEnabled(open && !editor_->isNew() && !songbookRoot_.empty() &&
                                   onSongPage());

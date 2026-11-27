@@ -811,7 +811,7 @@ TEST_CASE("Score tab: Alt+N inserts staged notes, Ctrl+Return opens a line", "[a
     s.go("e16\\4 g\\3 |\n    }", 11);
     auto* act = A::scores(s.window)->insertStagedAction();
     CHECK(act->shortcut() == QKeySequence(Qt::ALT | Qt::Key_N));
-    CHECK(act->shortcutContext() == Qt::WindowShortcut);
+    CHECK(act->shortcutContext() == Qt::WidgetWithChildrenShortcut); // the song page (MainWindow)
     CHECK(!act->isEnabled());
     fb->stage(1, 3);
     CHECK(act->isEnabled());

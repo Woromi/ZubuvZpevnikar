@@ -289,6 +289,7 @@ private:
     QAction* pasteAction_ = nullptr;
     QAction* newScoreAction_ = nullptr; // Song > New Score…
     QMenu* songMenu_ = nullptr;
+    QAction* rebuildPreviewAction_ = nullptr; // View > Rebuild Preview (Ctrl+R): the song's PDF
     // The song toolbar's song-only group (hidden on a score tab) and Mark Checked's button.
     std::vector<QAction*> songOnlyButtons_;
     QAction* markCheckedButton_ = nullptr;

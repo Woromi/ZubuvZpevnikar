@@ -86,10 +86,21 @@ TEST_CASE("Songbooks page: undo and redo of a removed song", "[app][songbooks]")
     CHECK(slurp(big) == removed);
     CHECK(!w.page->canRedo());
 
-    // The page has no Ctrl+Z of its own any more (the Edit menu's key does it).
+    // Ctrl+Z on the page undoes the book edit; Edit > Undo names it.
     A::tree(*w.page)->setFocus();
     QTest::keyClick(A::tree(*w.page), Qt::Key_Z, Qt::ControlModifier);
-    CHECK(slurp(big) == removed);
+    CHECK(slurp(big) == original);
+    QAction* undoMenu = nullptr;
+    for (QAction* action : w.window.findChildren<QAction*>())
+        if (action->text().startsWith(QStringLiteral("&Undo")))
+            undoMenu = action;
+    REQUIRE(undoMenu != nullptr);
+    CHECK_FALSE(undoMenu->isEnabled());
+    w.page->redo();
+    CHECK(undoMenu->isEnabled());
+    CHECK(undoMenu->text().startsWith(QStringLiteral("&Undo remove 1 song")));
+    undoMenu->trigger();
+    CHECK(slurp(big) == original);
 }
 
 TEST_CASE("Songbooks page: edits are named in the history", "[app][songbooks]") {
