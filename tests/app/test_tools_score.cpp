@@ -246,9 +246,15 @@ TEST_CASE("Score preview mouse: click, drag, Shift+click and double-click select
 
     // Drag from a note in the first system onto the second system.
     const std::size_t evFrom = s.eventOfText("h,\\5 <d");
-    const std::size_t evTo = s.eventOfText("e,\\6 h,\\5 e\\4>4 e'\\1 g'\\1") + 1;
-    const QPoint from = s.widgetOf(evFrom), to = s.behind(evTo);
-    CHECK(to.y() > from.y() + 40); // another system
+    // A note of the next system (where the lines wrap depends on the preview's width).
+    const QPoint from = s.widgetOf(evFrom);
+    std::size_t evTo = evFrom + 4;
+    const auto& linked = A::eventLink(s.window);
+    while (evTo + 1 < A::scoreEvents(s.window).size() &&
+           (!linked.contains(evTo) || s.behind(evTo).y() <= from.y() + 40))
+        ++evTo;
+    const QPoint to = s.behind(evTo);
+    REQUIRE(to.y() > from.y() + 40); // another system
     QTest::mousePress(s.view, Qt::LeftButton, Qt::NoModifier, from);
     QTest::mouseMove(s.view, s.widgetOf(evFrom + 2));
     QTest::mouseMove(s.view, s.widgetOf(evFrom + 3) + QPoint(0, 25));

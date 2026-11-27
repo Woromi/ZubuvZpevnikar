@@ -102,6 +102,9 @@ void SongbookCheck::start() {
     if (shown != all) { // nothing filtered: there is no choice to make
         layout->addWidget(allSongs);
         layout->addWidget(shownSongs);
+    } else {
+        allSongs->hide(); // outside the layout they would sit over the dialog's top left
+        shownSongs->hide();
     }
     if (hooks_.unsavedEdits && hooks_.unsavedEdits())
         layout->addWidget(new QLabel(tr("Unsaved edits are not scanned."), &dialog));
